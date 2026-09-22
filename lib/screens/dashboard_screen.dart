@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -275,37 +276,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Overview',
+      extendBody: true,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xCC1B211E),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: NavigationBar(
+                height: 72,
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                indicatorColor: const Color(0x5535A968),
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (index) =>
+                    setState(() => _selectedIndex = index),
+                labelTextStyle: WidgetStatePropertyAll(
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard),
+                    label: 'Overview',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.wb_sunny_outlined),
+                    selectedIcon: Icon(Icons.wb_sunny),
+                    label: 'PV',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.power_outlined),
+                    selectedIcon: Icon(Icons.power),
+                    label: 'AC',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.battery_5_bar_outlined),
+                    selectedIcon: Icon(Icons.battery_full),
+                    label: 'Battery',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.videocam_outlined),
+                    selectedIcon: Icon(Icons.videocam),
+                    label: 'CCTV',
+                  ),
+                ],
+              ),
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.wb_sunny_outlined),
-            selectedIcon: Icon(Icons.wb_sunny),
-            label: 'PV',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.power_outlined),
-            selectedIcon: Icon(Icons.power),
-            label: 'AC',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.battery_5_bar_outlined),
-            selectedIcon: Icon(Icons.battery_full),
-            label: 'Battery',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.videocam_outlined),
-            selectedIcon: Icon(Icons.videocam),
-            label: 'CCTV',
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -637,13 +664,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 25,
+                            reservedSize: 30,
                             interval: _timeInterval(series),
-                            getTitlesWidget: (value, meta) => Text(
-                              _axisTime(value),
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFFB7C4BD),
+                            getTitlesWidget: (value, meta) => SideTitleWidget(
+                              axisSide: meta.axisSide,
+                              space: 6,
+                              child: SizedBox(
+                                width: 32,
+                                child: Text(
+                                  _axisTime(value),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 8,
+                                    color: Color(0xFFB7C4BD),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -709,7 +744,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (_maxY(series) - _minY(series)) / 3;
 
   double _timeInterval(List<_ChartSeries> series) {
-    final interval = (_maxX(series) - _minX(series)) / 4;
+    final interval = (_maxX(series) - _minX(series)) / 3;
     return interval == 0 ? 1 : interval;
   }
 
