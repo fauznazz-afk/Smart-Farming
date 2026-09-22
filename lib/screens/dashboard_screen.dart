@@ -350,11 +350,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String get _pageTitle => const [
-    'PLTS Monitoring',
-    'PV Monitoring',
-    'AC Monitoring',
-    'Battery Monitoring',
-    'CCTV Monitoring',
+    'EnerGrow',
+    'PV monitoring',
+    'AC monitoring',
+    'Battery monitoring',
+    'CCTV monitoring',
   ][_selectedIndex];
 
   List<Widget> get _pageContent {
@@ -390,7 +390,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return [CctvScreen(streamUrl: _cctvUrl)];
       default:
         return [
-          _sectionTitle('LIVE ENERGY SOURCES'),
+          _sectionTitle('Live energy sources'),
           _summaryTile(
             'PV',
             _pzem,
@@ -410,7 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Icons.battery_full,
             3,
           ),
-          _sectionTitle('ENVIRONMENT'),
+          _sectionTitle('Environment'),
           _telemetryCard(_sensor, _envTheme, [
             _MetricDef(
               'temp_dht',
@@ -439,9 +439,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String prefix,
     List<_MetricDef> metrics,
   ) => [
-    _sectionTitle('$name STATUS'),
+    _sectionTitle('$name status'),
     _telemetryCard(data, theme, metrics),
-    _sectionTitle('$name · LAST 24 HOURS'),
+    _sectionTitle('$name · Last 24 hours'),
     _chartCard(theme, prefix),
   ];
 

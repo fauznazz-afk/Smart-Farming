@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const BrandLogo(size: 116, showName: true),
               const SizedBox(height: 28),
               const Text(
-                'PLTS Monitoring',
+                'EnerGrow',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 32),
