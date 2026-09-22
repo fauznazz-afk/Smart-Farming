@@ -325,7 +325,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onDestinationSelected: (index) =>
                     setState(() => _selectedIndex = index),
                 labelTextStyle: WidgetStatePropertyAll(
-                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  const TextStyle(
+                    fontSize: 10,
+                    height: 1.1,
+                    letterSpacing: 0.1,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 destinations: const [
                   NavigationDestination(
@@ -394,7 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
           _MetricDef(
             'soc',
-            'State of charge',
+            'State Of Charge',
             '%',
             Icons.battery_charging_full,
           ),
@@ -403,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return [CctvScreen(streamUrl: _cctvUrl)];
       default:
         return [
-          _sectionTitle('Live energy sources'),
+          _sectionTitle('Live Energy Sources'),
           _summaryTile(
             'PV',
             _pzem,
@@ -415,7 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           _summaryTile('AC', _pzem, _acTheme, 'power_ac', 'W', Icons.power, 2),
           _summaryTile(
-            'BATTERY',
+            'Battery',
             _battery,
             _batteryTheme,
             'soc',
@@ -452,9 +457,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String prefix,
     List<_MetricDef> metrics,
   ) => [
-    _sectionTitle('$name status'),
+    _sectionTitle('$name Status'),
     _telemetryCard(data, theme, metrics),
-    _sectionTitle('$name · Last 24 hours'),
+    _sectionTitle('$name · Last 24 Hours'),
     _chartCard(theme, prefix),
   ];
 

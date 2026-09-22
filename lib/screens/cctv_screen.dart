@@ -45,7 +45,7 @@ class _CctvScreenState extends State<CctvScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
           child: Text(
-            'CCTV monitoring',
+            'CCTV Monitoring',
             style: Theme.of(context).textTheme.labelLarge
                 ?.copyWith(letterSpacing: 1.1),
           ),
