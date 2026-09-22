@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../services/thingsboard_api.dart';
+import '../theme/app_theme_controller.dart';
 import 'dashboard_screen.dart';
 import '../widgets/brand_logo.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AppThemeController themeController;
+
+  const LoginScreen({super.key, required this.themeController});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -36,7 +39,12 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => DashboardScreen(api: _api)),
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(
+              api: _api,
+              themeController: widget.themeController,
+            ),
+          ),
         );
       } else {
         setState(() => _errorMsg = 'Username atau password salah');

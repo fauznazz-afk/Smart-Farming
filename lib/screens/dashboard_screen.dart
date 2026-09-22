@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
+import '../theme/app_theme_controller.dart';
 import '../widgets/brand_logo.dart';
 import 'cctv_screen.dart';
 import 'login_screen.dart';
@@ -42,7 +43,12 @@ const _envTheme = _SectionTheme(
 
 class DashboardScreen extends StatefulWidget {
   final ThingsBoardApi api;
-  const DashboardScreen({super.key, required this.api});
+  final AppThemeController themeController;
+  const DashboardScreen({
+    super.key,
+    required this.api,
+    required this.themeController,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -119,7 +125,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(
+            builder: (_) =>
+                LoginScreen(themeController: widget.themeController),
+          ),
           (_) => false,
         );
         return;
@@ -212,7 +221,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(themeController: widget.themeController),
+      ),
       (_) => false,
     );
   }
@@ -220,7 +231,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openSettings() async {
     final changed = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(themeController: widget.themeController),
+      ),
     );
     if (changed == true) _loadPreferences();
   }
@@ -307,7 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 backgroundColor: Colors.transparent,
                 surfaceTintColor: Colors.transparent,
                 elevation: 0,
-                indicatorColor: const Color(0x6635A968),
+                indicatorColor: const Color(0x33FFFFFF),
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (index) =>
                     setState(() => _selectedIndex = index),
@@ -351,10 +364,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String get _pageTitle => const [
     'EnerGrow',
-    'PV monitoring',
-    'AC monitoring',
-    'Battery monitoring',
-    'CCTV monitoring',
+    'PV Monitoring',
+    'AC Monitoring',
+    'Battery Monitoring',
+    'CCTV Monitoring',
   ][_selectedIndex];
 
   List<Widget> get _pageContent {

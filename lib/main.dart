@@ -4,53 +4,78 @@ import 'package:flutter/services.dart';
 import 'services/thingsboard_api.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
 
 void main() {
   runApp(const PltsMonitoringApp());
 }
 
-class PltsMonitoringApp extends StatelessWidget {
+class PltsMonitoringApp extends StatefulWidget {
   const PltsMonitoringApp({super.key});
 
   @override
+  State<PltsMonitoringApp> createState() => _PltsMonitoringAppState();
+}
+
+class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
+  final _themeController = AppThemeController();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeController.load();
+  }
+
+  @override
+  void dispose() {
+    _themeController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'EnerGrow',
-      debugShowCheckedModeBanner: false,
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Color(0xFF101412),
-          statusBarIconBrightness: Brightness.light,
-          systemNavigationBarColor: Color(0xFF101412),
-          systemNavigationBarIconBrightness: Brightness.light,
-          systemNavigationBarDividerColor: Color(0xFF101412),
-          systemNavigationBarContrastEnforced: false,
+    return AnimatedBuilder(
+      animation: _themeController,
+      builder: (context, _) => MaterialApp(
+        title: 'EnerGrow',
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Color(0xFF101412),
+            statusBarIconBrightness: Brightness.light,
+            systemNavigationBarColor: Color(0xFF101412),
+            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarDividerColor: Color(0xFF101412),
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: child!,
         ),
-        child: child!,
-      ),
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFF4B942),
+        theme: ThemeData(
+          useMaterial3: true,
           brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: _themeController.seedColor,
+            brightness: Brightness.dark,
+          ),
+          scaffoldBackgroundColor: const Color(0xFF101412),
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: true,
+            fillColor: Color(0xFF1B211E),
+            border: OutlineInputBorder(),
+          ),
         ),
-        scaffoldBackgroundColor: const Color(0xFF101412),
-        inputDecorationTheme: const InputDecorationTheme(
-          filled: true,
-          fillColor: Color(0xFF1B211E),
-          border: OutlineInputBorder(),
-        ),
+        home: _SplashRouter(themeController: _themeController),
       ),
-      home: const _SplashRouter(),
     );
   }
 }
 
 /// Cek dulu apakah ada token tersimpan sebelum nentuin ke Login atau Dashboard
 class _SplashRouter extends StatefulWidget {
-  const _SplashRouter();
+  final AppThemeController themeController;
+
+  const _SplashRouter({required this.themeController});
 
   @override
   State<_SplashRouter> createState() => _SplashRouterState();
@@ -92,6 +117,8 @@ class _SplashRouterState extends State<_SplashRouter> {
         ),
       );
     }
-    return _hasToken ? DashboardScreen(api: _api) : const LoginScreen();
+    return _hasToken
+        ? DashboardScreen(api: _api, themeController: widget.themeController)
+        : LoginScreen(themeController: widget.themeController);
   }
 }

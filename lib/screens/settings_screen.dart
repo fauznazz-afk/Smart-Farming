@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_theme_controller.dart';
+
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
+const appVersion = '1.0.0+1';
+
+const _paletteOptions = <String, Color>{
+  'EnerGrow green': Color(0xFF35A968),
+  'Solar amber': Color(0xFFF4B942),
+  'Ocean cyan': Color(0xFF2AA7A1),
+  'Forest teal': Color(0xFF2E7D65),
+};
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final AppThemeController themeController;
+
+  const SettingsScreen({super.key, required this.themeController});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -14,10 +26,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cctvUrlController = TextEditingController(text: defaultCctvUrl);
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
+  Color _selectedSeed = AppThemeController.defaultSeed;
 
   @override
   void initState() {
     super.initState();
+    _selectedSeed = widget.themeController.seedColor;
     _loadSettings();
   }
 
@@ -35,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
       _cctvUrlController.text =
           preferences.getString('cctv_url') ?? defaultCctvUrl;
+      _selectedSeed = widget.themeController.seedColor;
     });
   }
 
@@ -65,6 +80,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text('Monitoring preferences'),
             subtitle: Text('Control how often live telemetry is refreshed.'),
           ),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('App color'),
+            subtitle: Text('Choose the accent palette used across EnerGrow.'),
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _paletteOptions.entries.map((entry) {
+              final selected =
+                  _selectedSeed.toARGB32() == entry.value.toARGB32();
+              return ChoiceChip(
+                label: Text(entry.key),
+                selected: selected,
+                avatar: CircleAvatar(backgroundColor: entry.value),
+                onSelected: (_) {
+                  setState(() => _selectedSeed = entry.value);
+                  widget.themeController.setSeedColor(entry.value);
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Auto refresh telemetry'),
@@ -107,6 +145,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: _saveSettings,
             icon: const Icon(Icons.save),
             label: const Text('Save settings'),
+          ),
+          const SizedBox(height: 28),
+          const Divider(),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline),
+            title: Text('About'),
+            subtitle: Text('EnerGrow monitoring application'),
+            trailing: Text('v$appVersion'),
           ),
         ],
       ),
