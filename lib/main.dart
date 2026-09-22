@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'services/thingsboard_api.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'widgets/brand_logo.dart';
 
 void main() {
   runApp(const PltsMonitoringApp());
@@ -66,7 +68,16 @@ class _SplashRouterState extends State<_SplashRouter> {
   Widget build(BuildContext context) {
     if (_checking) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BrandLogo(size: 92, showName: true),
+              SizedBox(height: 24),
+              CircularProgressIndicator(),
+            ],
+          ),
+        ),
       );
     }
     return _hasToken ? DashboardScreen(api: _api) : const LoginScreen();

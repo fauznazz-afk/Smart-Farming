@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../services/thingsboard_api.dart';
 import 'dashboard_screen.dart';
+import '../widgets/brand_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -49,14 +51,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.solar_power, size: 64, color: Colors.orange),
-              const SizedBox(height: 16),
+              const BrandLogo(size: 116, showName: true),
+              const SizedBox(height: 28),
               const Text(
                 'PLTS Monitoring',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -82,7 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_errorMsg != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(_errorMsg!, style: const TextStyle(color: Colors.red)),
+                  child: Text(
+                    _errorMsg!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 ),
               SizedBox(
                 width: double.infinity,
