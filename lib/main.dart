@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'services/thingsboard_api.dart';
 import 'screens/login_screen.dart';
@@ -17,6 +18,17 @@ class PltsMonitoringApp extends StatelessWidget {
     return MaterialApp(
       title: 'PLTS Monitoring',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Color(0xFF101412),
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Color(0xFF101412),
+          systemNavigationBarIconBrightness: Brightness.light,
+          systemNavigationBarDividerColor: Color(0xFF101412),
+          systemNavigationBarContrastEnforced: false,
+        ),
+        child: child!,
+      ),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
