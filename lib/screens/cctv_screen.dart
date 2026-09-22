@@ -72,13 +72,6 @@ class _CctvScreenState extends State<CctvScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Source: ${widget.streamUrl}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
       ],
     );
   }

@@ -131,7 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _fetchHistory() async {
-    setState(() => _chartLoading = true);
+    if (_history.isEmpty) setState(() => _chartLoading = true);
     final requests = <String, Future<List<TelemetryPoint>>>{
       'battery_voltage': widget.api.fetchHistory(
         ThingsBoardApi.deviceBattery,
@@ -166,12 +166,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'pv_power': widget.api.fetchHistory(
         ThingsBoardApi.devicePzem,
         'power_dc',
-        start: _dayAgo,
-        end: DateTime.now(),
-      ),
-      'pv_energy': widget.api.fetchHistory(
-        ThingsBoardApi.devicePzem,
-        'energy_dc',
         start: _dayAgo,
         end: DateTime.now(),
       ),
@@ -329,7 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return _sourcePage('PV', _pzem, _pvTheme, 'pv', [
           _MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
-          _MetricDef('current_dc', 'Current', 'A', Icons.electric_bolt),
+          _MetricDef('current_dc', 'Current', 'A', Icons.swap_horiz),
           _MetricDef('power_dc', 'Power', 'W', Icons.wb_sunny),
           _MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
         ]);
@@ -571,12 +565,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Color(0xFFFFC857),
       ),
       _ChartSeries('Power', _history['${prefix}_power'] ?? [], theme.accent),
-      if (prefix == 'pv')
-        _ChartSeries(
-          'Energy',
-          _history['pv_energy'] ?? [],
-          const Color(0xFF8EE28E),
-        ),
     ];
     final hasData = series.any((item) => item.points.isNotEmpty);
     return Container(
