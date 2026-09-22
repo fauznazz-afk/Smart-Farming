@@ -9,10 +9,14 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 ## Fitur (MVP)
 
 - **Login** menggunakan akun ThingsBoard (JWT, auto-redirect saat token expired)
-- **Dashboard real-time** — 3 section: Battery, Smart Meter PV & AC, Environment
+- **Dashboard real-time** dengan navigasi Overview, PV, AC, dan Battery
+- **Chart histori 24 jam** untuk Voltage, Current, dan Power pada tiap sumber energi
 - **Auto-refresh** tiap 10 detik + pull-to-refresh manual
 - **UI grouped-list** bergaya fluid, dengan skema warna semantik per section
-- **(Roadmap)** Grafik historis, CCTV live view, push notification, integrasi Google Sheets
+- **Indikator data stale** yang menampilkan usia telemetry terakhir
+- **(Roadmap)** CCTV live view, push notification, integrasi Google Sheets
+
+Versi rilis saat ini: **1.0.0 (build 1)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -99,6 +103,28 @@ Pastikan semua item bertanda `[✓]` sebelum lanjut.
    ```bash
    flutter install
    ```
+
+### Instal APK Release
+
+APK release tersedia pada GitHub Release project ini. Unduh file `app-release.apk` dari halaman Releases, lalu buka file tersebut pada perangkat Android. Jika Android meminta izin, aktifkan instalasi dari sumber ini untuk aplikasi yang digunakan membuka APK.
+
+Untuk membangun APK sendiri:
+
+```bash
+flutter build apk --release
+```
+
+File hasil build:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Checksum SHA-256 dapat dibuat untuk memverifikasi file yang diunduh:
+
+```bash
+certutil -hashfile app-release.apk SHA256
+```
 
 ---
 
