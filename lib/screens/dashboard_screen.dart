@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
 import '../widgets/brand_logo.dart';
+import 'cctv_screen.dart';
 import 'login_screen.dart';
+import 'settings_screen.dart';
 
 class _SectionTheme {
   final Color bg;
@@ -52,6 +55,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _loading = true;
   bool _chartLoading = true;
+  bool _autoRefresh = true;
+  int _refreshSeconds = 10;
+  String _cctvUrl = defaultCctvUrl;
   String? _error;
   Timer? _refreshTimer;
 
@@ -59,10 +65,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _fetchAll();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _fetchAll(),
-    );
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _autoRefresh = preferences.getBool('auto_refresh') ?? true;
+      _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
+      _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
+    });
+    _restartRefreshTimer();
+  }
+
+  void _restartRefreshTimer() {
+    _refreshTimer?.cancel();
+    if (_autoRefresh) {
+      _refreshTimer = Timer.periodic(
+        Duration(seconds: _refreshSeconds),
+        (_) => _fetchAll(),
+      );
+    }
   }
 
   @override
@@ -198,6 +222,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _openSettings() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (changed == true) _loadPreferences();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -218,8 +250,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'logout') _logout();
+              if (value == 'settings') _openSettings();
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('Settings'),
+                ),
+              ),
               PopupMenuItem(value: 'logout', child: Text('Logout')),
             ],
           ),
@@ -265,6 +306,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             selectedIcon: Icon(Icons.battery_full),
             label: 'Battery',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.videocam_outlined),
+            selectedIcon: Icon(Icons.videocam),
+            label: 'CCTV',
+          ),
         ],
       ),
     );
@@ -275,6 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'PV Monitoring',
     'AC Monitoring',
     'Battery Monitoring',
+    'CCTV Monitoring',
   ][_selectedIndex];
 
   List<Widget> get _pageContent {
@@ -306,6 +353,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Icons.battery_charging_full,
           ),
         ]);
+      case 4:
+        return [CctvScreen(streamUrl: _cctvUrl)];
       default:
         return [
           _sectionTitle('LIVE ENERGY SOURCES'),
