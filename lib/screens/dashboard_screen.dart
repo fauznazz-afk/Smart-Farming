@@ -304,7 +304,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0x88263D32),
+                color: const Color(0x331F2422),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(color: Colors.white30),
                 boxShadow: const [
@@ -315,51 +315,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              child: NavigationBar(
-                height: 72,
-                backgroundColor: Colors.transparent,
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                indicatorColor: const Color(0x33FFFFFF),
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) =>
-                    setState(() => _selectedIndex = index),
-                labelTextStyle: WidgetStatePropertyAll(
-                  const TextStyle(
-                    fontSize: 10,
-                    height: 1.1,
-                    letterSpacing: 0.1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                child: Row(
+                  children: [
+                    _glassNavItem(
+                      0,
+                      Icons.dashboard_outlined,
+                      Icons.dashboard,
+                      'Overview',
+                    ),
+                    _glassNavItem(
+                      1,
+                      Icons.wb_sunny_outlined,
+                      Icons.wb_sunny,
+                      'PV',
+                    ),
+                    _glassNavItem(2, Icons.power_outlined, Icons.power, 'AC'),
+                    _glassNavItem(
+                      3,
+                      Icons.battery_5_bar_outlined,
+                      Icons.battery_full,
+                      'Battery',
+                    ),
+                    _glassNavItem(
+                      4,
+                      Icons.videocam_outlined,
+                      Icons.videocam,
+                      'CCTV',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _glassNavItem(
+    int index,
+    IconData icon,
+    IconData selectedIcon,
+    String label,
+  ) {
+    final selected = _selectedIndex == index;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => setState(() => _selectedIndex = index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            height: 54,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: selected ? const Color(0x22FFFFFF) : Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(selected ? selectedIcon : icon, size: 20),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    height: 1,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
                   ),
                 ),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(Icons.dashboard),
-                    label: 'Overview',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.wb_sunny_outlined),
-                    selectedIcon: Icon(Icons.wb_sunny),
-                    label: 'PV',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.power_outlined),
-                    selectedIcon: Icon(Icons.power),
-                    label: 'AC',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.battery_5_bar_outlined),
-                    selectedIcon: Icon(Icons.battery_full),
-                    label: 'Battery',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.videocam_outlined),
-                    selectedIcon: Icon(Icons.videocam),
-                    label: 'CCTV',
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
