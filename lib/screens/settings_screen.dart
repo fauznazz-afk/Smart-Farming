@@ -72,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) => setState(() => _autoRefresh = value),
           ),
           DropdownButtonFormField<int>(
-            value: _refreshSeconds,
+            initialValue: _refreshSeconds,
             decoration: const InputDecoration(labelText: 'Refresh interval'),
             items: const [5, 10, 30, 60]
                 .map(
