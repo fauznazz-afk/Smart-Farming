@@ -269,7 +269,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRefresh: _fetchAll,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  MediaQuery.of(context).padding.bottom + 104,
+                ),
                 children: [
                   if (_error != null) _warningBanner(),
                   ..._pageContent,
@@ -286,16 +291,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xCC1B211E),
+                color: const Color(0x88263D32),
                 borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white24),
+                border: Border.all(color: Colors.white30),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x55000000),
+                    blurRadius: 20,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
               child: NavigationBar(
                 height: 72,
                 backgroundColor: Colors.transparent,
                 surfaceTintColor: Colors.transparent,
                 elevation: 0,
-                indicatorColor: const Color(0x5535A968),
+                indicatorColor: const Color(0x6635A968),
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (index) =>
                     setState(() => _selectedIndex = index),
