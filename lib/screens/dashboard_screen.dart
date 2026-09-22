@@ -24,9 +24,9 @@ const _batteryTheme = _SectionTheme(
   Color(0xFF48D7B4),
 );
 const _pvTheme = _SectionTheme(
-  Color(0xFF453315),
-  Color(0xFFFFD27A),
-  Color(0xFFFFB938),
+  Color(0xFF26382D),
+  Color(0xFFFFD166),
+  Color(0xFFF59E0B),
 );
 const _acTheme = _SectionTheme(
   Color(0xFF3E2A20),
@@ -557,12 +557,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _ChartSeries(
         'Voltage',
         _history['${prefix}_voltage'] ?? [],
-        const Color(0xFF6FC7FF),
+        prefix == 'pv' ? const Color(0xFF4DABF7) : const Color(0xFF6FC7FF),
       ),
       _ChartSeries(
         'Current',
         _history['${prefix}_current'] ?? [],
-        const Color(0xFFFFC857),
+        prefix == 'pv' ? const Color(0xFF2EC4B6) : const Color(0xFFFFC857),
       ),
       _ChartSeries('Power', _history['${prefix}_power'] ?? [], theme.accent),
     ];
@@ -619,13 +619,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 42,
+                            reservedSize: 48,
                             interval: _chartInterval(series),
-                            getTitlesWidget: (value, meta) => Text(
-                              _axisNumber(value),
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFFB7C4BD),
+                            getTitlesWidget: (value, meta) => SideTitleWidget(
+                              axisSide: meta.axisSide,
+                              space: 4,
+                              child: Text(
+                                _axisNumber(value),
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  color: Color(0xFFB7C4BD),
+                                ),
                               ),
                             ),
                           ),
@@ -702,7 +706,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   double _chartInterval(List<_ChartSeries> series) =>
-      (_maxY(series) - _minY(series)) / 4;
+      (_maxY(series) - _minY(series)) / 3;
 
   double _timeInterval(List<_ChartSeries> series) {
     final interval = (_maxX(series) - _minX(series)) / 4;
