@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [1.1.1] - 2026-09-23
+
+### Added
+
+- Added Dark Mode & Light Mode toggle in Settings (`Appearance` section) with instant preview and persistent preference storage via `SharedPreferences`.
+- Added Material 3 Light Theme with adaptive scaffold backgrounds, high-contrast cards, and matched form styling.
+- Added adaptive semantic palette variants for Live Energy Sources (PV, AC, Battery, and Environment) for both Light and Dark modes.
+- Added adaptive styling for historical 24-hour charts (card background, gridlines, axis numbers, and line series colors) to ensure high readability in both themes.
+- Added adaptive Android status bar and navigation bar brightness styling that seamlessly follows the active theme mode.
+- Added unit and widget tests for `AppThemeController` theme mode toggling and persistence.
+
 ## [1.1.0] - 2026-09-22
 
 ### Added

@@ -40,18 +40,26 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
       builder: (context, _) => MaterialApp(
         title: 'EnerGrow',
         debugShowCheckedModeBanner: false,
-        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF101412),
-            statusBarIconBrightness: Brightness.light,
-            systemNavigationBarColor: Color(0xFF101412),
-            systemNavigationBarIconBrightness: Brightness.light,
-            systemNavigationBarDividerColor: Color(0xFF101412),
-            systemNavigationBarContrastEnforced: false,
-          ),
-          child: child!,
-        ),
+        themeMode: _themeController.themeMode,
         theme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.light,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: _themeController.seedColor,
+            brightness: Brightness.light,
+          ),
+          scaffoldBackgroundColor: const Color(0xFFF6F8F7),
+          cardTheme: const CardThemeData(
+            color: Colors.white,
+            elevation: 0,
+          ),
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: true,
+            fillColor: Color(0xFFEBEFEA),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        darkTheme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,
           colorScheme: ColorScheme.fromSeed(
@@ -59,12 +67,35 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
             brightness: Brightness.dark,
           ),
           scaffoldBackgroundColor: const Color(0xFF101412),
+          cardTheme: const CardThemeData(
+            color: Color(0xFF1B211E),
+            elevation: 0,
+          ),
           inputDecorationTheme: const InputDecorationTheme(
             filled: true,
             fillColor: Color(0xFF1B211E),
             border: OutlineInputBorder(),
           ),
         ),
+        builder: (context, child) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final navColor = isDark
+              ? const Color(0xFF101412)
+              : const Color(0xFFF6F8F7);
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarColor: navColor,
+              systemNavigationBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarDividerColor: navColor,
+              systemNavigationBarContrastEnforced: false,
+            ),
+            child: child!,
+          );
+        },
         home: _SplashRouter(themeController: _themeController),
       ),
     );

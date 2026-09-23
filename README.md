@@ -13,10 +13,11 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **Chart histori 24 jam** untuk Voltage, Current, dan Power pada tiap sumber energi
 - **Auto-refresh** tiap 10 detik + pull-to-refresh manual
 - **UI grouped-list** bergaya fluid, dengan skema warna semantik per section
+- **Dark Mode & Light Mode toggle** di menu Pengaturan dengan penyimpanan preferensi lokal
 - **Indikator data stale** yang menampilkan usia telemetry terakhir
 - **(Roadmap)** CCTV live view, push notification, integrasi Google Sheets
 
-Versi rilis saat ini: **1.0.0 (build 1)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
+Versi rilis saat ini: **1.1.1 (build 3)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
 
 ---
 

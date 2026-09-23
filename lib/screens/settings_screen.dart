@@ -88,6 +88,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const ListTile(
             contentPadding: EdgeInsets.zero,
+            title: Text('Appearance'),
+            subtitle: Text('Customize application theme and appearance.'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(
+              widget.themeController.isDarkMode
+                  ? Icons.dark_mode_outlined
+                  : Icons.light_mode_outlined,
+            ),
+            title: const Text('Dark Mode'),
+            subtitle: Text(
+              widget.themeController.isDarkMode
+                  ? 'Dark theme is active'
+                  : 'Light theme is active',
+            ),
+            value: widget.themeController.isDarkMode,
+            onChanged: (value) {
+              widget.themeController.toggleDarkMode(value);
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 12),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
             title: Text('App color'),
             subtitle: Text('Choose the accent palette used across EnerGrow.'),
           ),

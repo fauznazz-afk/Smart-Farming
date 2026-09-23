@@ -5,8 +5,9 @@ import '../services/cctv_url.dart';
 
 class CctvScreen extends StatefulWidget {
   final String streamUrl;
+  final bool active;
 
-  const CctvScreen({super.key, required this.streamUrl});
+  const CctvScreen({super.key, required this.streamUrl, this.active = true});
 
   @override
   State<CctvScreen> createState() => _CctvScreenState();
@@ -20,8 +21,22 @@ class _CctvScreenState extends State<CctvScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.active) _scheduleWebViewInitialization();
+  }
+
+  @override
+  void didUpdateWidget(covariant CctvScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active && _controller == null) {
+      _scheduleWebViewInitialization();
+    }
+  }
+
+  void _scheduleWebViewInitialization() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _initializeWebView();
+      if (mounted && widget.active && _controller == null) {
+        _initializeWebView();
+      }
     });
   }
 
