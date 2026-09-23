@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [1.2.1] - 2026-09-24
+
+### Improved
+
+- Reduced chart history loading from three requests to one request per device.
+- Smoothed the dashboard app bar blur and reduced excess scroll space.
+- Refined the date selector and grouped Settings into clear sections with System, Light, and Dark appearance options.
+
 ## [1.2.0] - 2026-09-23
 
 ### Added

@@ -5,7 +5,7 @@ import '../services/cctv_url.dart';
 import '../theme/app_theme_controller.dart';
 
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
-const appVersion = '1.1.1+3';
+const appVersion = '1.2.1';
 
 const _paletteOptions = <String, Color>{
   'EnerGrow green': Color(0xFF35A968),

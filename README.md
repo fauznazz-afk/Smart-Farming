@@ -17,7 +17,7 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **Indikator data stale** yang menampilkan usia telemetry terakhir
 - **(Roadmap)** CCTV live view, push notification, integrasi Google Sheets
 
-Versi rilis saat ini: **1.1.1 (build 3)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
+Versi rilis saat ini: **1.2.1 (build 5)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
 
 ---
 
