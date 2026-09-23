@@ -55,6 +55,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final _pageController = PageController();
   DeviceTelemetry? _battery;
   DeviceTelemetry? _pzem;
   DeviceTelemetry? _sensor;
@@ -62,6 +63,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _loading = true;
   bool _chartLoading = true;
+  bool _chartPointerActive = false;
+  bool _historyRequestInFlight = false;
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
   String _cctvUrl = defaultCctvUrl;
@@ -98,6 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -117,7 +121,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _loading = false;
         _error = null;
       });
-      unawaited(_fetchHistory());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_fetchHistory());
+      });
     } catch (error) {
       if (!mounted) return;
       if (error.toString().contains('Token expired')) {
@@ -141,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _fetchHistory() async {
+    if (_historyRequestInFlight) return;
+    _historyRequestInFlight = true;
     if (_history.isEmpty) setState(() => _chartLoading = true);
     final requests = <String, Future<List<TelemetryPoint>>>{
       'battery_voltage': widget.api.fetchHistory(
@@ -212,6 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _history.addAll(Map.fromEntries(results));
       _chartLoading = false;
     });
+    _historyRequestInFlight = false;
   }
 
   DateTime get _dayAgo => DateTime.now().subtract(const Duration(hours: 24));
@@ -278,20 +287,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null && _battery == null
           ? _errorView()
-          : RefreshIndicator(
-              onRefresh: _fetchAll,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  8,
-                  16,
-                  MediaQuery.of(context).padding.bottom + 104,
+          : PageView.builder(
+              controller: _pageController,
+              physics: _chartPointerActive
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
+              itemCount: 5,
+              onPageChanged: (index) {
+                if (_selectedIndex != index) {
+                  setState(() => _selectedIndex = index);
+                }
+              },
+              itemBuilder: (context, index) => RefreshIndicator(
+                onRefresh: _fetchAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 104,
+                  ),
+                  children: [
+                    if (_error != null) _warningBanner(),
+                    ..._pageContentFor(index),
+                  ],
                 ),
-                children: [
-                  if (_error != null) _warningBanner(),
-                  ..._pageContent,
-                ],
               ),
             ),
       extendBody: true,
@@ -368,7 +389,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         label: label,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () => setState(() => _selectedIndex = index),
+          onTap: () => _selectPage(index),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
@@ -410,8 +431,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'CCTV Monitoring',
   ][_selectedIndex];
 
-  List<Widget> get _pageContent {
-    switch (_selectedIndex) {
+  void _selectPage(int index) {
+    if (_selectedIndex == index) return;
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  List<Widget> _pageContentFor(int index) {
+    switch (index) {
       case 1:
         return _sourcePage('PV', _pzem, _pvTheme, 'pv', [
           _MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
@@ -512,7 +542,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: theme.bg,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        onTap: () => setState(() => _selectedIndex = targetIndex),
+        onTap: () => _selectPage(targetIndex),
         leading: Icon(icon, color: theme.fg),
         title: Text(
           name,
@@ -648,15 +678,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final series = [
       _ChartSeries(
         'Voltage',
+        'V',
         _history['${prefix}_voltage'] ?? [],
         prefix == 'pv' ? const Color(0xFF4DABF7) : const Color(0xFF6FC7FF),
       ),
       _ChartSeries(
         'Current',
+        'A',
         _history['${prefix}_current'] ?? [],
         prefix == 'pv' ? const Color(0xFF2EC4B6) : const Color(0xFFFFC857),
       ),
-      _ChartSeries('Power', _history['${prefix}_power'] ?? [], theme.accent),
+      _ChartSeries('Power', 'W', _history['${prefix}_power'] ?? [], theme.accent),
     ];
     final hasData = series.any((item) => item.points.isNotEmpty);
     return Container(
@@ -676,13 +708,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   spacing: 16,
                   runSpacing: 8,
                   children: series
-                      .map((item) => _legend(item.label, item.color))
+                      .map((item) => _legend(item, item.color))
                       .toList(),
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: LineChart(
-                    LineChartData(
+                  child: Listener(
+                    onPointerDown: (_) => _setChartPointerActive(true),
+                    onPointerUp: (_) => _setChartPointerActive(false),
+                    onPointerCancel: (_) => _setChartPointerActive(false),
+                    child: LineChart(
+                      LineChartData(
                       minX: _minX(series),
                       maxX: _maxX(series),
                       minY: _minY(series),
@@ -749,26 +785,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: series
-                          .map(
-                            (item) => LineChartBarData(
-                              spots: item.points
-                                  .map(
-                                    (point) => FlSpot(
-                                      point.timestamp.millisecondsSinceEpoch
-                                          .toDouble(),
-                                      point.value,
+                        borderData: FlBorderData(show: false),
+                        lineTouchData: LineTouchData(
+                          touchTooltipData: LineTouchTooltipData(
+                            getTooltipItems: (touchedSpots) => touchedSpots
+                                .map(
+                                  (spot) => LineTooltipItem(
+                                    '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
+                                    const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                  )
-                                  .toList(),
-                              isCurved: true,
-                              color: item.color,
-                              barWidth: 2.5,
-                              dotData: const FlDotData(show: false),
-                            ),
-                          )
-                          .toList(),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        lineBarsData: series
+                            .map(
+                              (item) => LineChartBarData(
+                                spots: item.points
+                                    .map(
+                                      (point) => FlSpot(
+                                        point.timestamp.millisecondsSinceEpoch
+                                            .toDouble(),
+                                        point.value,
+                                      ),
+                                    )
+                                    .toList(),
+                                isCurved: true,
+                                color: item.color,
+                                barWidth: 2.5,
+                                dotData: const FlDotData(show: false),
+                              ),
+                            )
+                            .toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -813,8 +866,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return interval == 0 ? 1 : interval;
   }
 
-  String _axisNumber(double value) =>
-      value.abs() >= 100 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  String _axisNumber(double value) {
+    final formatted = value.toStringAsFixed(2);
+    return formatted.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  void _setChartPointerActive(bool active) {
+    if (_chartPointerActive == active || !mounted) return;
+    setState(() => _chartPointerActive = active);
+  }
 
   String _axisTime(double value) {
     final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
@@ -835,7 +895,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            series.label,
+            '${series.label} (${series.unit})',
             style: TextStyle(
               color: series.color,
               fontSize: 10,
@@ -843,15 +903,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           Text(
-            'Latest ${_axisNumber(latestPoint.value)}',
+            'Latest ${_axisNumber(latestPoint.value)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Avg ${_axisNumber(average)}',
+            'Avg ${_axisNumber(average)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Min ${_axisNumber(minimum)}  Max ${_axisNumber(maximum)}',
+            'Min ${_axisNumber(minimum)}  Max ${_axisNumber(maximum)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
         ],
@@ -859,7 +919,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _legend(String label, Color color) => Row(
+  Widget _legend(_ChartSeries series, Color color) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
@@ -868,7 +928,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 6),
-      Text(label, style: const TextStyle(fontSize: 12)),
+      Text(
+        '${series.label} (${series.unit})',
+        style: const TextStyle(fontSize: 12),
+      ),
     ],
   );
 }
@@ -883,7 +946,8 @@ class _MetricDef {
 
 class _ChartSeries {
   final String label;
+  final String unit;
   final List<TelemetryPoint> points;
   final Color color;
-  _ChartSeries(this.label, this.points, this.color);
+  _ChartSeries(this.label, this.unit, this.points, this.color);
 }

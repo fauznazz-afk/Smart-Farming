@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../services/cctv_url.dart';
+
 class CctvScreen extends StatefulWidget {
   final String streamUrl;
 
@@ -11,30 +13,58 @@ class CctvScreen extends StatefulWidget {
 }
 
 class _CctvScreenState extends State<CctvScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   bool _loading = true;
   bool _failed = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initializeWebView();
+    });
+  }
+
+  void _initializeWebView() {
+    final streamUri = parseAllowedCctvUrl(widget.streamUrl);
+    if (streamUri == null) {
+      _failed = true;
+      setState(() => _loading = false);
+      return;
+    }
+    _failed = false;
+    final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() {
-            _loading = true;
-            _failed = false;
-          }),
-          onPageFinished: (_) => setState(() => _loading = false),
-          onWebResourceError: (_) => setState(() {
-            _loading = false;
-            _failed = true;
-          }),
+          onPageStarted: (_) {
+            if (!mounted) return;
+            setState(() {
+              _loading = true;
+              _failed = false;
+            });
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _loading = false);
+          },
+          onNavigationRequest: (request) {
+            return parseAllowedCctvUrl(request.url) == null
+                ? NavigationDecision.prevent
+                : NavigationDecision.navigate;
+          },
+          onWebResourceError: (error) {
+            if (mounted && error.isForMainFrame == true) {
+              setState(() {
+                _loading = false;
+                _failed = true;
+              });
+            }
+          },
         ),
-      )
-      ..loadRequest(Uri.parse(widget.streamUrl));
+      );
+    setState(() => _controller = controller);
+    controller.loadRequest(streamUri);
   }
 
   @override
@@ -58,12 +88,15 @@ class _CctvScreenState extends State<CctvScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                WebViewWidget(controller: _controller),
+                if (_controller != null)
+                  WebViewWidget(controller: _controller!)
+                else
+                  const Center(child: CircularProgressIndicator()),
                 if (_loading) const Center(child: CircularProgressIndicator()),
                 if (_failed)
                   Center(
                     child: FilledButton.icon(
-                      onPressed: () => _controller.reload(),
+                      onPressed: _controller?.reload,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Reload camera'),
                     ),

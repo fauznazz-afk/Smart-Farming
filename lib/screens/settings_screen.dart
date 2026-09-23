@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/cctv_url.dart';
 import '../theme/app_theme_controller.dart';
 
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
@@ -26,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cctvUrlController = TextEditingController(text: defaultCctvUrl);
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
+  bool _saving = false;
   Color _selectedSeed = AppThemeController.defaultSeed;
 
   @override
@@ -54,16 +56,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
-    final url = Uri.tryParse(_cctvUrlController.text.trim());
-    if (url == null || !url.hasScheme) {
+    if (_saving) return;
+    final url = parseAllowedCctvUrl(_cctvUrlController.text);
+    if (url == null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('CCTV URL tidak valid')));
+          .showSnackBar(const SnackBar(
+        content: Text('CCTV URL harus HTTPS dan memakai host resmi'),
+      ));
       return;
     }
+    setState(() => _saving = true);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('auto_refresh', _autoRefresh);
     await preferences.setInt('refresh_seconds', _refreshSeconds);
-    await preferences.setString('cctv_url', _cctvUrlController.text.trim());
+    await preferences.setString('cctv_url', url.toString());
     if (!mounted) return;
     Navigator.pop(context, true);
   }
@@ -142,9 +148,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 28),
           FilledButton.icon(
-            onPressed: _saveSettings,
-            icon: const Icon(Icons.save),
-            label: const Text('Save settings'),
+            onPressed: _saving ? null : _saveSettings,
+            icon: _saving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save),
+            label: Text(_saving ? 'Saving...' : 'Save settings'),
           ),
           const SizedBox(height: 28),
           const Divider(),

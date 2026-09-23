@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/telemetry_model.dart';
@@ -12,9 +13,10 @@ class ThingsBoardApi {
   static const String deviceSensor = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
   static const String devicePzem = 'af9531a0-ac44-11f1-841c-f5914d050259';
 
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
 
-  /// Login pakai customer user, simpan token ke SharedPreferences
+  /// Login pakai customer user, simpan token ke secure storage.
   Future<bool> login(String username, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
     final response = await http.post(
@@ -27,19 +29,38 @@ class ThingsBoardApi {
       final data = jsonDecode(response.body);
       _token = data['token'];
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('tb_token', _token!);
-      await prefs.setString('tb_refresh_token', data['refreshToken']);
+      await _secureStorage.write(key: 'tb_token', value: _token);
+      final refreshToken = data['refreshToken'] as String?;
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _secureStorage.write(
+          key: 'tb_refresh_token',
+          value: refreshToken,
+        );
+      }
+      await _removeLegacyCredentials();
 
       return true;
     }
     return false; // login gagal (username/password salah)
   }
 
-  /// Load token yang udah tersimpan (biar gak perlu login ulang tiap buka app)
+  /// Load token yang sudah tersimpan agar tidak perlu login ulang tiap buka app.
   Future<bool> loadSavedToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('tb_token');
+    final preferences = await SharedPreferences.getInstance();
+    _token = await _secureStorage.read(key: 'tb_token') ??
+        preferences.getString('tb_token');
+    if (_token != null &&
+        await _secureStorage.read(key: 'tb_token') == null) {
+      await _secureStorage.write(key: 'tb_token', value: _token);
+      final legacyRefreshToken = preferences.getString('tb_refresh_token');
+      if (legacyRefreshToken != null && legacyRefreshToken.isNotEmpty) {
+        await _secureStorage.write(
+          key: 'tb_refresh_token',
+          value: legacyRefreshToken,
+        );
+      }
+    }
+    await _removeLegacyCredentials(preferences);
     if (_token == null) return false;
 
     try {
@@ -55,10 +76,19 @@ class ThingsBoardApi {
   }
 
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('tb_token');
-    await prefs.remove('tb_refresh_token');
+    await _secureStorage.delete(key: 'tb_token');
+    await _secureStorage.delete(key: 'tb_refresh_token');
+    await _removeLegacyCredentials();
     _token = null;
+  }
+
+  Future<void> _removeLegacyCredentials([
+    SharedPreferences? preferences,
+  ]) async {
+    final legacyPreferences =
+        preferences ?? await SharedPreferences.getInstance();
+    await legacyPreferences.remove('tb_token');
+    await legacyPreferences.remove('tb_refresh_token');
   }
 
   bool get isLoggedIn => _token != null;

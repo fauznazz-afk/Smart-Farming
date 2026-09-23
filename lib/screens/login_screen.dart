@@ -49,8 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         setState(() => _errorMsg = 'Username atau password salah');
       }
-    } catch (e) {
-      setState(() => _errorMsg = 'Gagal terhubung: $e');
+    } catch (_) {
+      setState(() => _errorMsg = 'Gagal terhubung. Coba lagi nanti.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
