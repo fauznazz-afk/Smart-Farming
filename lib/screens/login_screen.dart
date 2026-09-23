@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const BrandLogo(size: 100, showName: false),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   LiquidGlassCard(
                     isDark: isDark,
                     performanceMode: performanceMode,

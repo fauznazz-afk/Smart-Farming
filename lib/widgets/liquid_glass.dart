@@ -46,7 +46,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.12, size.height * 0.10),
         radius: size.width * 0.60,
-        color: const Color(0xFF1A4D3A),
+        color: const Color(0xFF66706B),
         centerAlpha: 0.70,
       );
       _drawOrb(
@@ -54,7 +54,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.88, size.height * 0.28),
         radius: size.width * 0.50,
-        color: const Color(0xFF0D3B5E),
+        color: const Color(0xFF7A827E),
         centerAlpha: 0.60,
       );
       _drawOrb(
@@ -62,7 +62,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.55, size.height * 0.78),
         radius: size.width * 0.55,
-        color: const Color(0xFF2D1B4E),
+        color: const Color(0xFF4F5954),
         centerAlpha: 0.50,
       );
     } else {
@@ -71,7 +71,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.08, size.height * 0.08),
         radius: size.width * 0.65,
-        color: const Color(0xFFB0E0C8),
+        color: const Color(0xFFCBD2CE),
         centerAlpha: 0.65,
       );
       _drawOrb(
@@ -79,7 +79,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.92, size.height * 0.22),
         radius: size.width * 0.52,
-        color: const Color(0xFFFFE1A8),
+        color: const Color(0xFFDDE2DF),
         centerAlpha: 0.55,
       );
       _drawOrb(
@@ -87,7 +87,7 @@ class _AmbientOrbsPainter extends CustomPainter {
         size,
         center: Offset(size.width * 0.45, size.height * 0.82),
         radius: size.width * 0.58,
-        color: const Color(0xFFBCDCF4),
+        color: const Color(0xFFB8C1BC),
         centerAlpha: 0.50,
       );
     }
@@ -144,7 +144,7 @@ class LiquidGlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final surface =
-        tintColor ?? (isDark ? const Color(0xFF1C2820) : Colors.white);
+        tintColor ?? (isDark ? const Color(0xFF202020) : Colors.white);
 
     final border = Border.all(
       width: 1.2,
@@ -189,8 +189,8 @@ class LiquidGlassCard extends StatelessWidget {
                     surface.withValues(alpha: 0.62),
                   ]
                 : [
-                    Colors.white.withValues(alpha: 0.92),
-                    Colors.white.withValues(alpha: 0.76),
+                    surface.withValues(alpha: 0.72),
+                    surface.withValues(alpha: 0.44),
                   ],
           ),
           borderRadius: radius,
@@ -465,7 +465,6 @@ class GlassDateChip extends StatelessWidget {
     required this.isSelected,
     required this.isDark,
     required this.onTap,
-    required this.accentColor,
     this.performanceMode = true,
   });
 
@@ -473,17 +472,23 @@ class GlassDateChip extends StatelessWidget {
   final int dayNumber;
   final bool isSelected, isDark, performanceMode;
   final VoidCallback onTap;
-  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
+    final selectedColor = isDark
+        ? Colors.white.withValues(alpha: 0.22)
+        : Colors.black.withValues(alpha: 0.10);
     final decoration = isSelected
         ? BoxDecoration(
-            color: accentColor,
-            border: Border.all(color: accentColor.withValues(alpha: 0.8)),
+            color: selectedColor,
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : Colors.black.withValues(alpha: 0.18),
+            ),
             boxShadow: [
               BoxShadow(
-                color: accentColor.withValues(alpha: 0.40),
+                color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -507,20 +512,27 @@ class GlassDateChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        width: 44,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        width: 52,
+        height: 78,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: decoration,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              dayName,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white54 : Colors.black45),
+            SizedBox(
+              height: 14,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  dayName,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? (isDark ? Colors.white : Colors.black87)
+                        : (isDark ? Colors.white54 : Colors.black45),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -530,7 +542,7 @@ class GlassDateChip extends StatelessWidget {
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: isSelected
-                    ? Colors.white
+                    ? (isDark ? Colors.white : Colors.black87)
                     : (isDark ? Colors.white : Colors.black87),
               ),
             ),

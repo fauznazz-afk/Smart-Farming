@@ -141,8 +141,6 @@ class _SplashRouterState extends State<_SplashRouter> {
             mainAxisSize: MainAxisSize.min,
             children: [
               BrandLogo(size: 92, showName: true),
-              SizedBox(height: 24),
-              CircularProgressIndicator(),
             ],
           ),
         ),

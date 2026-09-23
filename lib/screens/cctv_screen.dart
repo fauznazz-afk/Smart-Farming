@@ -88,7 +88,7 @@ class _CctvScreenState extends State<CctvScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
+          padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
           child: Text(
             'CCTV Monitoring',
             style: Theme.of(context).textTheme.labelLarge

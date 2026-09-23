@@ -16,8 +16,13 @@ const _paletteOptions = <String, Color>{
 
 class SettingsScreen extends StatefulWidget {
   final AppThemeController themeController;
+  final Future<void> Function() onLogout;
 
-  const SettingsScreen({super.key, required this.themeController});
+  const SettingsScreen({
+    super.key,
+    required this.themeController,
+    required this.onLogout,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -74,6 +79,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.pop(context, true);
   }
 
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout?'),
+        content: const Text('Your saved session will be cleared from this device.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await widget.onLogout();
+  }
+
+  Widget _sectionTitle(String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,15 +130,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('Monitoring preferences'),
-            subtitle: Text('Control how often live telemetry is refreshed.'),
-          ),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('Appearance'),
-            subtitle: Text('Customize application theme and appearance.'),
+          _sectionTitle(
+            'Appearance',
+            'Customize the visual identity of EnerGrow.',
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -110,12 +153,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() {});
             },
           ),
-          const SizedBox(height: 12),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('App color'),
-            subtitle: Text('Choose the accent palette used across EnerGrow.'),
+          const SizedBox(height: 8),
+          const Text(
+            'App color',
+            style: TextStyle(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -133,7 +176,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
+          _sectionTitle(
+            'Monitoring',
+            'Control how often live telemetry is refreshed.',
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Auto refresh telemetry'),
@@ -155,13 +201,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (value != null) setState(() => _refreshSeconds = value);
             },
           ),
-          const SizedBox(height: 24),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('CCTV source'),
-            subtitle: Text(
-              'Use a go2rtc stream page that supports WebSocket video.',
-            ),
+          _sectionTitle(
+            'CCTV source',
+            'Use a go2rtc stream page that supports WebSocket video.',
           ),
           TextField(
             controller: _cctvUrlController,
@@ -171,7 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               prefixIcon: Icon(Icons.link),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: _saving ? null : _saveSettings,
             icon: _saving
@@ -182,12 +224,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : const Icon(Icons.save),
             label: Text(_saving ? 'Saving...' : 'Save settings'),
           ),
-          const SizedBox(height: 28),
-          const Divider(height: 32),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('Performance'),
-            subtitle: Text('Control rendering quality and glass effects.'),
+          _sectionTitle(
+            'Performance',
+            'Control rendering quality and glass effects.',
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -204,13 +243,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() {});
             },
           ),
-          const Divider(),
-          const ListTile(
+          _sectionTitle(
+            'About',
+            'Application information and account actions.',
+          ),
+          ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline),
-            title: Text('About'),
-            subtitle: Text('EnerGrow monitoring application'),
-            trailing: Text('v$appVersion'),
+            leading: const Icon(Icons.info_outline),
+            title: const Text('EnerGrow monitoring application'),
+            trailing: const Text('v$appVersion'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _confirmLogout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
           ),
         ],
       ),

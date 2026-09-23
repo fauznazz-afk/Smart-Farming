@@ -13,16 +13,6 @@ import 'settings_screen.dart';
 
 // ── File-level accent colours & tint helpers ──────────────────────────────────
 
-const _pvAccent  = Color(0xFFF4B942);
-const _acAccent  = Color(0xFFFF7043);
-const _batAccent = Color(0xFF35A968);
-const _envAccent = Color(0xFF4EA8DE);
-
-Color _pvTint(bool d)  => d ? const Color(0xFF28230F) : const Color(0xFFFFFCEE);
-Color _acTint(bool d)  => d ? const Color(0xFF280F0A) : const Color(0xFFFFF4EE);
-Color _batTint(bool d) => d ? const Color(0xFF0D2118) : const Color(0xFFEEFAF4);
-Color _envTint(bool d) => d ? const Color(0xFF0D1B28) : const Color(0xFFEEF6FF);
-
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 class DashboardScreen extends StatefulWidget {
@@ -98,6 +88,34 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   bool get _performanceMode => widget.themeController.performanceMode;
+
+  Color _themeColor({required double lightness, double saturation = 0.62}) {
+    final hsl = HSLColor.fromColor(widget.themeController.seedColor);
+    return hsl
+        .withSaturation(saturation.clamp(0.0, 1.0))
+        .withLightness(lightness.clamp(0.0, 1.0))
+        .toColor();
+  }
+
+  Color get _themeSecondaryColor {
+    return widget.themeController.seedColor;
+  }
+
+  Color _metricColor(int index, bool isDark) {
+    final base = HSLColor.fromColor(widget.themeController.seedColor);
+    return base
+        .withSaturation(isDark ? 0.64 : 0.72)
+        .withLightness(isDark ? 0.68 : 0.40)
+        .toColor();
+  }
+
+  Color _strongMetricColor(int index, bool isDark) {
+    final base = HSLColor.fromColor(widget.themeController.seedColor);
+    return base
+        .withSaturation(isDark ? 0.78 : 0.86)
+        .withLightness(isDark ? 0.64 : 0.36)
+        .toColor();
+  }
 
   // ── Data loading ──────────────────────────────────────────────────────────────
   Future<void> _loadDisplayName() async {
@@ -307,7 +325,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       context,
       MaterialPageRoute(
         builder: (_) =>
-            SettingsScreen(themeController: widget.themeController),
+            SettingsScreen(
+              themeController: widget.themeController,
+              onLogout: _logout,
+            ),
       ),
     );
     if (changed == true) _loadPreferences();
@@ -324,41 +345,24 @@ class _DashboardScreenState extends State<DashboardScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: Row(
-          children: [
-            const BrandLogo(size: 28),
-            const SizedBox(width: 8),
-            Text(
-              _pageTitle,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+        centerTitle: true,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: BrandLogo(
+            size: 30,
+            accentColor: widget.themeController.seedColor,
+            secondaryColor: _themeSecondaryColor,
+          ),
+        ),
+        title: const Text(
+          'EnerGrow',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _fetchAll,
-          ),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'logout') _logout();
-              if (v == 'settings') _openSettings();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'settings',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.settings_outlined),
-                  title: Text('Settings'),
-                ),
-              ),
-              PopupMenuItem(value: 'logout', child: Text('Logout')),
-            ],
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
           ),
         ],
       ),
@@ -387,9 +391,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(
                           16,
-                          MediaQuery.of(context).padding.top +
-                              kToolbarHeight +
-                              8,
+                          MediaQuery.of(context).padding.top + kToolbarHeight - 6,
                           16,
                           MediaQuery.of(context).padding.bottom + 104,
                         ),
@@ -417,7 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           final page = _pageController.hasClients
               ? (_pageController.page ?? _selectedIndex.toDouble())
               : _selectedIndex.toDouble();
-          final primary = Theme.of(context).colorScheme.primary;
+          final primary = _strongMetricColor(_selectedIndex, isDark);
           return RepaintBoundary(
             child: Container(
               height: 64,
@@ -510,9 +512,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Icon(
                             icon,
                             size: 20,
-                            color: isDark
-                                ? Colors.white60
-                                : const Color(0xFF8A9490),
+                            color: _metricColor(index, isDark)
+                                .withValues(alpha: 0.72),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -520,9 +521,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             maxLines: 1,
                             style: TextStyle(
                               fontSize: 9,
-                              color: isDark
-                                  ? Colors.white60
-                                  : const Color(0xFF8A9490),
+                              color: _metricColor(index, isDark)
+                                  .withValues(alpha: 0.72),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -535,15 +535,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-
-  // ── Page title ────────────────────────────────────────────────────────────────
-  String get _pageTitle => const [
-    'EnerGrow',
-    'PV Monitoring',
-    'AC Monitoring',
-    'Battery Monitoring',
-    'CCTV Monitoring',
-  ][_selectedIndex];
 
   // ── Page content router ───────────────────────────────────────────────────────
   List<Widget> _pageContentFor(int index, bool isDark) => switch (index) {
@@ -561,11 +552,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Overview page ─────────────────────────────────────────────────────────────
   List<Widget> _overviewPage(bool isDark) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final primary = isDark ? Colors.white70 : Colors.black54;
     return [
       _greetingHeader(isDark, primary),
       const SizedBox(height: 16),
-      _dateStrip(isDark, primary),
+      _dateStrip(isDark),
       const SizedBox(height: 20),
       _heroCard(isDark),
       const SizedBox(height: 12),
@@ -630,9 +621,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _dateStrip(bool isDark, Color primary) {
+  Widget _dateStrip(bool isDark) {
     return SizedBox(
-      height: 72,
+      height: 82,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _stripDays.length,
@@ -648,7 +639,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             isSelected: isSelected,
             isDark: isDark,
             onTap: () => _selectDate(d),
-            accentColor: primary,
             performanceMode: _performanceMode,
           );
         },
@@ -672,7 +662,11 @@ class _DashboardScreenState extends State<DashboardScreen>
           // Header row
           Row(
             children: [
-              const Icon(Icons.wb_sunny_rounded, size: 18, color: _pvAccent),
+              Icon(
+                Icons.wb_sunny_rounded,
+                size: 18,
+                color: _metricColor(2, isDark),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Live Active Power',
@@ -754,7 +748,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 trackColor: isDark
                     ? Colors.white.withValues(alpha: 0.12)
                     : Colors.black.withValues(alpha: 0.08),
-                progressColor: _batAccent,
+                progressColor: widget.themeController.seedColor,
                 size: 90,
                 strokeWidth: 9,
               ),
@@ -770,7 +764,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     label: 'PV Output',
                     value: pvPower?.toStringAsFixed(0) ?? '--',
                     unit: 'W',
-                    accentColor: _pvAccent,
+                    accentColor: _themeColor(lightness: isDark ? 0.72 : 0.42),
                     progress: ((pvPower ?? 0) / 300).clamp(0.0, 1.0),
                     isDark: isDark,
                     performanceMode: _performanceMode,
@@ -782,7 +776,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                     label: 'AC Load',
                     value: acPower.toStringAsFixed(0),
                     unit: 'W',
-                    accentColor: _acAccent,
+                    accentColor: _themeColor(
+                      lightness: isDark ? 0.64 : 0.36,
+                      saturation: 0.48,
+                    ),
                     progress: (acPower / 2000).clamp(0.0, 1.0),
                     isDark: isDark,
                     performanceMode: _performanceMode,
@@ -794,7 +791,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     label: 'Battery',
                     value: soc.toStringAsFixed(0),
                     unit: '%',
-                    accentColor: _batAccent,
+                    accentColor: widget.themeController.seedColor,
                     progress: soc / 100,
                     isDark: isDark,
                     performanceMode: _performanceMode,
@@ -828,17 +825,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: LiquidGlassCard(
               isDark: isDark,
               performanceMode: _performanceMode,
-              tintColor: _batTint(isDark),
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.battery_charging_full,
                         size: 14,
-                        color: _batAccent,
+                        color: _metricColor(0, isDark),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -859,7 +855,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     trackColor: isDark
                         ? Colors.white.withValues(alpha: 0.10)
                         : Colors.black.withValues(alpha: 0.07),
-                    progressColor: _batAccent,
+                    progressColor: widget.themeController.seedColor,
                     size: 110,
                     strokeWidth: 11,
                   ),
@@ -889,14 +885,17 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: LiquidGlassCard(
               isDark: isDark,
               performanceMode: _performanceMode,
-              tintColor: _acTint(isDark),
               padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.power, size: 14, color: _acAccent),
+                      Icon(
+                        Icons.power,
+                        size: 14,
+                        color: _metricColor(2, isDark),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'AC Grid',
@@ -1028,7 +1027,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: _performanceMode,
-      tintColor: _envTint(isDark),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1036,7 +1034,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: _envAccent),
+              Icon(icon, size: 16, color: _metricColor(3, isDark)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -1079,9 +1077,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Detail pages ──────────────────────────────────────────────────────────────
   List<Widget> _pvPage(bool isDark) => [
-    _glassPageHeader('PV Status', Icons.wb_sunny, _pvAccent, isDark),
+    _glassPageHeader(
+        'PV Status', Icons.wb_sunny, _strongMetricColor(0, isDark), isDark),
     const SizedBox(height: 10),
-    _glassTelemetryCard(_pzem, isDark, _pvAccent, _pvTint(isDark), [
+    _glassTelemetryCard(_pzem, isDark, _metricColor(0, isDark), [
       _MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
       _MetricDef('current_dc', 'Current', 'A', Icons.swap_horiz),
       _MetricDef('power_dc', 'Power', 'W', Icons.wb_sunny),
@@ -1090,13 +1089,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     const SizedBox(height: 16),
     _chartSectionHeader('PV · Last 24 Hours', isDark),
     const SizedBox(height: 8),
-    _glassChartCard('pv', _pvAccent, isDark),
+    _glassChartCard('pv', isDark),
   ];
 
   List<Widget> _acPage(bool isDark) => [
-    _glassPageHeader('AC Status', Icons.power, _acAccent, isDark),
+    _glassPageHeader(
+        'AC Status', Icons.power, _strongMetricColor(1, isDark), isDark),
     const SizedBox(height: 10),
-    _glassTelemetryCard(_pzem, isDark, _acAccent, _acTint(isDark), [
+    _glassTelemetryCard(_pzem, isDark, _metricColor(1, isDark), [
       _MetricDef('voltage_ac', 'Voltage', 'V', Icons.bolt),
       _MetricDef('current_ac', 'Current', 'A', Icons.swap_horiz),
       _MetricDef('power_ac', 'Power', 'W', Icons.power),
@@ -1107,14 +1107,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     const SizedBox(height: 16),
     _chartSectionHeader('AC · Last 24 Hours', isDark),
     const SizedBox(height: 8),
-    _glassChartCard('ac', _acAccent, isDark),
+    _glassChartCard('ac', isDark),
   ];
 
   List<Widget> _batteryPage(bool isDark) => [
     _glassPageHeader(
-        'Battery Status', Icons.battery_charging_full, _batAccent, isDark),
+        'Battery Status',
+        Icons.battery_charging_full,
+        _strongMetricColor(2, isDark),
+        isDark),
     const SizedBox(height: 10),
-    _glassTelemetryCard(_battery, isDark, _batAccent, _batTint(isDark), [
+    _glassTelemetryCard(
+        _battery, isDark, _metricColor(2, isDark), [
       _MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
       _MetricDef('current', 'Current', 'A', Icons.swap_horiz),
       _MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
@@ -1126,7 +1130,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     const SizedBox(height: 16),
     _chartSectionHeader('Battery · Last 24 Hours', isDark),
     const SizedBox(height: 8),
-    _glassChartCard('battery', _batAccent, isDark),
+    _glassChartCard('battery', isDark),
   ];
 
   // ── Component helpers ─────────────────────────────────────────────────────────
@@ -1183,15 +1187,15 @@ class _DashboardScreenState extends State<DashboardScreen>
               borderRadius: BorderRadius.circular(10),
               color: Theme.of(context)
                   .colorScheme
-                  .primary
-                  .withValues(alpha: 0.15),
+                  .onSurface
+                  .withValues(alpha: 0.10),
             ),
             child: Text(
               '${sel.day}/${sel.month}/${sel.year}',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
+                color: isDark ? Colors.white70 : Colors.black54,
               ),
             ),
           ),
@@ -1203,14 +1207,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     DeviceTelemetry? data,
     bool isDark,
     Color accent,
-    Color tintColor,
     List<_MetricDef> metrics,
   ) {
     final stale = data?.isStale() ?? true;
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: _performanceMode,
-      tintColor: tintColor,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
@@ -1249,7 +1251,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   child: Row(
                     children: [
-                      Icon(metric.icon, size: 19, color: accent),
+                      Icon(
+                        metric.icon,
+                        size: 19,
+                        color: _metricColor(index, isDark),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -1284,29 +1290,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _glassChartCard(String prefix, Color sectionAccent, bool isDark) {
+  Widget _glassChartCard(String prefix, bool isDark) {
     final series = [
       _ChartSeries(
         'Voltage',
         'V',
         _history['${prefix}_voltage'] ?? [],
-        prefix == 'pv'
-            ? (isDark ? const Color(0xFF4DABF7) : const Color(0xFF1E70BF))
-            : (isDark ? const Color(0xFF6FC7FF) : const Color(0xFF0284C7)),
+        isDark ? const Color(0xFFFF5252) : const Color(0xFFE53935),
       ),
       _ChartSeries(
         'Current',
         'A',
         _history['${prefix}_current'] ?? [],
-        prefix == 'pv'
-            ? (isDark ? const Color(0xFF2EC4B6) : const Color(0xFF0D9488))
-            : (isDark ? const Color(0xFFFFC857) : const Color(0xFFD97706)),
+        isDark ? const Color(0xFF69F0AE) : const Color(0xFF43A047),
       ),
       _ChartSeries(
         'Power',
         'W',
         _history['${prefix}_power'] ?? [],
-        sectionAccent,
+        isDark ? const Color(0xFF448AFF) : const Color(0xFF1E88E5),
       ),
     ];
     final bounds = _chartBounds.putIfAbsent(
@@ -1600,7 +1602,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Min ${_axisNumber(minimum)}  Max ${_axisNumber(maximum)} ${series.unit}',
+            'Min ${_axisNumber(minimum)} ${series.unit}',
+            style: const TextStyle(fontSize: 9),
+          ),
+          Text(
+            'Max ${_axisNumber(maximum)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
         ],

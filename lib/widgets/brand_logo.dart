@@ -3,11 +3,21 @@ import 'package:flutter/material.dart';
 class BrandLogo extends StatelessWidget {
   final double size;
   final bool showName;
+  final Color? accentColor;
+  final Color? secondaryColor;
 
-  const BrandLogo({super.key, this.size = 52, this.showName = false});
+  const BrandLogo({
+    super.key,
+    this.size = 52,
+    this.showName = false,
+    this.accentColor,
+    this.secondaryColor,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final primary = accentColor ?? const Color(0xFFEFA13E);
+    final secondary = secondaryColor ?? const Color(0xFF35A968);
     final mark = Container(
       width: size,
       height: size,
@@ -31,7 +41,7 @@ class BrandLogo extends StatelessWidget {
             child: Icon(
               Icons.wb_sunny,
               size: size * .48,
-              color: const Color(0xFFEFA13E),
+              color: primary,
             ),
           ),
           Positioned(
@@ -40,7 +50,7 @@ class BrandLogo extends StatelessWidget {
             child: Icon(
               Icons.eco,
               size: size * .62,
-              color: const Color(0xFF35A968),
+              color: secondary,
             ),
           ),
         ],
@@ -54,16 +64,16 @@ class BrandLogo extends StatelessWidget {
         mark,
         const SizedBox(height: 10),
         RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
+          text: TextSpan(
+            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
             children: [
               TextSpan(
                 text: 'Ener',
-                style: TextStyle(color: Color(0xFFEFA13E)),
+                style: TextStyle(color: primary),
               ),
               TextSpan(
                 text: 'Grow',
-                style: TextStyle(color: Color(0xFF35A968)),
+                style: TextStyle(color: secondary),
               ),
             ],
           ),
