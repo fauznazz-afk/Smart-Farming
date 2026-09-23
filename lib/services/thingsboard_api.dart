@@ -177,6 +177,7 @@ class ThingsBoardApi {
     required DateTime start,
     required DateTime end,
     int intervalMs = 300000,
+    int limit = 2000,
   }) async {
     final startTs = start.millisecondsSinceEpoch;
     final endTs = end.millisecondsSinceEpoch;
@@ -189,6 +190,7 @@ class ThingsBoardApi {
       'endTs': '$endTs',
       'interval': '$intervalMs',
       'agg': 'AVG',
+      'limit': '$limit',
     });
 
     final response = await http.get(url, headers: _authHeaders);
@@ -204,7 +206,9 @@ class ThingsBoardApi {
     } else if (response.statusCode == 401) {
       throw Exception('Token expired, silakan login ulang');
     } else {
-      throw Exception('Gagal fetch history: ${response.statusCode}');
+      throw Exception(
+        'Gagal fetch history: ${response.statusCode} ${response.body}',
+      );
     }
   }
 

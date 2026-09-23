@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/energy_summary_card.dart';
 import 'cctv_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -36,10 +38,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   DeviceTelemetry? _pzem;
   DeviceTelemetry? _sensor;
   final Map<String, List<TelemetryPoint>> _history = {};
+  final Map<String, List<TelemetryPoint>> _energyHistory = {};
   final _chartBounds = <String, _ChartBounds>{};
   int _selectedIndex = 0;
   bool _loading = true;
   bool _chartLoading = true;
+  bool _energyLoading = true;
+  String? _energyError;
+  bool _weeklyEnergySummary = false;
+  bool _energyRequestInFlight = false;
   bool _chartPointerActive = false;
   bool _telemetryRequestInFlight = false;
   final _historyRequestInFlight = <String>{};
@@ -50,7 +57,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   String? _error;
   Timer? _refreshTimer;
   DateTime _selectedDate = DateTime.now();
+  DateTime? _energyUpdatedAt;
   String _displayName = '';
+  bool _energyAlertsEnabled = true;
+  int _lowSocThreshold = 20;
+  int _staleTelemetryMinutes = 10;
+  Set<String> _activeAlertIds = {};
+  List<String> _activeAlertMessages = [];
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -60,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     widget.themeController.addListener(_onThemeChanged);
     _fetchAll();
+    _fetchEnergyHistory();
     _loadPreferences();
     _loadDisplayName();
   }
@@ -138,6 +152,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() {
       _autoRefresh = preferences.getBool('auto_refresh') ?? true;
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
+      _energyAlertsEnabled = preferences.getBool('energy_alerts_enabled') ?? true;
+      _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
+      _staleTelemetryMinutes = preferences.getInt('stale_telemetry_minutes') ?? 10;
       _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
     });
     _restartRefreshTimer();
@@ -163,13 +180,26 @@ class _DashboardScreenState extends State<DashboardScreen>
         widget.api.fetchSensorData(),
       ]);
       if (!mounted) return;
-      setState(() {
-        _battery = results[0];
-        _pzem = results[1];
-        _sensor = results[2];
-        _loading = false;
-        _error = null;
-      });
+      final changed = _loading ||
+          _error != null ||
+          !_sameTelemetry(_battery, results[0]) ||
+          !_sameTelemetry(_pzem, results[1]) ||
+          !_sameTelemetry(_sensor, results[2]);
+      _battery = results[0];
+      _pzem = results[1];
+      _sensor = results[2];
+      if (changed) {
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+      }
+      _evaluateEnergyAlerts();
+      final lastEnergyUpdate = _energyUpdatedAt;
+      if (lastEnergyUpdate == null ||
+          DateTime.now().difference(lastEnergyUpdate).inMinutes >= 15) {
+        unawaited(_fetchEnergyHistory());
+      }
     } catch (error) {
       if (!mounted) return;
       if (error.toString().contains('Token expired')) {
@@ -185,10 +215,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
         return;
       }
-      setState(() {
-        _error = error.toString();
-        _loading = false;
-      });
+      final message = error.toString();
+      if (_error != message || _loading) {
+        setState(() {
+          _error = message;
+          _loading = false;
+        });
+      }
     } finally {
       _telemetryRequestInFlight = false;
     }
@@ -196,10 +229,159 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _refreshCurrentPage() async {
     await _fetchAll();
+    if (_selectedIndex == 0) await _fetchEnergyHistory();
     final prefix = _prefixForPage(_selectedIndex);
     if (prefix == null) return;
     _historyLoaded.remove(prefix);
     await _fetchHistoryFor(prefix);
+  }
+
+  Future<void> _fetchEnergyHistory() async {
+    if (_energyRequestInFlight) return;
+    _energyRequestInFlight = true;
+    if (mounted && _energyHistory.isEmpty) {
+      setState(() => _energyLoading = true);
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 13, minutes: 15));
+    try {
+      final histories = await widget.api.fetchHistoryForKeys(
+        ThingsBoardApi.devicePzem,
+        const ['power_dc', 'power_ac'],
+        start: start,
+        end: now,
+        intervalMs: 30 * 60 * 1000,
+        limit: 1500,
+      );
+      if (!mounted) return;
+      final hasHistory = histories.values.any((points) => points.isNotEmpty);
+      setState(() {
+        _energyHistory
+          ..clear()
+          ..addAll(histories);
+        _energyLoading = false;
+        _energyError = hasHistory
+            ? null
+            : 'ThingsBoard tidak mengirim histori power_dc/power_ac dalam 14 hari terakhir.';
+        _energyUpdatedAt = now;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      debugPrint('Energy summary history request failed: $error');
+      setState(() {
+        _energyLoading = false;
+        _energyError = 'Histori daya gagal dimuat. Tarik layar untuk mencoba lagi.';
+      });
+    } finally {
+      _energyRequestInFlight = false;
+    }
+  }
+
+  void _evaluateEnergyAlerts() {
+    if (!_energyAlertsEnabled) {
+      final changed = _activeAlertIds.isNotEmpty;
+      _activeAlertIds = {};
+      _activeAlertMessages = [];
+      if (changed && mounted) setState(() {});
+      return;
+    }
+    final alerts = <String, String>{};
+    final soc = _battery?.latestValues['soc'];
+    if (soc != null && soc < _lowSocThreshold) {
+      alerts['low_soc'] = 'SOC baterai rendah: ${soc.toStringAsFixed(0)}%';
+    }
+    final devices = <(String, String, DeviceTelemetry?)>[
+      ('battery', 'Baterai', _battery),
+      ('pzem', 'PZEM', _pzem),
+      ('sensor', 'Sensor lingkungan', _sensor),
+    ];
+    for (final (id, name, telemetry) in devices) {
+      if (telemetry != null &&
+          telemetry.isStale(minutes: _staleTelemetryMinutes)) {
+        alerts['stale_$id'] = 'Data $name belum diperbarui';
+      }
+    }
+    final newMessages = alerts.entries
+        .where((entry) => !_activeAlertIds.contains(entry.key))
+        .map((entry) => entry.value)
+        .toList();
+    final changed = alerts.length != _activeAlertIds.length ||
+        !alerts.keys.every(_activeAlertIds.contains) ||
+        !_sameStrings(alerts.values.toList(), _activeAlertMessages);
+    if (!changed) return;
+    _activeAlertIds = alerts.keys.toSet();
+    _activeAlertMessages = alerts.values.toList();
+    if (newMessages.isNotEmpty && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(newMessages.join(' · '))));
+      });
+    }
+    if (mounted) setState(() {});
+  }
+
+  bool _sameStrings(List<String> first, List<String> second) {
+    if (first.length != second.length) return false;
+    for (var i = 0; i < first.length; i++) {
+      if (first[i] != second[i]) return false;
+    }
+    return true;
+  }
+
+  bool _sameTelemetry(DeviceTelemetry? first, DeviceTelemetry second) {
+    if (first == null) return false;
+    if (first.latestValues.length != second.latestValues.length) return false;
+    for (final entry in second.latestValues.entries) {
+      if (first.latestValues[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  void _setWeeklyEnergySummary(bool weekly) {
+    if (_weeklyEnergySummary == weekly) return;
+    setState(() => _weeklyEnergySummary = weekly);
+  }
+
+  double _energyForPeriod(String key, DateTime start, DateTime end) {
+    final points = [...?_energyHistory[key]]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    var kwh = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      final previous = points[i - 1];
+      final current = points[i];
+      final gapMs = current.timestamp.difference(previous.timestamp).inMilliseconds;
+      if (gapMs <= 0 || gapMs > 60 * 60 * 1000) continue;
+      final left = previous.timestamp.isAfter(start) ? previous.timestamp : start;
+      final right = current.timestamp.isBefore(end) ? current.timestamp : end;
+      final durationMs = right.difference(left).inMilliseconds;
+      if (durationMs <= 0) continue;
+      final leftFraction = left.difference(previous.timestamp).inMilliseconds / gapMs;
+      final rightFraction = right.difference(previous.timestamp).inMilliseconds / gapMs;
+      final leftPower = previous.value + (current.value - previous.value) * leftFraction;
+      final rightPower = previous.value + (current.value - previous.value) * rightFraction;
+      final averageWatts =
+          math.max(0.0, (leftPower + rightPower) / 2).toDouble();
+      kwh += averageWatts * durationMs / 3600000000;
+    }
+    return kwh;
+  }
+
+  ({double current, double previous}) _energyComparison(String key) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final periodStart = _weeklyEnergySummary
+        ? today.subtract(const Duration(days: 6))
+        : today;
+    final previousStart = _weeklyEnergySummary
+        ? periodStart.subtract(const Duration(days: 7))
+        : today.subtract(const Duration(days: 1));
+    return (
+      current: _energyForPeriod(key, periodStart, now),
+      previous: _energyForPeriod(key, previousStart, periodStart),
+    );
   }
 
   Future<void> _fetchHistoryFor(String prefix) async {
@@ -421,6 +603,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             MediaQuery.of(context).padding.bottom + 76,
                           ),
                           children: [
+                            if (_activeAlertMessages.isNotEmpty)
+                              _energyAlertBanner(),
                             if (_error != null) _warningBanner(),
                             ..._pageContentFor(index, isDark),
                           ],
@@ -586,10 +770,31 @@ class _DashboardScreenState extends State<DashboardScreen>
       const SizedBox(height: 20),
       _heroCard(isDark),
       const SizedBox(height: 12),
+      _energySummaryCard(isDark),
+      const SizedBox(height: 12),
       _dualCards(isDark),
       const SizedBox(height: 12),
       _environmentGrid(isDark),
     ];
+  }
+
+  Widget _energySummaryCard(bool isDark) {
+    final solar = _energyComparison('power_dc');
+    final load = _energyComparison('power_ac');
+    return EnergySummaryCard(
+      isDark: isDark,
+      performanceMode: _performanceMode,
+      weekly: _weeklyEnergySummary,
+      loading: _energyLoading,
+      hasData: (_energyHistory['power_dc']?.isNotEmpty ?? false) ||
+          (_energyHistory['power_ac']?.isNotEmpty ?? false),
+      errorMessage: _energyError,
+      solarKwh: solar.current,
+      previousSolarKwh: solar.previous,
+      loadKwh: load.current,
+      previousLoadKwh: load.previous,
+      onRangeChanged: _setWeeklyEnergySummary,
+    );
   }
 
   Widget _greetingHeader(bool isDark, Color primary) {
@@ -1615,6 +1820,39 @@ class _DashboardScreenState extends State<DashboardScreen>
           actions: [
             TextButton(onPressed: _fetchAll, child: const Text('Retry')),
           ],
+        ),
+      );
+
+  Widget _energyAlertBanner() => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE66A45).withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFE66A45).withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.notifications_active_outlined,
+                  color: Color(0xFFE66A45)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _activeAlertMessages
+                      .map((message) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(message),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
         ),
       );
 

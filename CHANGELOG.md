@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added estimated daily and seven-day PV production and AC consumption summaries, compared with the previous equivalent period.
+- Added configurable in-app alerts for low battery SOC and stale telemetry.
+- Push delivery while the app is closed still requires an FCM-enabled backend or ThingsBoard notification integration.
+
 ## [1.2.1] - 2026-09-24
 
 ### Improved

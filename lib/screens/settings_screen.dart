@@ -32,6 +32,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cctvUrlController = TextEditingController(text: defaultCctvUrl);
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
+  bool _energyAlertsEnabled = true;
+  int _lowSocThreshold = 20;
+  int _staleTelemetryMinutes = 10;
   bool _saving = false;
   Color _selectedSeed = AppThemeController.defaultSeed;
 
@@ -54,6 +57,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _autoRefresh = preferences.getBool('auto_refresh') ?? true;
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
+      _energyAlertsEnabled =
+          preferences.getBool('energy_alerts_enabled') ?? true;
+      _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
+      _staleTelemetryMinutes =
+          preferences.getInt('stale_telemetry_minutes') ?? 10;
       _cctvUrlController.text =
           preferences.getString('cctv_url') ?? defaultCctvUrl;
       _selectedSeed = widget.themeController.seedColor;
@@ -74,6 +82,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('auto_refresh', _autoRefresh);
     await preferences.setInt('refresh_seconds', _refreshSeconds);
+    await preferences.setBool('energy_alerts_enabled', _energyAlertsEnabled);
+    await preferences.setInt('low_soc_threshold', _lowSocThreshold);
+    await preferences.setInt(
+      'stale_telemetry_minutes',
+      _staleTelemetryMinutes,
+    );
     await preferences.setString('cctv_url', url.toString());
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -245,6 +259,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) {
                   if (value != null) setState(() => _refreshSeconds = value);
                 },
+              ),
+            ],
+          ),
+          _settingsSection(
+            title: 'Energy alerts',
+            subtitle: 'Show warnings when power data needs attention.',
+            icon: Icons.notifications_active_outlined,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Enable energy alerts'),
+                subtitle: const Text(
+                  'In-app alerts appear while the dashboard is open.',
+                ),
+                value: _energyAlertsEnabled,
+                onChanged: (value) =>
+                    setState(() => _energyAlertsEnabled = value),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                initialValue: _lowSocThreshold,
+                decoration: const InputDecoration(
+                  labelText: 'Warn when battery SOC falls below',
+                ),
+                items: const [10, 15, 20, 25, 30, 40, 50]
+                    .map((value) => DropdownMenuItem(
+                          value: value,
+                          child: Text('$value%'),
+                        ))
+                    .toList(),
+                onChanged: _energyAlertsEnabled
+                    ? (value) {
+                        if (value != null) {
+                          setState(() => _lowSocThreshold = value);
+                        }
+                      }
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: _staleTelemetryMinutes,
+                decoration: const InputDecoration(
+                  labelText: 'Warn when telemetry is older than',
+                ),
+                items: const [5, 10, 15, 30, 60]
+                    .map((value) => DropdownMenuItem(
+                          value: value,
+                          child: Text('$value minutes'),
+                        ))
+                    .toList(),
+                onChanged: _energyAlertsEnabled
+                    ? (value) {
+                        if (value != null) {
+                          setState(() => _staleTelemetryMinutes = value);
+                        }
+                      }
+                    : null,
               ),
             ],
           ),
