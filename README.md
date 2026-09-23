@@ -1,4 +1,4 @@
-# PLTS Monitoring App
+# EnerGrow
 
 Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga Surya) hybrid — bagian dari proyek **FNN-XAI-IoT**, program MBKM. Aplikasi ini menampilkan data real-time dari baterai aki, listrik AC (PZEM), dan panel surya (PV), dikonsumsi langsung dari dashboard [ThingsBoard](https://thingsboard.io/) yang sudah berjalan di infrastruktur IoT lahan.
 
