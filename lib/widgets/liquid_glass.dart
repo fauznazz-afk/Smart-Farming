@@ -465,32 +465,27 @@ class GlassDateChip extends StatelessWidget {
     required this.isSelected,
     required this.isDark,
     required this.onTap,
+    this.accentColor = const Color(0xFF35A968),
     this.performanceMode = true,
   });
 
   final String dayName;
   final int dayNumber;
   final bool isSelected, isDark, performanceMode;
+  final Color accentColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final selectedColor = isDark
-        ? Colors.white.withValues(alpha: 0.22)
-        : Colors.black.withValues(alpha: 0.10);
     final decoration = isSelected
         ? BoxDecoration(
-            color: selectedColor,
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.45)
-                  : Colors.black.withValues(alpha: 0.18),
-            ),
+            color: accentColor,
+            border: Border.all(color: accentColor.withValues(alpha: 0.75)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: accentColor.withValues(alpha: 0.28),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
             borderRadius: BorderRadius.circular(14),
@@ -512,15 +507,15 @@ class GlassDateChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        width: 52,
-        height: 78,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        width: 48,
+        height: 68,
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
         decoration: decoration,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: 14,
+              height: 13,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
@@ -529,20 +524,20 @@ class GlassDateChip extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: isSelected
-                        ? (isDark ? Colors.white : Colors.black87)
+                        ? Colors.white
                         : (isDark ? Colors.white54 : Colors.black45),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               '$dayNumber',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: isSelected
-                    ? (isDark ? Colors.white : Colors.black87)
+                    ? Colors.white
                     : (isDark ? Colors.white : Colors.black87),
               ),
             ),

@@ -100,25 +100,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true && mounted) await widget.onLogout();
   }
 
-  Widget _sectionTitle(String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+  Widget _settingsSection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ...children,
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -128,92 +157,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
-          _sectionTitle(
-            'Appearance',
-            'Customize the visual identity of EnerGrow.',
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: Icon(
-              widget.themeController.isDarkMode
-                  ? Icons.dark_mode_outlined
-                  : Icons.light_mode_outlined,
-            ),
-            title: const Text('Dark Mode'),
-            subtitle: Text(
-              widget.themeController.isDarkMode
-                  ? 'Dark theme is active'
-                  : 'Light theme is active',
-            ),
-            value: widget.themeController.isDarkMode,
-            onChanged: (value) {
-              widget.themeController.toggleDarkMode(value);
-              setState(() {});
-            },
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'App color',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _paletteOptions.entries.map((entry) {
-              final selected =
-                  _selectedSeed.toARGB32() == entry.value.toARGB32();
-              return ChoiceChip(
-                label: Text(entry.key),
-                selected: selected,
-                avatar: CircleAvatar(backgroundColor: entry.value),
-                onSelected: (_) {
-                  setState(() => _selectedSeed = entry.value);
-                  widget.themeController.setSeedColor(entry.value);
-                },
-              );
-            }).toList(),
-          ),
-          _sectionTitle(
-            'Monitoring',
-            'Control how often live telemetry is refreshed.',
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Auto refresh telemetry'),
-            value: _autoRefresh,
-            onChanged: (value) => setState(() => _autoRefresh = value),
-          ),
-          DropdownButtonFormField<int>(
-            initialValue: _refreshSeconds,
-            decoration: const InputDecoration(labelText: 'Refresh interval'),
-            items: const [5, 10, 30, 60]
-                .map(
-                  (seconds) => DropdownMenuItem(
-                    value: seconds,
-                    child: Text('$seconds seconds'),
+          _settingsSection(
+            title: 'Appearance',
+            subtitle: 'Choose the app theme and accent color.',
+            icon: Icons.palette_outlined,
+            children: [
+              SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text('System'),
+                    icon: Icon(Icons.settings_suggest_outlined),
                   ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value != null) setState(() => _refreshSeconds = value);
-            },
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text('Light'),
+                    icon: Icon(Icons.light_mode_outlined),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text('Dark'),
+                    icon: Icon(Icons.dark_mode_outlined),
+                  ),
+                ],
+                selected: {widget.themeController.themeMode},
+                onSelectionChanged: (selection) {
+                  widget.themeController.setThemeMode(selection.first);
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Accent color',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _paletteOptions.entries.map((entry) {
+                  final selected =
+                      _selectedSeed.toARGB32() == entry.value.toARGB32();
+                  return ChoiceChip(
+                    label: Text(entry.key),
+                    selected: selected,
+                    avatar: CircleAvatar(
+                      radius: 9,
+                      backgroundColor: entry.value,
+                    ),
+                    onSelected: (_) {
+                      setState(() => _selectedSeed = entry.value);
+                      widget.themeController.setSeedColor(entry.value);
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
           ),
-          _sectionTitle(
-            'CCTV source',
-            'Use a go2rtc stream page that supports WebSocket video.',
+          _settingsSection(
+            title: 'Monitoring',
+            subtitle: 'Set how often live telemetry updates.',
+            icon: Icons.monitor_heart_outlined,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Auto refresh telemetry'),
+                value: _autoRefresh,
+                onChanged: (value) => setState(() => _autoRefresh = value),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                initialValue: _refreshSeconds,
+                decoration: const InputDecoration(
+                  labelText: 'Refresh interval',
+                ),
+                items: const [5, 10, 30, 60]
+                    .map(
+                      (seconds) => DropdownMenuItem(
+                        value: seconds,
+                        child: Text('$seconds seconds'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _refreshSeconds = value);
+                },
+              ),
+            ],
           ),
-          TextField(
-            controller: _cctvUrlController,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              labelText: 'Stream URL',
-              prefixIcon: Icon(Icons.link),
-            ),
+          _settingsSection(
+            title: 'CCTV source',
+            subtitle: 'Set the secure camera stream page.',
+            icon: Icons.videocam_outlined,
+            children: [
+              TextField(
+                controller: _cctvUrlController,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Stream URL',
+                  prefixIcon: Icon(Icons.link),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
+          _settingsSection(
+            title: 'Performance',
+            subtitle: 'Tune glass effects for smoother scrolling.',
+            icon: Icons.speed_outlined,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Smooth Glass Mode'),
+                subtitle: Text(
+                  widget.themeController.performanceMode
+                      ? 'Optimized rendering is enabled'
+                      : 'Full backdrop blur is enabled',
+                ),
+                value: widget.themeController.performanceMode,
+                onChanged: (value) {
+                  widget.themeController.setPerformanceMode(value);
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
           FilledButton.icon(
             onPressed: _saving ? null : _saveSettings,
             icon: _saving
@@ -224,40 +294,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : const Icon(Icons.save),
             label: Text(_saving ? 'Saving...' : 'Save settings'),
           ),
-          _sectionTitle(
-            'Performance',
-            'Control rendering quality and glass effects.',
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.speed_outlined),
-            title: const Text('Smooth Glass Mode'),
-            subtitle: Text(
-              widget.themeController.performanceMode
-                  ? 'Optimized for smooth 60fps on all devices'
-                  : 'Full backdrop blur enabled (may affect performance)',
-            ),
-            value: widget.themeController.performanceMode,
-            onChanged: (value) {
-              widget.themeController.setPerformanceMode(value);
-              setState(() {});
-            },
-          ),
-          _sectionTitle(
-            'About',
-            'Application information and account actions.',
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline),
-            title: const Text('EnerGrow monitoring application'),
-            trailing: const Text('v$appVersion'),
-          ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _confirmLogout,
-            icon: const Icon(Icons.logout),
-            label: const Text('Logout'),
+          _settingsSection(
+            title: 'About',
+            subtitle: 'App and account information.',
+            icon: Icons.info_outline,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('EnerGrow monitoring application'),
+                trailing: const Text('v$appVersion'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _confirmLogout,
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
+              ),
+            ],
           ),
         ],
       ),

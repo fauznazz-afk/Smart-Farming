@@ -160,22 +160,47 @@ class ThingsBoardApi {
     required DateTime end,
     int intervalMs = 300000, // 5 menit
   }) async {
+    final histories = await fetchHistoryForKeys(
+      deviceId,
+      [key],
+      start: start,
+      end: end,
+      intervalMs: intervalMs,
+    );
+    return histories[key] ?? <TelemetryPoint>[];
+  }
+
+  /// Fetch several telemetry series in one request (useful for chart screens).
+  Future<Map<String, List<TelemetryPoint>>> fetchHistoryForKeys(
+    String deviceId,
+    List<String> keys, {
+    required DateTime start,
+    required DateTime end,
+    int intervalMs = 300000,
+  }) async {
     final startTs = start.millisecondsSinceEpoch;
     final endTs = end.millisecondsSinceEpoch;
 
     final url = Uri.parse(
-      '$baseUrl/api/plugins/telemetry/DEVICE/$deviceId/values/timeseries'
-      '?keys=$key&startTs=$startTs&endTs=$endTs&interval=$intervalMs&agg=AVG',
-    );
+      '$baseUrl/api/plugins/telemetry/DEVICE/$deviceId/values/timeseries',
+    ).replace(queryParameters: {
+      'keys': keys.join(','),
+      'startTs': '$startTs',
+      'endTs': '$endTs',
+      'interval': '$intervalMs',
+      'agg': 'AVG',
+    });
 
     final response = await http.get(url, headers: _authHeaders);
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final list = json[key] as List<dynamic>? ?? [];
-      return list
-          .map((e) => TelemetryPoint.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return {
+        for (final key in keys)
+          key: (json[key] as List<dynamic>? ?? [])
+              .map((e) => TelemetryPoint.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      };
     } else if (response.statusCode == 401) {
       throw Exception('Token expired, silakan login ulang');
     } else {

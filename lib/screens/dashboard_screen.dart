@@ -51,7 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _refreshTimer;
   DateTime _selectedDate = DateTime.now();
   String _displayName = '';
-  bool _appBarBlurred = false;
+  final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
   @override
@@ -69,6 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     widget.themeController.removeListener(_onThemeChanged);
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
+    _appBarBlurProgress.dispose();
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -116,9 +117,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
-    final blurred = notification.metrics.pixels > 18;
-    if (blurred != _appBarBlurred && mounted) {
-      setState(() => _appBarBlurred = blurred);
+    final progress = ((notification.metrics.pixels - 4) / 44)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    if ((progress - _appBarBlurProgress.value).abs() >= 0.015) {
+      _appBarBlurProgress.value = progress;
     }
     return false;
   }
@@ -228,38 +231,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     final deviceId = prefix == 'battery'
         ? ThingsBoardApi.deviceBattery
         : ThingsBoardApi.devicePzem;
-    final requests = <String, Future<List<TelemetryPoint>>>{
-      '${prefix}_voltage': widget.api.fetchHistory(
+    Map<String, List<TelemetryPoint>> histories;
+    try {
+      histories = await widget.api.fetchHistoryForKeys(
         deviceId,
-        keys.$1,
+        [keys.$1, keys.$2, keys.$3],
         start: start,
         end: end,
-      ),
-      '${prefix}_current': widget.api.fetchHistory(
-        deviceId,
-        keys.$2,
-        start: start,
-        end: end,
-      ),
-      '${prefix}_power': widget.api.fetchHistory(
-        deviceId,
-        keys.$3,
-        start: start,
-        end: end,
-      ),
-    };
-    final results = await Future.wait(
-      requests.entries.map((entry) async {
-        try {
-          return MapEntry(entry.key, await entry.value);
-        } catch (_) {
-          return MapEntry(entry.key, <TelemetryPoint>[]);
-        }
-      }),
-    );
+      );
+    } catch (_) {
+      histories = const {};
+    }
     if (mounted) {
       setState(() {
-        _history.addAll(Map.fromEntries(results));
+        _history['${prefix}_voltage'] = histories[keys.$1] ?? [];
+        _history['${prefix}_current'] = histories[keys.$2] ?? [];
+        _history['${prefix}_power'] = histories[keys.$3] ?? [];
         _chartBounds.remove(prefix);
         _historyLoaded.add(prefix);
         _chartLoading = false;
@@ -348,22 +335,36 @@ class _DashboardScreenState extends State<DashboardScreen>
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: _appBarBlurred
-            ? (isDark
-                ? const Color(0xB8101412)
-                : const Color(0xB8F6F8F7))
-            : Colors.transparent,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        flexibleSpace: _appBarBlurred
-            ? ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: const SizedBox.expand(),
-                ),
-              )
-            : null,
+        flexibleSpace: ValueListenableBuilder<double>(
+          valueListenable: _appBarBlurProgress,
+          builder: (context, progress, _) {
+            if (progress == 0) return const SizedBox.expand();
+            final baseColor = isDark
+                ? const Color(0xFF101412)
+                : const Color(0xFFF6F8F7);
+            return ClipRect(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: 8 * progress,
+                      sigmaY: 8 * progress,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                  ColoredBox(
+                    color: baseColor.withValues(alpha: 0.72 * progress),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
         leading: IconButton(
           tooltip: 'Refresh',
           icon: const Icon(Icons.refresh_rounded),
@@ -417,7 +418,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 kToolbarHeight -
                                 6,
                             16,
-                            MediaQuery.of(context).padding.bottom + 104,
+                            MediaQuery.of(context).padding.bottom + 76,
                           ),
                           children: [
                             if (_error != null) _warningBanner(),
@@ -650,11 +651,12 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _dateStrip(bool isDark) {
     return SizedBox(
-      height: 82,
+      height: 74,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         itemCount: _stripDays.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 7),
         itemBuilder: (context, i) {
           final d = _stripDays[i];
           final isSelected = d.year == _selectedDate.year &&
@@ -665,6 +667,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             dayNumber: d.day,
             isSelected: isSelected,
             isDark: isDark,
+            accentColor: _strongMetricColor(0, isDark),
             onTap: () => _selectDate(d),
             performanceMode: _performanceMode,
           );
@@ -1686,7 +1689,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Date / time name helpers ──────────────────────────────────────────────────
   String _dayNameShort(int weekday) =>
-      const ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][(weekday - 1) % 7];
+      const ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'][(weekday - 1) % 7];
 
   String _dayNameFull(int weekday) => const [
         'Senin',
