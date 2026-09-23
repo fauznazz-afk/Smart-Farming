@@ -5,7 +5,7 @@ import '../services/cctv_url.dart';
 import '../theme/app_theme_controller.dart';
 
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
-const appVersion = '1.0.0+1';
+const appVersion = '1.1.1+3';
 
 const _paletteOptions = <String, Color>{
   'EnerGrow green': Color(0xFF35A968),
@@ -183,6 +183,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: Text(_saving ? 'Saving...' : 'Save settings'),
           ),
           const SizedBox(height: 28),
+          const Divider(height: 32),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Performance'),
+            subtitle: Text('Control rendering quality and glass effects.'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.speed_outlined),
+            title: const Text('Smooth Glass Mode'),
+            subtitle: Text(
+              widget.themeController.performanceMode
+                  ? 'Optimized for smooth 60fps on all devices'
+                  : 'Full backdrop blur enabled (may affect performance)',
+            ),
+            value: widget.themeController.performanceMode,
+            onChanged: (value) {
+              widget.themeController.setPerformanceMode(value);
+              setState(() {});
+            },
+          ),
           const Divider(),
           const ListTile(
             contentPadding: EdgeInsets.zero,

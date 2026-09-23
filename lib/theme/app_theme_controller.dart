@@ -14,6 +14,9 @@ class AppThemeController extends ChangeNotifier {
 
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
+  bool _performanceMode = true;
+  bool get performanceMode => _performanceMode;
+
   Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
     final storedSeed = preferences.getInt(_seedKey);
@@ -39,6 +42,7 @@ class AppThemeController extends ChangeNotifier {
       _themeMode = ThemeMode.dark;
     }
 
+    _performanceMode = preferences.getBool('performance_mode') ?? true;
     notifyListeners();
   }
 
@@ -63,5 +67,12 @@ class AppThemeController extends ChangeNotifier {
 
   Future<void> toggleDarkMode(bool isDark) async {
     await setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  Future<void> setPerformanceMode(bool value) async {
+    _performanceMode = value;
+    notifyListeners();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('performance_mode', value);
   }
 }

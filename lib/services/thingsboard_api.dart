@@ -79,7 +79,39 @@ class ThingsBoardApi {
     await _secureStorage.delete(key: 'tb_token');
     await _secureStorage.delete(key: 'tb_refresh_token');
     await _removeLegacyCredentials();
+    await clearUserCache();
     _token = null;
+  }
+
+  /// Fetches and caches the display name for the logged-in user.
+  Future<String> fetchDisplayName() async {
+    final preferences = await SharedPreferences.getInstance();
+    final cached = preferences.getString('user_display_name');
+    if (cached != null && cached.isNotEmpty) return cached;
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/auth/user'),
+        headers: _authHeaders,
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final firstName = data['firstName'] as String? ?? '';
+        final email = data['email'] as String? ?? '';
+        final name = firstName.isNotEmpty
+            ? firstName
+            : (email.contains('@') ? email.split('@').first : email);
+        final displayName = name.isNotEmpty ? name : 'User';
+        await preferences.setString('user_display_name', displayName);
+        return displayName;
+      }
+    } catch (_) {}
+    return 'User';
+  }
+
+  /// Clears cached user display name.
+  Future<void> clearUserCache() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove('user_display_name');
   }
 
   Future<void> _removeLegacyCredentials([
