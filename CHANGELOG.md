@@ -2,13 +2,18 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [1.2.2] - 2026-09-24
 
 ### Added
 
 - Added estimated daily and seven-day PV production and AC consumption summaries, compared with the previous equivalent period.
 - Added configurable in-app alerts for low battery SOC and stale telemetry.
-- Push delivery while the app is closed still requires an FCM-enabled backend or ThingsBoard notification integration.
+
+### Improved
+
+- Redesigned the CCTV page with a standby state, camera status, and clearer playback controls.
+- Changed CCTV playback to start only after the user presses **Play kamera**; added stop, retry, and reload controls.
+- Avoided rebuilding the dashboard when periodic telemetry polling returns unchanged values.
 
 ## [1.2.1] - 2026-09-24
 
