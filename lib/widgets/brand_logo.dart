@@ -37,20 +37,29 @@ class BrandLogo extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Positioned(
-            top: size * .14,
-            child: Icon(
-              Icons.wb_sunny,
-              size: size * .48,
-              color: primary,
+            top: size * .10,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Icon(
+                Icons.wb_sunny,
+                size: size * .48,
+                color: primary,
+              ),
             ),
           ),
           Positioned(
-            bottom: size * .1,
-            right: size * .12,
-            child: Icon(
-              Icons.eco,
-              size: size * .62,
-              color: secondary,
+            bottom: size * .08,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Icon(
+                Icons.eco,
+                size: size * .62,
+                color: secondary,
+              ),
             ),
           ),
         ],

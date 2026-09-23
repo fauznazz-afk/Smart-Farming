@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
-import '../widgets/brand_logo.dart';
 import '../widgets/liquid_glass.dart';
 import 'cctv_screen.dart';
 import 'login_screen.dart';
@@ -51,6 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _refreshTimer;
   DateTime _selectedDate = DateTime.now();
   String _displayName = '';
+  bool _appBarBlurred = false;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
   @override
@@ -97,10 +98,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         .toColor();
   }
 
-  Color get _themeSecondaryColor {
-    return widget.themeController.seedColor;
-  }
-
   Color _metricColor(int index, bool isDark) {
     final base = HSLColor.fromColor(widget.themeController.seedColor);
     return base
@@ -115,6 +112,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         .withSaturation(isDark ? 0.78 : 0.86)
         .withLightness(isDark ? 0.64 : 0.36)
         .toColor();
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    final blurred = notification.metrics.pixels > 18;
+    if (blurred != _appBarBlurred && mounted) {
+      setState(() => _appBarBlurred = blurred);
+    }
+    return false;
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────────
@@ -342,21 +348,34 @@ class _DashboardScreenState extends State<DashboardScreen>
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: _appBarBlurred
+            ? (isDark
+                ? const Color(0xB8101412)
+                : const Color(0xB8F6F8F7))
+            : Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: BrandLogo(
-            size: 30,
-            accentColor: widget.themeController.seedColor,
-            secondaryColor: _themeSecondaryColor,
-          ),
+        flexibleSpace: _appBarBlurred
+            ? ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: const SizedBox.expand(),
+                ),
+              )
+            : null,
+        leading: IconButton(
+          tooltip: 'Refresh',
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: _loading ? null : _fetchAll,
         ),
         title: const Text(
           'EnerGrow',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
         ),
         actions: [
           IconButton(
@@ -385,20 +404,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                       final prefix = _prefixForPage(index);
                       if (prefix != null) unawaited(_fetchHistoryFor(prefix));
                     },
-                    itemBuilder: (context, index) => RefreshIndicator(
-                      onRefresh: _refreshCurrentPage,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          MediaQuery.of(context).padding.top + kToolbarHeight - 6,
-                          16,
-                          MediaQuery.of(context).padding.bottom + 104,
+                    itemBuilder: (context, index) => NotificationListener<
+                        ScrollNotification>(
+                      onNotification: _handleScrollNotification,
+                      child: RefreshIndicator(
+                        onRefresh: _refreshCurrentPage,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            MediaQuery.of(context).padding.top +
+                                kToolbarHeight -
+                                6,
+                            16,
+                            MediaQuery.of(context).padding.bottom + 104,
+                          ),
+                          children: [
+                            if (_error != null) _warningBanner(),
+                            ..._pageContentFor(index, isDark),
+                          ],
                         ),
-                        children: [
-                          if (_error != null) _warningBanner(),
-                          ..._pageContentFor(index, isDark),
-                        ],
                       ),
                     ),
                   ),
@@ -570,9 +595,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     final now = DateTime.now();
     final greeting = now.hour < 12
         ? 'Selamat Pagi'
-        : now.hour < 17
+        : now.hour < 15
             ? 'Selamat Siang'
-            : 'Selamat Malam';
+            : now.hour < 18
+        ? 'Selamat Sore'
+        : 'Selamat Malam';
     return Row(
       children: [
         Container(
@@ -602,7 +629,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               Text(
                 '$greeting${_displayName.isNotEmpty ? ", $_displayName!" : "!"}',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : Colors.black87,
                 ),
@@ -610,7 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               Text(
                 '${_dayNameFull(now.weekday)}, ${now.day} ${_monthName(now.month)} ${now.year}',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: isDark ? Colors.white54 : Colors.black45,
                 ),
               ),
@@ -760,41 +787,51 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: Row(
               children: [
                 Expanded(
-                  child: GlassCapsule(
-                    label: 'PV Output',
-                    value: pvPower?.toStringAsFixed(0) ?? '--',
-                    unit: 'W',
-                    accentColor: _themeColor(lightness: isDark ? 0.72 : 0.42),
-                    progress: ((pvPower ?? 0) / 300).clamp(0.0, 1.0),
-                    isDark: isDark,
-                    performanceMode: _performanceMode,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: GlassCapsule(
-                    label: 'AC Load',
-                    value: acPower.toStringAsFixed(0),
-                    unit: 'W',
-                    accentColor: _themeColor(
-                      lightness: isDark ? 0.64 : 0.36,
-                      saturation: 0.48,
+                  child: _dashboardShortcut(
+                    pageIndex: 1,
+                    child: GlassCapsule(
+                      label: 'PV Output',
+                      value: pvPower?.toStringAsFixed(0) ?? '--',
+                      unit: 'W',
+                      accentColor:
+                          _themeColor(lightness: isDark ? 0.72 : 0.42),
+                      progress: ((pvPower ?? 0) / 300).clamp(0.0, 1.0),
+                      isDark: isDark,
+                      performanceMode: _performanceMode,
                     ),
-                    progress: (acPower / 2000).clamp(0.0, 1.0),
-                    isDark: isDark,
-                    performanceMode: _performanceMode,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: GlassCapsule(
-                    label: 'Battery',
-                    value: soc.toStringAsFixed(0),
-                    unit: '%',
-                    accentColor: widget.themeController.seedColor,
-                    progress: soc / 100,
-                    isDark: isDark,
-                    performanceMode: _performanceMode,
+                  child: _dashboardShortcut(
+                    pageIndex: 2,
+                    child: GlassCapsule(
+                      label: 'AC Load',
+                      value: acPower.toStringAsFixed(0),
+                      unit: 'W',
+                      accentColor: _themeColor(
+                        lightness: isDark ? 0.64 : 0.36,
+                        saturation: 0.48,
+                      ),
+                      progress: (acPower / 2000).clamp(0.0, 1.0),
+                      isDark: isDark,
+                      performanceMode: _performanceMode,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _dashboardShortcut(
+                    pageIndex: 3,
+                    child: GlassCapsule(
+                      label: 'Battery',
+                      value: soc.toStringAsFixed(0),
+                      unit: '%',
+                      accentColor: widget.themeController.seedColor,
+                      progress: soc / 100,
+                      isDark: isDark,
+                      performanceMode: _performanceMode,
+                    ),
                   ),
                 ),
               ],
@@ -822,13 +859,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         children: [
           // Battery detail card
           Expanded(
-            child: LiquidGlassCard(
-              isDark: isDark,
-              performanceMode: _performanceMode,
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+            child: _dashboardShortcut(
+              pageIndex: 3,
+              child: LiquidGlassCard(
+                isDark: isDark,
+                performanceMode: _performanceMode,
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                   Row(
                     children: [
                       Icon(
@@ -875,20 +914,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                           '${a.toStringAsFixed(2)} A', 'Current', isDark),
                     ],
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
           // AC status card
           Expanded(
-            child: LiquidGlassCard(
-              isDark: isDark,
-              performanceMode: _performanceMode,
-              padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: _dashboardShortcut(
+              pageIndex: 2,
+              child: LiquidGlassCard(
+                isDark: isDark,
+                performanceMode: _performanceMode,
+                padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   Row(
                     children: [
                       Icon(
@@ -940,12 +982,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                   _dividerLine(isDark),
                   _glassMetricRow(
                       'Frequency', '${freqAc.toStringAsFixed(1)} Hz', isDark),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _dashboardShortcut({
+    required int pageIndex,
+    required Widget child,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selectPage(pageIndex),
+      child: child,
     );
   }
 
