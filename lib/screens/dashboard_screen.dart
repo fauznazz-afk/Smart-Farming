@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -528,27 +527,13 @@ class _DashboardScreenState extends State<DashboardScreen>
             final baseColor = isDark
                 ? const Color(0xFF101412)
                 : const Color(0xFFF6F8F7);
-            return ClipRect(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: 8 * progress,
-                      sigmaY: 8 * progress,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                  ColoredBox(
-                    color: baseColor.withValues(alpha: 0.72 * progress),
-                  ),
-                ],
-              ),
+            return ColoredBox(
+              color: baseColor.withValues(alpha: 0.88 * progress),
             );
           },
         ),
         leading: IconButton(
-          tooltip: 'Refresh',
+          tooltip: 'Muat ulang data',
           icon: const Icon(Icons.refresh_rounded),
           onPressed: _loading ? null : _fetchAll,
         ),
@@ -562,7 +547,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         actions: [
           IconButton(
-            tooltip: 'Settings',
+            tooltip: 'Pengaturan',
             icon: const Icon(Icons.settings_outlined),
             onPressed: _openSettings,
           ),
@@ -656,13 +641,13 @@ class _DashboardScreenState extends State<DashboardScreen>
               child: Row(
                 children: [
                   _navItem(0, Icons.dashboard_outlined, Icons.dashboard,
-                      'Overview', page, isDark, primary),
+                      'Ringkas', page, isDark, primary),
                   _navItem(1, Icons.wb_sunny_outlined, Icons.wb_sunny, 'PV',
                       page, isDark, primary),
                   _navItem(2, Icons.power_outlined, Icons.power, 'AC', page,
                       isDark, primary),
                   _navItem(3, Icons.battery_5_bar_outlined, Icons.battery_full,
-                      'Battery', page, isDark, primary),
+                      'Baterai', page, isDark, primary),
                   _navItem(4, Icons.videocam_outlined, Icons.videocam, 'CCTV',
                       page, isDark, primary),
                 ],
