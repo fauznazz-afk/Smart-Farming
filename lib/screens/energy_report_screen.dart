@@ -268,6 +268,10 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
             : _error != null
             ? _errorView(isDark)
             : RefreshIndicator(
+                color: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                strokeWidth: 2.5,
+                displacement: 48,
                 onRefresh: _load,
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),

@@ -134,7 +134,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _usernameCtrl,
                           decoration: InputDecoration(
                             labelText: 'Username / Email',
-                            prefixIcon: const Icon(Icons.person_outline),
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.all(13),
+                              child: Image.asset(
+                                'assets/user_icon.png',
+                                width: 22,
+                                height: 22,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                colorBlendMode: BlendMode.srcIn,
+                                semanticLabel: 'Pengguna',
+                              ),
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

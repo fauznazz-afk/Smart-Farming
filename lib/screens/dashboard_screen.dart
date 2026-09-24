@@ -624,6 +624,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ScrollNotification>(
                       onNotification: _handleScrollNotification,
                       child: RefreshIndicator(
+                        color: Theme.of(context).colorScheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        strokeWidth: 2.5,
+                        displacement: 58,
+                        edgeOffset:
+                            MediaQuery.of(context).padding.top + kToolbarHeight,
                         onRefresh: _refreshCurrentPage,
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -870,14 +876,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             color: primary.withValues(alpha: 0.18),
             border: Border.all(color: primary.withValues(alpha: 0.35)),
           ),
-          child: Center(
-            child: Text(
-              (_displayName.isNotEmpty ? _displayName[0] : 'U').toUpperCase(),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: primary,
-              ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Image.asset(
+              'assets/user_icon.png',
+              fit: BoxFit.contain,
+              color: primary,
+              colorBlendMode: BlendMode.srcIn,
+              semanticLabel: 'Profil pengguna',
             ),
           ),
         ),
