@@ -16,6 +16,7 @@ class EnergySummaryCard extends StatelessWidget {
     required this.loadKwh,
     required this.previousLoadKwh,
     required this.onRangeChanged,
+    required this.onOpenReport,
   });
 
   final bool isDark;
@@ -29,6 +30,7 @@ class EnergySummaryCard extends StatelessWidget {
   final double loadKwh;
   final double previousLoadKwh;
   final ValueChanged<bool> onRangeChanged;
+  final VoidCallback onOpenReport;
 
   String _formatEnergy(double value) => value.toStringAsFixed(2);
 
@@ -116,6 +118,12 @@ class EnergySummaryCard extends StatelessWidget {
                 selected: {weekly},
                 onSelectionChanged: (selection) =>
                     onRangeChanged(selection.first),
+              ),
+              IconButton(
+                tooltip: 'Lihat laporan energi',
+                visualDensity: VisualDensity.compact,
+                onPressed: onOpenReport,
+                icon: const Icon(Icons.insert_chart_outlined_rounded),
               ),
             ],
           ),

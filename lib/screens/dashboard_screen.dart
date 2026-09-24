@@ -10,6 +10,7 @@ import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
 import 'cctv_screen.dart';
+import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
@@ -837,6 +838,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       loadKwh: load.current,
       previousLoadKwh: load.previous,
       onRangeChanged: _setWeeklyEnergySummary,
+      onOpenReport: _openEnergyReport,
+    );
+  }
+
+  void _openEnergyReport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EnergyReportScreen()),
     );
   }
 
