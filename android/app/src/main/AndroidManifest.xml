@@ -3,6 +3,7 @@
     <application
         android:label="EnerGrow"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@drawable/energrow_launcher">
         <activity
             android:name=".MainActivity"

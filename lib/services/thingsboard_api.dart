@@ -206,9 +206,7 @@ class ThingsBoardApi {
     } else if (response.statusCode == 401) {
       throw Exception('Token expired, silakan login ulang');
     } else {
-      throw Exception(
-        'Gagal fetch history: ${response.statusCode} ${response.body}',
-      );
+      throw Exception('Gagal fetch history: ${response.statusCode}');
     }
   }
 

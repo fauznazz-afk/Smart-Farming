@@ -185,11 +185,11 @@ class LiquidGlassCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: isDark
                 ? [
-                    surface.withValues(alpha: 0.82),
-                    surface.withValues(alpha: 0.62),
+                    surface.withValues(alpha: 0.66),
+                    surface.withValues(alpha: 0.46),
                   ]
                 : [
-                    surface.withValues(alpha: 0.72),
+                    surface.withValues(alpha: 0.64),
                     surface.withValues(alpha: 0.44),
                   ],
           ),
@@ -204,14 +204,14 @@ class LiquidGlassCard extends StatelessWidget {
       result = ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             width: width,
             height: height,
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.07)
-                  : Colors.white.withValues(alpha: 0.55),
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white.withValues(alpha: 0.42),
               borderRadius: radius,
               border: border,
               boxShadow: shadows,
