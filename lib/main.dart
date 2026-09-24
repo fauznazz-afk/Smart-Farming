@@ -58,10 +58,7 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
             brightness: Brightness.light,
           ),
           scaffoldBackgroundColor: const Color(0xFFF6F8F7),
-          cardTheme: const CardThemeData(
-            color: Colors.white,
-            elevation: 0,
-          ),
+          cardTheme: const CardThemeData(color: Colors.white, elevation: 0),
           inputDecorationTheme: const InputDecorationTheme(
             filled: true,
             fillColor: Color(0xFFEBEFEA),
@@ -94,11 +91,13 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
           return AnnotatedRegion<SystemUiOverlayStyle>(
             value: SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
-              statusBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
+              statusBarIconBrightness: isDark
+                  ? Brightness.light
+                  : Brightness.dark,
               systemNavigationBarColor: navColor,
-              systemNavigationBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarIconBrightness: isDark
+                  ? Brightness.light
+                  : Brightness.dark,
               systemNavigationBarDividerColor: navColor,
               systemNavigationBarContrastEnforced: false,
             ),
@@ -194,9 +193,7 @@ class _SplashRouterState extends State<_SplashRouter> {
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              BrandLogo(size: 92, showName: true),
-            ],
+            children: [BrandLogo(size: 92, showName: true)],
           ),
         ),
       );
@@ -214,7 +211,10 @@ class _SplashRouterState extends State<_SplashRouter> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const BrandLogo(size: 88),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: const BrandLogo(size: 88),
+                    ),
                     const SizedBox(height: 20),
                     const Text(
                       'Sesi EnerGrow tersimpan',
@@ -250,7 +250,9 @@ class _SplashRouterState extends State<_SplashRouter> {
                             )
                           : const Icon(Icons.fingerprint),
                       label: Text(
-                        _authenticating ? 'Memverifikasi…' : 'Buka dengan biometrik',
+                        _authenticating
+                            ? 'Memverifikasi…'
+                            : 'Buka dengan biometrik',
                       ),
                     ),
                     TextButton(

@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _refreshTimer;
   Timer? _connectionStatusTimer;
   bool _connectionStatusInitialized = false;
-  bool _showConnectionStatus = false;
+  bool _connectionStatusVisible = false;
   DateTime _selectedDate = DateTime.now();
   DateTime? _energyUpdatedAt;
   DateTime? _lastSuccessfulTelemetryAt;
@@ -226,7 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final now = DateTime.now();
       final statusChanged = !_connectionStatusInitialized || _error != null;
       _connectionStatusInitialized = true;
-      if (statusChanged) _showConnectionStatusForThreeSeconds();
+      if (statusChanged) _showConnectionStatus();
       final changed =
           _loading ||
           _error != null ||
@@ -270,7 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final message = error.toString();
       final statusChanged = !_connectionStatusInitialized || _error == null;
       _connectionStatusInitialized = true;
-      if (statusChanged) _showConnectionStatusForThreeSeconds();
+      if (statusChanged) _showConnectionStatus();
       if (_error != message || _loading) {
         setState(() {
           _error = message;
@@ -417,11 +417,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (mounted) setState(() {});
   }
 
-  void _showConnectionStatusForThreeSeconds() {
+  void _showConnectionStatus() {
     _connectionStatusTimer?.cancel();
-    if (mounted) setState(() => _showConnectionStatus = true);
+    if (mounted && !_connectionStatusVisible) {
+      setState(() => _connectionStatusVisible = true);
+    }
     _connectionStatusTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _showConnectionStatus = false);
+      if (!mounted) return;
+      setState(() => _connectionStatusVisible = false);
     });
   }
 
@@ -803,9 +806,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           MediaQuery.of(context).padding.bottom + 76,
                         ),
                         children: [
-                          if (_showConnectionStatus &&
-                              (_battery != null || _error != null))
-                            _connectionStatusBanner(),
+                          if (_battery != null || _error != null)
+                            _animatedConnectionStatusBanner(),
                           if (_activeAlertMessages.isNotEmpty)
                             _energyAlertBanner(),
                           ..._pageContentFor(index, isDark),
@@ -2030,18 +2032,49 @@ class _DashboardScreenState extends State<DashboardScreen>
                           borderData: FlBorderData(show: false),
                           lineTouchData: LineTouchData(
                             touchTooltipData: LineTouchTooltipData(
-                              getTooltipItems: (touchedSpots) => touchedSpots
-                                  .map(
-                                    (spot) => LineTooltipItem(
-                                      '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
-                                      const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                              tooltipRoundedRadius: 14,
+                              tooltipPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 9,
+                              ),
+                              tooltipMargin: 12,
+                              maxContentWidth: 150,
+                              fitInsideHorizontally: true,
+                              fitInsideVertically: true,
+                              tooltipBorder: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.24),
+                                width: 1,
+                              ),
+                              getTooltipColor: (_) => isDark
+                                  ? const Color(0xCC18211D)
+                                  : const Color(0xD9FFFFFF),
+                              getTooltipItems: (touchedSpots) {
+                                if (touchedSpots.isEmpty) {
+                                  return const [];
+                                }
+                                final time = _axisTime(touchedSpots.first.x);
+                                final values = <String>[];
+                                for (final spot in touchedSpots) {
+                                  values.add(
+                                    '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
+                                  );
+                                }
+                                final tooltip = LineTooltipItem(
+                                  '$time\n${values.join('  ·  ')}',
+                                  TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF17211C),
+                                    fontSize: 11,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                );
+                                return List<LineTooltipItem?>.generate(
+                                  touchedSpots.length,
+                                  (index) => index == 0 ? tooltip : null,
+                                );
+                              },
                             ),
                           ),
                           lineBarsData: series
@@ -2174,50 +2207,93 @@ class _DashboardScreenState extends State<DashboardScreen>
         : 'ThingsBoard terhubung';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Tooltip(
-        message: failed
-            ? 'Fetch telemetry gagal. Periksa koneksi/server. ${_error ?? ''}'
-            : 'Fetch sukses${lastUpdate == null ? '' : ' pukul ${_formatClock(lastUpdate)}'}${stale ? '. Data lama: ${staleNames.join(', ')}' : ''}',
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 36),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 360),
+        reverseDuration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            alignment: Alignment.topCenter,
+            child: child,
           ),
-          child: Row(
-            children: [
-              Icon(
-                failed ? Icons.cloud_off : Icons.cloud_done_outlined,
-                color: color,
-                size: 17,
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+        ),
+        child: Tooltip(
+          key: ValueKey('$failed:$stale:$label'),
+          message: failed
+              ? 'Fetch telemetry gagal. Periksa koneksi/server. ${_error ?? ''}'
+              : 'Fetch sukses${lastUpdate == null ? '' : ' pukul ${_formatClock(lastUpdate)}'}${stale ? '. Data lama: ${staleNames.join(', ')}' : ''}',
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 36),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  failed ? Icons.cloud_off : Icons.cloud_done_outlined,
+                  color: color,
+                  size: 17,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
                   ),
                 ),
-              ),
-              if (failed)
-                InkWell(
-                  onTap: _fetchAll,
-                  borderRadius: BorderRadius.circular(16),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.refresh, size: 18),
+                if (failed)
+                  InkWell(
+                    onTap: _fetchAll,
+                    borderRadius: BorderRadius.circular(16),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.refresh, size: 18),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _animatedConnectionStatusBanner() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 420),
+      reverseDuration: const Duration(milliseconds: 520),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInOutCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SizeTransition(
+          sizeFactor: animation,
+          axis: Axis.vertical,
+          alignment: Alignment.topCenter,
+          child: child,
+        ),
+      ),
+      child: _connectionStatusVisible
+          ? KeyedSubtree(
+              key: const ValueKey('connection-status-visible'),
+              child: _connectionStatusBanner(),
+            )
+          : const SizedBox(
+              key: ValueKey('connection-status-hidden'),
+              width: double.infinity,
+              height: 0,
+            ),
     );
   }
 
