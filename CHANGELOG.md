@@ -10,6 +10,13 @@ All notable changes to this project are documented here.
 - Added a dashboard status that distinguishes ThingsBoard fetch failures from stale telemetry and shows the last successful fetch time.
 - Added validation for environmental threshold ranges in Settings.
 
+### Improved
+
+- Smoothed dashboard page transitions by reducing unnecessary rebuilds, isolating page repaints, and optimizing chart rendering.
+- Improved the ThingsBoard connection banner with a three-second display period and smooth fade/collapse exit animation.
+- Enhanced chart touch tooltips with one shared timestamp and combined `V`, `A`, and `W` values in a rounded frosted-transparent panel.
+- Rounded the saved-session logo shown on the biometric authentication screen.
+
 ## [1.2.3] - 2026-09-24
 
 ### Fixed
