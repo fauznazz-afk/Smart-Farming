@@ -845,7 +845,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _openEnergyReport() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const EnergyReportScreen()),
+      MaterialPageRoute(
+        builder: (_) => EnergyReportScreen(api: widget.api),
+      ),
     );
   }
 

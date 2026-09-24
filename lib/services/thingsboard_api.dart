@@ -286,7 +286,12 @@ class ThingsBoardApi {
     } else if (response.statusCode == 401) {
       throw Exception('Token expired, silakan login ulang');
     } else {
-      throw Exception('Gagal fetch history: ${response.statusCode}');
+      final detail = response.body.trim();
+      final message = detail.length > 400 ? '${detail.substring(0, 400)}…' : detail;
+      throw Exception(
+        'Gagal fetch history: ${response.statusCode}'
+        '${message.isEmpty ? '' : ' — $message'}',
+      );
     }
   }
 

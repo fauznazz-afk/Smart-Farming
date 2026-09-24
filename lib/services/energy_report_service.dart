@@ -1,11 +1,7 @@
-import 'dart:async';
-import 'dart:isolate';
 import 'dart:math' as math;
 
-import 'package:http/http.dart' as http;
-
-const energySpreadsheetCsvUrl =
-    'https://docs.google.com/spreadsheets/d/1xhqranU4CQrOrC8pqHDnbbPItQeEYnkPVMJGal2nx2w/export?format=csv&gid=1401376274';
+import '../models/telemetry_model.dart';
+import 'thingsboard_api.dart';
 
 class EnergyBucket {
   const EnergyBucket({
@@ -27,246 +23,116 @@ class EnergyReportData {
     required this.firstSample,
     required this.lastSample,
     required this.sampleCount,
-    required this.skippedGaps,
   });
 
   final List<EnergyBucket> buckets;
   final DateTime firstSample;
   final DateTime lastSample;
   final int sampleCount;
-  final int skippedGaps;
 
   double get pvKwh => buckets.fold(0, (sum, item) => sum + item.pvKwh);
   double get acKwh => buckets.fold(0, (sum, item) => sum + item.acKwh);
+}
 
-  factory EnergyReportData.fromMap(Map<String, dynamic> map) {
-    final buckets = (map['buckets'] as List<dynamic>)
-        .cast<Map<String, dynamic>>()
+/// Loads hourly power aggregates from ThingsBoard's stored device telemetry.
+class EnergyReportService {
+  EnergyReportService(this._api);
+
+  final ThingsBoardApi _api;
+
+  Future<EnergyReportData> load({required DateTime referenceDate}) async {
+    final currentMonth = DateTime(referenceDate.year, referenceDate.month);
+    final start = DateTime(currentMonth.year, currentMonth.month - 1);
+    final now = DateTime.now();
+    final requestedEnd = DateTime(currentMonth.year, currentMonth.month + 1);
+    final end = requestedEnd.isAfter(now) ? now : requestedEnd;
+    if (!end.isAfter(start)) {
+      throw Exception('Rentang laporan tidak valid.');
+    }
+
+    final histories = <String, List<TelemetryPoint>>{
+      'power_dc': <TelemetryPoint>[],
+      'power_ac': <TelemetryPoint>[],
+    };
+    // This ThingsBoard instance caps aggregate queries below a full 31-day
+    // window. Fetch 28-day chunks (672 hourly intervals) to stay under it.
+    const maxQueryDuration = Duration(days: 28);
+    var cursor = start;
+    while (cursor.isBefore(end)) {
+      final chunkEnd = cursor.add(maxQueryDuration).isBefore(end)
+          ? cursor.add(maxQueryDuration)
+          : end;
+      final result = await _api.fetchHistoryForKeys(
+        ThingsBoardApi.devicePzem,
+        const ['power_dc', 'power_ac'],
+        start: cursor,
+        end: chunkEnd,
+        intervalMs: const Duration(hours: 1).inMilliseconds,
+        limit: 720,
+      );
+      for (final key in histories.keys) {
+        histories[key]!.addAll(result[key] ?? const <TelemetryPoint>[]);
+      }
+      cursor = chunkEnd;
+    }
+    final dc = histories['power_dc'] ?? const <TelemetryPoint>[];
+    final ac = histories['power_ac'] ?? const <TelemetryPoint>[];
+    if (dc.isEmpty && ac.isEmpty) {
+      throw Exception('ThingsBoard belum memiliki histori daya pada periode ini.');
+    }
+
+    final byHour = <DateTime, _MutableEnergyBucket>{};
+    DateTime? firstSample;
+    DateTime? lastSample;
+    for (final point in dc) {
+      final hour = _hourOf(point.timestamp);
+      final bucket = byHour.putIfAbsent(hour, () => _MutableEnergyBucket());
+      bucket.pvKwh = math.max(0, point.value) / 1000;
+      bucket.sampleCount++;
+      firstSample = _earlier(firstSample, point.timestamp);
+      lastSample = _later(lastSample, point.timestamp);
+    }
+    for (final point in ac) {
+      final hour = _hourOf(point.timestamp);
+      final bucket = byHour.putIfAbsent(hour, () => _MutableEnergyBucket());
+      bucket.acKwh = math.max(0, point.value) / 1000;
+      bucket.sampleCount++;
+      firstSample = _earlier(firstSample, point.timestamp);
+      lastSample = _later(lastSample, point.timestamp);
+    }
+
+    final buckets = byHour.entries
         .map(
-          (item) => EnergyBucket(
-            hour: DateTime.fromMillisecondsSinceEpoch(item['hour'] as int),
-            pvKwh: (item['pv'] as num).toDouble(),
-            acKwh: (item['ac'] as num).toDouble(),
-            sampleCount: item['samples'] as int,
+          (entry) => EnergyBucket(
+            hour: entry.key,
+            pvKwh: entry.value.pvKwh,
+            acKwh: entry.value.acKwh,
+            sampleCount: entry.value.sampleCount,
           ),
         )
-        .toList(growable: false);
+        .toList()
+      ..sort((a, b) => a.hour.compareTo(b.hour));
+
     return EnergyReportData(
       buckets: buckets,
-      firstSample: DateTime.fromMillisecondsSinceEpoch(map['first'] as int),
-      lastSample: DateTime.fromMillisecondsSinceEpoch(map['last'] as int),
-      sampleCount: map['count'] as int,
-      skippedGaps: map['gaps'] as int,
+      firstSample: firstSample!,
+      lastSample: lastSample!,
+      sampleCount: buckets.fold(0, (sum, item) => sum + item.sampleCount),
     );
   }
 }
 
-class EnergyReportService {
-  static Future<EnergyReportData>? _cachedRequest;
+DateTime _hourOf(DateTime value) =>
+    DateTime(value.year, value.month, value.day, value.hour);
 
-  Future<EnergyReportData> load({bool refresh = false}) {
-    if (refresh || _cachedRequest == null) {
-      _cachedRequest = _load();
-    }
-    return _cachedRequest!;
-  }
+DateTime _earlier(DateTime? current, DateTime candidate) =>
+    current == null || candidate.isBefore(current) ? candidate : current;
 
-  Future<EnergyReportData> _load() async {
-    final response = await http
-        .get(Uri.parse(energySpreadsheetCsvUrl))
-        .timeout(const Duration(seconds: 35));
-    if (response.statusCode != 200) {
-      throw Exception('Spreadsheet gagal dimuat (${response.statusCode}).');
-    }
-    final csv = response.body;
-    return EnergyReportData.fromMap(
-      await Isolate.run(() => _parseEnergyCsv(csv)),
-    );
-  }
-}
+DateTime _later(DateTime? current, DateTime candidate) =>
+    current == null || candidate.isAfter(current) ? candidate : current;
 
-Map<String, dynamic> _parseEnergyCsv(String text) {
-  final rows = _parseCsv(text);
-  if (rows.length < 2) throw const FormatException('CSV tidak memiliki data.');
-
-  final header = rows.first.map((value) => value.trim().toLowerCase()).toList();
-  final dcIndex = header.indexWhere((value) => value.contains('power dc'));
-  final acIndex = header.indexWhere((value) => value.contains('power ac'));
-  if (dcIndex < 0 || acIndex < 0) {
-    throw const FormatException(
-      'Kolom Power DC (W) dan Power AC (W) tidak ditemukan.',
-    );
-  }
-
-  final samples = <({DateTime time, double dc, double ac})>[];
-  for (final row in rows.skip(1)) {
-    if (row.length <= math.max(dcIndex, acIndex)) continue;
-    final time = _parseSheetTimestamp(row.first.trim());
-    final dc = double.tryParse(row[dcIndex].trim());
-    final ac = double.tryParse(row[acIndex].trim());
-    if (time == null || dc == null || ac == null) continue;
-    samples.add((time: time, dc: dc, ac: ac));
-  }
-  if (samples.isEmpty) {
-    throw const FormatException('Tidak ada baris daya valid.');
-  }
-  samples.sort((a, b) => a.time.compareTo(b.time));
-
-  final buckets = <int, Map<String, dynamic>>{};
-  var skippedGaps = 0;
-  for (var i = 0; i < samples.length; i++) {
-    final current = samples[i];
-    final hour = DateTime(
-      current.time.year,
-      current.time.month,
-      current.time.day,
-      current.time.hour,
-    );
-    final bucket = buckets.putIfAbsent(
-      hour.millisecondsSinceEpoch,
-      () => {
-        'hour': hour.millisecondsSinceEpoch,
-        'pv': 0.0,
-        'ac': 0.0,
-        'samples': 0,
-      },
-    );
-    bucket['samples'] = (bucket['samples'] as int) + 1;
-
-    if (i == 0) continue;
-    final previous = samples[i - 1];
-    final gapMs = current.time.difference(previous.time).inMilliseconds;
-    if (gapMs <= 0) continue;
-    if (gapMs > const Duration(seconds: 60).inMilliseconds) {
-      skippedGaps++;
-      continue;
-    }
-
-    var cursorMs = previous.time.millisecondsSinceEpoch;
-    final endMs = current.time.millisecondsSinceEpoch;
-    while (cursorMs < endMs) {
-      final cursorTime = DateTime.fromMillisecondsSinceEpoch(cursorMs);
-      final nextHour = DateTime(
-        cursorTime.year,
-        cursorTime.month,
-        cursorTime.day,
-        cursorTime.hour + 1,
-      ).millisecondsSinceEpoch;
-      final segmentEnd = endMs < nextHour ? endMs : nextHour;
-      final leftFraction =
-          (cursorMs - previous.time.millisecondsSinceEpoch) / gapMs;
-      final rightFraction =
-          (segmentEnd - previous.time.millisecondsSinceEpoch) / gapMs;
-      final segmentMs = segmentEnd - cursorMs;
-      final hourStart = DateTime(
-        cursorTime.year,
-        cursorTime.month,
-        cursorTime.day,
-        cursorTime.hour,
-      );
-      final target = buckets.putIfAbsent(
-        hourStart.millisecondsSinceEpoch,
-        () => {
-          'hour': hourStart.millisecondsSinceEpoch,
-          'pv': 0.0,
-          'ac': 0.0,
-          'samples': 0,
-        },
-      );
-      target['pv'] =
-          (target['pv'] as double) +
-          _trapezoidKwh(
-            previous.dc,
-            current.dc,
-            leftFraction,
-            rightFraction,
-            segmentMs,
-          );
-      target['ac'] =
-          (target['ac'] as double) +
-          _trapezoidKwh(
-            previous.ac,
-            current.ac,
-            leftFraction,
-            rightFraction,
-            segmentMs,
-          );
-      cursorMs = segmentEnd;
-    }
-  }
-
-  final orderedBuckets = buckets.values.toList()
-    ..sort((a, b) => (a['hour'] as int).compareTo(b['hour'] as int));
-  return {
-    'buckets': orderedBuckets,
-    'first': samples.first.time.millisecondsSinceEpoch,
-    'last': samples.last.time.millisecondsSinceEpoch,
-    'count': samples.length,
-    'gaps': skippedGaps,
-  };
-}
-
-double _trapezoidKwh(
-  double first,
-  double second,
-  double leftFraction,
-  double rightFraction,
-  int durationMs,
-) {
-  final left = math
-      .max(0.0, first + (second - first) * leftFraction)
-      .toDouble();
-  final right = math
-      .max(0.0, first + (second - first) * rightFraction)
-      .toDouble();
-  return (left + right) / 2 * durationMs / 3600000000;
-}
-
-DateTime? _parseSheetTimestamp(String value) {
-  final match = RegExp(
-    r'^(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$',
-  ).firstMatch(value);
-  if (match == null) return null;
-  return DateTime(
-    int.parse(match[3]!),
-    int.parse(match[2]!),
-    int.parse(match[1]!),
-    int.parse(match[4]!),
-    int.parse(match[5]!),
-    int.parse(match[6]!),
-  );
-}
-
-List<List<String>> _parseCsv(String input) {
-  final rows = <List<String>>[];
-  var row = <String>[];
-  var cell = StringBuffer();
-  var quoted = false;
-  for (var i = input.startsWith('\uFEFF') ? 1 : 0; i < input.length; i++) {
-    final char = input[i];
-    if (char == '"') {
-      if (quoted && i + 1 < input.length && input[i + 1] == '"') {
-        cell.write('"');
-        i++;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (char == ',' && !quoted) {
-      row.add(cell.toString());
-      cell = StringBuffer();
-    } else if ((char == '\n' || char == '\r') && !quoted) {
-      if (char == '\r' && i + 1 < input.length && input[i + 1] == '\n') i++;
-      row.add(cell.toString());
-      cell = StringBuffer();
-      if (row.any((value) => value.isNotEmpty)) rows.add(row);
-      row = <String>[];
-    } else {
-      cell.write(char);
-    }
-  }
-  if (cell.length > 0 || row.isNotEmpty) {
-    row.add(cell.toString());
-    if (row.any((value) => value.isNotEmpty)) rows.add(row);
-  }
-  return rows;
+class _MutableEnergyBucket {
+  double pvKwh = 0;
+  double acKwh = 0;
+  int sampleCount = 0;
 }

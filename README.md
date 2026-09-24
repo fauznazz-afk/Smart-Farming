@@ -12,12 +12,13 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **Dashboard real-time** dengan navigasi Overview, PV, AC, dan Battery
 - **Chart histori 24 jam** untuk Voltage, Current, dan Power pada tiap sumber energi
 - **Ringkasan energi harian dan mingguan** dengan estimasi produksi PV, pemakaian AC, dan perbandingan terhadap periode sebelumnya
+- **Laporan energi harian dan bulanan** dari histori time-series ThingsBoard, diperbarui otomatis setiap 5 menit dan dapat diekspor ke CSV
 - **Peringatan dalam aplikasi** untuk SOC baterai rendah dan telemetry yang stale, dengan ambang yang bisa diatur
 - **Auto-refresh** tiap 10 detik + pull-to-refresh manual
 - **UI grouped-list** bergaya fluid, dengan skema warna semantik per section
 - **Dark Mode & Light Mode toggle** di menu Pengaturan dengan penyimpanan preferensi lokal
 - **Indikator data stale** yang menampilkan usia telemetry terakhir
-- **(Roadmap)** CCTV live view, push notification, integrasi Google Sheets
+- **(Roadmap)** Push notification
 
 Versi rilis saat ini: **1.2.1 (build 5)**. Catatan perubahan lengkap tersedia di [CHANGELOG](./CHANGELOG.md).
 

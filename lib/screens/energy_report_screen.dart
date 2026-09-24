@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -6,46 +7,63 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../services/energy_report_service.dart';
+import '../services/thingsboard_api.dart';
 import '../widgets/liquid_glass.dart';
 
 class EnergyReportScreen extends StatefulWidget {
-  const EnergyReportScreen({super.key});
+  const EnergyReportScreen({super.key, required this.api});
+
+  final ThingsBoardApi api;
 
   @override
   State<EnergyReportScreen> createState() => _EnergyReportScreenState();
 }
 
 class _EnergyReportScreenState extends State<EnergyReportScreen> {
-  final _service = EnergyReportService();
+  late final EnergyReportService _service = EnergyReportService(widget.api);
+  Timer? _refreshTimer;
   EnergyReportData? _data;
   DateTime _selectedDate = DateTime.now();
   bool _monthly = false;
   bool _loading = true;
   bool _sharing = false;
+  bool _requestInFlight = false;
+  int? _touchedBucketIndex;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) => _load());
   }
 
-  Future<void> _load({bool refresh = false}) async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (_requestInFlight) return;
+    _requestInFlight = true;
     setState(() {
-      _loading = true;
+      _loading = _data == null;
       _error = null;
     });
     try {
-      final data = await _service.load(refresh: refresh);
+      final data = await _service.load(referenceDate: _selectedDate);
       if (!mounted) return;
       setState(() {
         _data = data;
         _loading = false;
+        _requestInFlight = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _requestInFlight = false;
         _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
@@ -59,7 +77,15 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
       lastDate: DateTime.now().add(const Duration(days: 1)),
       helpText: _monthly ? 'Pilih bulan laporan' : 'Pilih tanggal laporan',
     );
-    if (selected != null) setState(() => _selectedDate = selected);
+    if (selected == null) return;
+    final monthChanged =
+        selected.year != _selectedDate.year ||
+        selected.month != _selectedDate.month;
+    setState(() {
+      _selectedDate = selected;
+      _touchedBucketIndex = null;
+    });
+    if (monthChanged) await _load();
   }
 
   List<EnergyBucket> _periodBuckets() {
@@ -156,10 +182,10 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
         'Periode',
         _monthly ? _monthLabel(_selectedDate) : _dateLabel(_selectedDate),
       ],
-      ['Sumber', 'Log_PZEM — Google Sheets'],
+      ['Sumber', 'ThingsBoard PZEM time-series'],
       [
         'Metode',
-        'Integrasi trapezoid daya terhadap waktu; celah >60 detik dilewati',
+        'Rata-rata daya per jam dikali durasi interval; interval tanpa data tidak diestimasi',
       ],
       [],
       [
@@ -172,18 +198,18 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
         [
           _monthly ? _dateLabel(bucket.hour) : _hourLabel(bucket.hour),
           '${bucket.sampleCount}',
-          bucket.pvKwh.toStringAsFixed(5),
-          bucket.acKwh.toStringAsFixed(5),
+          bucket.pvKwh.toStringAsFixed(2),
+          bucket.acKwh.toStringAsFixed(2),
         ],
       [
         'TOTAL',
         '${buckets.fold<int>(0, (sum, item) => sum + item.sampleCount)}',
         buckets
             .fold<double>(0, (sum, item) => sum + item.pvKwh)
-            .toStringAsFixed(5),
+            .toStringAsFixed(2),
         buckets
             .fold<double>(0, (sum, item) => sum + item.acKwh)
-            .toStringAsFixed(5),
+            .toStringAsFixed(2),
       ],
     ];
     return '\uFEFF${rows.map((row) => row.map(_escapeCsv).join(',')).join('\r\n')}\r\n';
@@ -229,8 +255,8 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
         title: const Text('Laporan energi'),
         actions: [
           IconButton(
-            tooltip: 'Muat ulang spreadsheet',
-            onPressed: _loading ? null : () => _load(refresh: true),
+            tooltip: 'Segarkan laporan',
+            onPressed: _requestInFlight ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -242,7 +268,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
             : _error != null
             ? _errorView(isDark)
             : RefreshIndicator(
-                onRefresh: () => _load(refresh: true),
+                onRefresh: _load,
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   children: [
@@ -296,7 +322,10 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           ButtonSegment(value: true, label: Text('Bulanan')),
         ],
         selected: {_monthly},
-        onSelectionChanged: (value) => setState(() => _monthly = value.first),
+        onSelectionChanged: (value) => setState(() {
+          _monthly = value.first;
+          _touchedBucketIndex = null;
+        }),
       ),
       const SizedBox(height: 8),
       OutlinedButton.icon(
@@ -384,7 +413,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           Text(label, style: const TextStyle(fontSize: 11)),
           const SizedBox(height: 3),
           Text(
-            '${value.toStringAsFixed(3)} kWh',
+            '${value.toStringAsFixed(2)} kWh',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
@@ -411,7 +440,11 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   }
 
   Widget _chartCard(bool isDark, List<EnergyBucket> buckets) {
-    final chartWidth = (buckets.length * (_monthly ? 22 : 28)).toDouble();
+    final selectedIndex = (_touchedBucketIndex ?? 0)
+        .clamp(0, buckets.length - 1)
+        .toInt();
+    final selectedBucket = buckets[selectedIndex];
+    final chartWidth = (buckets.length * (_monthly ? 18 : 22)).toDouble();
     final maxValue = buckets.fold<double>(
       0,
       (max, item) => mathMax(max, mathMax(item.pvKwh, item.acKwh)),
@@ -426,6 +459,42 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
             const Text(
               'Energi per interval',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.black.withValues(alpha: 0.045),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _monthly
+                          ? _dateLabel(selectedBucket.hour)
+                          : _hourLabel(selectedBucket.hour),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  _legendValue(
+                    'PV',
+                    selectedBucket.pvKwh,
+                    const Color(0xFFFFC857),
+                  ),
+                  const SizedBox(width: 12),
+                  _legendValue(
+                    'AC',
+                    selectedBucket.acKwh,
+                    const Color(0xFF69B7FF),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -461,7 +530,23 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                       ],
                       gridData: FlGridData(show: true, drawVerticalLine: false),
                       borderData: FlBorderData(show: false),
-                      barTouchData: BarTouchData(enabled: true),
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchExtraThreshold: const EdgeInsets.symmetric(
+                          vertical: 44,
+                          horizontal: 10,
+                        ),
+                        handleBuiltInTouches: false,
+                        touchCallback: (_, response) {
+                          final index = response?.spot?.touchedBarGroupIndex;
+                          if (index != null &&
+                              index >= 0 &&
+                              index < buckets.length &&
+                              index != _touchedBucketIndex) {
+                            setState(() => _touchedBucketIndex = index);
+                          }
+                        },
+                      ),
                       titlesData: FlTitlesData(
                         topTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
@@ -475,7 +560,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                             reservedSize: 38,
                             interval: maxY / 4,
                             getTitlesWidget: (value, _) => Text(
-                              value.toStringAsFixed(1),
+                              value.toStringAsFixed(2),
                               style: TextStyle(
                                 fontSize: 9,
                                 color: isDark ? Colors.white54 : Colors.black54,
@@ -519,6 +604,42 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            if (buckets.length > 1)
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Interval sebelumnya',
+                    onPressed: selectedIndex == 0
+                        ? null
+                        : () => setState(
+                            () => _touchedBucketIndex = selectedIndex - 1,
+                          ),
+                    icon: const Icon(Icons.chevron_left_rounded),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      min: 0,
+                      max: (buckets.length - 1).toDouble(),
+                      divisions: buckets.length - 1,
+                      value: selectedIndex.toDouble(),
+                      label: _monthly
+                          ? _dateLabel(selectedBucket.hour)
+                          : _hourLabel(selectedBucket.hour),
+                      onChanged: (value) =>
+                          setState(() => _touchedBucketIndex = value.round()),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Interval berikutnya',
+                    onPressed: selectedIndex >= buckets.length - 1
+                        ? null
+                        : () => setState(
+                            () => _touchedBucketIndex = selectedIndex + 1,
+                          ),
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -546,6 +667,22 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     ],
   );
 
+  Widget _legendValue(String label, double value, Color color) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(
+        '$label ${value.toStringAsFixed(2)}',
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    ],
+  );
+
   Widget _dataNote(bool isDark, EnergyReportData data) => Card(
     child: Padding(
       padding: const EdgeInsets.all(14),
@@ -558,12 +695,12 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Google Sheets · Log_PZEM · ${data.sampleCount} sampel tersedia',
+            'ThingsBoard · PZEM · ${data.sampleCount} agregat daya per jam',
             style: const TextStyle(fontSize: 12),
           ),
           const SizedBox(height: 5),
           Text(
-            'kWh dihitung dengan integrasi trapezoid dari Power DC/AC (W). Jeda data lebih dari 60 detik dilewati agar tidak menggelembungkan total.',
+            'Energi per jam dihitung dari rata-rata Power DC/AC (W) yang tersimpan di time-series database. Data disegarkan otomatis setiap 5 menit.',
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white60 : Colors.black54,
@@ -587,7 +724,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Data spreadsheet mencakup ${_dateLabel(data.firstSample)} hingga ${_dateLabel(data.lastSample)}.',
+            'Data ThingsBoard mencakup ${_dateLabel(data.firstSample)} hingga ${_dateLabel(data.lastSample)}.',
             textAlign: TextAlign.center,
             style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
           ),
@@ -607,13 +744,13 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: () => _load(refresh: true),
+            onPressed: _load,
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Coba lagi'),
           ),
           const SizedBox(height: 8),
           Text(
-            'Pastikan spreadsheet dapat dilihat oleh siapa saja yang memiliki link.',
+            'Pastikan perangkat PZEM mengirim telemetry dan akun ThingsBoard memiliki akses histori perangkat.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
