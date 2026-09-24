@@ -143,7 +143,11 @@ class _SplashRouterState extends State<_SplashRouter> {
       _hasToken = has;
       _checking = false;
     });
-    if (has) await _authenticate();
+    if (has) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _authenticate();
+      });
+    }
   }
 
   Future<void> _authenticate() async {

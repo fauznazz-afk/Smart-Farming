@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -556,8 +557,25 @@ class _DashboardScreenState extends State<DashboardScreen>
             final baseColor = isDark
                 ? const Color(0xFF101412)
                 : const Color(0xFFF6F8F7);
-            return ColoredBox(
-              color: baseColor.withValues(alpha: 0.88 * progress),
+            return ClipRect(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(
+                  sigmaX: 16 * progress,
+                  sigmaY: 16 * progress,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: baseColor.withValues(alpha: 0.34 * progress),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: (isDark ? Colors.white : Colors.black)
+                            .withValues(alpha: 0.08 * progress),
+                      ),
+                    ),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
             );
           },
         ),
@@ -649,14 +667,6 @@ class _DashboardScreenState extends State<DashboardScreen>
               height: 64,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
-                color: isDark
-                    ? const Color(0xCC101412)
-                    : const Color(0xF0FFFFFF),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.06),
-                ),
                 boxShadow: [
                   BoxShadow(
                     color: isDark
@@ -667,19 +677,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  _navItem(0, Icons.dashboard_outlined, Icons.dashboard,
-                      'Ringkas', page, isDark, primary),
-                  _navItem(1, Icons.wb_sunny_outlined, Icons.wb_sunny, 'PV',
-                      page, isDark, primary),
-                  _navItem(2, Icons.power_outlined, Icons.power, 'AC', page,
-                      isDark, primary),
-                  _navItem(3, Icons.battery_5_bar_outlined, Icons.battery_full,
-                      'Baterai', page, isDark, primary),
-                  _navItem(4, Icons.videocam_outlined, Icons.videocam, 'CCTV',
-                      page, isDark, primary),
-                ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0x66101412)
+                          : Colors.white.withValues(alpha: 0.42),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.14)
+                            : Colors.black.withValues(alpha: 0.07),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _navItem(0, Icons.dashboard_outlined, Icons.dashboard,
+                            'Ringkas', page, isDark, primary),
+                        _navItem(1, Icons.wb_sunny_outlined, Icons.wb_sunny,
+                            'PV', page, isDark, primary),
+                        _navItem(2, Icons.power_outlined, Icons.power, 'AC',
+                            page, isDark, primary),
+                        _navItem(3, Icons.battery_5_bar_outlined,
+                            Icons.battery_full, 'Baterai', page, isDark, primary),
+                        _navItem(4, Icons.videocam_outlined, Icons.videocam,
+                            'CCTV', page, isDark, primary),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           );
