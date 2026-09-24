@@ -93,70 +93,74 @@ class _CctvScreenState extends State<CctvScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 8, 2, 14),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(Icons.videocam_rounded, color: primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('CCTV Monitoring',
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.videocam_rounded, color: primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('CCTV Monitoring',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         )),
-                    const SizedBox(height: 2),
-                    Text('Pantau kondisi area secara langsung',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color
-                              ?.withValues(alpha: 0.66),
-                        )),
-                  ],
-                ),
+                  ),
+                  _statusPill(isDark),
+                ],
               ),
-              _statusPill(isDark),
+              Padding(
+                padding: const EdgeInsets.only(left: 54, top: 4),
+                child: Text('Pantau area secara langsung',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.textTheme.bodySmall?.color
+                          ?.withValues(alpha: 0.66),
+                    )),
+              ),
             ],
           ),
         ),
         ClipRRect(
           borderRadius: BorderRadius.circular(22),
-          child: Container(
-            width: double.infinity,
-            height: 250,
-            color: const Color(0xFF080D0A),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (_controller != null && _playing)
-                  WebViewWidget(controller: _controller!),
-                if (!_playing) _standby(primary),
-                if (_loading && _playing)
-                  ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.56),
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Container(
+              width: double.infinity,
+              color: const Color(0xFF080D0A),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_controller != null && _playing)
+                    WebViewWidget(controller: _controller!),
+                  if (!_playing) _standby(primary),
+                  if (_loading && _playing)
+                    ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.56),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
                     ),
-                  ),
-                if (_failed) _errorOverlay(),
-                if (_playing && !_loading && !_failed)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: _roundControl(
-                      icon: Icons.stop_rounded,
-                      tooltip: 'Stop stream',
-                      onPressed: _stopStream,
+                  if (_failed) _errorOverlay(),
+                  if (_playing && !_loading && !_failed)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: _roundControl(
+                        icon: Icons.stop_rounded,
+                        tooltip: 'Stop stream',
+                        onPressed: _stopStream,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -245,11 +249,11 @@ class _CctvScreenState extends State<CctvScreen> {
             left: -70,
             top: -110,
             child: Container(
-              width: 250,
-              height: 250,
+              width: 190,
+              height: 190,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primary.withValues(alpha: 0.13),
+                color: primary.withValues(alpha: 0.09),
               ),
             ),
           ),
