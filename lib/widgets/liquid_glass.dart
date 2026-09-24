@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 // ── AmbientBackground ────────────────────────────────────────────────────────
@@ -19,12 +20,17 @@ class AmbientBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        ColoredBox(
-          color: isDark ? const Color(0xFF0D1410) : const Color(0xFFF2F5F3),
-        ),
         RepaintBoundary(
-          child: CustomPaint(
-            painter: _AmbientOrbsPainter(isDark: isDark),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                color: isDark
+                    ? const Color(0xFF0D1410)
+                    : const Color(0xFFF2F5F3),
+              ),
+              CustomPaint(painter: _AmbientOrbsPainter(isDark: isDark)),
+            ],
           ),
         ),
         child,
@@ -455,7 +461,7 @@ class _GaugePainter extends CustomPainter {
       oldDelegate.trackColor != trackColor;
 }
 
-// ── GlassDateChip ─────────────────────────────────────────────────────────────
+// ── GlassDateChip ────────────────────────────────────────────────────────────
 
 class GlassDateChip extends StatelessWidget {
   const GlassDateChip({
@@ -504,46 +510,48 @@ class GlassDateChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
           );
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        width: width,
-        height: 68,
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
-        decoration: decoration,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 13,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  dayName,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? Colors.white
-                        : (isDark ? Colors.white54 : Colors.black45),
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          width: width,
+          height: 68,
+          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
+          decoration: decoration,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 13,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    dayName,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white54 : Colors.black45),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              '$dayNumber',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white : Colors.black87),
+              const SizedBox(height: 3),
+              Text(
+                '$dayNumber',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white : Colors.black87),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

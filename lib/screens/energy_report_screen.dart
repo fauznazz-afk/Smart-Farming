@@ -28,7 +28,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   bool _loading = true;
   bool _sharing = false;
   bool _requestInFlight = false;
-  int? _touchedBucketIndex;
+  final ValueNotifier<int?> _touchedBucketNotifier = ValueNotifier<int?>(null);
   String? _error;
 
   @override
@@ -41,6 +41,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _touchedBucketNotifier.dispose();
     super.dispose();
   }
 
@@ -54,6 +55,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     try {
       final data = await _service.load(referenceDate: _selectedDate);
       if (!mounted) return;
+      _touchedBucketNotifier.value = null;
       setState(() {
         _data = data;
         _loading = false;
@@ -81,9 +83,9 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     final monthChanged =
         selected.year != _selectedDate.year ||
         selected.month != _selectedDate.month;
+    _touchedBucketNotifier.value = null;
     setState(() {
       _selectedDate = selected;
-      _touchedBucketIndex = null;
     });
     if (monthChanged) await _load();
   }
@@ -326,10 +328,12 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           ButtonSegment(value: true, label: Text('Bulanan')),
         ],
         selected: {_monthly},
-        onSelectionChanged: (value) => setState(() {
-          _monthly = value.first;
-          _touchedBucketIndex = null;
-        }),
+        onSelectionChanged: (value) {
+          _touchedBucketNotifier.value = null;
+          setState(() {
+            _monthly = value.first;
+          });
+        },
       ),
       const SizedBox(height: 8),
       OutlinedButton.icon(
@@ -444,10 +448,6 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   }
 
   Widget _chartCard(bool isDark, List<EnergyBucket> buckets) {
-    final selectedIndex = (_touchedBucketIndex ?? 0)
-        .clamp(0, buckets.length - 1)
-        .toInt();
-    final selectedBucket = buckets[selectedIndex];
     final chartWidth = (buckets.length * (_monthly ? 18 : 22)).toDouble();
     final maxValue = buckets.fold<double>(
       0,
@@ -465,140 +465,159 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.07)
-                    : Colors.black.withValues(alpha: 0.045),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _monthly
-                          ? _dateLabel(selectedBucket.hour)
-                          : _hourLabel(selectedBucket.hour),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+            ValueListenableBuilder<int?>(
+              valueListenable: _touchedBucketNotifier,
+              builder: (context, touchedIndex, _) {
+                final selectedIndex = (touchedIndex ?? 0)
+                    .clamp(0, buckets.length - 1)
+                    .toInt();
+                final selectedBucket = buckets[selectedIndex];
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : Colors.black.withValues(alpha: 0.045),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _monthly
+                              ? _dateLabel(selectedBucket.hour)
+                              : _hourLabel(selectedBucket.hour),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
+                      _legendValue(
+                        'PV',
+                        selectedBucket.pvKwh,
+                        const Color(0xFFFFC857),
+                      ),
+                      const SizedBox(width: 12),
+                      _legendValue(
+                        'AC',
+                        selectedBucket.acKwh,
+                        const Color(0xFF69B7FF),
+                      ),
+                    ],
                   ),
-                  _legendValue(
-                    'PV',
-                    selectedBucket.pvKwh,
-                    const Color(0xFFFFC857),
-                  ),
-                  const SizedBox(width: 12),
-                  _legendValue(
-                    'AC',
-                    selectedBucket.acKwh,
-                    const Color(0xFF69B7FF),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              height: 230,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: chartWidth < 300 ? 300 : chartWidth,
-                  child: BarChart(
-                    BarChartData(
-                      maxY: maxY,
-                      minY: 0,
-                      barGroups: [
-                        for (var i = 0; i < buckets.length; i++)
-                          BarChartGroupData(
-                            x: i,
-                            barsSpace: 2,
-                            barRods: [
-                              BarChartRodData(
-                                toY: buckets[i].pvKwh,
-                                color: const Color(0xFFFFC857),
-                                width: _monthly ? 6 : 8,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              BarChartRodData(
-                                toY: buckets[i].acKwh,
-                                color: const Color(0xFF69B7FF),
-                                width: _monthly ? 6 : 8,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ],
+            RepaintBoundary(
+              child: SizedBox(
+                height: 230,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: chartWidth < 300 ? 300 : chartWidth,
+                    child: BarChart(
+                      BarChartData(
+                        maxY: maxY,
+                        minY: 0,
+                        barGroups: [
+                          for (var i = 0; i < buckets.length; i++)
+                            BarChartGroupData(
+                              x: i,
+                              barsSpace: 2,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: buckets[i].pvKwh,
+                                  color: const Color(0xFFFFC857),
+                                  width: _monthly ? 6 : 8,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                BarChartRodData(
+                                  toY: buckets[i].acKwh,
+                                  color: const Color(0xFF69B7FF),
+                                  width: _monthly ? 6 : 8,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ],
+                            ),
+                        ],
+                        gridData: const FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                        ),
+                        borderData: FlBorderData(show: false),
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchExtraThreshold: const EdgeInsets.symmetric(
+                            vertical: 44,
+                            horizontal: 10,
                           ),
-                      ],
-                      gridData: FlGridData(show: true, drawVerticalLine: false),
-                      borderData: FlBorderData(show: false),
-                      barTouchData: BarTouchData(
-                        enabled: true,
-                        touchExtraThreshold: const EdgeInsets.symmetric(
-                          vertical: 44,
-                          horizontal: 10,
+                          handleBuiltInTouches: false,
+                          touchCallback: (_, response) {
+                            final index = response?.spot?.touchedBarGroupIndex;
+                            if (index != null &&
+                                index >= 0 &&
+                                index < buckets.length &&
+                                index != _touchedBucketNotifier.value) {
+                              _touchedBucketNotifier.value = index;
+                            }
+                          },
                         ),
-                        handleBuiltInTouches: false,
-                        touchCallback: (_, response) {
-                          final index = response?.spot?.touchedBarGroupIndex;
-                          if (index != null &&
-                              index >= 0 &&
-                              index < buckets.length &&
-                              index != _touchedBucketIndex) {
-                            setState(() => _touchedBucketIndex = index);
-                          }
-                        },
-                      ),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 38,
-                            interval: maxY / 4,
-                            getTitlesWidget: (value, _) => Text(
-                              value.toStringAsFixed(2),
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: isDark ? Colors.white54 : Colors.black54,
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 38,
+                              interval: maxY / 4,
+                              getTitlesWidget: (value, _) => Text(
+                                value.toStringAsFixed(2),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : Colors.black54,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 26,
-                            interval: _monthly ? 5 : 4,
-                            getTitlesWidget: (value, _) {
-                              final index = value.toInt();
-                              if (index < 0 || index >= buckets.length) {
-                                return const SizedBox.shrink();
-                              }
-                              final date = buckets[index].hour;
-                              final text = _monthly
-                                  ? '${date.day}'
-                                  : date.hour.toString().padLeft(2, '0');
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  text,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: isDark
-                                        ? Colors.white54
-                                        : Colors.black54,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 26,
+                              interval: _monthly ? 5 : 4,
+                              getTitlesWidget: (value, _) {
+                                final index = value.toInt();
+                                if (index < 0 || index >= buckets.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                final date = buckets[index].hour;
+                                final text = _monthly
+                                    ? '${date.day}'
+                                    : date.hour.toString().padLeft(2, '0');
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    text,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.black54,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -609,40 +628,47 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
             ),
             const SizedBox(height: 8),
             if (buckets.length > 1)
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Interval sebelumnya',
-                    onPressed: selectedIndex == 0
-                        ? null
-                        : () => setState(
-                            () => _touchedBucketIndex = selectedIndex - 1,
-                          ),
-                    icon: const Icon(Icons.chevron_left_rounded),
-                  ),
-                  Expanded(
-                    child: Slider(
-                      min: 0,
-                      max: (buckets.length - 1).toDouble(),
-                      divisions: buckets.length - 1,
-                      value: selectedIndex.toDouble(),
-                      label: _monthly
-                          ? _dateLabel(selectedBucket.hour)
-                          : _hourLabel(selectedBucket.hour),
-                      onChanged: (value) =>
-                          setState(() => _touchedBucketIndex = value.round()),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Interval berikutnya',
-                    onPressed: selectedIndex >= buckets.length - 1
-                        ? null
-                        : () => setState(
-                            () => _touchedBucketIndex = selectedIndex + 1,
-                          ),
-                    icon: const Icon(Icons.chevron_right_rounded),
-                  ),
-                ],
+              ValueListenableBuilder<int?>(
+                valueListenable: _touchedBucketNotifier,
+                builder: (context, touchedIndex, _) {
+                  final selectedIndex = (touchedIndex ?? 0)
+                      .clamp(0, buckets.length - 1)
+                      .toInt();
+                  final selectedBucket = buckets[selectedIndex];
+                  return Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Interval sebelumnya',
+                        onPressed: selectedIndex == 0
+                            ? null
+                            : () => _touchedBucketNotifier.value =
+                                  selectedIndex - 1,
+                        icon: const Icon(Icons.chevron_left_rounded),
+                      ),
+                      Expanded(
+                        child: Slider(
+                          min: 0,
+                          max: (buckets.length - 1).toDouble(),
+                          divisions: buckets.length - 1,
+                          value: selectedIndex.toDouble(),
+                          label: _monthly
+                              ? _dateLabel(selectedBucket.hour)
+                              : _hourLabel(selectedBucket.hour),
+                          onChanged: (value) =>
+                              _touchedBucketNotifier.value = value.round(),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Interval berikutnya',
+                        onPressed: selectedIndex >= buckets.length - 1
+                            ? null
+                            : () => _touchedBucketNotifier.value =
+                                  selectedIndex + 1,
+                        icon: const Icon(Icons.chevron_right_rounded),
+                      ),
+                    ],
+                  );
+                },
               ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
