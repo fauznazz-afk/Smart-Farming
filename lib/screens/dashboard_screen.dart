@@ -59,10 +59,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _refreshTimer;
   DateTime _selectedDate = DateTime.now();
   DateTime? _energyUpdatedAt;
+  DateTime? _lastSuccessfulTelemetryAt;
   String _displayName = '';
   bool _energyAlertsEnabled = true;
+  bool _environmentAlertsEnabled = false;
   int _lowSocThreshold = 20;
   int _staleTelemetryMinutes = 10;
+  double? _environmentTempMin;
+  double? _environmentTempMax;
+  double? _environmentHumidityMin;
+  double? _environmentHumidityMax;
+  double? _environmentTdsMin;
+  double? _environmentTdsMax;
   Set<String> _activeAlertIds = {};
   List<String> _activeAlertMessages = [];
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
@@ -155,11 +163,26 @@ class _DashboardScreenState extends State<DashboardScreen>
       _autoRefresh = preferences.getBool('auto_refresh') ?? true;
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
       _energyAlertsEnabled = preferences.getBool('energy_alerts_enabled') ?? true;
+      _environmentAlertsEnabled =
+          preferences.getBool('environment_alerts_enabled') ?? false;
       _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
       _staleTelemetryMinutes = preferences.getInt('stale_telemetry_minutes') ?? 10;
+      _environmentTempMin =
+          double.tryParse(preferences.getString('environment_temp_min') ?? '');
+      _environmentTempMax =
+          double.tryParse(preferences.getString('environment_temp_max') ?? '');
+      _environmentHumidityMin = double.tryParse(
+          preferences.getString('environment_humidity_min') ?? '');
+      _environmentHumidityMax = double.tryParse(
+          preferences.getString('environment_humidity_max') ?? '');
+      _environmentTdsMin =
+          double.tryParse(preferences.getString('environment_tds_min') ?? '');
+      _environmentTdsMax =
+          double.tryParse(preferences.getString('environment_tds_max') ?? '');
       _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
     });
     _restartRefreshTimer();
+    _evaluateEnergyAlerts();
   }
 
   void _restartRefreshTimer() {
@@ -182,15 +205,19 @@ class _DashboardScreenState extends State<DashboardScreen>
         widget.api.fetchSensorData(),
       ]);
       if (!mounted) return;
+      final now = DateTime.now();
       final changed = _loading ||
           _error != null ||
           !_sameTelemetry(_battery, results[0]) ||
           !_sameTelemetry(_pzem, results[1]) ||
           !_sameTelemetry(_sensor, results[2]);
+      final statusChanged = _lastSuccessfulTelemetryAt == null ||
+          now.difference(_lastSuccessfulTelemetryAt!).inMinutes >= 1;
       _battery = results[0];
       _pzem = results[1];
       _sensor = results[2];
-      if (changed) {
+      _lastSuccessfulTelemetryAt = now;
+      if (changed || statusChanged) {
         setState(() {
           _loading = false;
           _error = null;
@@ -281,7 +308,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _evaluateEnergyAlerts() {
-    if (!_energyAlertsEnabled) {
+    if (!_energyAlertsEnabled && !_environmentAlertsEnabled) {
       final changed = _activeAlertIds.isNotEmpty;
       _activeAlertIds = {};
       _activeAlertMessages = [];
@@ -289,20 +316,36 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
     final alerts = <String, String>{};
-    final soc = _battery?.latestValues['soc'];
-    if (soc != null && soc < _lowSocThreshold) {
-      alerts['low_soc'] = 'SOC baterai rendah: ${soc.toStringAsFixed(0)}%';
-    }
-    final devices = <(String, String, DeviceTelemetry?)>[
-      ('battery', 'Baterai', _battery),
-      ('pzem', 'PZEM', _pzem),
-      ('sensor', 'Sensor lingkungan', _sensor),
-    ];
-    for (final (id, name, telemetry) in devices) {
-      if (telemetry != null &&
-          telemetry.isStale(minutes: _staleTelemetryMinutes)) {
-        alerts['stale_$id'] = 'Data $name belum diperbarui';
+    if (_energyAlertsEnabled) {
+      final soc = _battery?.latestValues['soc'];
+      if (soc != null && soc < _lowSocThreshold) {
+        alerts['low_soc'] = 'SOC baterai rendah: ${soc.toStringAsFixed(0)}%';
       }
+      final devices = <(String, String, DeviceTelemetry?)>[
+        ('battery', 'Baterai', _battery),
+        ('pzem', 'PZEM', _pzem),
+        ('sensor', 'Sensor lingkungan', _sensor),
+      ];
+      for (final (id, name, telemetry) in devices) {
+        if (telemetry != null &&
+            telemetry.isStale(minutes: _staleTelemetryMinutes)) {
+          alerts['stale_$id'] = 'Data $name belum diperbarui';
+        }
+      }
+    }
+    final sensor = _sensor;
+    if (_environmentAlertsEnabled &&
+        sensor != null &&
+        !sensor.isStale(minutes: _staleTelemetryMinutes)) {
+      _addRangeAlerts(alerts, id: 'ambient_temp', label: 'Suhu lingkungan',
+          unit: '°C', value: sensor.latestValues['temp_dht'],
+          minimum: _environmentTempMin, maximum: _environmentTempMax);
+      _addRangeAlerts(alerts, id: 'humidity', label: 'Kelembapan', unit: '%',
+          value: sensor.latestValues['humidity_dht'],
+          minimum: _environmentHumidityMin, maximum: _environmentHumidityMax);
+      _addRangeAlerts(alerts, id: 'tds', label: 'TDS', unit: 'ppm',
+          value: sensor.latestValues['tds_ppm'], minimum: _environmentTdsMin,
+          maximum: _environmentTdsMax);
     }
     final newMessages = alerts.entries
         .where((entry) => !_activeAlertIds.contains(entry.key))
@@ -324,6 +367,41 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     if (mounted) setState(() {});
   }
+
+  void _addRangeAlerts(Map<String, String> alerts, {
+    required String id,
+    required String label,
+    required String unit,
+    required double? value,
+    required double? minimum,
+    required double? maximum,
+  }) {
+    if (value == null) return;
+    if (minimum != null && value < minimum) {
+      alerts['environment_${id}_low'] =
+          '$label rendah: ${value.toStringAsFixed(1)} $unit (batas $minimum $unit)';
+    }
+    if (maximum != null && value > maximum) {
+      alerts['environment_${id}_high'] =
+          '$label tinggi: ${value.toStringAsFixed(1)} $unit (batas $maximum $unit)';
+    }
+  }
+
+  List<String> _staleDeviceNames() {
+    final devices = <(String, DeviceTelemetry?)>[
+      ('Baterai', _battery),
+      ('PZEM', _pzem),
+      ('Sensor lingkungan', _sensor),
+    ];
+    return devices
+        .where((entry) => entry.$2 != null &&
+            entry.$2!.isStale(minutes: _staleTelemetryMinutes))
+        .map((entry) => entry.$1)
+        .toList();
+  }
+
+  String _formatClock(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
   bool _sameStrings(List<String> first, List<String> second) {
     if (first.length != second.length) return false;
@@ -642,9 +720,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                             MediaQuery.of(context).padding.bottom + 76,
                           ),
                           children: [
+                            if (_battery != null || _error != null)
+                              _connectionStatusBanner(),
                             if (_activeAlertMessages.isNotEmpty)
                               _energyAlertBanner(),
-                            if (_error != null) _warningBanner(),
                             ..._pageContentFor(index, isDark),
                           ],
                         ),
@@ -1922,6 +2001,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               const Icon(Icons.cloud_off, size: 42),
               const SizedBox(height: 12),
+              const Text('Gagal mengambil telemetry dari ThingsBoard.'),
+              const SizedBox(height: 8),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -1934,17 +2015,66 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       );
 
-  Widget _warningBanner() => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: MaterialBanner(
-          padding: const EdgeInsets.all(12),
-          content: const Text('Some data could not be updated.'),
-          leading: const Icon(Icons.warning_amber),
-          actions: [
-            TextButton(onPressed: _fetchAll, child: const Text('Retry')),
+  Widget _connectionStatusBanner() {
+    final failed = _error != null;
+    final staleNames = _staleDeviceNames();
+    final stale = !failed && staleNames.isNotEmpty;
+    final color = failed
+        ? Colors.deepOrange
+        : stale
+            ? Colors.orange.shade800
+            : Colors.green;
+    final lastUpdate = _lastSuccessfulTelemetryAt;
+    final label = failed
+        ? 'ThingsBoard gagal'
+        : stale
+            ? 'Terhubung · stale: ${staleNames.join(', ')}'
+            : 'ThingsBoard terhubung';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Tooltip(
+        message: failed
+            ? 'Fetch telemetry gagal. Periksa koneksi/server. ${_error ?? ''}'
+            : 'Fetch sukses${lastUpdate == null ? '' : ' pukul ${_formatClock(lastUpdate)}'}${stale ? '. Data lama: ${staleNames.join(', ')}' : ''}',
+        child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(failed ? Icons.cloud_off : Icons.cloud_done_outlined,
+                color: color, size: 17),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ),
+            if (failed)
+              InkWell(
+                onTap: _fetchAll,
+                borderRadius: BorderRadius.circular(16),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.refresh, size: 18),
+                ),
+              ),
           ],
         ),
-      );
+        ),
+      ),
+    );
+  }
 
   Widget _energyAlertBanner() => Padding(
         padding: const EdgeInsets.only(bottom: 10),

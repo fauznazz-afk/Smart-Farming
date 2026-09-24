@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [1.3.0] - Unreleased
+
+### Added
+
+- Added configurable local alerts for ambient temperature, humidity, and water TDS. Blank thresholds are ignored, and alerts only evaluate fresh sensor telemetry.
+- Added a dashboard status that distinguishes ThingsBoard fetch failures from stale telemetry and shows the last successful fetch time.
+- Added validation for environmental threshold ranges in Settings.
+
 ## [1.2.3] - 2026-09-24
 
 ### Fixed

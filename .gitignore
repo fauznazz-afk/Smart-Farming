@@ -45,5 +45,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android release signing material (keep private and back up securely)
+/android/key.properties
+/android/upload-keystore.jks
+
 # Widget Preview related
 .widget_preview/

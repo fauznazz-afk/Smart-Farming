@@ -2,9 +2,9 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
-**Versi aplikasi yang didokumentasikan:** 1.2.3 (build 7; `pubspec.yaml`)
-**Versi dokumen:** 1.1
-**Status:** Baseline produk dan implementasi per 24 September 2026
+**Versi aplikasi saat ini:** 1.3.0 (build 8; belum dirilis)
+**Versi dokumen:** 1.2
+**Status:** Implementasi lokal per 24 September 2026; rilis 1.3.0 belum diterbitkan
 
 ---
 
@@ -12,7 +12,7 @@
 
 EnerGrow adalah aplikasi mobile untuk memantau sistem energi hybrid di lahan pertanian/hidroponik. Aplikasi mengambil telemetry dari tiga perangkat ThingsBoard: baterai, PZEM (PV dan AC), serta sensor lingkungan. Aplikasi juga menyediakan histori grafik, ringkasan energi, laporan, pengaturan, dan halaman CCTV.
 
-Aplikasi merupakan client untuk infrastruktur IoT yang sudah berjalan. Backend utama adalah ThingsBoard CE; aplikasi tidak memiliki backend bisnis tersendiri. Dokumen ini mencatat perilaku produk yang sudah ada pada versi 1.2.3 dan pekerjaan lanjutan yang disarankan.
+Aplikasi merupakan client untuk infrastruktur IoT yang sudah berjalan. Backend utama adalah ThingsBoard CE; aplikasi tidak memiliki backend bisnis tersendiri. Dokumen ini mencatat perilaku produk pada kode 1.3.0 yang belum dirilis dan pekerjaan lanjutan yang disarankan.
 
 ## 2. Pengguna dan tujuan
 
@@ -85,11 +85,13 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 
 ### 4.5 Peringatan lokal dan data stale
 
-**Status: Diimplementasikan saat aplikasi terbuka.**
+**Status: Diimplementasikan secara lokal; perlu masuk release 1.3.0.**
 
 - Peringatan lokal muncul untuk SOC baterai rendah dan telemetry yang melewati ambang usia.
 - Pengguna dapat mengaktifkan/menonaktifkan peringatan dan mengatur ambang SOC serta usia telemetry di Settings.
 - Kartu telemetry menampilkan usia update saat stale.
+- Pengguna dapat menentukan batas minimum dan/atau maksimum suhu lingkungan, kelembapan, dan TDS air. Batas kosong diabaikan; alert lingkungan hanya mengevaluasi data sensor yang masih segar.
+- Dashboard membedakan kegagalan fetch ThingsBoard dari perangkat yang telemetry-nya stale dan menunjukkan waktu fetch sukses terakhir.
 - Peringatan tidak dikirim ketika aplikasi ditutup; push notification belum tersedia.
 
 Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pada kartu telemetry, dan ringkasan Overview.
@@ -107,7 +109,7 @@ Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pad
 
 **Status: Diimplementasikan.**
 
-- Preferensi tema (System/Light/Dark), warna aksen, polling, peringatan energi, ambang stale/SOC, dan URL CCTV disimpan lokal.
+- Preferensi tema (System/Light/Dark), warna aksen, polling, peringatan energi/lingkungan, ambang stale/SOC, batas sensor, dan URL CCTV disimpan lokal.
 - Pengguna dapat melihat versi aplikasi yang dibaca dari metadata paket, serta melakukan logout.
 - Pengaturan mengoptimalkan efek visual untuk performa.
 
@@ -153,6 +155,8 @@ Urutan berikut disarankan berdasarkan risiko dan kesesuaian terhadap implementas
 - Grafik historis menampilkan data yang tersedia untuk tanggal terpilih.
 - Pengguna dapat melakukan logout manual.
 - Stale telemetry dan alert SOC rendah ditampilkan saat aplikasi berjalan sesuai konfigurasi.
+- Alert suhu lingkungan, kelembapan, dan TDS mengikuti batas yang diisi pengguna dan hanya menggunakan telemetry segar.
+- Status ThingsBoard membedakan fetch gagal dari telemetry perangkat yang stale.
 - Ringkasan/laporan energi menyatakan hasilnya sebagai estimasi dari data histori.
 - Halaman CCTV memvalidasi URL, menyediakan kontrol playback dan fullscreen, serta menampilkan kegagalan stream dengan jelas.
 - APK release tersedia sebagai artefak build. Instalasi dan uji pada perangkat fisik harus dicatat terpisah; keberadaan file APK saja bukan bukti uji perangkat.

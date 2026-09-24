@@ -3,6 +3,7 @@
 Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga Surya) hybrid — bagian dari proyek **FNN-XAI-IoT**, program MBKM. Aplikasi ini menampilkan data real-time dari baterai aki, listrik AC (PZEM), dan panel surya (PV), dikonsumsi langsung dari dashboard [ThingsBoard](https://thingsboard.io/) yang sudah berjalan di infrastruktur IoT lahan.
 
 > 📄 Lihat [PRD lengkap](./PRD_PLTS_Monitoring_App.md) untuk detail requirement, scope MVP, dan roadmap.
+> 🚀 Ikuti [panduan rilis GitHub](./PRD_GitHub_Release_Process.md) untuk menyiapkan APK bertanda tangan dan menerbitkan release.
 
 ---
 
@@ -21,7 +22,7 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **CCTV layar penuh** dalam orientasi landscape
 - **(Roadmap)** Push notification
 
-Versi aplikasi: **1.2.3 (build 7)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md).
+Versi pengembangan saat ini: **1.3.0 (build 8)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md). Release 1.3.0 belum diterbitkan.
 
 ---
 
