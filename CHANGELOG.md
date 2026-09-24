@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [1.2.3] - 2026-09-24
+
+### Fixed
+
+- Applied the configured stale telemetry threshold consistently to device cards and the Overview summary.
+- Added landscape fullscreen playback controls for CCTV.
+- Synchronized the Settings version label with the application release version.
+
 ## [1.2.2] - 2026-09-24
 
 ### Added

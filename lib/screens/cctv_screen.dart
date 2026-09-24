@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
@@ -6,8 +7,14 @@ import '../services/cctv_url.dart';
 class CctvScreen extends StatefulWidget {
   final String streamUrl;
   final bool active;
+  final bool fullScreen;
 
-  const CctvScreen({super.key, required this.streamUrl, this.active = true});
+  const CctvScreen({
+    super.key,
+    required this.streamUrl,
+    this.active = true,
+    this.fullScreen = false,
+  });
 
   @override
   State<CctvScreen> createState() => _CctvScreenState();
@@ -18,6 +25,31 @@ class _CctvScreenState extends State<CctvScreen> {
   bool _playing = false;
   bool _loading = false;
   bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fullScreen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        SystemChrome.setPreferredOrientations(const [
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        _startStream();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.fullScreen) {
+      SystemChrome.setPreferredOrientations(const []);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant CctvScreen oldWidget) {
@@ -88,6 +120,8 @@ class _CctvScreenState extends State<CctvScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final primary = theme.colorScheme.primary;
 
+    if (widget.fullScreen) return _fullScreenView();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,10 +187,20 @@ class _CctvScreenState extends State<CctvScreen> {
                     Positioned(
                       top: 12,
                       right: 12,
-                      child: _roundControl(
-                        icon: Icons.stop_rounded,
-                        tooltip: 'Stop stream',
-                        onPressed: _stopStream,
+                      child: Row(
+                        children: [
+                          _roundControl(
+                            icon: Icons.fullscreen_rounded,
+                            tooltip: 'Layar penuh',
+                            onPressed: _openFullScreen,
+                          ),
+                          const SizedBox(width: 8),
+                          _roundControl(
+                            icon: Icons.stop_rounded,
+                            tooltip: 'Stop stream',
+                            onPressed: _stopStream,
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -199,6 +243,55 @@ class _CctvScreenState extends State<CctvScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _fullScreenView() => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (_controller != null && _playing)
+                      WebViewWidget(controller: _controller!),
+                    if (!_playing) _standby(Theme.of(context).colorScheme.primary),
+                    if (_loading && _playing)
+                      const ColoredBox(
+                        color: Colors.black54,
+                        child: Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                      ),
+                    if (_failed) _errorOverlay(),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: _roundControl(
+                icon: Icons.close_rounded,
+                tooltip: 'Tutup layar penuh',
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            Positioned(top: 16, left: 16, child: _statusPill(true)),
+          ],
+        ),
+      );
+
+  void _openFullScreen() {
+    _stopStream();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CctvScreen(streamUrl: widget.streamUrl, fullScreen: true),
+      ),
     );
   }
 

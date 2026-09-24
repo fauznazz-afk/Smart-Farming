@@ -1007,7 +1007,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     final pvPower = _pzem?.latestValues['power_dc'];
     final acPower = _pzem?.latestValues['power_ac'] ?? 0.0;
     final soc = _battery?.latestValues['soc'] ?? 0.0;
-    final pzemStale = _pzem?.isStale() ?? true;
+    final pzemStale =
+        _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true;
 
     return LiquidGlassCard(
       isDark: isDark,
@@ -1593,7 +1594,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     Color accent,
     List<_MetricDef> metrics,
   ) {
-    final stale = data?.isStale() ?? true;
+    final stale = data?.isStale(minutes: _staleTelemetryMinutes) ?? true;
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: _performanceMode,

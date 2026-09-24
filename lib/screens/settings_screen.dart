@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/cctv_url.dart';
 import '../theme/app_theme_controller.dart';
 
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
-const appVersion = '1.2.1';
-
 const _paletteOptions = <String, Color>{
   'EnerGrow green': Color(0xFF35A968),
   'Solar amber': Color(0xFFF4B942),
@@ -36,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _lowSocThreshold = 20;
   int _staleTelemetryMinutes = 10;
   bool _saving = false;
+  String? _appVersion;
   Color _selectedSeed = AppThemeController.defaultSeed;
 
   @override
@@ -43,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _selectedSeed = widget.themeController.seedColor;
     _loadSettings();
+    _loadAppVersion();
   }
 
   @override
@@ -65,6 +66,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _cctvUrlController.text =
           preferences.getString('cctv_url') ?? defaultCctvUrl;
       _selectedSeed = widget.themeController.seedColor;
+    });
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() {
+      _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
     });
   }
 
@@ -390,7 +399,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('EnerGrow monitoring application'),
-                trailing: const Text('v$appVersion'),
+                trailing: Text(
+                  _appVersion == null ? 'Loading…' : 'v$_appVersion',
+                ),
               ),
               OutlinedButton.icon(
                 onPressed: _confirmLogout,

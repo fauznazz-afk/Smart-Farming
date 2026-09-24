@@ -1,158 +1,176 @@
-# PRD — Aplikasi Mobile Monitoring PLTS
+# PRD — EnerGrow: Aplikasi Mobile Monitoring PLTS
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
-**Platform:** Android (Flutter)
-**Versi dokumen:** 1.0
-**Status:** Draft untuk MVP
+**Platform:** Flutter (target utama Android)
+**Versi aplikasi yang didokumentasikan:** 1.2.3 (build 7; `pubspec.yaml`)
+**Versi dokumen:** 1.1
+**Status:** Baseline produk dan implementasi per 24 September 2026
 
 ---
 
-## 1. Overview
+## 1. Ringkasan
 
-Aplikasi mobile untuk memantau kondisi kelistrikan pada lahan pertanian secara *real-time*, mencakup tiga sumber energi: **baterai aki**, **listrik AC (PZEM)**, dan **listrik panel surya (PV)**. Ditujukan untuk pengelola lahan pertanian/hidroponik yang mengandalkan sistem energi hybrid untuk pompa air, sensor, dan perangkat pendukung lainnya.
+EnerGrow adalah aplikasi mobile untuk memantau sistem energi hybrid di lahan pertanian/hidroponik. Aplikasi mengambil telemetry dari tiga perangkat ThingsBoard: baterai, PZEM (PV dan AC), serta sensor lingkungan. Aplikasi juga menyediakan histori grafik, ringkasan energi, laporan, pengaturan, dan halaman CCTV.
 
-Aplikasi ini adalah **lapisan mobile di atas infrastruktur IoT yang sudah berjalan** (ESP32 sensor → ThingsBoard dashboard), bukan sistem backend baru. Fokus utama adalah pengalaman monitoring yang ringan, cepat diakses, dan nyaman digunakan di lapangan — dengan UI fluid bergaya *grouped list* (terinspirasi navigasi iOS) dan tema gelap sebagai default.
+Aplikasi merupakan client untuk infrastruktur IoT yang sudah berjalan. Backend utama adalah ThingsBoard CE; aplikasi tidak memiliki backend bisnis tersendiri. Dokumen ini mencatat perilaku produk yang sudah ada pada versi 1.2.3 dan pekerjaan lanjutan yang disarankan.
 
----
+## 2. Pengguna dan tujuan
 
-## 2. Infrastruktur yang Sudah Tersedia (Constraint & Fondasi)
+Pengguna utama adalah pengelola lahan yang perlu melihat kondisi energi dari ponsel tanpa membuka dashboard web ThingsBoard.
 
-PRD ini disusun dengan asumsi memanfaatkan penuh stack berikut, **bukan membangun ulang**:
+Tujuan produk:
 
-| Komponen | Status |
+- Memperlihatkan telemetry terbaru dari Battery, PV, AC, dan lingkungan.
+- Membantu pengguna melihat perubahan historis serta ringkasan pemakaian/produksi energi.
+- Menjelaskan kapan telemetry terakhir diterima dan memberi peringatan lokal yang relevan.
+- Menyediakan akses sesi ThingsBoard yang praktis dengan logout yang jelas.
+
+## 3. Infrastruktur dan batasan
+
+| Komponen | Peran/status |
 |---|---|
-| ESP32 #1/#2/#3 (sensor + gateway) | Sudah terpasang, mengirim data via ESP-NOW → MQTT |
-| Mosquitto MQTT Broker | Sudah jalan di Orange Pi |
-| ThingsBoard CE (dashboard, REST API, WebSocket, Auth/JWT) | Sudah terdeploy, jadi backend utama aplikasi |
-| PostgreSQL | Sudah dipakai ThingsBoard untuk data time-series |
-| Orange Pi 4 Pro + Cloudflare Tunnel (`mbkm20262027.tech`) | Sudah publish dashboard ke internet |
-| go2rtc (rencana CCTV) | Direncanakan, belum live |
+| ESP32 dan sensor | Mengirim data melalui ESP-NOW/MQTT; laju dan kualitas data bergantung pada perangkat/firmware. |
+| Mosquitto | Broker MQTT pada infrastruktur Orange Pi. |
+| ThingsBoard CE | Backend utama untuk autentikasi, REST API, dan penyimpanan/akses telemetry. |
+| PostgreSQL | Penyimpanan yang dikelola ThingsBoard. |
+| Orange Pi + Cloudflare Tunnel | Hosting self-hosted; ketersediaan aplikasi bergantung pada perangkat, jaringan, dan tunnel. |
+| go2rtc/CCTV | Aplikasi memiliki halaman WebView untuk URL CCTV HTTPS yang diizinkan. Ketersediaan live stream tetap bergantung pada konfigurasi layanan CCTV. |
 
-**Implikasi:** semua kebutuhan backend, auth, database, dan realtime messaging **sudah tersedia** dari ThingsBoard. Aplikasi Flutter murni bertindak sebagai *client* yang mengonsumsi REST API dan WebSocket ThingsBoard.
+Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push service, atau subscription telemetry WebSocket di versi ini.
 
----
+## 4. Fitur dan status implementasi versi 1.2.3
 
-## 3. Tujuan MVP
+### 4.1 Autentikasi dan sesi
 
-Aplikasi versi pertama fokus menjawab satu kebutuhan inti: **memantau kondisi energi lahan dari HP, kapan saja, tanpa harus buka dashboard web ThingsBoard.**
+**Status: Diimplementasikan.**
 
-Di luar itu (push notification, integrasi Google Sheets, mode offline penuh, biometric login) masuk kategori pengembangan lanjutan — dibahas di Bagian 7.
+- Login menggunakan username dan password akun ThingsBoard.
+- JWT dan refresh token disimpan menggunakan secure storage. Ada migrasi token lama dari SharedPreferences.
+- Sesi tersimpan dimuat saat aplikasi dibuka. Jika ada token tersimpan, pengguna dapat membuka sesi dengan biometrik atau memilih login ThingsBoard.
+- Request API mencoba memperbarui access token menggunakan refresh token. Jika sesi ditolak, dashboard menghapus sesi dan mengarahkan pengguna ke Login.
+- Logout manual tersedia melalui Settings.
+- Tidak ada Register atau Lupa Password; akun dibuat/dikelola di ThingsBoard.
 
----
+### 4.2 Dashboard dan telemetry
 
-## 4. Kebutuhan Fungsional (MVP)
+**Status: Diimplementasikan dengan susunan UI berbeda dari konsep awal PRD.**
 
-### 4.1 Autentikasi
-- Login menggunakan akun ThingsBoard (Customer User atau Tenant Admin) — **bukan sistem auth baru**
-- Token JWT disimpan lokal (`SharedPreferences`) agar tidak perlu login ulang setiap buka app
-- Auto-redirect ke halaman Login jika token kedaluwarsa/invalid, dengan pesan singkat sebelum redirect
-- Tidak ada fitur Register/Lupa Password di app — akun tetap di-*provision* manual oleh admin ThingsBoard (sesuai pola akses saat ini)
+- Navigasi utama berisi Overview, PV, AC, Battery, CCTV, dan Settings.
+- Overview merangkum status energi dan lingkungan; halaman PV, AC, dan Battery menampilkan metrik perangkat serta grafik.
+- Data Battery, PZEM (PV/AC), dan sensor lingkungan diminta dari ThingsBoard REST API.
+- Polling otomatis aktif secara default setiap 10 detik. Pengguna dapat mengubah interval atau mematikannya di Settings.
+- Pull-to-refresh memperbarui telemetry dan histori halaman aktif.
+- Dashboard menghindari rebuild saat hasil telemetry tidak berubah.
+- Tampilan mendukung tema gelap dan terang serta pilihan warna aksen.
 
-### 4.2 Dashboard Monitoring Real-time
-- Tiga section utama: **Battery**, **Smart Meter PV & AC**, **Environment**
-- Tiap section ditampilkan sebagai satu card berisi list metrik (bukan grid terpisah) — gaya *grouped list* fluid
-- Data diperbarui berkala (polling tiap 10 detik sebagai baseline; upgrade ke WebSocket subscription dibahas di roadmap)
-- Pull-to-refresh manual
-- Skema warna semantik per section (teal untuk Battery, amber untuk PV/AC, biru untuk Environment)
+**Perbedaan dari konsep awal:** PRD versi 1.0 mengusulkan tiga card grouped-list di satu dashboard. Implementasi saat ini memakai Overview dan halaman/tab detail terpisah. Bentuk navigasi tab ini menjadi baseline produk.
 
-### 4.3 Grafik Historis
-- Chart tren untuk metrik kunci (SOC baterai, PV power, AC power) dalam rentang waktu (24 jam sebagai default MVP)
-- Menggunakan endpoint `timeseries` ThingsBoard dengan agregasi (AVG)
+### 4.3 Grafik historis
 
-### 4.4 CCTV Live View
-- Card khusus di dashboard menampilkan live feed dari go2rtc
-- Tap untuk memperbesar ke fullscreen
-- *(Bergantung pada go2rtc yang masih dalam tahap setup — lihat catatan risiko di Bagian 6)*
+**Status: Diimplementasikan.**
 
-### 4.5 Manajemen Sesi
-- Auto logout saat token invalid
-- Logout manual dari halaman Profil/Pengaturan
+- Grafik telemetry tersedia pada halaman PV, AC, dan Battery.
+- Data dibaca melalui endpoint time-series ThingsBoard dengan agregasi AVG.
+- Tampilan grafik mengikuti tanggal yang dipilih; tersedia pemilih tanggal untuk meninjau hari lain.
+- Rentang dan resolusi mengikuti implementasi query aplikasi. Ketersediaan titik data bergantung pada telemetry dan retensi ThingsBoard.
 
----
+### 4.4 Ringkasan dan laporan energi
 
-## 5. Kebutuhan Non-Fungsional
+**Status: Diimplementasikan pada versi 1.2.3.**
 
-| Aspek | Target |
+- Overview menampilkan estimasi produksi PV dan konsumsi AC untuk periode harian atau tujuh hari, dengan perbandingan periode sebelumnya.
+- Halaman laporan menyediakan analisis energi pada rentang harian/bulanan dan ekspor CSV.
+- Perhitungan merupakan estimasi berbasis histori daya; hasil bergantung pada kelengkapan dan interval telemetry.
+- Laporan memperbarui datanya secara berkala saat halaman laporan terbuka dan mendukung refresh manual.
+
+### 4.5 Peringatan lokal dan data stale
+
+**Status: Diimplementasikan saat aplikasi terbuka.**
+
+- Peringatan lokal muncul untuk SOC baterai rendah dan telemetry yang melewati ambang usia.
+- Pengguna dapat mengaktifkan/menonaktifkan peringatan dan mengatur ambang SOC serta usia telemetry di Settings.
+- Kartu telemetry menampilkan usia update saat stale.
+- Peringatan tidak dikirim ketika aplikasi ditutup; push notification belum tersedia.
+
+Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pada kartu telemetry, dan ringkasan Overview.
+
+### 4.6 CCTV
+
+**Status: Integrasi UI diimplementasikan; ketersediaan stream perlu diverifikasi di lingkungan deploy.**
+
+- CCTV tersedia sebagai halaman/tab tersendiri dan dimulai dalam keadaan standby.
+- Pengguna menekan Play untuk memuat halaman stream melalui WebView; tersedia status, stop, retry, dan reload.
+- URL harus HTTPS dan memakai host yang diizinkan.
+- Tombol layar penuh membuka stream dalam orientasi landscape dengan kontrol untuk keluar. CCTV bukan card pada Overview.
+
+### 4.7 Pengaturan dan tampilan
+
+**Status: Diimplementasikan.**
+
+- Preferensi tema (System/Light/Dark), warna aksen, polling, peringatan energi, ambang stale/SOC, dan URL CCTV disimpan lokal.
+- Pengguna dapat melihat versi aplikasi yang dibaca dari metadata paket, serta melakukan logout.
+- Pengaturan mengoptimalkan efek visual untuk performa.
+
+## 5. Kebutuhan nonfungsional
+
+| Aspek | Baseline/target |
 |---|---|
-| Waktu loading awal | < 2 detik pada perangkat kelas menengah |
-| Responsif | Menyesuaikan berbagai ukuran layar Android |
-| Keamanan | Komunikasi API via HTTPS (sudah terjamin lewat Cloudflare Tunnel); token JWT dari ThingsBoard |
-| Latency data | Selaras dengan siklus telemetry ESP32 (saat ini bergantung pada interval kirim MQTT masing-masing device) |
-| Ketersediaan | Bergantung pada uptime Orange Pi + Cloudflare Tunnel — tidak ada SLA formal karena self-hosted |
+| Keamanan transport | HTTPS untuk ThingsBoard dan URL CCTV yang diizinkan. Token sesi disimpan dengan secure storage. |
+| Kinerja | Polling tidak boleh menumpuk request; UI menghindari rebuild ketika data tidak berubah. Satu cold launch APK 1.2.3 pada perangkat uji tercatat 930 ms; perlu pengukuran berulang dan perangkat lain untuk memastikan konsistensi target <2 detik. |
+| Responsif | Pada satu perangkat Android 1220×2712, halaman Overview dapat digulir dan konten terlihat. Ukuran layar lain belum diuji. |
+| Ketahanan data | Jika fetch gagal, tampilkan status/error; MVP tidak menjanjikan cache offline lengkap. |
+| Ketersediaan | Tidak ada SLA formal; bergantung pada Orange Pi, ThingsBoard, tunnel, jaringan, dan perangkat IoT. |
+| Akurasi | Nilai dan estimasi hanya seakurat telemetry yang dikirim perangkat dan histori yang tersedia. |
 
----
+## 6. Di luar cakupan versi saat ini
 
-## 6. Risiko & Catatan Realistis
+- Push notification saat aplikasi tertutup.
+- Mode offline dengan cache telemetry lengkap.
+- Subscription WebSocket untuk menggantikan polling REST.
+- Register dan reset password dari aplikasi.
+- Pengelolaan banyak pengguna/role di aplikasi.
+- Prediksi FNN dan penjelasan XAI di aplikasi.
+- Backend/API kustom.
+- Status kesehatan stream yang diverifikasi end-to-end.
 
-- **CCTV**: fitur ini bergantung pada go2rtc yang belum live. Jangan dianggap "siap pakai" sebelum integrasi backend selesai.
-- **Latency**: karena data PZEM-017 (DC) sempat mengalami *stale read* (tercatat di catatan project), grafik/nilai di app bisa saja menampilkan data usang jika masalah firmware itu belum sepenuhnya teratasi. App sebaiknya punya indikator "data terakhir diperbarui X menit lalu" untuk transparansi ke pengguna.
-- **Single point of failure**: seluruh sistem (ThingsBoard, MQTT, Tunnel) berjalan di satu Orange Pi. Tidak ada redundansi — jika Orange Pi down, app otomatis tidak bisa menampilkan data apa pun.
-- **Tanpa backend/API kustom**: karena app langsung bicara ke ThingsBoard, fitur yang butuh logika bisnis kompleks (misal agregasi custom, aturan notifikasi canggih) akan lebih sulit diimplementasikan dibanding jika ada backend perantara. Ini trade-off yang disadari demi kecepatan development di tahap MVP.
+## 7. Saran pengembangan
 
----
+Urutan berikut disarankan berdasarkan risiko dan kesesuaian terhadap implementasi sekarang:
 
-## 7. Roadmap Pengembangan Lanjutan (Di Luar MVP)
+1. **Kurangi waktu cold start.** Profilkan startup pada build release dan optimalkan bagian yang terbukti lambat; ukur ulang sampai target <2 detik tercapai.
+2. **Verifikasi CCTV end-to-end.** Uji URL produksi, kontrol fullscreen, dan rotasi pada perangkat Android.
+3. **Ukur layout pada beberapa ukuran perangkat Android** dan simpan hasil verifikasi APK/perangkat di catatan rilis.
+4. **Perjelas status fetch dan usia data.** Tampilkan waktu pembaruan yang mudah ditemukan dan bedakan kegagalan koneksi dari telemetry yang stale.
+5. **Pertimbangkan WebSocket setelah polling stabil.** Evaluasi dampaknya terhadap baterai, koneksi ThingsBoard, serta kompleksitas reconnect sebelum mengganti polling.
+6. **Tambahkan push notification hanya dengan jalur server.** Tentukan sumber aturan/threshold dan layanan pengiriman terlebih dahulu; alert lokal yang ada hanya aktif saat aplikasi berjalan.
 
-Fitur berikut **tidak dikerjakan di MVP**, dicatat sebagai arah pengembangan yang bisa dibicarakan lebih lanjut:
+## 8. Kriteria penerimaan baseline
 
-| Fitur | Catatan |
-|---|---|
-| Push notification (anomali baterai/listrik) | Butuh Firebase Cloud Messaging + logic threshold; bisa dibangun sebagai Python service terpisah yang subscribe ke MQTT dan trigger FCM |
-| Integrasi Google Sheets | ESP32 sudah punya rencana logging HTTP POST ke Sheets secara terpisah dari app — sinkronisasi tampilan link di app bisa menyusul |
-| Mode offline dengan cache lengkap | MVP hanya menampilkan status "gagal fetch" saat offline, bukan cache penuh |
-| Biometric login (Face ID/Fingerprint) | Nice-to-have, tidak prioritas |
-| WebSocket real-time (menggantikan polling) | ThingsBoard mendukung ini secara native; upgrade natural setelah MVP polling stabil |
-| Prediksi FNN + XAI di dalam app | Menunggu model FNN selesai dikembangkan terlebih dahulu (masih tahap riset) |
-| Multi-user/role management | Saat ini cukup 1-2 akun customer user; belum jadi kebutuhan mendesak |
-| Backend/API kustom (Node.js dll) | Dipertimbangkan hanya jika kebutuhan logika bisnis melebihi kapasitas REST API ThingsBoard |
+- Login ThingsBoard berhasil; sesi bertahan setelah aplikasi ditutup dan dibuka kembali.
+- Token yang ditolak menghapus sesi dan mengarahkan pengguna ke Login.
+- Overview dan halaman PV, AC, Battery menampilkan data sesuai device/key ThingsBoard yang dikonfigurasi.
+- Polling default 10 detik dan pull-to-refresh berfungsi; interval dapat diubah di Settings.
+- Grafik historis menampilkan data yang tersedia untuk tanggal terpilih.
+- Pengguna dapat melakukan logout manual.
+- Stale telemetry dan alert SOC rendah ditampilkan saat aplikasi berjalan sesuai konfigurasi.
+- Ringkasan/laporan energi menyatakan hasilnya sebagai estimasi dari data histori.
+- Halaman CCTV memvalidasi URL, menyediakan kontrol playback dan fullscreen, serta menampilkan kegagalan stream dengan jelas.
+- APK release tersedia sebagai artefak build. Instalasi dan uji pada perangkat fisik harus dicatat terpisah; keberadaan file APK saja bukan bukti uji perangkat.
 
----
+## 9. Roadmap
 
-## 8. User Flow (MVP)
+- **Prioritas perbaikan:** verifikasi CCTV dan APK pada perangkat; kurangi waktu cold start.
+- **Peningkatan monitoring:** pertimbangkan WebSocket, cache ringan untuk tampilan terakhir, dan push notification berbasis server.
+- **Riset produk:** integrasi hasil FNN-XAI setelah model dan format output stabil.
+- **Skala pengguna:** evaluasi role/multi-user dan backend perantara hanya jika kebutuhan operasional bertambah.
 
-### Alur Autentikasi
-1. Splash screen singkat (tema gelap)
-2. Cek token tersimpan → jika valid, langsung ke Dashboard
-3. Jika tidak ada token/invalid → halaman Login
-4. Login sukses → token disimpan → redirect ke Dashboard
-5. Token expired saat pemakaian → dialog singkat → redirect ke Login
+## 10. Hasil verifikasi versi 1.2.3
 
-### Alur Monitoring
-1. Dashboard menampilkan 3 card section (Battery, Smart Meter PV & AC, Environment)
-2. Pull-to-refresh untuk update manual, auto-refresh tiap 10 detik
-3. *(Roadmap)* Tap section untuk lihat detail chart historis
-4. *(Jika CCTV live)* Card CCTV terpisah, tap untuk fullscreen
-
-### Alur Pengaturan
-1. Tab/menu Profil menampilkan info akun
-2. Tombol logout manual
-
----
-
-## 9. Tech Stack (Aktual)
-
-| Layer | Teknologi |
-|---|---|
-| Mobile Frontend | Flutter (Dart), Material 3 |
-| State Management | `setState` / `StatefulWidget` (MVP) — evaluasi Provider/Riverpod jika kompleksitas naik |
-| HTTP Client | package `http` |
-| Local Storage | `shared_preferences` (token JWT) |
-| Chart | `fl_chart` |
-| CCTV Streaming | *(pending)* — kandidat: `flutter_vlc_player` untuk konsumsi stream go2rtc |
-| Backend/API | ThingsBoard CE REST API + WebSocket (tidak ada backend kustom) |
-| Auth | ThingsBoard JWT (built-in) |
-| Message Broker | Mosquitto (device → ThingsBoard, sudah berjalan) |
-| Database | PostgreSQL (dikelola ThingsBoard, sudah berjalan) |
-| Hosting | Orange Pi 4 Pro (self-hosted) + Cloudflare Tunnel |
-
----
-
-## 10. Definition of Done (MVP)
-
-- [ ] Login berhasil menggunakan akun ThingsBoard, token tersimpan dan persist antar sesi
-- [ ] Dashboard menampilkan data real-time dari 3 device (Battery, PZEM, Sensor) dengan auto-refresh
-- [ ] UI menggunakan skema warna semantik per section + card grouped-list style
-- [ ] Auto-redirect ke Login saat token expired
-- [ ] Minimal 1 grafik historis (24 jam) untuk salah satu metrik kunci berhasil ditampilkan
-- [ ] APK release berhasil di-build dan terinstall di perangkat fisik
-- [ ] Indikator "data stale" muncul jika `lastUpdate` lebih dari threshold tertentu (mengantisipasi isu PZEM-017)
+- `flutter analyze`: lulus tanpa temuan.
+- `flutter test`: lulus (2 test).
+- APK release 1.2.3 build 7 berhasil dibuat.
+- APK release 1.2.3 build 7 berhasil dipasang dan dibuka pada perangkat Android 24090RA29G dengan resolusi 1220×2712. Package Manager melaporkan versionName 1.2.3 dan versionCode 7.
+- Layar Login tampil normal setelah instalasi baru. Sesi dan preferensi lokal lama terhapus saat paket sebelumnya di-uninstall; login ThingsBoard belum dilakukan.
+- Cold launch awal APK 1.2.3 tercatat 930 ms (`adb am start -W`), memenuhi target <2 detik pada pengukuran tunggal ini.
+- Pengukuran sebelum penggantian APK pada 1.2.2 sempat mencatat 2417–3339 ms; hasil lama itu tidak mewakili build 1.2.3 dan menunjukkan hasil startup perlu diuji berulang.
+- Halaman monitoring setelah login, stream CCTV, dan tata letak pada ukuran perangkat lain belum diverifikasi langsung.
