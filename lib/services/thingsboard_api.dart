@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/telemetry_model.dart';
 
+enum _TokenRefreshResult { refreshed, rejected, unavailable }
+
 class ThingsBoardApi {
   // Ganti sesuai domain lo
   static const String baseUrl = 'https://dashboard.mbkm20262027.tech';
@@ -15,6 +17,8 @@ class ThingsBoardApi {
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
+  String? _refreshToken;
+  Future<_TokenRefreshResult>? _refreshInFlight;
 
   /// Login pakai customer user, simpan token ke secure storage.
   Future<bool> login(String username, String password) async {
@@ -27,15 +31,22 @@ class ThingsBoardApi {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      _token = data['token'];
+      final token = data['token'];
+      if (token is! String || token.isEmpty) return false;
+      _token = token;
+      final refreshToken = data['refreshToken'];
+      _refreshToken = refreshToken is String && refreshToken.isNotEmpty
+          ? refreshToken
+          : null;
 
       await _secureStorage.write(key: 'tb_token', value: _token);
-      final refreshToken = data['refreshToken'] as String?;
-      if (refreshToken != null && refreshToken.isNotEmpty) {
+      if (_refreshToken != null) {
         await _secureStorage.write(
           key: 'tb_refresh_token',
-          value: refreshToken,
+          value: _refreshToken,
         );
+      } else {
+        await _secureStorage.delete(key: 'tb_refresh_token');
       }
       await _removeLegacyCredentials();
 
@@ -44,35 +55,27 @@ class ThingsBoardApi {
     return false; // login gagal (username/password salah)
   }
 
-  /// Load token yang sudah tersimpan agar tidak perlu login ulang tiap buka app.
+  /// Load the saved session without discarding it when the network is offline.
   Future<bool> loadSavedToken() async {
     final preferences = await SharedPreferences.getInstance();
-    _token = await _secureStorage.read(key: 'tb_token') ??
-        preferences.getString('tb_token');
+    final secureToken = await _secureStorage.read(key: 'tb_token');
+    final secureRefreshToken =
+        await _secureStorage.read(key: 'tb_refresh_token');
+    _token = secureToken ?? preferences.getString('tb_token');
+    _refreshToken =
+        secureRefreshToken ?? preferences.getString('tb_refresh_token');
     if (_token != null &&
-        await _secureStorage.read(key: 'tb_token') == null) {
+        secureToken == null) {
       await _secureStorage.write(key: 'tb_token', value: _token);
-      final legacyRefreshToken = preferences.getString('tb_refresh_token');
-      if (legacyRefreshToken != null && legacyRefreshToken.isNotEmpty) {
-        await _secureStorage.write(
-          key: 'tb_refresh_token',
-          value: legacyRefreshToken,
-        );
-      }
+    }
+    if (_refreshToken != null && secureRefreshToken == null) {
+      await _secureStorage.write(
+        key: 'tb_refresh_token',
+        value: _refreshToken,
+      );
     }
     await _removeLegacyCredentials(preferences);
-    if (_token == null) return false;
-
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/auth/user'),
-        headers: _authHeaders,
-      );
-      if (response.statusCode == 200) return true;
-    } catch (_) {}
-
-    await logout();
-    return false;
+    return _token != null && _token!.isNotEmpty;
   }
 
   Future<void> logout() async {
@@ -81,6 +84,7 @@ class ThingsBoardApi {
     await _removeLegacyCredentials();
     await clearUserCache();
     _token = null;
+    _refreshToken = null;
   }
 
   /// Fetches and caches the display name for the logged-in user.
@@ -89,9 +93,8 @@ class ThingsBoardApi {
     final cached = preferences.getString('user_display_name');
     if (cached != null && cached.isNotEmpty) return cached;
     try {
-      final response = await http.get(
+      final response = await _getWithTokenRefresh(
         Uri.parse('$baseUrl/api/auth/user'),
-        headers: _authHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -130,6 +133,83 @@ class ThingsBoardApi {
         'X-Authorization': 'Bearer $_token',
       };
 
+  Future<http.Response> _getWithTokenRefresh(Uri url) async {
+    final response = await http.get(url, headers: _authHeaders);
+    if (response.statusCode != 401) return response;
+
+    final refreshResult = await _refreshAccessToken();
+    if (refreshResult == _TokenRefreshResult.unavailable) {
+      throw Exception(
+        'Sesi tersimpan, tetapi server tidak dapat memperbaruinya. '
+        'Periksa koneksi lalu coba lagi.',
+      );
+    }
+    if (refreshResult == _TokenRefreshResult.rejected) return response;
+
+    return http.get(url, headers: _authHeaders);
+  }
+
+  Future<_TokenRefreshResult> _refreshAccessToken() async {
+    final existingRefresh = _refreshInFlight;
+    if (existingRefresh != null) return existingRefresh;
+
+    final refresh = _performTokenRefresh();
+    _refreshInFlight = refresh;
+    try {
+      return await refresh;
+    } finally {
+      if (identical(_refreshInFlight, refresh)) _refreshInFlight = null;
+    }
+  }
+
+  Future<_TokenRefreshResult> _performTokenRefresh() async {
+    final refreshToken = _refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await logout();
+      return _TokenRefreshResult.rejected;
+    }
+
+    late final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse('$baseUrl/api/auth/token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      ).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      return _TokenRefreshResult.unavailable;
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      await logout();
+      return _TokenRefreshResult.rejected;
+    }
+    if (response.statusCode != 200) return _TokenRefreshResult.unavailable;
+
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final token = data['token'];
+      if (token is! String || token.isEmpty) {
+        return _TokenRefreshResult.unavailable;
+      }
+      final nextRefreshToken = data['refreshToken'];
+      final refreshedToken = nextRefreshToken is String &&
+              nextRefreshToken.isNotEmpty
+          ? nextRefreshToken
+          : refreshToken;
+      await _secureStorage.write(key: 'tb_token', value: token);
+      await _secureStorage.write(
+        key: 'tb_refresh_token',
+        value: refreshedToken,
+      );
+      _token = token;
+      _refreshToken = refreshedToken;
+      return _TokenRefreshResult.refreshed;
+    } catch (_) {
+      return _TokenRefreshResult.unavailable;
+    }
+  }
+
   /// Fetch nilai telemetry terkini (latest value) untuk satu device
   Future<DeviceTelemetry> fetchLatestTelemetry(
     String deviceId,
@@ -140,7 +220,7 @@ class ThingsBoardApi {
       '$baseUrl/api/plugins/telemetry/DEVICE/$deviceId/values/timeseries?keys=$keysParam',
     );
 
-    final response = await http.get(url, headers: _authHeaders);
+    final response = await _getWithTokenRefresh(url);
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -193,7 +273,7 @@ class ThingsBoardApi {
       'limit': '$limit',
     });
 
-    final response = await http.get(url, headers: _authHeaders);
+    final response = await _getWithTokenRefresh(url);
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;

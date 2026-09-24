@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:local_auth/local_auth.dart';
 
 import 'services/thingsboard_api.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
+import 'widgets/liquid_glass.dart';
 
 void main() {
   runApp(const PltsMonitoringApp());
@@ -41,6 +44,12 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
         title: 'EnerGrow',
         debugShowCheckedModeBanner: false,
         themeMode: _themeController.themeMode,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
         theme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.light,
@@ -114,8 +123,12 @@ class _SplashRouter extends StatefulWidget {
 
 class _SplashRouterState extends State<_SplashRouter> {
   final _api = ThingsBoardApi();
+  final _localAuth = LocalAuthentication();
   bool _checking = true;
   bool _hasToken = false;
+  bool _unlocked = false;
+  bool _authenticating = false;
+  String? _authError;
 
   @override
   void initState() {
@@ -130,6 +143,44 @@ class _SplashRouterState extends State<_SplashRouter> {
       _hasToken = has;
       _checking = false;
     });
+    if (has) await _authenticate();
+  }
+
+  Future<void> _authenticate() async {
+    if (_authenticating || !_hasToken || _unlocked) return;
+    setState(() {
+      _authenticating = true;
+      _authError = null;
+    });
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Autentikasi untuk membuka sesi EnerGrow',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unlocked = authenticated;
+        _authError = authenticated
+            ? null
+            : 'Autentikasi dibatalkan. Gunakan biometrik untuk melanjutkan.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _authError =
+            'Biometrik tidak tersedia. Masuk menggunakan akun ThingsBoard.';
+      });
+    } finally {
+      _authenticating = false;
+    }
+  }
+
+  void _usePasswordLogin() {
+    setState(() {
+      _hasToken = false;
+      _authError = null;
+    });
   }
 
   @override
@@ -142,6 +193,70 @@ class _SplashRouterState extends State<_SplashRouter> {
             children: [
               BrandLogo(size: 92, showName: true),
             ],
+          ),
+        ),
+      );
+    }
+    if (_hasToken && !_unlocked) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: AmbientBackground(
+          isDark: isDark,
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const BrandLogo(size: 88),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Sesi EnerGrow tersimpan',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Gunakan sidik jari atau pengenalan wajah untuk membuka aplikasi.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                      ),
+                    ),
+                    if (_authError != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        _authError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: _authenticating ? null : _authenticate,
+                      icon: _authenticating
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.fingerprint),
+                      label: Text(
+                        _authenticating ? 'Memverifikasi…' : 'Buka dengan biometrik',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _usePasswordLogin,
+                      child: const Text('Masuk dengan akun ThingsBoard'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       );

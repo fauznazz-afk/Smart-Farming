@@ -467,6 +467,7 @@ class GlassDateChip extends StatelessWidget {
     required this.onTap,
     this.accentColor = const Color(0xFF35A968),
     this.performanceMode = true,
+    this.width = 48,
   });
 
   final String dayName;
@@ -474,6 +475,7 @@ class GlassDateChip extends StatelessWidget {
   final bool isSelected, isDark, performanceMode;
   final Color accentColor;
   final VoidCallback onTap;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -507,7 +509,7 @@ class GlassDateChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        width: 48,
+        width: width,
         height: 68,
         padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
         decoration: decoration,

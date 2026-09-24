@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
@@ -33,6 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   // ── State fields ─────────────────────────────────────────────────────────────
   final _pageController = PageController();
+  final _localAuth = LocalAuthentication();
   DeviceTelemetry? _battery;
   DeviceTelemetry? _pzem;
   DeviceTelemetry? _sensor;
@@ -47,6 +49,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _weeklyEnergySummary = false;
   bool _energyRequestInFlight = false;
   bool _chartPointerActive = false;
+  bool _appLocked = false;
+  bool _appUnlocking = false;
+  bool _authenticateOnResume = false;
+  String? _appLockError;
   bool _telemetryRequestInFlight = false;
   final _historyRequestInFlight = <String>{};
   final _historyLoaded = <String>{};
@@ -90,11 +96,67 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _restartRefreshTimer();
+      if (_appLocked && _authenticateOnResume) {
+        _authenticateOnResume = false;
+        unawaited(_authenticateToUnlock());
+      } else if (!_appLocked) {
+        _restartRefreshTimer();
+      }
     } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
       _refreshTimer?.cancel();
+      if (!_appUnlocking && !_appLocked) {
+        _authenticateOnResume = true;
+        setState(() {
+          _appLocked = true;
+          _appLockError = null;
+        });
+      }
     }
+  }
+
+  Future<void> _authenticateToUnlock() async {
+    if (_appUnlocking || !_appLocked) return;
+    _appUnlocking = true;
+    setState(() => _appLockError = null);
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Autentikasi untuk melanjutkan sesi EnerGrow',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+      if (!mounted) return;
+      if (authenticated) {
+        setState(() {
+          _appLocked = false;
+          _appLockError = null;
+        });
+        _restartRefreshTimer();
+      } else {
+        setState(() {
+          _appLockError = 'Autentikasi dibatalkan. Coba lagi untuk melanjutkan.';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _appLockError =
+            'Biometrik tidak tersedia. Masuk kembali dengan akun ThingsBoard.';
+      });
+    } finally {
+      _appUnlocking = false;
+    }
+  }
+
+  void _usePasswordLogin() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(themeController: widget.themeController),
+      ),
+      (_) => false,
+    );
   }
 
   // ── Theme helpers ─────────────────────────────────────────────────────────────
@@ -481,6 +543,34 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (prefix != null) unawaited(_fetchHistoryFor(prefix));
   }
 
+  Future<void> _pickDateFromCalendar() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = today.subtract(const Duration(days: 6));
+    final selected = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    final initialDate = selected.isBefore(firstDate)
+        ? firstDate
+        : selected.isAfter(today)
+            ? today
+            : selected;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: today,
+      locale: const Locale('id', 'ID'),
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+      helpText: 'Pilih tanggal dalam 7 hari terakhir',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+    );
+    if (picked != null && mounted) _selectDate(picked);
+  }
+
   // ── Auth ──────────────────────────────────────────────────────────────────────
   Future<void> _logout() async {
     await widget.api.logout();
@@ -512,7 +602,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -600,6 +693,68 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       extendBody: true,
       bottomNavigationBar: _glassNavBar(isDark),
+        ),
+        if (_appLocked) _appLockScreen(isDark),
+      ],
+    );
+  }
+
+  Widget _appLockScreen(bool isDark) {
+    return Material(
+      color: isDark ? const Color(0xFF101412) : const Color(0xFFF6F8F7),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fingerprint, size: 56),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sesi EnerGrow terkunci',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Autentikasi biometrik untuk melanjutkan.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
+                ),
+                if (_appLockError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _appLockError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed:
+                      _appUnlocking ? null : _authenticateToUnlock,
+                  icon: _appUnlocking
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.lock_open_rounded),
+                  label: Text(
+                    _appUnlocking ? 'Memverifikasi…' : 'Buka dengan biometrik',
+                  ),
+                ),
+                TextButton(
+                  onPressed: _usePasswordLogin,
+                  child: const Text('Masuk dengan akun ThingsBoard'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -840,29 +995,91 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _dateStrip(bool isDark) {
-    return SizedBox(
-      height: 74,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        itemCount: _stripDays.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 7),
-        itemBuilder: (context, i) {
-          final d = _stripDays[i];
-          final isSelected = d.year == _selectedDate.year &&
-              d.month == _selectedDate.month &&
-              d.day == _selectedDate.day;
-          return GlassDateChip(
-            dayName: _dayNameShort(d.weekday),
-            dayNumber: d.day,
-            isSelected: isSelected,
-            isDark: isDark,
-            accentColor: _strongMetricColor(0, isDark),
-            onTap: () => _selectDate(d),
-            performanceMode: _performanceMode,
-          );
-        },
-      ),
+    final days = _stripDays;
+    final first = days.first;
+    final last = days.last;
+    final dateRange = first.month == last.month
+        ? '${first.day}–${last.day} ${_monthName(last.month)} ${last.year}'
+        : '${first.day} ${_monthName(first.month)} – '
+            '${last.day} ${_monthName(last.month)} ${last.year}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Pilih tanggal',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 28,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: _pickDateFromCalendar,
+                icon: Icon(
+                  Icons.calendar_month_outlined,
+                  size: 16,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  dateRange,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '7 hari',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 6.0;
+            final chipWidth =
+                (constraints.maxWidth - gap * (days.length - 1)) / days.length;
+            return Row(
+              children: [
+                for (var i = 0; i < days.length; i++) ...[
+                  if (i > 0) const SizedBox(width: gap),
+                  SizedBox(
+                    width: chipWidth,
+                    child: GlassDateChip(
+                      width: chipWidth,
+                      dayName: _dayNameShort(days[i].weekday),
+                      dayNumber: days[i].day,
+                      isSelected: days[i].year == _selectedDate.year &&
+                          days[i].month == _selectedDate.month &&
+                          days[i].day == _selectedDate.day,
+                      isDark: isDark,
+                      accentColor: _strongMetricColor(0, isDark),
+                      onTap: () => _selectDate(days[i]),
+                      performanceMode: _performanceMode,
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 
