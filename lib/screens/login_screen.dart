@@ -61,8 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final performanceMode = widget.themeController.performanceMode;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: AmbientBackground(
@@ -75,21 +73,28 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const BrandLogo(size: 100, showName: false),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: const BrandLogo(size: 100, showName: false),
+                  ),
                   const SizedBox(height: 12),
                   LiquidGlassCard(
                     isDark: isDark,
-                    performanceMode: performanceMode,
+                    performanceMode: false,
                     padding: const EdgeInsets.all(24),
                     borderRadius: 20,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Selamat Datang',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            'EnerGrow',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),

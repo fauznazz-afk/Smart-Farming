@@ -3,7 +3,7 @@
     <application
         android:label="EnerGrow"
         android:name="${applicationName}"
-        android:icon="@drawable/ic_energrow">
+        android:icon="@drawable/energrow_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
