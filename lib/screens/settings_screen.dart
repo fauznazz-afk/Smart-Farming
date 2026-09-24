@@ -610,7 +610,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _settingsSection(
             title: 'About',
-            subtitle: 'App and account information.',
+            subtitle: 'Application information.',
             icon: Icons.info_outline,
             children: [
               ListTile(
@@ -620,6 +620,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _appVersion == null ? 'Loading…' : 'v$_appVersion',
                 ),
               ),
+            ],
+          ),
+          _settingsSection(
+            title: 'Account',
+            subtitle: 'Manage your ThingsBoard session.',
+            icon: Icons.manage_accounts_outlined,
+            children: [
               OutlinedButton.icon(
                 onPressed: _confirmLogout,
                 icon: const Icon(Icons.logout),

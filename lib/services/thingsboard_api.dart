@@ -7,6 +7,7 @@ import '../models/telemetry_model.dart';
 enum _TokenRefreshResult { refreshed, rejected, unavailable }
 
 class ThingsBoardApi {
+  static const _requestTimeout = Duration(seconds: 15);
   // Ganti sesuai domain lo
   static const String baseUrl = 'https://dashboard.mbkm20262027.tech';
 
@@ -27,7 +28,7 @@ class ThingsBoardApi {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -134,7 +135,9 @@ class ThingsBoardApi {
       };
 
   Future<http.Response> _getWithTokenRefresh(Uri url) async {
-    final response = await http.get(url, headers: _authHeaders);
+    final response = await http
+        .get(url, headers: _authHeaders)
+        .timeout(_requestTimeout);
     if (response.statusCode != 401) return response;
 
     final refreshResult = await _refreshAccessToken();
@@ -146,7 +149,7 @@ class ThingsBoardApi {
     }
     if (refreshResult == _TokenRefreshResult.rejected) return response;
 
-    return http.get(url, headers: _authHeaders);
+    return http.get(url, headers: _authHeaders).timeout(_requestTimeout);
   }
 
   Future<_TokenRefreshResult> _refreshAccessToken() async {
@@ -175,7 +178,7 @@ class ThingsBoardApi {
         Uri.parse('$baseUrl/api/auth/token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refreshToken': refreshToken}),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(_requestTimeout);
     } catch (_) {
       return _TokenRefreshResult.unavailable;
     }

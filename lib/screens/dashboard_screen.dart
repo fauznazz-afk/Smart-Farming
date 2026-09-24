@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/telemetry_model.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
@@ -35,6 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   // ── State fields ─────────────────────────────────────────────────────────────
   final _pageController = PageController();
+  final ValueNotifier<int> _selectedPage = ValueNotifier(0);
   DeviceTelemetry? _battery;
   DeviceTelemetry? _pzem;
   DeviceTelemetry? _sensor;
@@ -51,12 +54,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _chartPointerActive = false;
   bool _telemetryRequestInFlight = false;
   final _historyRequestInFlight = <String>{};
+  final _historyRequestDate = <String, DateTime>{};
+  final _historyPendingRefresh = <String>{};
   final _historyLoaded = <String>{};
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
   String _cctvUrl = defaultCctvUrl;
   String? _error;
   Timer? _refreshTimer;
+  Timer? _connectionStatusTimer;
+  bool _connectionStatusInitialized = false;
+  bool _showConnectionStatus = false;
   DateTime _selectedDate = DateTime.now();
   DateTime? _energyUpdatedAt;
   DateTime? _lastSuccessfulTelemetryAt;
@@ -92,8 +100,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     widget.themeController.removeListener(_onThemeChanged);
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
+    _selectedPage.dispose();
     _appBarBlurProgress.dispose();
     _refreshTimer?.cancel();
+    _connectionStatusTimer?.cancel();
     super.dispose();
   }
 
@@ -162,23 +172,31 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() {
       _autoRefresh = preferences.getBool('auto_refresh') ?? true;
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
-      _energyAlertsEnabled = preferences.getBool('energy_alerts_enabled') ?? true;
+      _energyAlertsEnabled =
+          preferences.getBool('energy_alerts_enabled') ?? true;
       _environmentAlertsEnabled =
           preferences.getBool('environment_alerts_enabled') ?? false;
       _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
-      _staleTelemetryMinutes = preferences.getInt('stale_telemetry_minutes') ?? 10;
-      _environmentTempMin =
-          double.tryParse(preferences.getString('environment_temp_min') ?? '');
-      _environmentTempMax =
-          double.tryParse(preferences.getString('environment_temp_max') ?? '');
+      _staleTelemetryMinutes =
+          preferences.getInt('stale_telemetry_minutes') ?? 10;
+      _environmentTempMin = double.tryParse(
+        preferences.getString('environment_temp_min') ?? '',
+      );
+      _environmentTempMax = double.tryParse(
+        preferences.getString('environment_temp_max') ?? '',
+      );
       _environmentHumidityMin = double.tryParse(
-          preferences.getString('environment_humidity_min') ?? '');
+        preferences.getString('environment_humidity_min') ?? '',
+      );
       _environmentHumidityMax = double.tryParse(
-          preferences.getString('environment_humidity_max') ?? '');
-      _environmentTdsMin =
-          double.tryParse(preferences.getString('environment_tds_min') ?? '');
-      _environmentTdsMax =
-          double.tryParse(preferences.getString('environment_tds_max') ?? '');
+        preferences.getString('environment_humidity_max') ?? '',
+      );
+      _environmentTdsMin = double.tryParse(
+        preferences.getString('environment_tds_min') ?? '',
+      );
+      _environmentTdsMax = double.tryParse(
+        preferences.getString('environment_tds_max') ?? '',
+      );
       _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
     });
     _restartRefreshTimer();
@@ -206,18 +224,23 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]);
       if (!mounted) return;
       final now = DateTime.now();
-      final changed = _loading ||
+      final statusChanged = !_connectionStatusInitialized || _error != null;
+      _connectionStatusInitialized = true;
+      if (statusChanged) _showConnectionStatusForThreeSeconds();
+      final changed =
+          _loading ||
           _error != null ||
           !_sameTelemetry(_battery, results[0]) ||
           !_sameTelemetry(_pzem, results[1]) ||
           !_sameTelemetry(_sensor, results[2]);
-      final statusChanged = _lastSuccessfulTelemetryAt == null ||
+      final timestampChanged =
+          _lastSuccessfulTelemetryAt == null ||
           now.difference(_lastSuccessfulTelemetryAt!).inMinutes >= 1;
       _battery = results[0];
       _pzem = results[1];
       _sensor = results[2];
       _lastSuccessfulTelemetryAt = now;
-      if (changed || statusChanged) {
+      if (changed || timestampChanged) {
         setState(() {
           _loading = false;
           _error = null;
@@ -245,6 +268,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         return;
       }
       final message = error.toString();
+      final statusChanged = !_connectionStatusInitialized || _error == null;
+      _connectionStatusInitialized = true;
+      if (statusChanged) _showConnectionStatusForThreeSeconds();
       if (_error != message || _loading) {
         setState(() {
           _error = message;
@@ -285,14 +311,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
       if (!mounted) return;
       final hasHistory = histories.values.any((points) => points.isNotEmpty);
+      final sortedHistories = {
+        for (final entry in histories.entries)
+          entry.key: List<TelemetryPoint>.of(entry.value)
+            ..sort((a, b) => a.timestamp.compareTo(b.timestamp)),
+      };
       setState(() {
         _energyHistory
           ..clear()
-          ..addAll(histories);
+          ..addAll(sortedHistories);
         _energyLoading = false;
-        _energyError = hasHistory
-            ? null
-            : 'ThingsBoard tidak mengirim histori power_dc/power_ac dalam 14 hari terakhir.';
+        _energyError = hasHistory ? null : 'ThingsBoard tidak mengirim histori power_dc/power_ac dalam 14 hari terakhir.';
         _energyUpdatedAt = now;
       });
     } catch (error) {
@@ -300,7 +329,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       debugPrint('Energy summary history request failed: $error');
       setState(() {
         _energyLoading = false;
-        _energyError = 'Histori daya gagal dimuat. Tarik layar untuk mencoba lagi.';
+        _energyError =
+            'Histori daya gagal dimuat. Tarik layar untuk mencoba lagi.';
       });
     } finally {
       _energyRequestInFlight = false;
@@ -337,21 +367,40 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_environmentAlertsEnabled &&
         sensor != null &&
         !sensor.isStale(minutes: _staleTelemetryMinutes)) {
-      _addRangeAlerts(alerts, id: 'ambient_temp', label: 'Suhu lingkungan',
-          unit: '°C', value: sensor.latestValues['temp_dht'],
-          minimum: _environmentTempMin, maximum: _environmentTempMax);
-      _addRangeAlerts(alerts, id: 'humidity', label: 'Kelembapan', unit: '%',
-          value: sensor.latestValues['humidity_dht'],
-          minimum: _environmentHumidityMin, maximum: _environmentHumidityMax);
-      _addRangeAlerts(alerts, id: 'tds', label: 'TDS', unit: 'ppm',
-          value: sensor.latestValues['tds_ppm'], minimum: _environmentTdsMin,
-          maximum: _environmentTdsMax);
+      _addRangeAlerts(
+        alerts,
+        id: 'ambient_temp',
+        label: 'Suhu lingkungan',
+        unit: '°C',
+        value: sensor.latestValues['temp_dht'],
+        minimum: _environmentTempMin,
+        maximum: _environmentTempMax,
+      );
+      _addRangeAlerts(
+        alerts,
+        id: 'humidity',
+        label: 'Kelembapan',
+        unit: '%',
+        value: sensor.latestValues['humidity_dht'],
+        minimum: _environmentHumidityMin,
+        maximum: _environmentHumidityMax,
+      );
+      _addRangeAlerts(
+        alerts,
+        id: 'tds',
+        label: 'TDS',
+        unit: 'ppm',
+        value: sensor.latestValues['tds_ppm'],
+        minimum: _environmentTdsMin,
+        maximum: _environmentTdsMax,
+      );
     }
     final newMessages = alerts.entries
         .where((entry) => !_activeAlertIds.contains(entry.key))
         .map((entry) => entry.value)
         .toList();
-    final changed = alerts.length != _activeAlertIds.length ||
+    final changed =
+        alerts.length != _activeAlertIds.length ||
         !alerts.keys.every(_activeAlertIds.contains) ||
         !_sameStrings(alerts.values.toList(), _activeAlertMessages);
     if (!changed) return;
@@ -368,7 +417,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (mounted) setState(() {});
   }
 
-  void _addRangeAlerts(Map<String, String> alerts, {
+  void _showConnectionStatusForThreeSeconds() {
+    _connectionStatusTimer?.cancel();
+    if (mounted) setState(() => _showConnectionStatus = true);
+    _connectionStatusTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showConnectionStatus = false);
+    });
+  }
+
+  void _addRangeAlerts(
+    Map<String, String> alerts, {
     required String id,
     required String label,
     required String unit,
@@ -394,8 +452,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       ('Sensor lingkungan', _sensor),
     ];
     return devices
-        .where((entry) => entry.$2 != null &&
-            entry.$2!.isStale(minutes: _staleTelemetryMinutes))
+        .where(
+          (entry) =>
+              entry.$2 != null &&
+              entry.$2!.isStale(minutes: _staleTelemetryMinutes),
+        )
         .map((entry) => entry.$1)
         .toList();
   }
@@ -426,24 +487,32 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   double _energyForPeriod(String key, DateTime start, DateTime end) {
-    final points = [...?_energyHistory[key]]
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final points = _energyHistory[key] ?? const <TelemetryPoint>[];
     var kwh = 0.0;
     for (var i = 1; i < points.length; i++) {
       final previous = points[i - 1];
       final current = points[i];
-      final gapMs = current.timestamp.difference(previous.timestamp).inMilliseconds;
+      final gapMs = current.timestamp
+          .difference(previous.timestamp)
+          .inMilliseconds;
       if (gapMs <= 0 || gapMs > 60 * 60 * 1000) continue;
-      final left = previous.timestamp.isAfter(start) ? previous.timestamp : start;
+      final left = previous.timestamp.isAfter(start)
+          ? previous.timestamp
+          : start;
       final right = current.timestamp.isBefore(end) ? current.timestamp : end;
       final durationMs = right.difference(left).inMilliseconds;
       if (durationMs <= 0) continue;
-      final leftFraction = left.difference(previous.timestamp).inMilliseconds / gapMs;
-      final rightFraction = right.difference(previous.timestamp).inMilliseconds / gapMs;
-      final leftPower = previous.value + (current.value - previous.value) * leftFraction;
-      final rightPower = previous.value + (current.value - previous.value) * rightFraction;
-      final averageWatts =
-          math.max(0.0, (leftPower + rightPower) / 2).toDouble();
+      final leftFraction =
+          left.difference(previous.timestamp).inMilliseconds / gapMs;
+      final rightFraction =
+          right.difference(previous.timestamp).inMilliseconds / gapMs;
+      final leftPower =
+          previous.value + (current.value - previous.value) * leftFraction;
+      final rightPower =
+          previous.value + (current.value - previous.value) * rightFraction;
+      final averageWatts = math
+          .max(0.0, (leftPower + rightPower) / 2)
+          .toDouble();
       kwh += averageWatts * durationMs / 3600000000;
     }
     return kwh;
@@ -465,11 +534,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _fetchHistoryFor(String prefix) async {
-    if (_historyRequestInFlight.contains(prefix)) return;
-    _historyRequestInFlight.add(prefix);
-    if (mounted && !_historyLoaded.contains(prefix)) {
-      setState(() => _chartLoading = true);
-    }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final selDay = DateTime(
@@ -477,6 +541,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       _selectedDate.month,
       _selectedDate.day,
     );
+    if (_historyRequestInFlight.contains(prefix)) {
+      if (_historyRequestDate[prefix] != selDay) {
+        _historyPendingRefresh.add(prefix);
+      }
+      return;
+    }
+    _historyRequestInFlight.add(prefix);
+    _historyRequestDate[prefix] = selDay;
+    if (mounted && !_historyLoaded.contains(prefix)) {
+      setState(() => _chartLoading = true);
+    }
     DateTime start, end;
     if (selDay == today) {
       end = now;
@@ -504,7 +579,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     } catch (_) {
       histories = const {};
     }
-    if (mounted) {
+    final currentDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    if (mounted && currentDay == selDay) {
       setState(() {
         _history['${prefix}_voltage'] = histories[keys.$1] ?? [];
         _history['${prefix}_current'] = histories[keys.$2] ?? [];
@@ -515,6 +595,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       });
     }
     _historyRequestInFlight.remove(prefix);
+    _historyRequestDate.remove(prefix);
+    if (_historyPendingRefresh.remove(prefix) &&
+        _prefixForPage(_selectedIndex) == prefix) {
+      unawaited(_fetchHistoryFor(prefix));
+    }
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────────
@@ -526,11 +611,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   };
 
   void _selectPage(int index) {
-    if (_selectedIndex == index) return;
+    if (_selectedPage.value == index) return;
     _pageController.animateToPage(
       index,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOutCubic,
     );
   }
 
@@ -574,8 +659,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     final initialDate = selected.isBefore(firstDate)
         ? firstDate
         : selected.isAfter(today)
-            ? today
-            : selected;
+        ? today
+        : selected;
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -607,11 +692,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            SettingsScreen(
-              themeController: widget.themeController,
-              onLogout: _logout,
-            ),
+        builder: (_) => SettingsScreen(
+          themeController: widget.themeController,
+          onLogout: _logout,
+        ),
       ),
     );
     if (changed == true) _loadPreferences();
@@ -684,121 +768,150 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : (_error != null && _battery == null)
-                ? _errorView()
-                : PageView.builder(
-                    controller: _pageController,
-                    physics: _chartPointerActive
-                        ? const NeverScrollableScrollPhysics()
-                        : const PageScrollPhysics(),
-                    itemCount: 5,
-                    onPageChanged: (index) {
-                      if (_selectedIndex != index) {
-                        setState(() => _selectedIndex = index);
-                      }
-                      final prefix = _prefixForPage(index);
-                      if (prefix != null) unawaited(_fetchHistoryFor(prefix));
-                    },
-                    itemBuilder: (context, index) => NotificationListener<
-                        ScrollNotification>(
-                      onNotification: _handleScrollNotification,
-                      child: RefreshIndicator(
-                        color: Theme.of(context).colorScheme.primary,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        strokeWidth: 2.5,
-                        displacement: 58,
-                        edgeOffset:
-                            MediaQuery.of(context).padding.top + kToolbarHeight,
-                        onRefresh: _refreshCurrentPage,
-                        child: ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: EdgeInsets.fromLTRB(
-                            16,
-                            MediaQuery.of(context).padding.top +
-                                kToolbarHeight -
-                                6,
-                            16,
-                            MediaQuery.of(context).padding.bottom + 76,
-                          ),
-                          children: [
-                            if (_battery != null || _error != null)
-                              _connectionStatusBanner(),
-                            if (_activeAlertMessages.isNotEmpty)
-                              _energyAlertBanner(),
-                            ..._pageContentFor(index, isDark),
-                          ],
+            ? _errorView()
+            : PageView.builder(
+                controller: _pageController,
+                physics: _chartPointerActive
+                    ? const NeverScrollableScrollPhysics()
+                    : const PageScrollPhysics(),
+                itemCount: 5,
+                onPageChanged: (index) {
+                  _selectedIndex = index;
+                  _selectedPage.value = index;
+                  final prefix = _prefixForPage(index);
+                  if (prefix != null) unawaited(_fetchHistoryFor(prefix));
+                },
+                itemBuilder: (context, index) => RepaintBoundary(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: RefreshIndicator(
+                      color: Theme.of(context).colorScheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      strokeWidth: 2.5,
+                      displacement: 58,
+                      edgeOffset:
+                          MediaQuery.of(context).padding.top + kToolbarHeight,
+                      onRefresh: _refreshCurrentPage,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          MediaQuery.of(context).padding.top +
+                              kToolbarHeight -
+                              6,
+                          16,
+                          MediaQuery.of(context).padding.bottom + 76,
                         ),
+                        children: [
+                          if (_showConnectionStatus &&
+                              (_battery != null || _error != null))
+                            _connectionStatusBanner(),
+                          if (_activeAlertMessages.isNotEmpty)
+                            _energyAlertBanner(),
+                          ..._pageContentFor(index, isDark),
+                        ],
                       ),
                     ),
                   ),
+                ),
+              ),
       ),
       extendBody: true,
-      bottomNavigationBar: _glassNavBar(isDark),
+      bottomNavigationBar: ValueListenableBuilder<int>(
+        valueListenable: _selectedPage,
+        builder: (context, _, child) => _glassNavBar(isDark),
+      ),
     );
   }
 
   // ── Bottom nav bar ────────────────────────────────────────────────────────────
   Widget _glassNavBar(bool isDark) {
+    final page = _selectedIndex.toDouble();
+    final primary = _strongMetricColor(_selectedIndex, isDark);
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: AnimatedBuilder(
-        animation: _pageController,
-        builder: (context, _) {
-          final page = _pageController.hasClients
-              ? (_pageController.page ?? _selectedIndex.toDouble())
-              : _selectedIndex.toDouble();
-          final primary = _strongMetricColor(_selectedIndex, isDark);
-          return RepaintBoundary(
+      child: RepaintBoundary(
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.40)
+                    : Colors.black.withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
             child: Container(
-              height: 64,
               decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xEE101412)
+                    : Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark
-                        ? Colors.black.withValues(alpha: 0.50)
-                        : Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.black.withValues(alpha: 0.07),
+                ),
+              ),
+              child: Row(
+                children: [
+                  _navItem(
+                    0,
+                    Icons.dashboard_outlined,
+                    Icons.dashboard,
+                    'Ringkas',
+                    page,
+                    isDark,
+                    primary,
+                  ),
+                  _navItem(
+                    1,
+                    Icons.wb_sunny_outlined,
+                    Icons.wb_sunny,
+                    'PV',
+                    page,
+                    isDark,
+                    primary,
+                  ),
+                  _navItem(
+                    2,
+                    Icons.power_outlined,
+                    Icons.power,
+                    'AC',
+                    page,
+                    isDark,
+                    primary,
+                  ),
+                  _navItem(
+                    3,
+                    Icons.battery_5_bar_outlined,
+                    Icons.battery_full,
+                    'Baterai',
+                    page,
+                    isDark,
+                    primary,
+                  ),
+                  _navItem(
+                    4,
+                    Icons.videocam_outlined,
+                    Icons.videocam,
+                    'CCTV',
+                    page,
+                    isDark,
+                    primary,
                   ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0x66101412)
-                          : Colors.white.withValues(alpha: 0.42),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.14)
-                            : Colors.black.withValues(alpha: 0.07),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        _navItem(0, Icons.dashboard_outlined, Icons.dashboard,
-                            'Ringkas', page, isDark, primary),
-                        _navItem(1, Icons.wb_sunny_outlined, Icons.wb_sunny,
-                            'PV', page, isDark, primary),
-                        _navItem(2, Icons.power_outlined, Icons.power, 'AC',
-                            page, isDark, primary),
-                        _navItem(3, Icons.battery_5_bar_outlined,
-                            Icons.battery_full, 'Baterai', page, isDark, primary),
-                        _navItem(4, Icons.videocam_outlined, Icons.videocam,
-                            'CCTV', page, isDark, primary),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -842,7 +955,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           ],
                         ),
-                        child: Icon(selectedIcon, size: 22, color: Colors.white),
+                        child: Icon(
+                          selectedIcon,
+                          size: 22,
+                          color: Colors.white,
+                        ),
                       )
                     : Column(
                         key: ValueKey('unsel_$index'),
@@ -851,8 +968,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Icon(
                             icon,
                             size: 20,
-                            color: _metricColor(index, isDark)
-                                .withValues(alpha: 0.72),
+                            color: _metricColor(
+                              index,
+                              isDark,
+                            ).withValues(alpha: 0.72),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -860,8 +979,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                             maxLines: 1,
                             style: TextStyle(
                               fontSize: 9,
-                              color: _metricColor(index, isDark)
-                                  .withValues(alpha: 0.72),
+                              color: _metricColor(
+                                index,
+                                isDark,
+                              ).withValues(alpha: 0.72),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -876,18 +997,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Page content router ───────────────────────────────────────────────────────
-  List<Widget> _pageContentFor(int index, bool isDark) => switch (index) {
-    1 => _pvPage(isDark),
-    2 => _acPage(isDark),
-    3 => _batteryPage(isDark),
-    4 => [
-      if (index == _selectedIndex)
-        CctvScreen(streamUrl: _cctvUrl)
-      else
-        const SizedBox(height: 340),
-    ],
-    _ => _overviewPage(isDark),
-  };
+  List<Widget> _pageContentFor(int index, bool isDark) {
+    return switch (index) {
+      1 => _pvPage(isDark),
+      2 => _acPage(isDark),
+      3 => _batteryPage(isDark),
+      4 => [CctvScreen(streamUrl: _cctvUrl)],
+      _ => _overviewPage(isDark),
+    };
+  }
 
   // ── Overview page ─────────────────────────────────────────────────────────────
   List<Widget> _overviewPage(bool isDark) {
@@ -915,7 +1033,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       performanceMode: _performanceMode,
       weekly: _weeklyEnergySummary,
       loading: _energyLoading,
-      hasData: (_energyHistory['power_dc']?.isNotEmpty ?? false) ||
+      hasData:
+          (_energyHistory['power_dc']?.isNotEmpty ?? false) ||
           (_energyHistory['power_ac']?.isNotEmpty ?? false),
       errorMessage: _energyError,
       solarKwh: solar.current,
@@ -930,9 +1049,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _openEnergyReport() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => EnergyReportScreen(api: widget.api),
-      ),
+      MaterialPageRoute(builder: (_) => EnergyReportScreen(api: widget.api)),
     );
   }
 
@@ -941,8 +1058,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     final greeting = now.hour < 12
         ? 'Selamat Pagi'
         : now.hour < 15
-            ? 'Selamat Siang'
-            : now.hour < 18
+        ? 'Selamat Siang'
+        : now.hour < 18
         ? 'Selamat Sore'
         : 'Selamat Malam';
     return Row(
@@ -1000,7 +1117,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final dateRange = first.month == last.month
         ? '${first.day}–${last.day} ${_monthName(last.month)} ${last.year}'
         : '${first.day} ${_monthName(first.month)} – '
-            '${last.day} ${_monthName(last.month)} ${last.year}';
+              '${last.day} ${_monthName(last.month)} ${last.year}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,7 +1181,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       width: chipWidth,
                       dayName: _dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
-                      isSelected: days[i].year == _selectedDate.year &&
+                      isSelected:
+                          days[i].year == _selectedDate.year &&
                           days[i].month == _selectedDate.month &&
                           days[i].day == _selectedDate.day,
                       isDark: isDark,
@@ -1086,8 +1204,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final pvPower = _pzem?.latestValues['power_dc'];
     final acPower = _pzem?.latestValues['power_ac'] ?? 0.0;
     final soc = _battery?.latestValues['soc'] ?? 0.0;
-    final pzemStale =
-        _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true;
+    final pzemStale = _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true;
 
     return LiquidGlassCard(
       isDark: isDark,
@@ -1203,8 +1320,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       label: 'PV Output',
                       value: pvPower?.toStringAsFixed(0) ?? '--',
                       unit: 'W',
-                      accentColor:
-                          _themeColor(lightness: isDark ? 0.72 : 0.42),
+                      accentColor: _themeColor(lightness: isDark ? 0.72 : 0.42),
                       progress: ((pvPower ?? 0) / 300).clamp(0.0, 1.0),
                       isDark: isDark,
                       performanceMode: _performanceMode,
@@ -1278,52 +1394,59 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.battery_charging_full,
-                        size: 14,
-                        color: _metricColor(0, isDark),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Battery',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white54 : Colors.black45,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.battery_charging_full,
+                          size: 14,
+                          color: _metricColor(0, isDark),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  GlassCircularGauge(
-                    progress: soc / 100,
-                    centerLabel: '${soc.toStringAsFixed(0)}%',
-                    centerSubLabel: 'SOC',
-                    trackColor: isDark
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.black.withValues(alpha: 0.07),
-                    progressColor: widget.themeController.seedColor,
-                    size: 110,
-                    strokeWidth: 11,
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _miniMetric('${v.toStringAsFixed(1)} V', 'Voltage', isDark),
-                      Container(
-                        width: 1,
-                        height: 28,
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.12)
-                            : Colors.black.withValues(alpha: 0.12),
-                      ),
-                      _miniMetric(
-                          '${a.toStringAsFixed(2)} A', 'Current', isDark),
-                    ],
-                  ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Battery',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white54 : Colors.black45,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    GlassCircularGauge(
+                      progress: soc / 100,
+                      centerLabel: '${soc.toStringAsFixed(0)}%',
+                      centerSubLabel: 'SOC',
+                      trackColor: isDark
+                          ? Colors.white.withValues(alpha: 0.10)
+                          : Colors.black.withValues(alpha: 0.07),
+                      progressColor: widget.themeController.seedColor,
+                      size: 110,
+                      strokeWidth: 11,
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _miniMetric(
+                          '${v.toStringAsFixed(1)} V',
+                          'Voltage',
+                          isDark,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 28,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.12)
+                              : Colors.black.withValues(alpha: 0.12),
+                        ),
+                        _miniMetric(
+                          '${a.toStringAsFixed(2)} A',
+                          'Current',
+                          isDark,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1341,57 +1464,69 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.power,
-                        size: 14,
-                        color: _metricColor(2, isDark),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'AC Grid',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white54 : Colors.black45,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.power,
+                          size: 14,
+                          color: _metricColor(2, isDark),
                         ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isStable
-                              ? Colors.green.withValues(alpha: 0.18)
-                              : Colors.red.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          isStable ? 'Stable' : 'Unstable',
+                        const SizedBox(width: 6),
+                        Text(
+                          'AC Grid',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isStable ? Colors.green : Colors.red,
+                            color: isDark ? Colors.white54 : Colors.black45,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _glassMetricRow(
-                      'Voltage', '${voltageAc.toStringAsFixed(1)} V', isDark),
-                  _dividerLine(isDark),
-                  _glassMetricRow(
-                      'Current', '${currentAc.toStringAsFixed(2)} A', isDark),
-                  _dividerLine(isDark),
-                  _glassMetricRow(
-                      'Power', '${powerAc.toStringAsFixed(0)} W', isDark),
-                  _dividerLine(isDark),
-                  _glassMetricRow(
-                      'Frequency', '${freqAc.toStringAsFixed(1)} Hz', isDark),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isStable
+                                ? Colors.green.withValues(alpha: 0.18)
+                                : Colors.red.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isStable ? 'Stable' : 'Unstable',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isStable ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _glassMetricRow(
+                      'Voltage',
+                      '${voltageAc.toStringAsFixed(1)} V',
+                      isDark,
+                    ),
+                    _dividerLine(isDark),
+                    _glassMetricRow(
+                      'Current',
+                      '${currentAc.toStringAsFixed(2)} A',
+                      isDark,
+                    ),
+                    _dividerLine(isDark),
+                    _glassMetricRow(
+                      'Power',
+                      '${powerAc.toStringAsFixed(0)} W',
+                      isDark,
+                    ),
+                    _dividerLine(isDark),
+                    _glassMetricRow(
+                      'Frequency',
+                      '${freqAc.toStringAsFixed(1)} Hz',
+                      isDark,
+                    ),
                   ],
                 ),
               ),
@@ -1402,10 +1537,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _dashboardShortcut({
-    required int pageIndex,
-    required Widget child,
-  }) {
+  Widget _dashboardShortcut({required int pageIndex, required Widget child}) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _selectPage(pageIndex),
@@ -1542,7 +1674,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Detail pages ──────────────────────────────────────────────────────────────
   List<Widget> _pvPage(bool isDark) => [
     _glassPageHeader(
-        'PV Status', Icons.wb_sunny, _strongMetricColor(0, isDark), isDark),
+      'PV Status',
+      Icons.wb_sunny,
+      _strongMetricColor(0, isDark),
+      isDark,
+    ),
     const SizedBox(height: 10),
     _glassTelemetryCard(_pzem, isDark, _metricColor(0, isDark), [
       _MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
@@ -1558,7 +1694,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   List<Widget> _acPage(bool isDark) => [
     _glassPageHeader(
-        'AC Status', Icons.power, _strongMetricColor(1, isDark), isDark),
+      'AC Status',
+      Icons.power,
+      _strongMetricColor(1, isDark),
+      isDark,
+    ),
     const SizedBox(height: 10),
     _glassTelemetryCard(_pzem, isDark, _metricColor(1, isDark), [
       _MetricDef('voltage_ac', 'Voltage', 'V', Icons.bolt),
@@ -1576,20 +1716,24 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   List<Widget> _batteryPage(bool isDark) => [
     _glassPageHeader(
-        'Battery Status',
-        Icons.battery_charging_full,
-        _strongMetricColor(2, isDark),
-        isDark),
+      'Battery Status',
+      Icons.battery_charging_full,
+      _strongMetricColor(2, isDark),
+      isDark,
+    ),
     const SizedBox(height: 10),
-    _glassTelemetryCard(
-        _battery, isDark, _metricColor(2, isDark), [
+    _glassTelemetryCard(_battery, isDark, _metricColor(2, isDark), [
       _MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
       _MetricDef('current', 'Current', 'A', Icons.swap_horiz),
       _MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
       _MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full),
       _MetricDef('cycles', 'Cycles', '', Icons.refresh),
       _MetricDef(
-          'remain_capacity_ah', 'Remaining Capacity', 'Ah', Icons.battery_3_bar),
+        'remain_capacity_ah',
+        'Remaining Capacity',
+        'Ah',
+        Icons.battery_3_bar,
+      ),
     ]),
     const SizedBox(height: 16),
     _chartSectionHeader('Battery · Last 24 Hours', isDark),
@@ -1630,9 +1774,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _chartSectionHeader(String title, bool isDark) {
     final sel = _selectedDate;
     final now = DateTime.now();
-    final isToday = sel.year == now.year &&
-        sel.month == now.month &&
-        sel.day == now.day;
+    final isToday =
+        sel.year == now.year && sel.month == now.month && sel.day == now.day;
     return Row(
       children: [
         Text(
@@ -1649,9 +1792,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
+              color: Theme.of(context).colorScheme.onSurface
                   .withValues(alpha: 0.10),
             ),
             child: Text(
@@ -1707,8 +1848,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             final displayValue = value == null
                 ? (metric.unit.isEmpty ? '--' : '-- ${metric.unit}')
                 : (metric.unit.isEmpty
-                    ? value.toStringAsFixed(2)
-                    : '${value.toStringAsFixed(2)} ${metric.unit}');
+                      ? value.toStringAsFixed(2)
+                      : '${value.toStringAsFixed(2)} ${metric.unit}');
             return Column(
               children: [
                 Padding(
@@ -1725,7 +1866,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Text(
                           metric.label,
                           style: TextStyle(
-                            color: isDark ? Colors.white.withValues(alpha: 0.87) : Colors.black87,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.87)
+                                : Colors.black87,
                           ),
                         ),
                       ),
@@ -1789,61 +1932,61 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: _chartLoading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
-              ? const Center(child: Text('No historical data available'))
-              : Column(
-                  children: [
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 8,
-                      children: series
-                          .map((item) => _legend(item, item.color))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: Listener(
-                        onPointerDown: (_) => _setChartPointerActive(true),
-                        onPointerUp: (_) => _setChartPointerActive(false),
-                        onPointerCancel: (_) => _setChartPointerActive(false),
-                        child: RepaintBoundary(
-                          child: LineChart(
-                            LineChartData(
-                              minX: bounds.minX,
-                              maxX: bounds.maxX,
-                              minY: bounds.minY,
-                              maxY: bounds.maxY,
-                              gridData: FlGridData(
-                                show: true,
-                                drawVerticalLine: true,
-                                horizontalInterval: bounds.chartInterval,
-                                verticalInterval: bounds.timeInterval,
-                                getDrawingHorizontalLine: (_) => FlLine(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.15)
-                                      : Colors.black.withValues(alpha: 0.08),
-                                  strokeWidth: 1,
-                                ),
-                                getDrawingVerticalLine: (_) => FlLine(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.10)
-                                      : Colors.black.withValues(alpha: 0.06),
-                                  strokeWidth: 1,
-                                ),
-                              ),
-                              titlesData: FlTitlesData(
-                                topTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false),
-                                ),
-                                rightTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false),
-                                ),
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 48,
-                                    interval: bounds.chartInterval,
-                                    getTitlesWidget: (value, meta) =>
-                                        SideTitleWidget(
+          ? const Center(child: Text('No historical data available'))
+          : Column(
+              children: [
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: series
+                      .map((item) => _legend(item, item.color))
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Listener(
+                    onPointerDown: (_) => _setChartPointerActive(true),
+                    onPointerUp: (_) => _setChartPointerActive(false),
+                    onPointerCancel: (_) => _setChartPointerActive(false),
+                    child: RepaintBoundary(
+                      child: LineChart(
+                        LineChartData(
+                          minX: bounds.minX,
+                          maxX: bounds.maxX,
+                          minY: bounds.minY,
+                          maxY: bounds.maxY,
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: true,
+                            horizontalInterval: bounds.chartInterval,
+                            verticalInterval: bounds.timeInterval,
+                            getDrawingHorizontalLine: (_) => FlLine(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.15)
+                                  : Colors.black.withValues(alpha: 0.08),
+                              strokeWidth: 1,
+                            ),
+                            getDrawingVerticalLine: (_) => FlLine(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.10)
+                                  : Colors.black.withValues(alpha: 0.06),
+                              strokeWidth: 1,
+                            ),
+                          ),
+                          titlesData: FlTitlesData(
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 48,
+                                interval: bounds.chartInterval,
+                                getTitlesWidget: (value, meta) =>
+                                    SideTitleWidget(
                                       axisSide: meta.axisSide,
                                       space: 4,
                                       child: Text(
@@ -1856,15 +1999,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 30,
-                                    interval: bounds.timeInterval,
-                                    getTitlesWidget: (value, meta) =>
-                                        SideTitleWidget(
+                              ),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 30,
+                                interval: bounds.timeInterval,
+                                getTitlesWidget: (value, meta) =>
+                                    SideTitleWidget(
                                       axisSide: meta.axisSide,
                                       space: 6,
                                       child: SizedBox(
@@ -1881,56 +2024,55 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
                               ),
-                              borderData: FlBorderData(show: false),
-                              lineTouchData: LineTouchData(
-                                touchTooltipData: LineTouchTooltipData(
-                                  getTooltipItems: (touchedSpots) =>
-                                      touchedSpots
-                                          .map(
-                                            (spot) => LineTooltipItem(
-                                              '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
-                                              const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                ),
-                              ),
-                              lineBarsData: series
+                            ),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          lineTouchData: LineTouchData(
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipItems: (touchedSpots) => touchedSpots
                                   .map(
-                                    (item) => LineChartBarData(
-                                      spots: item.points
-                                          .map(
-                                            (point) => FlSpot(
-                                              point.timestamp
-                                                  .millisecondsSinceEpoch
-                                                  .toDouble(),
-                                              point.value,
-                                            ),
-                                          )
-                                          .toList(),
-                                      isCurved: true,
-                                      color: item.color,
-                                      barWidth: 2.5,
-                                      dotData: const FlDotData(show: false),
+                                    (spot) => LineTooltipItem(
+                                      '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
+                                      const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   )
                                   .toList(),
                             ),
                           ),
+                          lineBarsData: series
+                              .map(
+                                (item) => LineChartBarData(
+                                  spots: item.points
+                                      .map(
+                                        (point) => FlSpot(
+                                          point.timestamp.millisecondsSinceEpoch
+                                              .toDouble(),
+                                          point.value,
+                                        ),
+                                      )
+                                      .toList(),
+                                  isCurved: false,
+                                  color: item.color,
+                                  barWidth: 2.5,
+                                  dotData: const FlDotData(show: false),
+                                ),
+                              )
+                              .toList(),
                         ),
+                        duration: Duration.zero,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Row(children: series.map(_statistics).toList()),
-                  ],
+                  ),
                 ),
+                const SizedBox(height: 10),
+                Row(children: series.map(_statistics).toList()),
+              ],
+            ),
     );
   }
 
@@ -1994,26 +2136,26 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Error / warning views ─────────────────────────────────────────────────────
   Widget _errorView() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off, size: 42),
-              const SizedBox(height: 12),
-              const Text('Gagal mengambil telemetry dari ThingsBoard.'),
-              const SizedBox(height: 8),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _fetchAll,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try again'),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off, size: 42),
+          const SizedBox(height: 12),
+          const Text('Gagal mengambil telemetry dari ThingsBoard.'),
+          const SizedBox(height: 8),
+          Text(_error!, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _fetchAll,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 
   Widget _connectionStatusBanner() {
     final failed = _error != null;
@@ -2022,14 +2164,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     final color = failed
         ? Colors.deepOrange
         : stale
-            ? Colors.orange.shade800
-            : Colors.green;
+        ? Colors.orange.shade800
+        : Colors.green;
     final lastUpdate = _lastSuccessfulTelemetryAt;
     final label = failed
         ? 'ThingsBoard gagal'
         : stale
-            ? 'Terhubung · stale: ${staleNames.join(', ')}'
-            : 'ThingsBoard terhubung';
+        ? 'Terhubung · stale: ${staleNames.join(', ')}'
+        : 'ThingsBoard terhubung';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Tooltip(
@@ -2037,77 +2179,84 @@ class _DashboardScreenState extends State<DashboardScreen>
             ? 'Fetch telemetry gagal. Periksa koneksi/server. ${_error ?? ''}'
             : 'Fetch sukses${lastUpdate == null ? '' : ' pukul ${_formatClock(lastUpdate)}'}${stale ? '. Data lama: ${staleNames.join(', ')}' : ''}',
         child: Container(
-        constraints: const BoxConstraints(minHeight: 36),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Icon(failed ? Icons.cloud_off : Icons.cloud_done_outlined,
-                color: color, size: 17),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+          constraints: const BoxConstraints(minHeight: 36),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                failed ? Icons.cloud_off : Icons.cloud_done_outlined,
+                color: color,
+                size: 17,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
                 ),
               ),
-            ),
-            if (failed)
-              InkWell(
-                onTap: _fetchAll,
-                borderRadius: BorderRadius.circular(16),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.refresh, size: 18),
+              if (failed)
+                InkWell(
+                  onTap: _fetchAll,
+                  borderRadius: BorderRadius.circular(16),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.refresh, size: 18),
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _energyAlertBanner() => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE66A45).withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFFE66A45).withValues(alpha: 0.4),
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE66A45).withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE66A45).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.notifications_active_outlined,
+            color: Color(0xFFE66A45),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _activeAlertMessages
+                  .map(
+                    (message) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(message),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.notifications_active_outlined,
-                  color: Color(0xFFE66A45)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _activeAlertMessages
-                      .map((message) => Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(message),
-                          ))
-                      .toList(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 
   // ── Chart stat / legend helpers ───────────────────────────────────────────────
   String _axisNumber(double value) {
@@ -2163,49 +2312,56 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _legend(_ChartSeries series, Color color) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '${series.label} (${series.unit})',
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Text(
+        '${series.label} (${series.unit})',
+        style: const TextStyle(fontSize: 12),
+      ),
+    ],
+  );
 
   // ── Date / time name helpers ──────────────────────────────────────────────────
-  String _dayNameShort(int weekday) =>
-      const ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'][(weekday - 1) % 7];
+  String _dayNameShort(int weekday) => const [
+    'Sen',
+    'Sel',
+    'Rab',
+    'Kam',
+    'Jum',
+    'Sab',
+    'Min',
+  ][(weekday - 1) % 7];
 
   String _dayNameFull(int weekday) => const [
-        'Senin',
-        'Selasa',
-        'Rabu',
-        'Kamis',
-        'Jumat',
-        'Sabtu',
-        'Minggu',
-      ][(weekday - 1) % 7];
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ][(weekday - 1) % 7];
 
   String _monthName(int month) => const [
-        'Januari',
-        'Februari',
-        'Maret',
-        'April',
-        'Mei',
-        'Juni',
-        'Juli',
-        'Agustus',
-        'September',
-        'Oktober',
-        'November',
-        'Desember',
-      ][month - 1];
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ][month - 1];
 }
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
