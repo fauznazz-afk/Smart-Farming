@@ -407,34 +407,43 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     Color color,
     IconData icon,
   ) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 11)),
-          const SizedBox(height: 3),
-          Text(
-            '${value.toStringAsFixed(2)} kWh',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+    child: MergeSemantics(
+      child: Semantics(
+        label:
+            '$label: ${value.toStringAsFixed(2)} kilowatt-hours. ${_comparisonLabel(value, previous)}',
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _comparisonLabel(value, previous),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10,
-              color: isDark ? Colors.white60 : Colors.black54,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(child: Icon(icon, color: color, size: 19)),
+              const SizedBox(height: 8),
+              Text(label, style: const TextStyle(fontSize: 11)),
+              const SizedBox(height: 3),
+              Text(
+                '${value.toStringAsFixed(2)} kWh',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _comparisonLabel(value, previous),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     ),
   );
@@ -454,169 +463,173 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
       (max, item) => mathMax(max, mathMax(item.pvKwh, item.acKwh)),
     );
     final maxY = maxValue <= 0 ? 1.0 : maxValue * 1.25;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Energi per interval',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            ValueListenableBuilder<int?>(
-              valueListenable: _touchedBucketNotifier,
-              builder: (context, touchedIndex, _) {
-                final selectedIndex = (touchedIndex ?? 0)
-                    .clamp(0, buckets.length - 1)
-                    .toInt();
-                final selectedBucket = buckets[selectedIndex];
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.07)
-                        : Colors.black.withValues(alpha: 0.045),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _monthly
-                              ? _dateLabel(selectedBucket.hour)
-                              : _hourLabel(selectedBucket.hour),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      _legendValue(
-                        'PV',
-                        selectedBucket.pvKwh,
-                        const Color(0xFFFFC857),
-                      ),
-                      const SizedBox(width: 12),
-                      _legendValue(
-                        'AC',
-                        selectedBucket.acKwh,
-                        const Color(0xFF69B7FF),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            RepaintBoundary(
-              child: SizedBox(
-                height: 230,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: chartWidth < 300 ? 300 : chartWidth,
-                    child: BarChart(
-                      BarChartData(
-                        maxY: maxY,
-                        minY: 0,
-                        barGroups: [
-                          for (var i = 0; i < buckets.length; i++)
-                            BarChartGroupData(
-                              x: i,
-                              barsSpace: 2,
-                              barRods: [
-                                BarChartRodData(
-                                  toY: buckets[i].pvKwh,
-                                  color: const Color(0xFFFFC857),
-                                  width: _monthly ? 6 : 8,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                BarChartRodData(
-                                  toY: buckets[i].acKwh,
-                                  color: const Color(0xFF69B7FF),
-                                  width: _monthly ? 6 : 8,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ],
+    return Semantics(
+      label: 'Energy bar chart showing ${buckets.length} intervals',
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Energi per interval',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              ValueListenableBuilder<int?>(
+                valueListenable: _touchedBucketNotifier,
+                builder: (context, touchedIndex, _) {
+                  final selectedIndex = (touchedIndex ?? 0)
+                      .clamp(0, buckets.length - 1)
+                      .toInt();
+                  final selectedBucket = buckets[selectedIndex];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : Colors.black.withValues(alpha: 0.045),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _monthly
+                                ? _dateLabel(selectedBucket.hour)
+                                : _hourLabel(selectedBucket.hour),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
-                        ],
-                        gridData: const FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
+                          ),
                         ),
-                        borderData: FlBorderData(show: false),
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchExtraThreshold: const EdgeInsets.symmetric(
-                            vertical: 44,
-                            horizontal: 10,
-                          ),
-                          handleBuiltInTouches: false,
-                          touchCallback: (_, response) {
-                            final index = response?.spot?.touchedBarGroupIndex;
-                            if (index != null &&
-                                index >= 0 &&
-                                index < buckets.length &&
-                                index != _touchedBucketNotifier.value) {
-                              _touchedBucketNotifier.value = index;
-                            }
-                          },
+                        _legendValue(
+                          'PV',
+                          selectedBucket.pvKwh,
+                          const Color(0xFFFFC857),
                         ),
-                        titlesData: FlTitlesData(
-                          topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
+                        const SizedBox(width: 12),
+                        _legendValue(
+                          'AC',
+                          selectedBucket.acKwh,
+                          const Color(0xFF69B7FF),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+              RepaintBoundary(
+                child: SizedBox(
+                  height: 230,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: chartWidth < 300 ? 300 : chartWidth,
+                      child: BarChart(
+                        BarChartData(
+                          maxY: maxY,
+                          minY: 0,
+                          barGroups: [
+                            for (var i = 0; i < buckets.length; i++)
+                              BarChartGroupData(
+                                x: i,
+                                barsSpace: 2,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: buckets[i].pvKwh,
+                                    color: const Color(0xFFFFC857),
+                                    width: _monthly ? 6 : 8,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  BarChartRodData(
+                                    toY: buckets[i].acKwh,
+                                    color: const Color(0xFF69B7FF),
+                                    width: _monthly ? 6 : 8,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ],
+                              ),
+                          ],
+                          gridData: const FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
                           ),
-                          rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
+                          borderData: FlBorderData(show: false),
+                          barTouchData: BarTouchData(
+                            enabled: true,
+                            touchExtraThreshold: const EdgeInsets.symmetric(
+                              vertical: 44,
+                              horizontal: 10,
+                            ),
+                            handleBuiltInTouches: false,
+                            touchCallback: (_, response) {
+                              final index =
+                                  response?.spot?.touchedBarGroupIndex;
+                              if (index != null &&
+                                  index >= 0 &&
+                                  index < buckets.length &&
+                                  index != _touchedBucketNotifier.value) {
+                                _touchedBucketNotifier.value = index;
+                              }
+                            },
                           ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 38,
-                              interval: maxY / 4,
-                              getTitlesWidget: (value, _) => Text(
-                                value.toStringAsFixed(2),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: isDark
-                                      ? Colors.white54
-                                      : Colors.black54,
+                          titlesData: FlTitlesData(
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 38,
+                                interval: maxY / 4,
+                                getTitlesWidget: (value, _) => Text(
+                                  value.toStringAsFixed(2),
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.black54,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 26,
-                              interval: _monthly ? 5 : 4,
-                              getTitlesWidget: (value, _) {
-                                final index = value.toInt();
-                                if (index < 0 || index >= buckets.length) {
-                                  return const SizedBox.shrink();
-                                }
-                                final date = buckets[index].hour;
-                                final text = _monthly
-                                    ? '${date.day}'
-                                    : date.hour.toString().padLeft(2, '0');
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Text(
-                                    text,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: isDark
-                                          ? Colors.white54
-                                          : Colors.black54,
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 26,
+                                interval: _monthly ? 5 : 4,
+                                getTitlesWidget: (value, _) {
+                                  final index = value.toInt();
+                                  if (index < 0 || index >= buckets.length) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final date = buckets[index].hour;
+                                  final text = _monthly
+                                      ? '${date.day}'
+                                      : date.hour.toString().padLeft(2, '0');
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      text,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: isDark
+                                            ? Colors.white54
+                                            : Colors.black54,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),
@@ -625,60 +638,60 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            if (buckets.length > 1)
-              ValueListenableBuilder<int?>(
-                valueListenable: _touchedBucketNotifier,
-                builder: (context, touchedIndex, _) {
-                  final selectedIndex = (touchedIndex ?? 0)
-                      .clamp(0, buckets.length - 1)
-                      .toInt();
-                  final selectedBucket = buckets[selectedIndex];
-                  return Row(
-                    children: [
-                      IconButton(
-                        tooltip: 'Interval sebelumnya',
-                        onPressed: selectedIndex == 0
-                            ? null
-                            : () => _touchedBucketNotifier.value =
-                                  selectedIndex - 1,
-                        icon: const Icon(Icons.chevron_left_rounded),
-                      ),
-                      Expanded(
-                        child: Slider(
-                          min: 0,
-                          max: (buckets.length - 1).toDouble(),
-                          divisions: buckets.length - 1,
-                          value: selectedIndex.toDouble(),
-                          label: _monthly
-                              ? _dateLabel(selectedBucket.hour)
-                              : _hourLabel(selectedBucket.hour),
-                          onChanged: (value) =>
-                              _touchedBucketNotifier.value = value.round(),
+              const SizedBox(height: 8),
+              if (buckets.length > 1)
+                ValueListenableBuilder<int?>(
+                  valueListenable: _touchedBucketNotifier,
+                  builder: (context, touchedIndex, _) {
+                    final selectedIndex = (touchedIndex ?? 0)
+                        .clamp(0, buckets.length - 1)
+                        .toInt();
+                    final selectedBucket = buckets[selectedIndex];
+                    return Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Interval sebelumnya',
+                          onPressed: selectedIndex == 0
+                              ? null
+                              : () => _touchedBucketNotifier.value =
+                                    selectedIndex - 1,
+                          icon: const Icon(Icons.chevron_left_rounded),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Interval berikutnya',
-                        onPressed: selectedIndex >= buckets.length - 1
-                            ? null
-                            : () => _touchedBucketNotifier.value =
-                                  selectedIndex + 1,
-                        icon: const Icon(Icons.chevron_right_rounded),
-                      ),
-                    ],
-                  );
-                },
+                        Expanded(
+                          child: Slider(
+                            min: 0,
+                            max: (buckets.length - 1).toDouble(),
+                            divisions: buckets.length - 1,
+                            value: selectedIndex.toDouble(),
+                            label: _monthly
+                                ? _dateLabel(selectedBucket.hour)
+                                : _hourLabel(selectedBucket.hour),
+                            onChanged: (value) =>
+                                _touchedBucketNotifier.value = value.round(),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Interval berikutnya',
+                          onPressed: selectedIndex >= buckets.length - 1
+                              ? null
+                              : () => _touchedBucketNotifier.value =
+                                    selectedIndex + 1,
+                          icon: const Icon(Icons.chevron_right_rounded),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _legend('PV', const Color(0xFFFFC857)),
+                  const SizedBox(width: 20),
+                  _legend('AC', const Color(0xFF69B7FF)),
+                ],
               ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _legend('PV', const Color(0xFFFFC857)),
-                const SizedBox(width: 20),
-                _legend('AC', const Color(0xFF69B7FF)),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -136,6 +136,7 @@ class LiquidGlassCard extends StatelessWidget {
     this.tintColor,
     this.width,
     this.height,
+    this.semanticLabel,
   });
 
   final Widget child;
@@ -146,6 +147,7 @@ class LiquidGlassCard extends StatelessWidget {
   final Color? tintColor;
   final double? width;
   final double? height;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +231,12 @@ class LiquidGlassCard extends StatelessWidget {
       );
     }
 
-    return RepaintBoundary(child: result);
+    final card = RepaintBoundary(child: result);
+
+    if (semanticLabel != null) {
+      return Semantics(label: semanticLabel, container: true, child: card);
+    }
+    return card;
   }
 }
 
@@ -259,6 +266,7 @@ class GlassCapsule extends StatelessWidget {
       performanceMode: performanceMode,
       borderRadius: 14,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      semanticLabel: '$label: $value $unit',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -324,29 +332,33 @@ class GlassCircularGauge extends StatelessWidget {
     this.size = 80.0,
     this.strokeWidth = 8.0,
     this.centerWidget,
+    this.semanticLabel,
   });
 
   final double progress, size, strokeWidth;
   final String centerLabel, centerSubLabel;
   final Color trackColor, progressColor;
   final Widget? centerWidget;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final gauge = SizedBox(
       width: size,
       height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
           RepaintBoundary(
-            child: CustomPaint(
-              size: Size(size, size),
-              painter: _GaugePainter(
-                progress: progress,
-                trackColor: trackColor,
-                progressColor: progressColor,
-                strokeWidth: strokeWidth,
+            child: ExcludeSemantics(
+              child: CustomPaint(
+                size: Size(size, size),
+                painter: _GaugePainter(
+                  progress: progress,
+                  trackColor: trackColor,
+                  progressColor: progressColor,
+                  strokeWidth: strokeWidth,
+                ),
               ),
             ),
           ),
@@ -377,6 +389,11 @@ class GlassCircularGauge extends StatelessWidget {
         ],
       ),
     );
+
+    if (semanticLabel != null) {
+      return Semantics(label: semanticLabel, child: gauge);
+    }
+    return gauge;
   }
 }
 
@@ -511,46 +528,53 @@ class GlassDateChip extends StatelessWidget {
           );
 
     return RepaintBoundary(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          width: width,
-          height: 68,
-          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
-          decoration: decoration,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 13,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    dayName,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? Colors.white54 : Colors.black45),
+      child: MergeSemantics(
+        child: Semantics(
+          button: true,
+          selected: isSelected,
+          label: '$dayName $dayNumber',
+          child: GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: width,
+              height: 68,
+              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
+              decoration: decoration,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 13,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        dayName,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? Colors.white54 : Colors.black45),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$dayNumber',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white : Colors.black87),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                '$dayNumber',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? Colors.white : Colors.black87),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

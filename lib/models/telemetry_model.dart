@@ -13,6 +13,12 @@ class TelemetryPoint {
       value: double.tryParse(json['value'].toString()) ?? 0.0,
     );
   }
+
+  /// Serialize to JSON for caching in SharedPreferences.
+  Map<String, dynamic> toJson() => {
+    'ts': timestamp.millisecondsSinceEpoch,
+    'value': value.toString(),
+  };
 }
 
 /// Snapshot semua telemetry terkini dari satu device
@@ -30,7 +36,9 @@ class DeviceTelemetry {
 
     json.forEach((key, list) {
       if (list is List && list.isNotEmpty) {
-        final point = TelemetryPoint.fromJson(list.first as Map<String, dynamic>);
+        final point = TelemetryPoint.fromJson(
+          list.first as Map<String, dynamic>,
+        );
         values[key] = point.value;
         if (latestTs == null || point.timestamp.isAfter(latestTs!)) {
           latestTs = point.timestamp;
@@ -41,7 +49,34 @@ class DeviceTelemetry {
     return DeviceTelemetry(latestValues: values, lastUpdate: latestTs);
   }
 
-  double get(String key, {double fallback = 0.0}) => latestValues[key] ?? fallback;
+  double get(String key, {double fallback = 0.0}) =>
+      latestValues[key] ?? fallback;
+
+  /// Serialize to JSON for caching in SharedPreferences.
+  Map<String, dynamic> toJson() => {
+    'latestValues': latestValues,
+    'lastUpdate': lastUpdate?.toIso8601String(),
+  };
+
+  /// Deserialize from JSON (cached in SharedPreferences).
+  factory DeviceTelemetry.fromCacheJson(Map<String, dynamic> json) {
+    final values = <String, double>{};
+    final raw = json['latestValues'];
+    if (raw is Map) {
+      raw.forEach((key, val) {
+        values[key.toString()] = (val is num)
+            ? val.toDouble()
+            : double.tryParse(val.toString()) ?? 0.0;
+      });
+    }
+    final lastUpdateStr = json['lastUpdate'] as String?;
+    return DeviceTelemetry(
+      latestValues: values,
+      lastUpdate: lastUpdateStr != null
+          ? DateTime.tryParse(lastUpdateStr)
+          : null,
+    );
+  }
 
   /// Cek apakah data terakhir lebih tua dari [minutes] menit (buat badge "stale data")
   bool isStale({int minutes = 10}) {

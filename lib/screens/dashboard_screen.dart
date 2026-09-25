@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
+import '../services/alarm_history_service.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
+import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
@@ -89,6 +91,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   double? _environmentTdsMin;
   double? _environmentTdsMax;
   Set<String> _activeAlertIds = {};
+  final _alarmHistoryService = AlarmHistoryService();
+  bool _isOfflineMode = false;
+  DateTime? _cachedTelemetryTime;
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
   late final Listenable _connectionChromeListenable = Listenable.merge([
     _liveRevision,
@@ -267,6 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _lastSuccessfulTelemetryAt = now;
       _loading = false;
       _error = null;
+      _isOfflineMode = false;
       if (changed || timestampChanged) {
         if (wasLoading) {
           if (mounted) setState(() {});
@@ -294,6 +300,70 @@ class _DashboardScreenState extends State<DashboardScreen>
           (_) => false,
         );
         return;
+      }
+      // Try to load cached telemetry for offline display.
+      if (_battery == null && _pzem == null && _sensor == null) {
+        final cached = await widget.api.loadCachedTelemetry();
+        final cacheTime = await widget.api.getCachedTelemetryTime();
+        if (cached != null && mounted) {
+          _isOfflineMode = true;
+          _cachedTelemetryTime = cacheTime;
+          // Split cached values into the three device slots based on keys.
+          final batteryKeys = {
+            'current',
+            'power',
+            'soc',
+            'voltage',
+            'cycles',
+            'remain_capacity_ah',
+            'full_capacity_ah',
+          };
+          final pzemKeys = {
+            'voltage_ac',
+            'voltage_dc',
+            'current_ac',
+            'current_dc',
+            'power_ac',
+            'power_dc',
+            'energy_ac',
+            'energy_dc',
+            'frequency_ac',
+            'pf_ac',
+          };
+          final sensorKeys = {
+            'humidity_dht',
+            'lux',
+            'tds_ppm',
+            'temp_dht',
+            'temp_ds18b20',
+          };
+          final batteryValues = <String, double>{};
+          final pzemValues = <String, double>{};
+          final sensorValues = <String, double>{};
+          cached.latestValues.forEach((key, value) {
+            if (batteryKeys.contains(key)) {
+              batteryValues[key] = value;
+            } else if (pzemKeys.contains(key)) {
+              pzemValues[key] = value;
+            } else if (sensorKeys.contains(key)) {
+              sensorValues[key] = value;
+            }
+          });
+          _battery = DeviceTelemetry(
+            latestValues: batteryValues,
+            lastUpdate: cached.lastUpdate,
+          );
+          _pzem = DeviceTelemetry(
+            latestValues: pzemValues,
+            lastUpdate: cached.lastUpdate,
+          );
+          _sensor = DeviceTelemetry(
+            latestValues: sensorValues,
+            lastUpdate: cached.lastUpdate,
+          );
+        }
+      } else {
+        _isOfflineMode = true;
       }
       final message = error.toString();
       final statusChanged = !_connectionStatusInitialized || _error == null;
@@ -426,10 +496,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         maximum: _environmentTdsMax,
       );
     }
-    final newMessages = alerts.entries
+    final newEntries = alerts.entries
         .where((entry) => !_activeAlertIds.contains(entry.key))
-        .map((entry) => entry.value)
         .toList();
+    final newMessages = newEntries.map((entry) => entry.value).toList();
     final nextMessages = alerts.values.toList();
     final changed =
         alerts.length != _activeAlertIds.length ||
@@ -438,6 +508,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!changed) return;
     _activeAlertIds = alerts.keys.toSet();
     _alertMessages.value = nextMessages;
+    // Persist newly fired alerts to alarm history
+    if (newEntries.isNotEmpty) {
+      final now = DateTime.now();
+      for (final entry in newEntries) {
+        final type = _alarmTypeFromId(entry.key);
+        final severity = _alarmSeverityFromId(entry.key);
+        final value = _alarmValueFromId(entry.key);
+        unawaited(
+          _alarmHistoryService.addAlarm(
+            AlarmRecord(
+              id: '${now.millisecondsSinceEpoch}_${entry.key}',
+              timestamp: now,
+              type: type,
+              severity: severity,
+              message: entry.value,
+              value: value,
+            ),
+          ),
+        );
+      }
+    }
     if (newMessages.isNotEmpty && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -477,6 +568,43 @@ class _DashboardScreenState extends State<DashboardScreen>
       alerts['environment_${id}_high'] =
           '$label tinggi: ${value.toStringAsFixed(1)} $unit (batas $maximum $unit)';
     }
+  }
+
+  /// Maps an alert ID string to an [AlarmType].
+  AlarmType _alarmTypeFromId(String id) {
+    if (id == 'low_soc') return AlarmType.lowSoc;
+    if (id.startsWith('stale_')) return AlarmType.staleTelemetry;
+    if (id.startsWith('environment_ambient_temp')) {
+      return AlarmType.environmentTemp;
+    }
+    if (id.startsWith('environment_humidity')) {
+      return AlarmType.environmentHumidity;
+    }
+    if (id.startsWith('environment_tds')) return AlarmType.environmentTds;
+    return AlarmType.deviceOffline;
+  }
+
+  /// Determines severity from the alert ID.
+  AlarmSeverity _alarmSeverityFromId(String id) {
+    // Low SOC and device offline are critical; others are warnings.
+    if (id == 'low_soc') return AlarmSeverity.critical;
+    if (id.startsWith('stale_')) return AlarmSeverity.warning;
+    return AlarmSeverity.warning;
+  }
+
+  /// Extracts the triggering numeric value from the alert ID.
+  double? _alarmValueFromId(String id) {
+    if (id == 'low_soc') return _battery?.latestValues['soc'];
+    if (id.startsWith('environment_ambient_temp')) {
+      return _sensor?.latestValues['temp_dht'];
+    }
+    if (id.startsWith('environment_humidity')) {
+      return _sensor?.latestValues['humidity_dht'];
+    }
+    if (id.startsWith('environment_tds')) {
+      return _sensor?.latestValues['tds_ppm'];
+    }
+    return null;
   }
 
   List<String> _staleDeviceNames() {
@@ -768,6 +896,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (changed == true) _loadPreferences();
   }
 
+  void _openAlarmHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -817,6 +952,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         actions: [
           IconButton(
+            tooltip: 'Alarm History',
+            icon: const Icon(Icons.history_outlined),
+            onPressed: _openAlarmHistory,
+          ),
+          IconButton(
             tooltip: 'Pengaturan',
             icon: const Icon(Icons.settings_outlined),
             onPressed: _openSettings,
@@ -846,6 +986,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   itemBuilder: (context, index) {
                     final items = <Widget Function()>[
                       _connectionStatusBannerBuilder,
+                      _offlineBannerBuilder,
                       _energyAlertBannerBuilder,
                       ..._pageContentFor(index, isDark),
                     ];
@@ -1098,6 +1239,75 @@ class _DashboardScreenState extends State<DashboardScreen>
           ? const SizedBox.shrink()
           : _energyAlertBanner(messages);
     });
+  }
+
+  Widget _offlineBannerBuilder() {
+    return _bindRevision(_liveRevision, true, () {
+      if (!_isOfflineMode) return const SizedBox.shrink();
+      return _offlineBanner();
+    });
+  }
+
+  Widget _offlineBanner() {
+    final cacheTime = _cachedTelemetryTime;
+    String ageText;
+    if (cacheTime == null) {
+      ageText = 'beberapa waktu lalu';
+    } else {
+      final age = DateTime.now().difference(cacheTime);
+      if (age.inMinutes < 1) {
+        ageText = 'baru saja';
+      } else if (age.inHours < 1) {
+        ageText = '${age.inMinutes} menit lalu';
+      } else if (age.inDays < 1) {
+        ageText = '${age.inHours} jam lalu';
+      } else {
+        ageText = '${age.inDays} hari lalu';
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.wifi_off_rounded,
+              color: Colors.orange.shade700,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Offline — menampilkan data terakhir dari $ageText',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade700,
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: _fetchAll,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.refresh,
+                  size: 18,
+                  color: Colors.orange.shade700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── Page content router ───────────────────────────────────────────────────────
@@ -1378,21 +1588,28 @@ class _DashboardScreenState extends State<DashboardScreen>
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Text(
-                          pvPower == null ? '--' : pvPower.toStringAsFixed(0),
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                            color: isDark ? Colors.white : Colors.black87,
+                        Semantics(
+                          label: pvPower == null
+                              ? 'PV output power unavailable'
+                              : 'PV output: ${pvPower.toStringAsFixed(0)} watts',
+                          child: Text(
+                            pvPower == null ? '--' : pvPower.toStringAsFixed(0),
+                            style: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              height: 1.0,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'W',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: isDark ? Colors.white54 : Colors.black45,
+                        ExcludeSemantics(
+                          child: Text(
+                            'W',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: isDark ? Colors.white54 : Colors.black45,
+                            ),
                           ),
                         ),
                       ],
@@ -1418,6 +1635,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 progressColor: widget.themeController.seedColor,
                 size: 90,
                 strokeWidth: 9,
+                semanticLabel:
+                    'Battery State of Charge: ${soc.toStringAsFixed(0)} percent',
               ),
             ],
           ),
@@ -1536,6 +1755,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       progressColor: widget.themeController.seedColor,
                       size: 110,
                       strokeWidth: 11,
+                      semanticLabel:
+                          'Battery State of Charge: ${soc.toStringAsFixed(0)} percent',
                     ),
                     const SizedBox(height: 14),
                     Row(
@@ -1989,34 +2210,41 @@ class _DashboardScreenState extends State<DashboardScreen>
                       : '${value.toStringAsFixed(2)} ${metric.unit}');
             return Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  child: Row(
-                    children: [
-                      Icon(
-                        metric.icon,
-                        size: 19,
-                        color: _metricColor(index, isDark),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          metric.label,
-                          style: TextStyle(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.87)
-                                : Colors.black87,
+                MergeSemantics(
+                  child: Semantics(
+                    label: '$metric: $displayValue',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      child: Row(
+                        children: [
+                          ExcludeSemantics(
+                            child: Icon(
+                              metric.icon,
+                              size: 19,
+                              color: _metricColor(index, isDark),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              metric.label,
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.87)
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            displayValue,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        displayValue,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 if (index < metrics.length - 1)
@@ -2083,11 +2311,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     final hasData = series.any((item) => item.points.isNotEmpty);
 
+    final chartLabel = switch (prefix) {
+      'pv' => 'PV Voltage, Current, and Power chart showing 24-hour history',
+      'ac' => 'AC Voltage, Current, and Power chart showing 24-hour history',
+      _ => 'Battery Voltage, Current, and Power chart showing 24-hour history',
+    };
+
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: _performanceMode,
       height: 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
+      semanticLabel: chartLabel,
       child: _chartLoading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
@@ -2259,50 +2494,60 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _miniMetric(String value, String label, bool isDark) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
+    return MergeSemantics(
+      child: Semantics(
+        label: '$label: $value',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white54 : Colors.black45,
+              ),
+            ),
+          ],
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: isDark ? Colors.white54 : Colors.black45,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _glassMetricRow(String label, String value, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.white54 : Colors.black45,
-            ),
+    return MergeSemantics(
+      child: Semantics(
+        label: '$label: $value',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -2374,43 +2619,48 @@ class _DashboardScreenState extends State<DashboardScreen>
           message: failed
               ? 'Fetch telemetry gagal. Periksa koneksi/server. ${_error ?? ''}'
               : 'Fetch sukses${lastUpdate == null ? '' : ' pukul ${_formatClock(lastUpdate)}'}${stale ? '. Data lama: ${staleNames.join(', ')}' : ''}',
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 36),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  failed ? Icons.cloud_off : Icons.cloud_done_outlined,
-                  color: color,
-                  size: 17,
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+          child: Semantics(
+            label: label,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  ExcludeSemantics(
+                    child: Icon(
+                      failed ? Icons.cloud_off : Icons.cloud_done_outlined,
                       color: color,
+                      size: 17,
                     ),
                   ),
-                ),
-                if (failed)
-                  InkWell(
-                    onTap: _fetchAll,
-                    borderRadius: BorderRadius.circular(16),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.refresh, size: 18),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
                     ),
                   ),
-              ],
+                  if (failed)
+                    InkWell(
+                      onTap: _fetchAll,
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.refresh, size: 18),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

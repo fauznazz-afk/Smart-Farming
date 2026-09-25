@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased] - 2026-09-25
+
+### Added
+
+- Added last-known telemetry caching with `SharedPreferences` and an offline dashboard banner showing the cache age.
+- Added telemetry retry handling with exponential backoff for network failures and HTTP 5xx responses.
+- Added persistent alarm history for low SOC, stale telemetry, and environment threshold alerts, with a dedicated history screen and clear action.
+- Added screen-reader semantics for telemetry metrics, charts, gauges, connection status, CCTV controls, and energy reports.
+
+### Improved
+
+- Merged successful telemetry snapshots from the battery, PZEM, and environment devices so offline mode can restore the complete dashboard state.
+- Preserved existing alert SnackBars while recording newly triggered alerts in alarm history.
+
+### Validation
+
+- `flutter analyze --no-pub` passed with no issues.
+- `flutter test --no-pub` passed.
+- Debug APK built, installed, and launched successfully on Android device `24090RA29G`.
+
 ## [1.3.0+8] - 2026-09-25
 
 ### Changed
