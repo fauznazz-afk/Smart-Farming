@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
 - Added connection health tracking for REST, WebSocket, and polling transports, including reconnect count and last successful update.
 - Added energy analytics for production forecasting, target comparison, peak usage, and estimated battery runway.
 - Added a Settings field for configuring the daily production target in kWh.
+- Combined dashboard energy summary and forecast into one Energy Analytics card.
 - Added alarm deduplication, acknowledgement/resolution workflow, reopening, and severity/status filters.
 - Hardened session refresh invalidation, token validation, WebSocket authentication guards, and API error handling.
 - Added visible date-range calendar controls directly to PV, AC, and Battery chart headers.
@@ -27,6 +28,7 @@ All notable changes to this project are documented here.
 - Fixed the date-range picker failing to open when the current day was selected by normalizing picker dates and validating the initial range.
 - Optimized forecast calculations by removing redundant combined-history sorting and allocations.
 - Forecast progress now refreshes after the daily target is changed in Settings.
+- Kept the detailed energy report flow for historical charts, custom ranges, and CSV export.
 
 ## [1.3.0] - 2026-09-25
 

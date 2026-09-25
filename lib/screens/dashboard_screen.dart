@@ -15,7 +15,6 @@ import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
-import '../widgets/energy_forecast_card.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'energy_report_screen.dart';
@@ -1617,12 +1616,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         () => _energySummaryCard(isDark),
       ),
       () => const SizedBox(height: 12),
-      () => _bindRevision(
-        Listenable.merge([_energyRevision, _liveRevision]),
-        isDark,
-        () => _energyForecastCard(isDark),
-      ),
-      () => const SizedBox(height: 12),
       () => _bindRevision(_liveRevision, isDark, () => _dualCards(isDark)),
       () => const SizedBox(height: 12),
       () =>
@@ -1644,25 +1637,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       previousSolarKwh: _previousSolarKwh,
       loadKwh: _loadKwh,
       previousLoadKwh: _previousLoadKwh,
+      forecast: _energyForecastService.calculate(
+        history: _energyHistory,
+        latest: {...?_battery?.latestValues, ...?_pzem?.latestValues},
+        dailyProductionTargetKwh: _dailyProductionTargetKwh,
+      ),
       onRangeChanged: _setWeeklyEnergySummary,
       onOpenReport: _openEnergyReport,
-    );
-  }
-
-  Widget _energyForecastCard(bool isDark) {
-    final latest = <String, double>{
-      ...?_battery?.latestValues,
-      ...?_pzem?.latestValues,
-    };
-    final result = _energyForecastService.calculate(
-      history: _energyHistory,
-      latest: latest,
-      dailyProductionTargetKwh: _dailyProductionTargetKwh,
-    );
-    return EnergyForecastCard(
-      result: result,
-      isDark: isDark,
-      performanceMode: _performanceMode,
     );
   }
 

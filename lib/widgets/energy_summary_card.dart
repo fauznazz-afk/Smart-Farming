@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/energy_forecast_service.dart';
 import 'liquid_glass.dart';
 
 class EnergySummaryCard extends StatelessWidget {
@@ -17,6 +18,7 @@ class EnergySummaryCard extends StatelessWidget {
     required this.previousLoadKwh,
     required this.onRangeChanged,
     required this.onOpenReport,
+    this.forecast,
   });
 
   final bool isDark;
@@ -31,6 +33,7 @@ class EnergySummaryCard extends StatelessWidget {
   final double previousLoadKwh;
   final ValueChanged<bool> onRangeChanged;
   final VoidCallback onOpenReport;
+  final EnergyForecastResult? forecast;
 
   String _formatEnergy(double value) => value.toStringAsFixed(2);
 
@@ -113,7 +116,7 @@ class EnergySummaryCard extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Ringkasan energi',
+                  'Energy analytics',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -160,28 +163,133 @@ class EnergySummaryCard extends StatelessWidget {
               ),
             )
           else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
               children: [
-                _metric(
-                  title: 'Produksi PV',
-                  value: solarKwh,
-                  previous: previousSolarKwh,
-                  color: solarColor,
-                  icon: Icons.wb_sunny_outlined,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _metric(
+                      title: 'Produksi PV',
+                      value: solarKwh,
+                      previous: previousSolarKwh,
+                      color: solarColor,
+                      icon: Icons.wb_sunny_outlined,
+                    ),
+                    const SizedBox(width: 10),
+                    _metric(
+                      title: 'Pemakaian AC',
+                      value: loadKwh,
+                      previous: previousLoadKwh,
+                      color: loadColor,
+                      icon: Icons.electrical_services_outlined,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                _metric(
-                  title: 'Pemakaian AC',
-                  value: loadKwh,
-                  previous: previousLoadKwh,
-                  color: loadColor,
-                  icon: Icons.electrical_services_outlined,
-                ),
+                if (forecast != null) ...[
+                  const SizedBox(height: 12),
+                  _forecastSummary(context, forecast!),
+                ],
               ],
             ),
         ],
       ),
+    );
+  }
+
+  Widget _forecastSummary(BuildContext context, EnergyForecastResult result) {
+    final target = result.productionTargetKwh;
+    final progress = result.targetProgress;
+    final targetLabel = target == null || progress == null
+        ? 'Target produksi belum diatur'
+        : '${(progress * 100).toStringAsFixed(0)}% dari ${target.toStringAsFixed(1)} kWh';
+    final runway = result.batteryDepletionHours == null
+        ? 'Battery runway tidak tersedia'
+        : '${result.batteryDepletionHours!.toStringAsFixed(1)} jam estimasi baterai';
+    return Semantics(
+      container: true,
+      label:
+          'Forecast energi. Estimasi produksi ${result.dailyProductionEstimateKwh.toStringAsFixed(2)} kilowatt-hours. '
+          '$targetLabel. $runway.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Forecast',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _forecastMetric(
+                  context,
+                  'Estimasi harian',
+                  '${result.dailyProductionEstimateKwh.toStringAsFixed(2)} kWh',
+                  Icons.auto_graph_rounded,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _forecastMetric(
+                  context,
+                  'Peak usage',
+                  result.peakUsageWatts == null
+                      ? 'Unavailable'
+                      : '${result.peakUsageWatts!.toStringAsFixed(0)} W',
+                  Icons.bolt_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (progress != null)
+            LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0).toDouble(),
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          const SizedBox(height: 5),
+          Text(
+            '$targetLabel · $runway',
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _forecastMetric(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 10)),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
