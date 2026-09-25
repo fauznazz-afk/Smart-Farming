@@ -9,8 +9,11 @@ import 'screens/dashboard_screen.dart';
 import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
 import 'widgets/liquid_glass.dart';
+import 'services/alarm_notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AlarmNotificationService.initialize();
   runApp(const PltsMonitoringApp());
 }
 

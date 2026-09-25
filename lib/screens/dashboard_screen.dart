@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
 import '../services/alarm_history_service.dart';
+import '../services/alarm_notification_service.dart';
 import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
@@ -658,6 +659,15 @@ class _DashboardScreenState extends State<DashboardScreen>
               message: entry.value,
               value: value,
             ),
+          ),
+        );
+        unawaited(
+          AlarmNotificationService.notifyAlarm(
+            id: entry.key,
+            title:
+                'EnerGrow: ${severity == AlarmSeverity.critical ? 'Critical' : 'Warning'} alarm',
+            message: entry.value,
+            critical: severity == AlarmSeverity.critical,
           ),
         );
       }
