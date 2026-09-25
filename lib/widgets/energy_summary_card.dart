@@ -260,6 +260,17 @@ class EnergySummaryCard extends StatelessWidget {
               color: isDark ? Colors.white60 : Colors.black54,
             ),
           ),
+          if (result.hasProduction)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Aktual hari ini: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ),
         ],
       ),
     );

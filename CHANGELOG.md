@@ -28,6 +28,7 @@ All notable changes to this project are documented here.
 - Fixed the date-range picker failing to open when the current day was selected by normalizing picker dates and validating the initial range.
 - Optimized forecast calculations by removing redundant combined-history sorting and allocations.
 - Forecast progress now refreshes after the daily target is changed in Settings.
+- Forecast calculations now use today's PV production and show the actual energy accumulated today.
 - Kept the detailed energy report flow for historical charts, custom ranges, and CSV export.
 
 ## [1.3.0] - 2026-09-25

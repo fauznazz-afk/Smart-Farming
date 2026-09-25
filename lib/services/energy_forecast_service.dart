@@ -46,17 +46,25 @@ class EnergyForecastService {
     Map<String, double> latest = const {},
     double? dailyProductionTargetKwh,
     double? batteryCapacityKwh,
+    DateTime? referenceDate,
   }) {
-    final production = _points(history, const [
-      'power_dc',
-      'pv_power',
-      'solar_power',
-    ]);
-    final usage = _points(history, const [
-      'power_ac',
-      'load_power',
-      'consumption_power',
-    ]);
+    final day = referenceDate ?? DateTime.now();
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final production =
+        _points(history, const ['power_dc', 'pv_power', 'solar_power'])
+            .where((point) {
+              return !point.timestamp.isBefore(dayStart) &&
+                  point.timestamp.isBefore(dayEnd);
+            })
+            .toList(growable: false);
+    final usage =
+        _points(history, const ['power_ac', 'load_power', 'consumption_power'])
+            .where((point) {
+              return !point.timestamp.isBefore(dayStart) &&
+                  point.timestamp.isBefore(dayEnd);
+            })
+            .toList(growable: false);
     final soc = _latestPoint(history, latest, const [
       'soc',
       'state_of_charge',

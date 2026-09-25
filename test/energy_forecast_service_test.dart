@@ -8,6 +8,7 @@ void main() {
     () {
       final start = DateTime(2026, 1, 1, 8);
       final result = const EnergyForecastService().calculate(
+        referenceDate: DateTime(2026, 1, 1),
         history: {
           'power_dc': [
             TelemetryPoint(timestamp: DateTime(2026, 1, 1, 9), value: 1000),
@@ -25,4 +26,20 @@ void main() {
       expect(result.peakUsageAt, DateTime(2026, 1, 1, 10));
     },
   );
+
+  test('daily estimate extrapolates today actual production to 24 hours', () {
+    final result = const EnergyForecastService().calculate(
+      referenceDate: DateTime(2026, 1, 1, 14),
+      history: {
+        'power_dc': [
+          TelemetryPoint(timestamp: DateTime(2026, 1, 1, 8), value: 333.33),
+          TelemetryPoint(timestamp: DateTime(2026, 1, 1, 11), value: 333.33),
+          TelemetryPoint(timestamp: DateTime(2026, 1, 1, 14), value: 333.33),
+        ],
+      },
+    );
+
+    expect(result.observedProductionKwh, closeTo(2.0, 0.01));
+    expect(result.dailyProductionEstimateKwh, closeTo(8.0, 0.01));
+  });
 }

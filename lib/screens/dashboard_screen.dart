@@ -1641,6 +1641,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         history: _energyHistory,
         latest: {...?_battery?.latestValues, ...?_pzem?.latestValues},
         dailyProductionTargetKwh: _dailyProductionTargetKwh,
+        referenceDate: DateTime.now(),
       ),
       onRangeChanged: _setWeeklyEnergySummary,
       onOpenReport: _openEnergyReport,
