@@ -27,7 +27,66 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+/// Section metadata used to build both the category list and the detail pages.
+class _SectionMeta {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _SectionMeta({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+}
+
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const _sections = <_SectionMeta>[
+    _SectionMeta(
+      title: 'Appearance',
+      subtitle: 'Choose the app theme and accent color.',
+      icon: Icons.palette_outlined,
+    ),
+    _SectionMeta(
+      title: 'Monitoring',
+      subtitle: 'Set how often live telemetry updates.',
+      icon: Icons.monitor_heart_outlined,
+    ),
+    _SectionMeta(
+      title: 'Energy alerts',
+      subtitle: 'Show warnings when power data needs attention.',
+      icon: Icons.notifications_active_outlined,
+    ),
+    _SectionMeta(
+      title: 'Environment alerts',
+      subtitle: 'Set crop-specific limits. Blank limits are not monitored.',
+      icon: Icons.sensors_outlined,
+    ),
+    _SectionMeta(
+      title: 'CCTV source',
+      subtitle: 'Set the secure camera stream page.',
+      icon: Icons.videocam_outlined,
+    ),
+    _SectionMeta(
+      title: 'Performance',
+      subtitle: 'Tune glass effects for smoother scrolling.',
+      icon: Icons.speed_outlined,
+    ),
+    _SectionMeta(
+      title: 'About',
+      subtitle: 'Application information.',
+      icon: Icons.info_outline,
+    ),
+    _SectionMeta(
+      title: 'Account',
+      subtitle: 'Manage your ThingsBoard session.',
+      icon: Icons.manage_accounts_outlined,
+    ),
+  ];
+
+  /// `null` = category list; `0–7` = detail page for that section.
+  int? _selectedSection;
+
   final _cctvUrlController = TextEditingController(text: defaultCctvUrl);
   final _ambientTempMinController = TextEditingController();
   final _ambientTempMaxController = TextEditingController();
@@ -331,8 +390,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String unit,
     TextEditingController minimum,
     TextEditingController maximum,
-  ) =>
-      Padding(
+  ) => Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,262 +437,340 @@ class _SettingsScreenState extends State<SettingsScreen> {
         label: Text(_saving ? 'Saving...' : 'Save settings'),
       );
 
+  // ---------------------------------------------------------------------------
+  // Category list (main page)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildCategoryList() {
+    final theme = Theme.of(context);
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _sections.length,
+      itemBuilder: (context, index) {
+        final section = _sections[index];
+        return ListTile(
+          leading: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              section.icon,
+              color: theme.colorScheme.onPrimary,
+              size: 19,
+            ),
+          ),
+          title: Text(section.title),
+          subtitle: Text(
+            section.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          onTap: () => setState(() => _selectedSection = index),
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Detail pages (one per category)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDetailPage(int index) {
+    final section = _sections[index];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _settingsSection(
+          title: section.title,
+          subtitle: section.subtitle,
+          icon: section.icon,
+          children: _sectionChildren(index),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _sectionChildren(int index) {
+    switch (index) {
+      case 0:
+        return _appearanceChildren();
+      case 1:
+        return _monitoringChildren();
+      case 2:
+        return _energyAlertsChildren();
+      case 3:
+        return _environmentAlertsChildren();
+      case 4:
+        return _cctvChildren();
+      case 5:
+        return _performanceChildren();
+      case 6:
+        return _aboutChildren();
+      case 7:
+        return _accountChildren();
+      default:
+        return [];
+    }
+  }
+
+  List<Widget> _appearanceChildren() => [
+        SegmentedButton<ThemeMode>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(
+              value: ThemeMode.system,
+              label: Text('System'),
+              icon: Icon(Icons.settings_suggest_outlined),
+            ),
+            ButtonSegment(
+              value: ThemeMode.light,
+              label: Text('Light'),
+              icon: Icon(Icons.light_mode_outlined),
+            ),
+            ButtonSegment(
+              value: ThemeMode.dark,
+              label: Text('Dark'),
+              icon: Icon(Icons.dark_mode_outlined),
+            ),
+          ],
+          selected: {widget.themeController.themeMode},
+          onSelectionChanged: (selection) {
+            widget.themeController.setThemeMode(selection.first);
+            setState(() {});
+          },
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Accent color',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _paletteOptions.entries.map((entry) {
+            final selected =
+                _selectedSeed.toARGB32() == entry.value.toARGB32();
+            return ChoiceChip(
+              label: Text(entry.key),
+              selected: selected,
+              avatar: CircleAvatar(
+                radius: 9,
+                backgroundColor: entry.value,
+              ),
+              onSelected: (_) {
+                setState(() => _selectedSeed = entry.value);
+                widget.themeController.setSeedColor(entry.value);
+              },
+            );
+          }).toList(),
+        ),
+      ];
+
+  List<Widget> _monitoringChildren() => [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Auto refresh telemetry'),
+          value: _autoRefresh,
+          onChanged: (value) => setState(() => _autoRefresh = value),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _refreshSeconds,
+          decoration: const InputDecoration(
+            labelText: 'Refresh interval',
+          ),
+          items: const [5, 10, 30, 60]
+              .map(
+                (seconds) => DropdownMenuItem(
+                  value: seconds,
+                  child: Text('$seconds seconds'),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) setState(() => _refreshSeconds = value);
+          },
+        ),
+      ];
+
+  List<Widget> _energyAlertsChildren() => [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Enable energy alerts'),
+          subtitle: const Text(
+            'In-app alerts appear while the dashboard is open.',
+          ),
+          value: _energyAlertsEnabled,
+          onChanged: (value) =>
+              setState(() => _energyAlertsEnabled = value),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _lowSocThreshold,
+          decoration: const InputDecoration(
+            labelText: 'Warn when battery SOC falls below',
+          ),
+          items: const [10, 15, 20, 25, 30, 40, 50]
+              .map((value) => DropdownMenuItem(
+                    value: value,
+                    child: Text('$value%'),
+                  ))
+              .toList(),
+          onChanged: _energyAlertsEnabled
+              ? (value) {
+                  if (value != null) {
+                    setState(() => _lowSocThreshold = value);
+                  }
+                }
+              : null,
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          initialValue: _staleTelemetryMinutes,
+          decoration: const InputDecoration(
+            labelText: 'Warn when telemetry is older than',
+          ),
+          items: const [5, 10, 15, 30, 60]
+              .map((value) => DropdownMenuItem(
+                    value: value,
+                    child: Text('$value minutes'),
+                  ))
+              .toList(),
+          onChanged: _energyAlertsEnabled
+              ? (value) {
+                  if (value != null) {
+                    setState(() => _staleTelemetryMinutes = value);
+                  }
+                }
+              : null,
+        ),
+      ];
+
+  List<Widget> _environmentAlertsChildren() => [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Enable environment alerts'),
+          subtitle: const Text(
+            'Alerts appear in the app when fresh sensor values cross a limit.',
+          ),
+          value: _environmentAlertsEnabled,
+          onChanged: (value) =>
+              setState(() => _environmentAlertsEnabled = value),
+        ),
+        _environmentRangeFields(
+          'Ambient temperature',
+          '°C',
+          _ambientTempMinController,
+          _ambientTempMaxController,
+        ),
+        _environmentRangeFields(
+          'Humidity',
+          '%',
+          _humidityMinController,
+          _humidityMaxController,
+        ),
+        _environmentRangeFields(
+          'Water TDS',
+          'ppm',
+          _tdsMinController,
+          _tdsMaxController,
+        ),
+      ];
+
+  List<Widget> _cctvChildren() => [
+        TextField(
+          controller: _cctvUrlController,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'Stream URL',
+            prefixIcon: Icon(Icons.link),
+          ),
+        ),
+      ];
+
+  List<Widget> _performanceChildren() => [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Smooth Glass Mode'),
+          subtitle: Text(
+            widget.themeController.performanceMode
+                ? 'Optimized rendering is enabled'
+                : 'Full backdrop blur is enabled',
+          ),
+          value: widget.themeController.performanceMode,
+          onChanged: (value) {
+            widget.themeController.setPerformanceMode(value);
+            setState(() {});
+          },
+        ),
+      ];
+
+  List<Widget> _aboutChildren() => [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('EnerGrow monitoring application'),
+          trailing: Text(
+            _appVersion == null ? 'Loading…' : 'v$_appVersion',
+          ),
+        ),
+      ];
+
+  List<Widget> _accountChildren() => [
+        OutlinedButton.icon(
+          onPressed: _confirmLogout,
+          icon: const Icon(Icons.logout),
+          label: const Text('Logout'),
+        ),
+      ];
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: _saveButton(),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        children: [
-          _settingsSection(
-            title: 'Appearance',
-            subtitle: 'Choose the app theme and accent color.',
-            icon: Icons.palette_outlined,
-            children: [
-              SegmentedButton<ThemeMode>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: ThemeMode.system,
-                    label: Text('System'),
-                    icon: Icon(Icons.settings_suggest_outlined),
-                  ),
-                  ButtonSegment(
-                    value: ThemeMode.light,
-                    label: Text('Light'),
-                    icon: Icon(Icons.light_mode_outlined),
-                  ),
-                  ButtonSegment(
-                    value: ThemeMode.dark,
-                    label: Text('Dark'),
-                    icon: Icon(Icons.dark_mode_outlined),
-                  ),
-                ],
-                selected: {widget.themeController.themeMode},
-                onSelectionChanged: (selection) {
-                  widget.themeController.setThemeMode(selection.first);
-                  setState(() {});
-                },
+    final viewingDetail = _selectedSection != null;
+    final title = viewingDetail ? _sections[_selectedSection!].title : 'Settings';
+    return PopScope(
+      canPop: !viewingDetail,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && viewingDetail) {
+          setState(() => _selectedSection = null);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: viewingDetail
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _selectedSection = null),
+                )
+              : null,
+          title: Text(title),
+        ),
+        bottomNavigationBar: viewingDetail
+            ? null
+            : SafeArea(
+                minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: _saveButton(),
               ),
-              const SizedBox(height: 18),
-              const Text(
-                'Accent color',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _paletteOptions.entries.map((entry) {
-                  final selected =
-                      _selectedSeed.toARGB32() == entry.value.toARGB32();
-                  return ChoiceChip(
-                    label: Text(entry.key),
-                    selected: selected,
-                    avatar: CircleAvatar(
-                      radius: 9,
-                      backgroundColor: entry.value,
-                    ),
-                    onSelected: (_) {
-                      setState(() => _selectedSeed = entry.value);
-                      widget.themeController.setSeedColor(entry.value);
-                    },
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'Monitoring',
-            subtitle: 'Set how often live telemetry updates.',
-            icon: Icons.monitor_heart_outlined,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Auto refresh telemetry'),
-                value: _autoRefresh,
-                onChanged: (value) => setState(() => _autoRefresh = value),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: _refreshSeconds,
-                decoration: const InputDecoration(
-                  labelText: 'Refresh interval',
-                ),
-                items: const [5, 10, 30, 60]
-                    .map(
-                      (seconds) => DropdownMenuItem(
-                        value: seconds,
-                        child: Text('$seconds seconds'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _refreshSeconds = value);
-                },
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'Energy alerts',
-            subtitle: 'Show warnings when power data needs attention.',
-            icon: Icons.notifications_active_outlined,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Enable energy alerts'),
-                subtitle: const Text(
-                  'In-app alerts appear while the dashboard is open.',
-                ),
-                value: _energyAlertsEnabled,
-                onChanged: (value) =>
-                    setState(() => _energyAlertsEnabled = value),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: _lowSocThreshold,
-                decoration: const InputDecoration(
-                  labelText: 'Warn when battery SOC falls below',
-                ),
-                items: const [10, 15, 20, 25, 30, 40, 50]
-                    .map((value) => DropdownMenuItem(
-                          value: value,
-                          child: Text('$value%'),
-                        ))
-                    .toList(),
-                onChanged: _energyAlertsEnabled
-                    ? (value) {
-                        if (value != null) {
-                          setState(() => _lowSocThreshold = value);
-                        }
-                      }
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: _staleTelemetryMinutes,
-                decoration: const InputDecoration(
-                  labelText: 'Warn when telemetry is older than',
-                ),
-                items: const [5, 10, 15, 30, 60]
-                    .map((value) => DropdownMenuItem(
-                          value: value,
-                          child: Text('$value minutes'),
-                        ))
-                    .toList(),
-                onChanged: _energyAlertsEnabled
-                    ? (value) {
-                        if (value != null) {
-                          setState(() => _staleTelemetryMinutes = value);
-                        }
-                      }
-                    : null,
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'Environment alerts',
-            subtitle:
-                'Set crop-specific limits. Blank limits are not monitored.',
-            icon: Icons.sensors_outlined,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Enable environment alerts'),
-                subtitle: const Text(
-                  'Alerts appear in the app when fresh sensor values cross a limit.',
-                ),
-                value: _environmentAlertsEnabled,
-                onChanged: (value) =>
-                    setState(() => _environmentAlertsEnabled = value),
-              ),
-              _environmentRangeFields(
-                'Ambient temperature',
-                '°C',
-                _ambientTempMinController,
-                _ambientTempMaxController,
-              ),
-              _environmentRangeFields(
-                'Humidity',
-                '%',
-                _humidityMinController,
-                _humidityMaxController,
-              ),
-              _environmentRangeFields(
-                'Water TDS',
-                'ppm',
-                _tdsMinController,
-                _tdsMaxController,
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'CCTV source',
-            subtitle: 'Set the secure camera stream page.',
-            icon: Icons.videocam_outlined,
-            children: [
-              TextField(
-                controller: _cctvUrlController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Stream URL',
-                  prefixIcon: Icon(Icons.link),
-                ),
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'Performance',
-            subtitle: 'Tune glass effects for smoother scrolling.',
-            icon: Icons.speed_outlined,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Smooth Glass Mode'),
-                subtitle: Text(
-                  widget.themeController.performanceMode
-                      ? 'Optimized rendering is enabled'
-                      : 'Full backdrop blur is enabled',
-                ),
-                value: widget.themeController.performanceMode,
-                onChanged: (value) {
-                  widget.themeController.setPerformanceMode(value);
-                  setState(() {});
-                },
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'About',
-            subtitle: 'Application information.',
-            icon: Icons.info_outline,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('EnerGrow monitoring application'),
-                trailing: Text(
-                  _appVersion == null ? 'Loading…' : 'v$_appVersion',
-                ),
-              ),
-            ],
-          ),
-          _settingsSection(
-            title: 'Account',
-            subtitle: 'Manage your ThingsBoard session.',
-            icon: Icons.manage_accounts_outlined,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _confirmLogout,
-                icon: const Icon(Icons.logout),
-                label: const Text('Logout'),
-              ),
-            ],
-          ),
-        ],
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: viewingDetail
+              ? _buildDetailPage(_selectedSection!)
+              : _buildCategoryList(),
+        ),
       ),
     );
   }

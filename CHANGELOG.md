@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [1.3.0+8] - 2026-09-25
+
+### Changed
+- Restructured settings page from a single flat scrolling page into a nested category-based navigation pattern (like phone settings)
+- Settings main page now shows a list of 8 categories: Appearance, Monitoring, Energy alerts, Environment alerts, CCTV source, Performance, About, Account
+- Tapping a category navigates to a detail page showing only that category's options
+- Added AnimatedSwitcher (200ms) for smooth transitions between category list and detail pages
+- Added PopScope to intercept system back button: when viewing a detail page, back returns to the category list instead of exiting to dashboard
+- AppBar dynamically shows the category name as title when viewing a detail page, with a back arrow button
+- Save button is only visible on the main category list page (hidden in detail pages)
+- All existing logic preserved: SharedPreferences keys, save mechanism, validation, theme controller calls, logout flow
+
+### Fixed
+- System back button (Android gesture/swipe) now correctly returns to the settings category list instead of immediately exiting to the dashboard
+
 ## [1.3.0] - Unreleased
 
 ### Added
