@@ -7,6 +7,9 @@ All notable changes to this project are documented here.
 ### Improved
 
 - Added a smooth bottom navigation collapse while scrolling down on dashboard pages.
+- Added live ThingsBoard telemetry over WebSocket with automatic reconnect and REST polling fallback.
+- Added custom telemetry chart ranges for up to 90 days with adaptive aggregation intervals.
+- Added a live/polling connection indicator to chart headers.
 - Anchored the collapsed navigation control to the left so the panel visually shrinks from right to left without shifting the dashboard content.
 - Updated bottom navigation labels to English: `Overview`, `PV`, `AC`, `Battery`, and `CCTV`.
 - Added scroll-direction and distance thresholds to prevent accidental navigation transitions during small gestures.

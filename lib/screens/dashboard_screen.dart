@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/telemetry_model.dart';
 import '../services/alarm_history_service.dart';
 import '../services/thingsboard_api.dart';
+import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
@@ -67,7 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _previousLoadKwh = 0.0;
   bool _telemetryRequestInFlight = false;
   final _historyRequestInFlight = <String>{};
-  final _historyRequestDate = <String, DateTime>{};
+  final _historyRequestDate = <String, String>{};
   final _historyPendingRefresh = <String>{};
   final _historyLoaded = <String>{};
   bool _autoRefresh = true;
@@ -78,6 +79,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Timer? _connectionStatusTimer;
   bool _connectionStatusInitialized = false;
   DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedRangeStart;
+  DateTime? _selectedRangeEnd;
   DateTime? _energyUpdatedAt;
   DateTime? _lastSuccessfulTelemetryAt;
   String _displayName = '';
@@ -103,6 +106,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     _connectionStatusVisible,
   ]);
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
+  late final ThingsBoardRealtimeService _realtimeService =
+      ThingsBoardRealtimeService(
+        api: widget.api,
+        onTelemetry: _handleRealtimeTelemetry,
+        onConnectionChanged: _handleRealtimeConnection,
+      );
+  bool _realtimeConnected = false;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
   @override
@@ -111,6 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     widget.themeController.addListener(_onThemeChanged);
     _fetchAll();
+    unawaited(_realtimeService.start());
     _fetchEnergyHistory();
     _loadPreferences();
     _loadDisplayName();
@@ -133,6 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _navCollapsed.dispose();
     _refreshTimer?.cancel();
     _connectionStatusTimer?.cancel();
+    unawaited(_realtimeService.stop());
     super.dispose();
   }
 
@@ -406,6 +418,60 @@ class _DashboardScreenState extends State<DashboardScreen>
     } finally {
       _telemetryRequestInFlight = false;
     }
+  }
+
+  void _handleRealtimeConnection(bool connected) {
+    if (!mounted || _realtimeConnected == connected) return;
+    setState(() => _realtimeConnected = connected);
+  }
+
+  void _handleRealtimeTelemetry(
+    String deviceId,
+    Map<String, TelemetryPoint> values,
+  ) {
+    if (!mounted || values.isEmpty) return;
+    DeviceTelemetry? current;
+    if (deviceId == ThingsBoardApi.deviceBattery) {
+      current = _battery;
+    } else if (deviceId == ThingsBoardApi.devicePzem) {
+      current = _pzem;
+    } else if (deviceId == ThingsBoardApi.deviceSensor) {
+      current = _sensor;
+    }
+    final mergedValues = <String, double>{
+      ...?current?.latestValues,
+      for (final entry in values.entries) entry.key: entry.value.value,
+    };
+    DateTime? latest = current?.lastUpdate;
+    for (final point in values.values) {
+      if (latest == null || point.timestamp.isAfter(latest)) {
+        latest = point.timestamp;
+      }
+    }
+    final updated = DeviceTelemetry(
+      latestValues: mergedValues,
+      lastUpdate: latest,
+    );
+    if (deviceId == ThingsBoardApi.deviceBattery) {
+      _battery = updated;
+    } else if (deviceId == ThingsBoardApi.devicePzem) {
+      _pzem = updated;
+    } else if (deviceId == ThingsBoardApi.deviceSensor) {
+      _sensor = updated;
+    } else {
+      return;
+    }
+    final wasLoading = _loading;
+    _isOfflineMode = false;
+    _lastSuccessfulTelemetryAt = DateTime.now();
+    _error = null;
+    _loading = false;
+    if (wasLoading) {
+      setState(() {});
+    } else {
+      _liveRevision.value++;
+    }
+    _evaluateEnergyAlerts();
   }
 
   Future<void> _refreshCurrentPage() async {
@@ -741,31 +807,58 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _fetchHistoryFor(String prefix) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final selDay = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-    );
+    final rangeStart =
+        _selectedRangeStart ??
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final rangeEnd = _selectedRangeEnd;
+    final selectionKey =
+        '${rangeStart.millisecondsSinceEpoch}:${rangeEnd?.millisecondsSinceEpoch ?? ''}';
     if (_historyRequestInFlight.contains(prefix)) {
-      if (_historyRequestDate[prefix] != selDay) {
+      if (_historyRequestDate[prefix] != selectionKey) {
         _historyPendingRefresh.add(prefix);
       }
       return;
     }
     _historyRequestInFlight.add(prefix);
-    _historyRequestDate[prefix] = selDay;
+    _historyRequestDate[prefix] = selectionKey;
     if (mounted && !_historyLoaded.contains(prefix)) {
       _chartLoading = true;
       _notifyCharts();
     }
     DateTime start, end;
-    if (selDay == today) {
+    if (rangeEnd != null) {
+      start = rangeStart;
+      end = DateTime(
+        rangeEnd.year,
+        rangeEnd.month,
+        rangeEnd.day,
+        23,
+        59,
+        59,
+        999,
+      );
+    } else if (rangeStart == today) {
       end = now;
       start = now.subtract(const Duration(hours: 24));
     } else {
-      start = selDay;
-      end = DateTime(selDay.year, selDay.month, selDay.day, 23, 59, 59);
+      start = rangeStart;
+      end = DateTime(
+        rangeStart.year,
+        rangeStart.month,
+        rangeStart.day,
+        23,
+        59,
+        59,
+      );
     }
+    final duration = end.difference(start);
+    final intervalMs = duration <= const Duration(days: 1)
+        ? 5 * 60 * 1000
+        : duration <= const Duration(days: 7)
+        ? 30 * 60 * 1000
+        : duration <= const Duration(days: 30)
+        ? 2 * 60 * 60 * 1000
+        : 6 * 60 * 60 * 1000;
     final keys = switch (prefix) {
       'pv' => ('voltage_dc', 'current_dc', 'power_dc'),
       'ac' => ('voltage_ac', 'current_ac', 'power_ac'),
@@ -781,16 +874,17 @@ class _DashboardScreenState extends State<DashboardScreen>
         [keys.$1, keys.$2, keys.$3],
         start: start,
         end: end,
+        intervalMs: intervalMs,
       );
     } catch (_) {
       histories = const {};
     }
-    final currentDay = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-    );
-    if (mounted && currentDay == selDay) {
+    final currentStart =
+        _selectedRangeStart ??
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final currentSelectionKey =
+        '${currentStart.millisecondsSinceEpoch}:${_selectedRangeEnd?.millisecondsSinceEpoch ?? ''}';
+    if (mounted && currentSelectionKey == selectionKey) {
       final vPoints = histories[keys.$1] ?? [];
       final cPoints = histories[keys.$2] ?? [];
       final pPoints = histories[keys.$3] ?? [];
@@ -857,6 +951,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (sel == cur) return;
     setState(() {
       _selectedDate = date;
+      _selectedRangeStart = null;
+      _selectedRangeEnd = null;
       _historyLoaded.clear();
       _chartBounds.clear();
       _chartSpots.clear();
@@ -869,29 +965,53 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _pickDateFromCalendar() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final firstDate = today.subtract(const Duration(days: 6));
-    final selected = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-    );
-    final initialDate = selected.isBefore(firstDate)
+    final firstDate = today.subtract(const Duration(days: 90));
+    DateTime normalize(DateTime value) =>
+        DateTime(value.year, value.month, value.day);
+    final selectedStart = normalize(_selectedRangeStart ?? _selectedDate);
+    final selectedEnd = normalize(_selectedRangeEnd ?? _selectedDate);
+    final initialStart = selectedStart.isBefore(firstDate)
         ? firstDate
-        : selected.isAfter(today)
+        : selectedStart.isAfter(today)
         ? today
-        : selected;
-    final picked = await showDatePicker(
+        : selectedStart;
+    final initialEnd = selectedEnd.isBefore(firstDate)
+        ? firstDate
+        : selectedEnd.isAfter(today)
+        ? today
+        : selectedEnd;
+    final safeEnd = initialEnd.isBefore(initialStart)
+        ? initialStart
+        : initialEnd;
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: initialDate,
+      initialDateRange: DateTimeRange(start: initialStart, end: safeEnd),
       firstDate: firstDate,
       lastDate: today,
       locale: const Locale('id', 'ID'),
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
-      helpText: 'Pilih tanggal dalam 7 hari terakhir',
+      helpText: 'Pilih rentang tanggal telemetry',
       cancelText: 'Batal',
-      confirmText: 'Pilih',
+      confirmText: 'Terapkan',
     );
-    if (picked != null && mounted) _selectDate(picked);
+    if (picked != null && mounted) {
+      final start = DateTime(
+        picked.start.year,
+        picked.start.month,
+        picked.start.day,
+      );
+      final end = DateTime(picked.end.year, picked.end.month, picked.end.day);
+      setState(() {
+        _selectedDate = start;
+        _selectedRangeStart = start;
+        _selectedRangeEnd = end;
+        _historyLoaded.clear();
+        _chartBounds.clear();
+        _chartSpots.clear();
+        _chartStats.clear();
+      });
+      final prefix = _prefixForPage(_selectedIndex);
+      if (prefix != null) unawaited(_fetchHistoryFor(prefix));
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1077,9 +1197,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context, constraints) => AnimatedContainer(
                     duration: const Duration(milliseconds: 380),
                     curve: Curves.easeInOutCubic,
-                                      alignment: Alignment.centerLeft,
-                                      width: collapsed ? 64 : constraints.maxWidth,
-                                      height: 64,
+                    alignment: Alignment.centerLeft,
+                    width: collapsed ? 64 : constraints.maxWidth,
+                    height: 64,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
@@ -1547,7 +1667,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     final days = _stripDays;
     final first = days.first;
     final last = days.last;
-    final dateRange = first.month == last.month
+    final dateRange = _selectedRangeStart != null && _selectedRangeEnd != null
+        ? '${_selectedRangeStart!.day} ${_monthName(_selectedRangeStart!.month)} '
+              '${_selectedRangeStart!.year} – '
+              '${_selectedRangeEnd!.day} ${_monthName(_selectedRangeEnd!.month)} '
+              '${_selectedRangeEnd!.year}'
+        : first.month == last.month
         ? '${first.day}–${last.day} ${_monthName(last.month)} ${last.year}'
         : '${first.day} ${_monthName(first.month)} – '
               '${last.day} ${_monthName(last.month)} ${last.year}';
@@ -1560,7 +1685,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: Row(
             children: [
               IconButton(
-                tooltip: 'Pilih tanggal',
+                tooltip: 'Pilih rentang tanggal',
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints.tightFor(
                   width: 28,
@@ -1589,7 +1714,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                '7 hari',
+                _selectedRangeStart != null ? 'Custom range' : 'Last 7 days',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.white54 : Colors.black45,
@@ -1615,6 +1740,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       dayName: _dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
                       isSelected:
+                          _selectedRangeStart == null &&
                           days[i].year == _selectedDate.year &&
                           days[i].month == _selectedDate.month &&
                           days[i].day == _selectedDate.day,
@@ -2135,7 +2261,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('PV · Last 24 Hours', isDark),
+    () => _chartSectionHeader('PV', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -2165,7 +2291,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('AC · Last 24 Hours', isDark),
+    () => _chartSectionHeader('AC', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -2200,7 +2326,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('Battery · Last 24 Hours', isDark),
+    () => _chartSectionHeader('Battery', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -2240,38 +2366,75 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _chartSectionHeader(String title, bool isDark) {
-    final sel = _selectedDate;
-    final now = DateTime.now();
-    final isToday =
-        sel.year == now.year && sel.month == now.month && sel.day == now.day;
+    final rangeLabel = _selectedRangeStart != null && _selectedRangeEnd != null
+        ? '${_selectedRangeStart!.day}/${_selectedRangeStart!.month}/${_selectedRangeStart!.year}'
+              '–${_selectedRangeEnd!.day}/${_selectedRangeEnd!.month}/${_selectedRangeEnd!.year}'
+        : 'Last 24 hours';
     return Row(
       children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white70 : Colors.black54,
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  rangeLabel,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white54 : Colors.black45,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 8),
-        if (!isToday)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Theme.of(context).colorScheme.onSurface
-                  .withValues(alpha: 0.10),
-            ),
-            child: Text(
-              '${sel.day}/${sel.month}/${sel.year}',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
+        Semantics(
+          button: true,
+          label: 'Choose custom telemetry date range',
+          child: IconButton(
+            tooltip: 'Choose date range',
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
+            onPressed: _pickDateFromCalendar,
+            icon: Icon(
+              Icons.calendar_month_outlined,
+              size: 18,
+              color: isDark ? Colors.white70 : Colors.black54,
             ),
           ),
+        ),
+        const SizedBox(width: 6),
+        Icon(
+          _realtimeConnected ? Icons.wifi : Icons.wifi_off,
+          size: 13,
+          color: _realtimeConnected
+              ? Colors.green
+              : (isDark ? Colors.white38 : Colors.black38),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          _realtimeConnected ? 'Live' : 'Polling',
+          style: TextStyle(
+            fontSize: 10,
+            color: _realtimeConnected
+                ? Colors.green
+                : (isDark ? Colors.white54 : Colors.black45),
+          ),
+        ),
       ],
     );
   }
@@ -2421,10 +2584,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     final hasData = series.any((item) => item.points.isNotEmpty);
 
+    final chartRangeLabel =
+        _selectedRangeStart != null && _selectedRangeEnd != null
+        ? '${_selectedRangeStart!.day}/${_selectedRangeStart!.month}/${_selectedRangeStart!.year} '
+              'to ${_selectedRangeEnd!.day}/${_selectedRangeEnd!.month}/${_selectedRangeEnd!.year}'
+        : 'the last 24 hours';
     final chartLabel = switch (prefix) {
-      'pv' => 'PV Voltage, Current, and Power chart showing 24-hour history',
-      'ac' => 'AC Voltage, Current, and Power chart showing 24-hour history',
-      _ => 'Battery Voltage, Current, and Power chart showing 24-hour history',
+      'pv' => 'PV Voltage, Current, and Power chart showing $chartRangeLabel',
+      'ac' => 'AC Voltage, Current, and Power chart showing $chartRangeLabel',
+      _ => 'Battery Voltage, Current, and Power chart showing $chartRangeLabel',
     };
 
     return LiquidGlassCard(

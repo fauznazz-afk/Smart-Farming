@@ -140,6 +140,18 @@ class ThingsBoardApi {
 
   bool get isLoggedIn => _token != null;
 
+  String? get accessToken => _token;
+
+  Uri get telemetryWebSocketUri {
+    final base = Uri.parse(baseUrl);
+    final scheme = base.scheme == 'https' ? 'wss' : 'ws';
+    return base.replace(
+      scheme: scheme,
+      path: '${base.path}/api/ws/plugins/telemetry',
+      queryParameters: {'token': _token ?? ''},
+    );
+  }
+
   Map<String, String> get _authHeaders => {
     'Content-Type': 'application/json',
     'X-Authorization': 'Bearer $_token',
