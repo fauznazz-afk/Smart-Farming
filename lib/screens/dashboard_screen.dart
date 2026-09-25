@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
@@ -95,6 +96,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isOfflineMode = false;
   DateTime? _cachedTelemetryTime;
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
+  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
+  double _downScrollDistance = 0;
   late final Listenable _connectionChromeListenable = Listenable.merge([
     _liveRevision,
     _connectionStatusVisible,
@@ -127,6 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _alertMessages.dispose();
     _cctvKeepAlive.dispose();
     _appBarBlurProgress.dispose();
+    _navCollapsed.dispose();
     _refreshTimer?.cancel();
     _connectionStatusTimer?.cancel();
     super.dispose();
@@ -175,7 +179,27 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.reverse) {
+        _downScrollDistance = 0;
+      } else if (notification.direction == ScrollDirection.forward) {
+        _downScrollDistance = 0;
+        _navCollapsed.value = false;
+      } else if (notification.metrics.pixels <= 0) {
+        _downScrollDistance = 0;
+        _navCollapsed.value = false;
+      }
+    } else if (notification is ScrollUpdateNotification &&
+        notification.scrollDelta != null &&
+        notification.scrollDelta! > 0) {
+      _downScrollDistance += notification.scrollDelta!;
+      if (_downScrollDistance >= 12 && !_navCollapsed.value) {
+        _navCollapsed.value = true;
+      }
+    }
     final progress = ((notification.metrics.pixels - 4) / 44)
         .clamp(0.0, 1.0)
         .toDouble();
@@ -1035,89 +1059,175 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Bottom nav bar ────────────────────────────────────────────────────────────
   Widget _glassNavBar(bool isDark) {
-    final page = _selectedIndex.toDouble();
-    final primary = _strongMetricColor(_selectedIndex, isDark);
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: RepaintBoundary(
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.40)
-                    : Colors.black.withValues(alpha: 0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xEE101412)
-                    : Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.14)
-                      : Colors.black.withValues(alpha: 0.07),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _navCollapsed,
+      builder: (context, collapsed, _) {
+        final page = _selectedIndex.toDouble();
+        final primary = _strongMetricColor(_selectedIndex, isDark);
+        return SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: RepaintBoundary(
+            child: SizedBox(
+              width: double.infinity,
+              height: 64,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 380),
+                    curve: Curves.easeInOutCubic,
+                                      alignment: Alignment.centerLeft,
+                                      width: collapsed ? 64 : constraints.maxWidth,
+                                      height: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.40)
+                              : Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xEE101412)
+                              : Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.14)
+                                : Colors.black.withValues(alpha: 0.07),
+                          ),
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            IgnorePointer(
+                              ignoring: collapsed,
+                              child: AnimatedOpacity(
+                                opacity: collapsed ? 0 : 1,
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeInOutCubic,
+                                child: Row(
+                                  children: [
+                                    _navItem(
+                                      0,
+                                      Icons.dashboard_outlined,
+                                      Icons.dashboard,
+                                      'Overview',
+                                      page,
+                                      isDark,
+                                      primary,
+                                    ),
+                                    _navItem(
+                                      1,
+                                      Icons.wb_sunny_outlined,
+                                      Icons.wb_sunny,
+                                      'PV',
+                                      page,
+                                      isDark,
+                                      primary,
+                                    ),
+                                    _navItem(
+                                      2,
+                                      Icons.power_outlined,
+                                      Icons.power,
+                                      'AC',
+                                      page,
+                                      isDark,
+                                      primary,
+                                    ),
+                                    _navItem(
+                                      3,
+                                      Icons.battery_5_bar_outlined,
+                                      Icons.battery_full,
+                                      'Battery',
+                                      page,
+                                      isDark,
+                                      primary,
+                                    ),
+                                    _navItem(
+                                      4,
+                                      Icons.videocam_outlined,
+                                      Icons.videocam,
+                                      'CCTV',
+                                      page,
+                                      isDark,
+                                      primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IgnorePointer(
+                              ignoring: !collapsed,
+                              child: AnimatedOpacity(
+                                opacity: collapsed ? 1 : 0,
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeInOutCubic,
+                                child: _collapsedNavItem(
+                                  _selectedIndex,
+                                  isDark,
+                                  primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  _navItem(
-                    0,
-                    Icons.dashboard_outlined,
-                    Icons.dashboard,
-                    'Ringkas',
-                    page,
-                    isDark,
-                    primary,
-                  ),
-                  _navItem(
-                    1,
-                    Icons.wb_sunny_outlined,
-                    Icons.wb_sunny,
-                    'PV',
-                    page,
-                    isDark,
-                    primary,
-                  ),
-                  _navItem(
-                    2,
-                    Icons.power_outlined,
-                    Icons.power,
-                    'AC',
-                    page,
-                    isDark,
-                    primary,
-                  ),
-                  _navItem(
-                    3,
-                    Icons.battery_5_bar_outlined,
-                    Icons.battery_full,
-                    'Baterai',
-                    page,
-                    isDark,
-                    primary,
-                  ),
-                  _navItem(
-                    4,
-                    Icons.videocam_outlined,
-                    Icons.videocam,
-                    'CCTV',
-                    page,
-                    isDark,
-                    primary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _collapsedNavItem(int index, bool isDark, Color primary) {
+    final icons = [
+      (Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
+      (Icons.wb_sunny_outlined, Icons.wb_sunny, 'PV'),
+      (Icons.power_outlined, Icons.power, 'AC'),
+      (Icons.battery_5_bar_outlined, Icons.battery_full, 'Battery'),
+      (Icons.videocam_outlined, Icons.videocam, 'CCTV'),
+    ];
+    final item = icons[index];
+    return Semantics(
+      button: true,
+      selected: true,
+      label: item.$3,
+      child: InkWell(
+        onTap: () => _navCollapsed.value = false,
+        borderRadius: BorderRadius.circular(28),
+        child: Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Container(
+              key: ValueKey(index),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primary,
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: 0.45),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
+              child: Icon(item.$2, size: 22, color: Colors.white),
             ),
           ),
         ),
