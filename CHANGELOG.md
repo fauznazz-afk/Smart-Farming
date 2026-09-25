@@ -10,6 +10,7 @@ All notable changes to this project are documented here.
 - Added live ThingsBoard telemetry over WebSocket with automatic reconnect and REST polling fallback.
 - Added custom telemetry chart ranges for up to 90 days with adaptive aggregation intervals.
 - Added a live/polling connection indicator to chart headers.
+- Added visible date-range calendar controls directly to PV, AC, and Battery chart headers.
 - Anchored the collapsed navigation control to the left so the panel visually shrinks from right to left without shifting the dashboard content.
 - Updated bottom navigation labels to English: `Overview`, `PV`, `AC`, `Battery`, and `CCTV`.
 - Added scroll-direction and distance thresholds to prevent accidental navigation transitions during small gestures.
@@ -18,6 +19,7 @@ All notable changes to this project are documented here.
 
 - Prevented the bottom navigation animation from changing the Scaffold layout height or causing the dashboard to disappear while scrolling.
 - Replaced abrupt navigation content switching with a crossfade and eased width animation.
+- Fixed the date-range picker failing to open when the current day was selected by normalizing picker dates and validating the initial range.
 
 ## [1.3.0] - 2026-09-25
 
