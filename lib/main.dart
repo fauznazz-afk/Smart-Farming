@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,11 +13,19 @@ import 'widgets/brand_logo.dart';
 import 'widgets/liquid_glass.dart';
 import 'services/alarm_notification_service.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await AlarmNotificationService.initialize();
-  await AlarmNotificationService.initializeBackgroundMonitoring();
   runApp(const PltsMonitoringApp());
+  unawaited(_initializeAlarmServices());
+}
+
+Future<void> _initializeAlarmServices() async {
+  try {
+    await AlarmNotificationService.initialize();
+    await AlarmNotificationService.initializeBackgroundMonitoring();
+  } catch (error) {
+    debugPrint('Alarm notification initialization failed: $error');
+  }
 }
 
 class PltsMonitoringApp extends StatefulWidget {
