@@ -94,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _humidityMaxController = TextEditingController();
   final _tdsMinController = TextEditingController();
   final _tdsMaxController = TextEditingController();
+  final _dailyProductionTargetController = TextEditingController();
   bool _autoRefresh = true;
   int _refreshSeconds = 10;
   bool _energyAlertsEnabled = true;
@@ -121,6 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _humidityMaxController.dispose();
     _tdsMinController.dispose();
     _tdsMaxController.dispose();
+    _dailyProductionTargetController.dispose();
     super.dispose();
   }
 
@@ -151,6 +153,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           preferences.getString('environment_tds_min') ?? '';
       _tdsMaxController.text =
           preferences.getString('environment_tds_max') ?? '';
+      _dailyProductionTargetController.text =
+          preferences.getString('daily_production_target_kwh') ?? '';
       _selectedSeed = widget.themeController.seedColor;
     });
   }
@@ -209,17 +213,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveSettings() async {
     if (_saving) return;
     final environmentRangeError =
-        _validateEnvironmentRange('suhu', _ambientTempMinController,
-            _ambientTempMaxController,
-            allowedMinimum: -40, allowedMaximum: 100) ??
-        _validateEnvironmentRange('kelembapan', _humidityMinController,
-            _humidityMaxController,
-            allowedMinimum: 0, allowedMaximum: 100) ??
-        _validateEnvironmentRange('TDS', _tdsMinController, _tdsMaxController,
-            allowedMinimum: 0);
+        _validateEnvironmentRange(
+          'suhu',
+          _ambientTempMinController,
+          _ambientTempMaxController,
+          allowedMinimum: -40,
+          allowedMaximum: 100,
+        ) ??
+        _validateEnvironmentRange(
+          'kelembapan',
+          _humidityMinController,
+          _humidityMaxController,
+          allowedMinimum: 0,
+          allowedMaximum: 100,
+        ) ??
+        _validateEnvironmentRange(
+          'TDS',
+          _tdsMinController,
+          _tdsMaxController,
+          allowedMinimum: 0,
+        );
     if (environmentRangeError != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(environmentRangeError)));
+      return;
+    }
+    final targetText = _dailyProductionTargetController.text.trim();
+    final target = targetText.isEmpty ? null : double.tryParse(targetText);
+    if (targetText.isNotEmpty && (target == null || target <= 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(environmentRangeError)),
+        const SnackBar(
+          content: Text(
+            'Target produksi harus berupa angka lebih besar dari 0.',
+          ),
+        ),
       );
       return;
     }
@@ -234,17 +261,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ].every((controller) => controller.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Isi minimal satu batas sensor untuk mengaktifkan peringatan.'),
+          content: Text(
+            'Isi minimal satu batas sensor untuk mengaktifkan peringatan.',
+          ),
         ),
       );
       return;
     }
     final url = parseAllowedCctvUrl(_cctvUrlController.text);
     if (url == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(
-        content: Text('CCTV URL harus HTTPS dan memakai host resmi'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('CCTV URL harus HTTPS dan memakai host resmi'),
+        ),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -257,10 +287,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _environmentAlertsEnabled,
     );
     await preferences.setInt('low_soc_threshold', _lowSocThreshold);
-    await preferences.setInt(
-      'stale_telemetry_minutes',
-      _staleTelemetryMinutes,
-    );
+    await preferences.setInt('stale_telemetry_minutes', _staleTelemetryMinutes);
+    if (target == null) {
+      await preferences.remove('daily_production_target_kwh');
+    } else {
+      await preferences.setString(
+        'daily_production_target_kwh',
+        target.toString(),
+      );
+    }
     await preferences.setString('cctv_url', url.toString());
     await _saveOptionalThreshold(
       preferences,
@@ -301,7 +336,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Logout?'),
-        content: const Text('Your saved session will be cleared from this device.'),
+        content: const Text(
+          'Your saved session will be cleared from this device.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -328,9 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
@@ -347,7 +382,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: theme.colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, color: theme.colorScheme.onPrimary, size: 19),
+                    child: Icon(
+                      icon,
+                      color: theme.colorScheme.onPrimary,
+                      size: 19,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -391,51 +430,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     TextEditingController minimum,
     TextEditingController maximum,
   ) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    padding: const EdgeInsets.only(top: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 6),
+        Row(
           children: [
-            Text(label, style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: minimum,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: InputDecoration(labelText: 'Min ($unit)'),
-                  ),
+            Expanded(
+              child: TextField(
+                controller: minimum,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: maximum,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: InputDecoration(labelText: 'Max ($unit)'),
-                  ),
+                decoration: InputDecoration(labelText: 'Min ($unit)'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: maximum,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
                 ),
-              ],
+                decoration: InputDecoration(labelText: 'Max ($unit)'),
+              ),
             ),
           ],
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _saveButton() => FilledButton.icon(
-        onPressed: _saving ? null : _saveSettings,
-        icon: _saving
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.save),
-        label: Text(_saving ? 'Saving...' : 'Save settings'),
-      );
+    onPressed: _saving ? null : _saveSettings,
+    icon: _saving
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.save),
+    label: Text(_saving ? 'Saving...' : 'Save settings'),
+  );
 
   // ---------------------------------------------------------------------------
   // Category list (main page)
@@ -524,215 +563,209 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   List<Widget> _appearanceChildren() => [
-        SegmentedButton<ThemeMode>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: ThemeMode.system,
-              label: Text('System'),
-              icon: Icon(Icons.settings_suggest_outlined),
-            ),
-            ButtonSegment(
-              value: ThemeMode.light,
-              label: Text('Light'),
-              icon: Icon(Icons.light_mode_outlined),
-            ),
-            ButtonSegment(
-              value: ThemeMode.dark,
-              label: Text('Dark'),
-              icon: Icon(Icons.dark_mode_outlined),
-            ),
-          ],
-          selected: {widget.themeController.themeMode},
-          onSelectionChanged: (selection) {
-            widget.themeController.setThemeMode(selection.first);
-            setState(() {});
+    SegmentedButton<ThemeMode>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: ThemeMode.system,
+          label: Text('System'),
+          icon: Icon(Icons.settings_suggest_outlined),
+        ),
+        ButtonSegment(
+          value: ThemeMode.light,
+          label: Text('Light'),
+          icon: Icon(Icons.light_mode_outlined),
+        ),
+        ButtonSegment(
+          value: ThemeMode.dark,
+          label: Text('Dark'),
+          icon: Icon(Icons.dark_mode_outlined),
+        ),
+      ],
+      selected: {widget.themeController.themeMode},
+      onSelectionChanged: (selection) {
+        widget.themeController.setThemeMode(selection.first);
+        setState(() {});
+      },
+    ),
+    const SizedBox(height: 18),
+    const Text('Accent color', style: TextStyle(fontWeight: FontWeight.w700)),
+    const SizedBox(height: 8),
+    Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _paletteOptions.entries.map((entry) {
+        final selected = _selectedSeed.toARGB32() == entry.value.toARGB32();
+        return ChoiceChip(
+          label: Text(entry.key),
+          selected: selected,
+          avatar: CircleAvatar(radius: 9, backgroundColor: entry.value),
+          onSelected: (_) {
+            setState(() => _selectedSeed = entry.value);
+            widget.themeController.setSeedColor(entry.value);
           },
-        ),
-        const SizedBox(height: 18),
-        const Text(
-          'Accent color',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _paletteOptions.entries.map((entry) {
-            final selected =
-                _selectedSeed.toARGB32() == entry.value.toARGB32();
-            return ChoiceChip(
-              label: Text(entry.key),
-              selected: selected,
-              avatar: CircleAvatar(
-                radius: 9,
-                backgroundColor: entry.value,
-              ),
-              onSelected: (_) {
-                setState(() => _selectedSeed = entry.value);
-                widget.themeController.setSeedColor(entry.value);
-              },
-            );
-          }).toList(),
-        ),
-      ];
+        );
+      }).toList(),
+    ),
+  ];
 
   List<Widget> _monitoringChildren() => [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Auto refresh telemetry'),
-          value: _autoRefresh,
-          onChanged: (value) => setState(() => _autoRefresh = value),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<int>(
-          initialValue: _refreshSeconds,
-          decoration: const InputDecoration(
-            labelText: 'Refresh interval',
-          ),
-          items: const [5, 10, 30, 60]
-              .map(
-                (seconds) => DropdownMenuItem(
-                  value: seconds,
-                  child: Text('$seconds seconds'),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value != null) setState(() => _refreshSeconds = value);
-          },
-        ),
-      ];
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Auto refresh telemetry'),
+      value: _autoRefresh,
+      onChanged: (value) => setState(() => _autoRefresh = value),
+    ),
+    const SizedBox(height: 8),
+    DropdownButtonFormField<int>(
+      initialValue: _refreshSeconds,
+      decoration: const InputDecoration(labelText: 'Refresh interval'),
+      items: const [5, 10, 30, 60]
+          .map(
+            (seconds) => DropdownMenuItem(
+              value: seconds,
+              child: Text('$seconds seconds'),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        if (value != null) setState(() => _refreshSeconds = value);
+      },
+    ),
+  ];
 
   List<Widget> _energyAlertsChildren() => [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Enable energy alerts'),
-          subtitle: const Text(
-            'In-app alerts appear while the dashboard is open.',
-          ),
-          value: _energyAlertsEnabled,
-          onChanged: (value) =>
-              setState(() => _energyAlertsEnabled = value),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<int>(
-          initialValue: _lowSocThreshold,
-          decoration: const InputDecoration(
-            labelText: 'Warn when battery SOC falls below',
-          ),
-          items: const [10, 15, 20, 25, 30, 40, 50]
-              .map((value) => DropdownMenuItem(
-                    value: value,
-                    child: Text('$value%'),
-                  ))
-              .toList(),
-          onChanged: _energyAlertsEnabled
-              ? (value) {
-                  if (value != null) {
-                    setState(() => _lowSocThreshold = value);
-                  }
-                }
-              : null,
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<int>(
-          initialValue: _staleTelemetryMinutes,
-          decoration: const InputDecoration(
-            labelText: 'Warn when telemetry is older than',
-          ),
-          items: const [5, 10, 15, 30, 60]
-              .map((value) => DropdownMenuItem(
-                    value: value,
-                    child: Text('$value minutes'),
-                  ))
-              .toList(),
-          onChanged: _energyAlertsEnabled
-              ? (value) {
-                  if (value != null) {
-                    setState(() => _staleTelemetryMinutes = value);
-                  }
-                }
-              : null,
-        ),
-      ];
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Enable energy alerts'),
+      subtitle: const Text('In-app alerts appear while the dashboard is open.'),
+      value: _energyAlertsEnabled,
+      onChanged: (value) => setState(() => _energyAlertsEnabled = value),
+    ),
+    const SizedBox(height: 8),
+    DropdownButtonFormField<int>(
+      initialValue: _lowSocThreshold,
+      decoration: const InputDecoration(
+        labelText: 'Warn when battery SOC falls below',
+      ),
+      items: const [10, 15, 20, 25, 30, 40, 50]
+          .map(
+            (value) => DropdownMenuItem(value: value, child: Text('$value%')),
+          )
+          .toList(),
+      onChanged: _energyAlertsEnabled
+          ? (value) {
+              if (value != null) {
+                setState(() => _lowSocThreshold = value);
+              }
+            }
+          : null,
+    ),
+    const SizedBox(height: 12),
+    DropdownButtonFormField<int>(
+      initialValue: _staleTelemetryMinutes,
+      decoration: const InputDecoration(
+        labelText: 'Warn when telemetry is older than',
+      ),
+      items: const [5, 10, 15, 30, 60]
+          .map(
+            (value) =>
+                DropdownMenuItem(value: value, child: Text('$value minutes')),
+          )
+          .toList(),
+      onChanged: _energyAlertsEnabled
+          ? (value) {
+              if (value != null) {
+                setState(() => _staleTelemetryMinutes = value);
+              }
+            }
+          : null,
+    ),
+    const SizedBox(height: 12),
+    TextField(
+      controller: _dailyProductionTargetController,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Daily production target',
+        suffixText: 'kWh',
+        helperText: 'Leave blank to hide target progress.',
+      ),
+    ),
+  ];
 
   List<Widget> _environmentAlertsChildren() => [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Enable environment alerts'),
-          subtitle: const Text(
-            'Alerts appear in the app when fresh sensor values cross a limit.',
-          ),
-          value: _environmentAlertsEnabled,
-          onChanged: (value) =>
-              setState(() => _environmentAlertsEnabled = value),
-        ),
-        _environmentRangeFields(
-          'Ambient temperature',
-          '°C',
-          _ambientTempMinController,
-          _ambientTempMaxController,
-        ),
-        _environmentRangeFields(
-          'Humidity',
-          '%',
-          _humidityMinController,
-          _humidityMaxController,
-        ),
-        _environmentRangeFields(
-          'Water TDS',
-          'ppm',
-          _tdsMinController,
-          _tdsMaxController,
-        ),
-      ];
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Enable environment alerts'),
+      subtitle: const Text(
+        'Alerts appear in the app when fresh sensor values cross a limit.',
+      ),
+      value: _environmentAlertsEnabled,
+      onChanged: (value) => setState(() => _environmentAlertsEnabled = value),
+    ),
+    _environmentRangeFields(
+      'Ambient temperature',
+      '°C',
+      _ambientTempMinController,
+      _ambientTempMaxController,
+    ),
+    _environmentRangeFields(
+      'Humidity',
+      '%',
+      _humidityMinController,
+      _humidityMaxController,
+    ),
+    _environmentRangeFields(
+      'Water TDS',
+      'ppm',
+      _tdsMinController,
+      _tdsMaxController,
+    ),
+  ];
 
   List<Widget> _cctvChildren() => [
-        TextField(
-          controller: _cctvUrlController,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'Stream URL',
-            prefixIcon: Icon(Icons.link),
-          ),
-        ),
-      ];
+    TextField(
+      controller: _cctvUrlController,
+      keyboardType: TextInputType.url,
+      decoration: const InputDecoration(
+        labelText: 'Stream URL',
+        prefixIcon: Icon(Icons.link),
+      ),
+    ),
+  ];
 
   List<Widget> _performanceChildren() => [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Smooth Glass Mode'),
-          subtitle: Text(
-            widget.themeController.performanceMode
-                ? 'Optimized rendering is enabled'
-                : 'Full backdrop blur is enabled',
-          ),
-          value: widget.themeController.performanceMode,
-          onChanged: (value) {
-            widget.themeController.setPerformanceMode(value);
-            setState(() {});
-          },
-        ),
-      ];
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Smooth Glass Mode'),
+      subtitle: Text(
+        widget.themeController.performanceMode
+            ? 'Optimized rendering is enabled'
+            : 'Full backdrop blur is enabled',
+      ),
+      value: widget.themeController.performanceMode,
+      onChanged: (value) {
+        widget.themeController.setPerformanceMode(value);
+        setState(() {});
+      },
+    ),
+  ];
 
   List<Widget> _aboutChildren() => [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('EnerGrow monitoring application'),
-          trailing: Text(
-            _appVersion == null ? 'Loading…' : 'v$_appVersion',
-          ),
-        ),
-      ];
+    ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('EnerGrow monitoring application'),
+      trailing: Text(_appVersion == null ? 'Loading…' : 'v$_appVersion'),
+    ),
+  ];
 
   List<Widget> _accountChildren() => [
-        OutlinedButton.icon(
-          onPressed: _confirmLogout,
-          icon: const Icon(Icons.logout),
-          label: const Text('Logout'),
-        ),
-      ];
+    OutlinedButton.icon(
+      onPressed: _confirmLogout,
+      icon: const Icon(Icons.logout),
+      label: const Text('Logout'),
+    ),
+  ];
 
   // ---------------------------------------------------------------------------
   // Build
@@ -741,7 +774,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final viewingDetail = _selectedSection != null;
-    final title = viewingDetail ? _sections[_selectedSection!].title : 'Settings';
+    final title = viewingDetail
+        ? _sections[_selectedSection!].title
+        : 'Settings';
     return PopScope(
       canPop: !viewingDetail,
       onPopInvokedWithResult: (didPop, _) {

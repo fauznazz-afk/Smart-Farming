@@ -97,6 +97,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   double? _environmentHumidityMax;
   double? _environmentTdsMin;
   double? _environmentTdsMax;
+  double? _dailyProductionTargetKwh;
   Set<String> _activeAlertIds = {};
   final _alarmHistoryService = AlarmHistoryService();
   final _connectionHealth = ConnectionHealthService();
@@ -267,6 +268,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
       _environmentTdsMax = double.tryParse(
         preferences.getString('environment_tds_max') ?? '',
+      );
+      _dailyProductionTargetKwh = double.tryParse(
+        preferences.getString('daily_production_target_kwh') ?? '',
       );
       _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
     });
@@ -1653,6 +1657,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final result = _energyForecastService.calculate(
       history: _energyHistory,
       latest: latest,
+      dailyProductionTargetKwh: _dailyProductionTargetKwh,
     );
     return EnergyForecastCard(
       result: result,
