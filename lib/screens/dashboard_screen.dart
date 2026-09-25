@@ -8,11 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
 import '../services/alarm_history_service.dart';
+import '../services/connection_health_service.dart';
+import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
+import '../widgets/energy_forecast_card.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'energy_report_screen.dart';
@@ -96,6 +99,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   double? _environmentTdsMax;
   Set<String> _activeAlertIds = {};
   final _alarmHistoryService = AlarmHistoryService();
+  final _connectionHealth = ConnectionHealthService();
+  static const _energyForecastService = EnergyForecastService();
   bool _isOfflineMode = false;
   DateTime? _cachedTelemetryTime;
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
@@ -104,6 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   late final Listenable _connectionChromeListenable = Listenable.merge([
     _liveRevision,
     _connectionStatusVisible,
+    _connectionHealth,
   ]);
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
   late final ThingsBoardRealtimeService _realtimeService =
@@ -271,16 +277,34 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _restartRefreshTimer() {
     _refreshTimer?.cancel();
     if (_autoRefresh) {
-      _refreshTimer = Timer.periodic(
-        Duration(seconds: _refreshSeconds),
-        (_) => _fetchAll(),
-      );
+      _connectionHealth.markConnected(ConnectionTransport.polling);
+      _refreshTimer = Timer.periodic(Duration(seconds: _refreshSeconds), (
+        _,
+      ) async {
+        final started = DateTime.now();
+        await _fetchAll();
+        if (_error == null) {
+          _connectionHealth.markSuccess(
+            ConnectionTransport.polling,
+            latency: DateTime.now().difference(started),
+          );
+        } else {
+          _connectionHealth.markError(
+            ConnectionTransport.polling,
+            degraded: true,
+          );
+        }
+      });
+    } else {
+      _connectionHealth.markDisconnected(ConnectionTransport.polling);
     }
   }
 
   Future<void> _fetchAll() async {
     if (_telemetryRequestInFlight) return;
     _telemetryRequestInFlight = true;
+    final started = DateTime.now();
+    _connectionHealth.markConnecting(ConnectionTransport.rest);
     try {
       final results = await Future.wait([
         widget.api.fetchBatteryData(),
@@ -309,6 +333,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       _loading = false;
       _error = null;
       _isOfflineMode = false;
+      _connectionHealth.markSuccess(
+        ConnectionTransport.rest,
+        latency: DateTime.now().difference(started),
+        updatedAt: now,
+      );
       if (changed || timestampChanged) {
         if (wasLoading) {
           if (mounted) setState(() {});
@@ -323,6 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         unawaited(_fetchEnergyHistory());
       }
     } catch (error) {
+      _connectionHealth.markError(ConnectionTransport.rest, degraded: true);
       if (!mounted) return;
       if (error.toString().contains('Token expired')) {
         await widget.api.logout();
@@ -423,6 +453,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _handleRealtimeConnection(bool connected) {
     if (!mounted || _realtimeConnected == connected) return;
     setState(() => _realtimeConnected = connected);
+    if (connected) {
+      _connectionHealth.markConnected(ConnectionTransport.webSocket);
+    } else {
+      _connectionHealth.markDisconnected(ConnectionTransport.webSocket);
+    }
   }
 
   void _handleRealtimeTelemetry(
@@ -462,6 +497,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
     final wasLoading = _loading;
+    _connectionHealth.markSuccess(
+      ConnectionTransport.webSocket,
+      latency: DateTime.now().difference(values.values.first.timestamp),
+      updatedAt: latest,
+    );
     _isOfflineMode = false;
     _lastSuccessfulTelemetryAt = DateTime.now();
     _error = null;
@@ -1573,6 +1613,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         () => _energySummaryCard(isDark),
       ),
       () => const SizedBox(height: 12),
+      () => _bindRevision(
+        Listenable.merge([_energyRevision, _liveRevision]),
+        isDark,
+        () => _energyForecastCard(isDark),
+      ),
+      () => const SizedBox(height: 12),
       () => _bindRevision(_liveRevision, isDark, () => _dualCards(isDark)),
       () => const SizedBox(height: 12),
       () =>
@@ -1596,6 +1642,22 @@ class _DashboardScreenState extends State<DashboardScreen>
       previousLoadKwh: _previousLoadKwh,
       onRangeChanged: _setWeeklyEnergySummary,
       onOpenReport: _openEnergyReport,
+    );
+  }
+
+  Widget _energyForecastCard(bool isDark) {
+    final latest = <String, double>{
+      ...?_battery?.latestValues,
+      ...?_pzem?.latestValues,
+    };
+    final result = _energyForecastService.calculate(
+      history: _energyHistory,
+      latest: latest,
+    );
+    return EnergyForecastCard(
+      result: result,
+      isDark: isDark,
+      performanceMode: _performanceMode,
     );
   }
 
@@ -2872,11 +2934,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         ? Colors.orange.shade800
         : Colors.green;
     final lastUpdate = _lastSuccessfulTelemetryAt;
+    final health = _connectionHealth.health;
     final label = failed
         ? 'ThingsBoard gagal'
         : stale
         ? 'Terhubung · stale: ${staleNames.join(', ')}'
-        : 'ThingsBoard terhubung';
+        : health.statusMessage;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AnimatedSwitcher(
@@ -2910,7 +2973,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                 children: [
                   ExcludeSemantics(
                     child: Icon(
-                      failed ? Icons.cloud_off : Icons.cloud_done_outlined,
+                      failed
+                          ? Icons.cloud_off
+                          : health.isHealthy
+                          ? Icons.cloud_done_outlined
+                          : Icons.cloud_off_outlined,
                       color: color,
                       size: 17,
                     ),

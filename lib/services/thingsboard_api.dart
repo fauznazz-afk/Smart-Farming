@@ -31,6 +31,8 @@ class ThingsBoardApi {
   String? _token;
   String? _refreshToken;
   Future<_TokenRefreshResult>? _refreshInFlight;
+  // Invalidates a refresh that completes after an explicit logout.
+  int _sessionVersion = 0;
 
   /// Login pakai customer user, simpan token ke secure storage.
   Future<bool> login(String username, String password) async {
@@ -47,6 +49,7 @@ class ThingsBoardApi {
       final data = jsonDecode(response.body);
       final token = data['token'];
       if (token is! String || token.isEmpty) return false;
+      _sessionVersion++;
       _token = token;
       final refreshToken = data['refreshToken'];
       _refreshToken = refreshToken is String && refreshToken.isNotEmpty
@@ -90,6 +93,7 @@ class ThingsBoardApi {
   }
 
   Future<void> logout() async {
+    _sessionVersion++;
     await _secureStorage.delete(key: 'tb_token');
     await _secureStorage.delete(key: 'tb_refresh_token');
     await _removeLegacyCredentials();
@@ -138,7 +142,7 @@ class ThingsBoardApi {
     await legacyPreferences.remove('tb_refresh_token');
   }
 
-  bool get isLoggedIn => _token != null;
+  bool get isLoggedIn => _token != null && _token!.isNotEmpty;
 
   String? get accessToken => _token;
 
@@ -148,7 +152,11 @@ class ThingsBoardApi {
     return base.replace(
       scheme: scheme,
       path: '${base.path}/api/ws/plugins/telemetry',
-      queryParameters: {'token': _token ?? ''},
+      // ThingsBoard requires the JWT in this WebSocket query parameter.
+      // Avoid emitting token= for an unauthenticated connection attempt.
+      queryParameters: _token == null || _token!.isEmpty
+          ? null
+          : {'token': _token!},
     );
   }
 
@@ -190,6 +198,7 @@ class ThingsBoardApi {
 
   Future<_TokenRefreshResult> _performTokenRefresh() async {
     final refreshToken = _refreshToken;
+    final sessionVersion = _sessionVersion;
     if (refreshToken == null || refreshToken.isEmpty) {
       await logout();
       return _TokenRefreshResult.rejected;
@@ -219,6 +228,11 @@ class ThingsBoardApi {
       final token = data['token'];
       if (token is! String || token.isEmpty) {
         return _TokenRefreshResult.unavailable;
+      }
+      // Do not resurrect a session after logout while this request was in
+      // flight.
+      if (sessionVersion != _sessionVersion || refreshToken != _refreshToken) {
+        return _TokenRefreshResult.rejected;
       }
       final nextRefreshToken = data['refreshToken'];
       final refreshedToken =
@@ -447,13 +461,8 @@ class ThingsBoardApi {
     } else if (response.statusCode == 401) {
       throw Exception('Token expired, silakan login ulang');
     } else {
-      final detail = response.body.trim();
-      final message = detail.length > 400
-          ? '${detail.substring(0, 400)}…'
-          : detail;
       throw Exception(
-        'Gagal fetch history: ${response.statusCode}'
-        '${message.isEmpty ? '' : ' — $message'}',
+        'Gagal fetch history: ${response.statusCode}',
       );
     }
   }

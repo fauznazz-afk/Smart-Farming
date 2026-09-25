@@ -10,6 +10,10 @@ All notable changes to this project are documented here.
 - Added live ThingsBoard telemetry over WebSocket with automatic reconnect and REST polling fallback.
 - Added custom telemetry chart ranges for up to 90 days with adaptive aggregation intervals.
 - Added a live/polling connection indicator to chart headers.
+- Added connection health tracking for REST, WebSocket, and polling transports, including reconnect count and last successful update.
+- Added energy analytics for production forecasting, target comparison, peak usage, and estimated battery runway.
+- Added alarm deduplication, acknowledgement/resolution workflow, reopening, and severity/status filters.
+- Hardened session refresh invalidation, token validation, WebSocket authentication guards, and API error handling.
 - Added visible date-range calendar controls directly to PV, AC, and Battery chart headers.
 - Anchored the collapsed navigation control to the left so the panel visually shrinks from right to left without shifting the dashboard content.
 - Updated bottom navigation labels to English: `Overview`, `PV`, `AC`, `Battery`, and `CCTV`.
@@ -20,6 +24,7 @@ All notable changes to this project are documented here.
 - Prevented the bottom navigation animation from changing the Scaffold layout height or causing the dashboard to disappear while scrolling.
 - Replaced abrupt navigation content switching with a crossfade and eased width animation.
 - Fixed the date-range picker failing to open when the current day was selected by normalizing picker dates and validating the initial range.
+- Optimized forecast calculations by removing redundant combined-history sorting and allocations.
 
 ## [1.3.0] - 2026-09-25
 

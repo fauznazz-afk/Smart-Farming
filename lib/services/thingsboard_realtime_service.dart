@@ -52,7 +52,8 @@ class ThingsBoardRealtimeService {
   }
 
   Future<void> _connect() async {
-    if (!_running || api.accessToken == null) return;
+    final token = api.accessToken;
+    if (!_running || token == null || token.isEmpty) return;
     try {
       final channel = WebSocketChannel.connect(api.telemetryWebSocketUri);
       _channel = channel;
