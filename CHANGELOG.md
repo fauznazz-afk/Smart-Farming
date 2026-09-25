@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased] - 2026-09-25
+
+### Improved
+
+- Added a smooth bottom navigation collapse while scrolling down on dashboard pages.
+- Anchored the collapsed navigation control to the left so the panel visually shrinks from right to left without shifting the dashboard content.
+- Updated bottom navigation labels to English: `Overview`, `PV`, `AC`, `Battery`, and `CCTV`.
+- Added scroll-direction and distance thresholds to prevent accidental navigation transitions during small gestures.
+
+### Fixed
+
+- Prevented the bottom navigation animation from changing the Scaffold layout height or causing the dashboard to disappear while scrolling.
+- Replaced abrupt navigation content switching with a crossfade and eased width animation.
+
 ## [1.3.0] - 2026-09-25
 
 ### Added
