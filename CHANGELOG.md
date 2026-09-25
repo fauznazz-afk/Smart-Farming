@@ -30,6 +30,7 @@ All notable changes to this project are documented here.
 - Forecast progress now refreshes after the daily target is changed in Settings.
 - Forecast calculations now use today's PV production and show the actual energy accumulated today.
 - Added local alarm notifications when alarms are detected during active monitoring.
+- Added periodic Android background alarm checks with local notifications after reboot.
 - Kept the detailed energy report flow for historical charts, custom ranges, and CSV export.
 
 ## [1.3.0] - 2026-09-25

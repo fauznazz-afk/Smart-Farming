@@ -14,6 +14,7 @@ import 'services/alarm_notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AlarmNotificationService.initialize();
+  await AlarmNotificationService.initializeBackgroundMonitoring();
   runApp(const PltsMonitoringApp());
 }
 
