@@ -12,6 +12,7 @@ import '../services/alarm_notification_service.dart';
 import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
+import '../services/cctv_url.dart';
 import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
@@ -272,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _dailyProductionTargetKwh = double.tryParse(
         preferences.getString('daily_production_target_kwh') ?? '',
       );
-      _cctvUrl = preferences.getString('cctv_url') ?? defaultCctvUrl;
+      _cctvUrl = await CctvUrl.loadCctvUrl();
     });
     _restartRefreshTimer();
     _evaluateEnergyAlerts();

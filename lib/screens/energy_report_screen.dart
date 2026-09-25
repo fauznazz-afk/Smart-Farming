@@ -5,6 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:csv/csv';
 
 import '../services/energy_report_service.dart';
 import '../services/thingsboard_api.dart';
@@ -804,6 +806,96 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
       ),
     ),
   );
+Future<void> _shareReport(List<EnergyBucket> buckets) async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final csv = _bucketsToCsv(buckets);
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File('${dir.path}/plts_laporan_$timestamp.csv');
+      await file.writeAsString(csv);
+      await SharePlus.shareFiles(
+        [file.path],
+        text: 'Laporan energi PLTS',
+        subject: 'Laporan Produksi dan Konsumsi Energi',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengekspor laporan: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  String _bucketsToCsv(List<EnergyBucket> buckets) {
+    final rows = <List<dynamic>>[
+      ['Jam', 'Produksi PV (kWh)', 'Konsumsi AC (kWh)', 'Jumlah Sampel'],
+    ];
+    for (final bucket in buckets) {
+      rows.add([
+        _monthly
+            ? '${bucket.hour.day}/${bucket.hour.month}/${bucket.hour.year}'
+            : '${bucket.hour.hour.toString().padLeft(2, '0')}:00',
+        bucket.pvKwh.toStringAsFixed(3),
+        bucket.acKwh.toStringAsFixed(3),
+        bucket.sampleCount,
+      ]);
+    }
+    // Tambahkan total
+    final totalPv = buckets.fold(0.0, (sum, b) => sum + b.pvKwh);
+    final totalAc = buckets.fold(0.0, (sum, b) => sum + b.acKwh;
+    final totalSamples = buckets.fold(0, (sum, b) => sum + b.sampleCount);
+    rows.add(['TOTAL', totalPv.toStringAsFixed(3), totalAc.toStringAsFixed(3), totalSamples]);
+    return const ListToCsvConverter().convert(rows);
+  }
 }
+Future<void> _shareReport(List<EnergyBucket> buckets) async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final csv = _bucketsToCsv(buckets);
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File('${dir.path}/plts_laporan_$timestamp.csv');
+      await file.writeAsString(csv);
+      await Share.shareFiles(
+        [file.path],
+        text: 'Laporan energi PLTS',
+        subject: 'Laporan Produksi dan Konsumsi Energi',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengekspor laporan: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  String _bucketsToCsv(List<EnergyBucket> buckets) {
+    final rows = <List<dynamic>>[
+      ['Jam', 'Produksi PV (kWh)', 'Konsumsi AC (kWh)', 'Jumlah Sampel'],
+    ];
+    for (final bucket in buckets) {
+      rows.add([
+        _monthly
+            ? '${bucket.hour.day}/${bucket.hour.month}/${bucket.hour.year}'
+            : '${bucket.hour.hour.toString().padLeft(2, '0')}:00',
+        bucket.pvKwh.toStringAsFixed(3),
+        bucket.acKwh.toStringAsFixed(3),
+        bucket.sampleCount,
+      ]);
+    }
+    // Tambahkan total
+    final totalPv = buckets.fold(0.0, (sum, b) => sum + b.pvKwh);
+    final totalAc = buckets.fold(0.0, (sum, b) => sum + b.acKwh);
+    final totalSamples = buckets.fold(0, (sum, b) => sum + b.sampleCount);
+    rows.add(['TOTAL', totalPv.toStringAsFixed(3), totalAc.toStringAsFixed(3), totalSamples]);
+    return const ListToCsvConverter().convert(rows);
+  }
 
 double mathMax(double a, double b) => a > b ? a : b;

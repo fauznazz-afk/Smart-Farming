@@ -87,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// `null` = category list; `0–7` = detail page for that section.
   int? _selectedSection;
 
-  final _cctvUrlController = TextEditingController(text: defaultCctvUrl);
+  late final TextEditingController _cctvUrlController;
   final _ambientTempMinController = TextEditingController();
   final _ambientTempMaxController = TextEditingController();
   final _humidityMinController = TextEditingController();
@@ -139,8 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
       _staleTelemetryMinutes =
           preferences.getInt('stale_telemetry_minutes') ?? 10;
-      _cctvUrlController.text =
-          preferences.getString('cctv_url') ?? defaultCctvUrl;
+      _cctvUrlController.text = await CctvUrl.loadCctvUrl();
       _ambientTempMinController.text =
           preferences.getString('environment_temp_min') ?? '';
       _ambientTempMaxController.text =
@@ -296,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         target.toString(),
       );
     }
-    await preferences.setString('cctv_url', url.toString());
+    await CctvUrl.saveCctvUrl(url.toString());
     await _saveOptionalThreshold(
       preferences,
       'environment_temp_min',
