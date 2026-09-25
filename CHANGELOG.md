@@ -16,6 +16,10 @@ All notable changes to this project are documented here.
 - Improved the ThingsBoard connection banner with a three-second display period and smooth fade/collapse exit animation.
 - Enhanced chart touch tooltips with one shared timestamp and combined `V`, `A`, and `W` values in a rounded frosted-transparent panel.
 - Rounded the saved-session logo shown on the biometric authentication screen.
+- Reduced dashboard rebuilds during telemetry updates by isolating live metrics, alerts, connection status, charts, and CCTV content with targeted listenables.
+- Added chart point processing and memoized statistics to reduce rendering work for large telemetry histories.
+- Improved energy report chart interaction and rendering with repaint isolation and a dedicated touch-state notifier.
+- Improved ambient glass rendering with repaint isolation for smoother scrolling and page transitions.
 
 ## [1.2.3] - 2026-09-24
 
