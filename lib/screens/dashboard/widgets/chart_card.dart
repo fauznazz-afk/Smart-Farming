@@ -5,6 +5,7 @@ import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
 import '../utils/date_helpers.dart';
+import '../utils/history_range.dart';
 
 /// Human readable name for a dashboard page prefix.
 String prefixTitle(String prefix) => switch (prefix) {
@@ -19,6 +20,7 @@ class ChartSectionHeader extends StatelessWidget {
     super.key,
     required this.title,
     required this.isDark,
+    required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
     required this.realtimeConnected,
@@ -27,6 +29,7 @@ class ChartSectionHeader extends StatelessWidget {
 
   final String title;
   final bool isDark;
+  final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final bool realtimeConnected;
@@ -34,10 +37,11 @@ class ChartSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rangeLabel = rangeStart != null && rangeEnd != null
-        ? '${rangeStart!.day}/${rangeStart!.month}/${rangeStart!.year}'
-              '–${rangeEnd!.day}/${rangeEnd!.month}/${rangeEnd!.year}'
-        : 'Last 24 hours';
+    final rangeLabel = describeHistoryRange(
+      selectedDate: selectedDate,
+      rangeStart: rangeStart,
+      rangeEnd: rangeEnd,
+    );
     return Row(
       children: [
         Expanded(
@@ -123,6 +127,7 @@ class TelemetryChartCard extends StatelessWidget {
     required this.stats,
     required this.boundsCache,
     required this.loading,
+    required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
     required this.onPointerActive,
@@ -136,6 +141,7 @@ class TelemetryChartCard extends StatelessWidget {
   final Map<String, SeriesStats?> stats;
   final Map<String, ChartBounds> boundsCache;
   final bool loading;
+  final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final ValueChanged<bool> onPointerActive;
@@ -155,7 +161,8 @@ class TelemetryChartCard extends StatelessWidget {
       performanceMode: performanceMode,
       height: 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel: '$title Voltage, Current, and Power chart showing ${_rangeLabel() ?? 'the last 24 hours'}',
+      semanticLabel: '$title Voltage, Current, and Power chart showing '
+          '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
       child: loading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
@@ -186,12 +193,6 @@ class TelemetryChartCard extends StatelessWidget {
               ],
             ),
     );
-  }
-
-  String? _rangeLabel() {
-    if (rangeStart == null || rangeEnd == null) return null;
-    return '${rangeStart!.day}/${rangeStart!.month}/${rangeStart!.year} '
-        'to ${rangeEnd!.day}/${rangeEnd!.month}/${rangeEnd!.year}';
   }
 
   List<ChartSeries> _buildSeries() {

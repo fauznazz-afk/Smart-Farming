@@ -178,16 +178,22 @@ class WeatherService {
 
   /// Initialize the weather service
   Future<void> initialize() async {
+    await reloadStoredConfig();
+
+    // Try to get current position
+    await _getCurrentPosition();
+  }
+
+  /// Re-reads the stored API key and cached location without touching GPS.
+  ///
+  /// The dashboard keeps one long-lived instance, so an API key added later in
+  /// Settings stays invisible to it until this is called.
+  Future<void> reloadStoredConfig() async {
     final prefs = await SharedPreferences.getInstance();
     _apiKey = prefs.getString(_apiKeyKey);
-    
-    // Try to get cached location
     _cachedLocationName = prefs.getString('${_locationKey}_name');
     _cachedLatitude = prefs.getDouble('${_locationKey}_lat');
     _cachedLongitude = prefs.getDouble('${_locationKey}_lon');
-    
-    // Try to get current position
-    await _getCurrentPosition();
   }
 
   /// Set API key

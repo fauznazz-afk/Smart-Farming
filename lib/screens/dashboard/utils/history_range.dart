@@ -104,3 +104,26 @@ HistoryWindow historyWindowFor({
     deviceId: historyDeviceForPrefix(prefix),
   );
 }
+
+String _dayMonthYear(DateTime value) =>
+    '${value.day}/${value.month}/${value.year}';
+
+/// Describes the currently selected telemetry range for the UI.
+///
+/// Mirrors [historyTimeWindow] so the label can never disagree with the window
+/// that was actually requested.
+String describeHistoryRange({
+  required DateTime selectedDate,
+  DateTime? rangeStart,
+  DateTime? rangeEnd,
+  DateTime? now,
+}) {
+  final reference = now ?? DateTime.now();
+  if (rangeStart != null && rangeEnd != null) {
+    return '${_dayMonthYear(rangeStart)} – ${_dayMonthYear(rangeEnd)}';
+  }
+  // No custom range: a single day is either today (rolling 24h) or a past day.
+  final day = rangeStart ?? startOfDay(selectedDate);
+  if (day == startOfDay(reference)) return 'Last 24 hours';
+  return _dayMonthYear(day);
+}

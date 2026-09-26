@@ -933,6 +933,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     if (changed == true) {
       _loadPreferences();
+      // The dashboard holds one long-lived weather service, so it has to be
+      // told to pick up an API key or city that was just saved in Settings.
+      await _weatherService.reloadStoredConfig();
       if (_weatherService.hasApiKey) {
         await _fetchWeather();
       }
@@ -1460,6 +1463,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return ChartSectionHeader(
       title: title,
       isDark: isDark,
+      selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
       realtimeConnected: _realtimeConnected,
@@ -1477,6 +1481,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       stats: _chartStats,
       boundsCache: _chartBounds,
       loading: _chartLoading,
+      selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
       onPointerActive: _setChartPointerActive,

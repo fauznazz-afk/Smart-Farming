@@ -146,6 +146,85 @@ void main() {
     });
   });
 
+  group('describeHistoryRange', () {
+    final now = DateTime(2026, 3, 10, 14, 30);
+
+    test('describes a custom range', () {
+      expect(
+        describeHistoryRange(
+          selectedDate: DateTime(2026, 3, 1),
+          rangeStart: DateTime(2026, 3, 1),
+          rangeEnd: DateTime(2026, 3, 5),
+          now: now,
+        ),
+        '1/3/2026 – 5/3/2026',
+      );
+    });
+
+    test('describes today as the rolling 24 hour window', () {
+      expect(
+        describeHistoryRange(
+          selectedDate: DateTime(2026, 3, 10, 9),
+          now: now,
+        ),
+        'Last 24 hours',
+      );
+    });
+
+    test('describes a selected past day instead of the last 24 hours', () {
+      expect(
+        describeHistoryRange(
+          selectedDate: DateTime(2026, 3, 5, 17, 45),
+          now: now,
+        ),
+        '5/3/2026',
+      );
+    });
+
+    test('a custom range wins over the selected day', () {
+      expect(
+        describeHistoryRange(
+          selectedDate: DateTime(2026, 3, 10),
+          rangeStart: DateTime(2026, 3, 2),
+          rangeEnd: DateTime(2026, 3, 4),
+          now: now,
+        ),
+        '2/3/2026 – 4/3/2026',
+      );
+    });
+
+    test('ignores the time component of the selected day', () {
+      final morning = describeHistoryRange(
+        selectedDate: DateTime(2026, 3, 10, 0, 1),
+        now: DateTime(2026, 3, 10, 0, 2),
+      );
+      final night = describeHistoryRange(
+        selectedDate: DateTime(2026, 3, 10, 23, 59),
+        now: DateTime(2026, 3, 10, 23, 59),
+      );
+      expect(morning, 'Last 24 hours');
+      expect(night, 'Last 24 hours');
+    });
+
+    test('label agrees with the window that was actually requested', () {
+      for (final day in [DateTime(2026, 3, 1), DateTime(2026, 3, 10)]) {
+        final label = describeHistoryRange(selectedDate: day, now: now);
+        final window = historyTimeWindow(
+          rangeStart: startOfDay(day),
+          rangeEnd: null,
+          now: now,
+        );
+        final isToday = startOfDay(day) == startOfDay(now);
+        expect(
+          isToday ? label == 'Last 24 hours' : label != 'Last 24 hours',
+          isTrue,
+          reason: 'label "$label" disagrees with the fetched window',
+        );
+        expect(window.end.isAfter(window.start), isTrue);
+      }
+    });
+  });
+
   group('splitCachedTelemetry', () {
     test('partitions a flat cache map per device', () {
       final split = splitCachedTelemetry({
