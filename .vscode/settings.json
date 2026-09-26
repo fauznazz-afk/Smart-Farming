@@ -1,6 +1,7 @@
 {
     "chat.tools.terminal.autoApprove": {
         "flutter": true,
-        "dart": true
+        "dart": true,
+        "C:\\src\\flutter\\bin\\flutter.bat": true
     }
 }

@@ -14,6 +14,7 @@ import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/cctv_url.dart';
 import '../services/thingsboard_realtime_service.dart';
+import '../services/weather_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/energy_summary_card.dart';
@@ -27,6 +28,7 @@ import 'dashboard/utils/alarm_helpers.dart';
 import 'dashboard/utils/bound.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/date_helpers.dart';
+import 'dashboard/widgets/weather_card.dart';
 
 // ── File-level accent colours & tint helpers ──────────────────────────────────
 
@@ -127,6 +129,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
   bool _realtimeConnected = false;
 
+  // Weather service
+  final _weatherService = WeatherService();
+  WeatherData? _currentWeather;
+  WeatherForecast? _weatherForecast;
+  bool _weatherLoading = false;
+  String? _weatherError;
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
   @override
   void initState() {
@@ -138,6 +147,40 @@ class _DashboardScreenState extends State<DashboardScreen>
     _fetchEnergyHistory();
     _loadPreferences();
     _loadDisplayName();
+    _initializeWeatherService();
+  }
+
+  Future<void> _initializeWeatherService() async {
+    await _weatherService.initialize();
+    if (_weatherService.hasApiKey) {
+      await _fetchWeather();
+    }
+  }
+
+  Future<void> _fetchWeather() async {
+    if (!_weatherService.hasApiKey) return;
+    setState(() {
+      _weatherLoading = true;
+      _weatherError = null;
+    });
+    try {
+      final weather = await _weatherService.getCurrentWeather();
+      final forecast = await _weatherService.getForecast();
+      if (mounted) {
+        setState(() {
+          _currentWeather = weather;
+          _weatherForecast = forecast;
+          _weatherLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _weatherLoading = false;
+          _weatherError = e.toString();
+        });
+      }
+    }
   }
 
   @override
@@ -1025,7 +1068,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
     );
-    if (changed == true) _loadPreferences();
+    if (changed == true) {
+      _loadPreferences();
+      // Refresh weather data with new API key/location
+      if (_weatherService.hasApiKey) {
+        await _fetchWeather();
+      }
+    }
   }
 
   void _openAlarmHistory() {
@@ -1556,6 +1605,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => _dateStrip(isDark),
       () => const SizedBox(height: 20),
       () => _bindRevision(_liveRevision, isDark, () => _heroCard(isDark)),
+      () => const SizedBox(height: 12),
+      () => WeatherCard(
+        weather: _currentWeather,
+        forecast: _weatherForecast,
+        isDark: isDark,
+        performanceMode: _performanceMode,
+        onRefresh: _fetchWeather,
+        onSettings: _openSettings,
+        isLoading: _weatherLoading,
+        error: _weatherError,
+      ),
       () => const SizedBox(height: 12),
       () => _bindRevision(
         _energyRevision,

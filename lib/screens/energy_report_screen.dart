@@ -158,7 +158,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Laporan energi'),
+        title: const Text('Energi Analytics'),
         actions: [
           IconButton(
             tooltip: 'Segarkan laporan',

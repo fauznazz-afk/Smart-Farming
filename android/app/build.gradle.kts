@@ -14,7 +14,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.example.plts_monitoring"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "30.0.16248370"
 
     compileOptions {

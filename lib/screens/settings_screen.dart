@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/cctv_url.dart';
+import '../services/weather_service.dart';
 import '../theme/app_theme_controller.dart';
 
 const defaultCctvUrl = 'https://cctv.mbkm20262027.tech/stream.html?src=cam1';
@@ -55,6 +56,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: _buildEnvironmentAlerts,
     ),
     _Section(
+      title: 'Weather',
+      subtitle: 'Configure OpenWeatherMap API and location.',
+      icon: Icons.cloud_outlined,
+      builder: _buildWeather,
+    ),
+    _Section(
       title: 'CCTV source',
       subtitle: 'Set the secure camera stream page.',
       icon: Icons.videocam_outlined,
@@ -88,6 +95,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Controllers grouped by feature
   final _cctvUrl = TextEditingController(text: defaultCctvUrl);
   final _dailyTarget = TextEditingController();
+  final _weatherApiKey = TextEditingController();
+  final _weatherCity = TextEditingController();
   final _envRanges = {
     'temp': _RangeControllers(),
     'humidity': _RangeControllers(),
@@ -102,6 +111,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _lowSoc = 20;
   int _staleMinutes = 10;
   Color _selectedSeed = AppThemeController.defaultSeed;
+  bool _weatherLoading = false;
+  String? _weatherError;
+  String? _weatherLocationName;
+  double? _weatherLatitude;
+  double? _weatherLongitude;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
@@ -116,6 +130,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _cctvUrl.dispose();
     _dailyTarget.dispose();
+    _weatherApiKey.dispose();
+    _weatherCity.dispose();
     for (final c in _envRanges.values) {
       c.dispose();
     }
@@ -135,6 +151,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _staleMinutes = p.getInt('stale_telemetry_minutes') ?? 10;
       _cctvUrl.text = p.getString('cctv_url') ?? defaultCctvUrl;
       _dailyTarget.text = p.getString('daily_production_target_kwh') ?? '';
+      _weatherApiKey.text = p.getString('weather_api_key') ?? '';
+      _weatherCity.text = p.getString('weather_location_name') ?? '';
+      _weatherLocationName = p.getString('weather_location_name');
+      _weatherLatitude = p.getDouble('weather_location_lat');
+      _weatherLongitude = p.getDouble('weather_location_lon');
       _envRanges['temp']!.min.text = p.getString('environment_temp_min') ?? '';
       _envRanges['temp']!.max.text = p.getString('environment_temp_max') ?? '';
       _envRanges['humidity']!.min.text =
@@ -198,6 +219,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await p.setInt('low_soc_threshold', _lowSoc);
     await p.setInt('stale_telemetry_minutes', _staleMinutes);
     await p.setString('cctv_url', _cctvUrl.text.trim());
+    await p.setString('weather_api_key', _weatherApiKey.text.trim());
+    await p.setString('weather_location_name', _weatherCity.text.trim());
 
     if (target == null) {
       await p.remove('daily_production_target_kwh');
@@ -518,6 +541,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ),
   ];
+
+  static List<Widget> _buildWeather(_SettingsScreenState s) => [
+    TextField(
+      controller: s._weatherApiKey,
+      decoration: const InputDecoration(
+        labelText: 'OpenWeatherMap API Key',
+        prefixIcon: Icon(Icons.key),
+        helperText: 'Get your free API key from openweathermap.org/api',
+      ),
+    ),
+    const SizedBox(height: 16),
+    TextField(
+      controller: s._weatherCity,
+      decoration: const InputDecoration(
+        labelText: 'City name (optional)',
+        prefixIcon: Icon(Icons.location_city),
+        helperText: 'Leave blank to use GPS location',
+      ),
+    ),
+    const SizedBox(height: 16),
+    if (s._weatherLocationName != null) ...[
+      Text(
+        'Current location: ${s._weatherLocationName}',
+        style: Theme.of(s.context).textTheme.bodyMedium,
+      ),
+      if (s._weatherLatitude != null && s._weatherLongitude != null)
+        Text(
+          'Coordinates: ${s._weatherLatitude!.toStringAsFixed(4)}, ${s._weatherLongitude!.toStringAsFixed(4)}',
+          style: Theme.of(s.context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(s.context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      const SizedBox(height: 16),
+    ],
+    FilledButton.icon(
+      onPressed: s._weatherLoading
+          ? null
+          : () => s._testWeatherConnection(),
+      icon: s._weatherLoading
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.cloud_sync),
+      label: Text(s._weatherLoading ? 'Testing...' : 'Test Connection'),
+    ),
+    if (s._weatherError != null) ...[
+      const SizedBox(height: 12),
+      Text(
+        s._weatherError!,
+        style: TextStyle(
+          color: Theme.of(s.context).colorScheme.error,
+        ),
+      ),
+    ],
+  ];
+
+  Future<void> _testWeatherConnection() async {
+    setState(() {
+      _weatherLoading = true;
+      _weatherError = null;
+    });
+
+    final weatherService = WeatherService();
+    await weatherService.initialize();
+    await weatherService.setApiKey(_weatherApiKey.text.trim());
+
+    try {
+      WeatherData? weather;
+      if (_weatherCity.text.trim().isNotEmpty) {
+        weather = await weatherService.getWeatherByCity(_weatherCity.text.trim());
+      } else {
+        weather = await weatherService.getCurrentWeather();
+      }
+
+      if (mounted) {
+        setState(() {
+          _weatherLoading = false;
+          if (weather != null) {
+            _weatherLocationName = weather.locationName;
+            _weatherLatitude = weather.latitude;
+            _weatherLongitude = weather.longitude;
+            _weatherCity.text = weather.locationName;
+            _weatherError = null;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Weather connection successful! Location: ${weather.locationName}'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            _weatherError = 'Failed to fetch weather data. Check your API key and location.';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _weatherLoading = false;
+          String errorMsg = e.toString();
+          // Clean up the error message
+          if (errorMsg.startsWith('Exception: ')) {
+            errorMsg = errorMsg.substring(11);
+          }
+          _weatherError = errorMsg;
+        });
+      }
+    }
+  }
 
   static List<Widget> _buildPerformance(_SettingsScreenState s) => [
     SwitchListTile(

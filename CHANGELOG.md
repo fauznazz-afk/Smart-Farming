@@ -6,11 +6,50 @@ All notable changes to this project are documented here.
 
 ### Added
 
-- Added modular architecture for Energy Report screen with extracted widgets (PeriodSelector, TotalsCard, ChartCard, DataNote, EmptyAndErrorViews, ExportButton) and utilities (format_helpers, csv_builder, chart_helpers)
+- Added Weather monitoring feature with OpenWeatherMap API integration
+  - New `WeatherService` class for fetching current weather and forecasts
+  - New `WeatherData` and `WeatherForecast` data models
+  - Weather card widget on Dashboard showing temperature, humidity, wind, cloud cover, and solar irradiance
+  - Solar production estimation based on weather conditions
+  - Weather settings section in Settings screen with API key and city configuration
+  - Test connection button to verify API key and location
+  - GPS location support for automatic weather fetching
+- Added modular architecture for Energy Report screen with extracted widgets (PeriodSelector, TotalsCard, ChartCard, DataNote, EmptyAndErrorViews, ExportButton) and utilities (format_helpers, csv_builder, chart_helpers, chart_helpers)
 - Added modular architecture for Dashboard screen with extracted chart utilities (MetricDef, SeriesStats, ChartSeries, ChartBounds, processSpots) and helpers (alarm_helpers, bound, color_helpers, date_helpers)
 - Added modular architecture for Settings screen with extracted _RangeControllers, _Section, static builder functions, and shared helpers
 - Added Energi Analytics title for Energy Report screen (replaced "Laporan energi")
 - Added comprehensive CHANGELOG documentation for all refactoring changes
+
+### Changed
+
+- Updated Android `compileSdk` to 36 to support latest plugin requirements (android_alarm_manager_plus, flutter_local_notifications, geolocator, etc.)
+- Updated `geocoding` dependency from ^2.1.1 to ^5.0.0 for Android 14+ compatibility
+- Added GPS permissions (ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION) to AndroidManifest.xml
+- Refactored Energy Report screen from 809 lines to 251 lines (-69%) with modular widget/utility structure
+- Refactored Dashboard screen from 3,072 lines to 2,550 lines (-17%) with ~500 lines extracted to reusable utilities
+- Refactored Settings screen from 816 lines to 470 lines (-42%) with consolidated validation, persistence, and builder patterns
+- Renamed Energy Report screen title from "Laporan energi" to "Energi Analytics"
+- Moved `await loadCctvUrl()` outside `setState` in `_loadPreferences` to fix async context issue
+- Restructured all three screens to use modular widget/utility architecture with clear separation of concerns
+
+### Fixed
+
+- Fixed Dart analyze errors in `weather_service.dart` (parentheses for type casting) and `weather_card.dart` (unnecessary underscores)
+- Fixed async context error in Dashboard `_loadPreferences` by moving `await loadCctvUrl()` outside `setState` callback
+- Resolved merge conflicts in settings_screen.dart and energy_report_screen.dart keeping refactored versions
+- Fixed import paths in all extracted utility/widget files for correct module resolution
+- Fixed weather data not updating on dashboard after saving API key in settings
+- Fixed weather card refresh button and settings button in no-data state
+
+### Improved
+
+- Reduced total codebase by ~1,000 lines through modular extraction while preserving all functionality
+- Improved maintainability with clear separation of concerns (widgets, utils, charts, helpers)
+- Enhanced testability with pure functions in utility files
+- Enhanced reusability of chart helpers, date formatters, color helpers, and alarm helpers across screens
+- Zero breaking changes - all functionality preserved
+- Better error handling in WeatherService with descriptive messages for API errors (401, 404, etc.)
+- Weather service now properly throws exceptions for GPS permission issues instead of silently failing
 
 ### Changed
 

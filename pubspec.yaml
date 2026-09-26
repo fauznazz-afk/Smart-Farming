@@ -48,6 +48,8 @@ dependencies:
   android_alarm_manager_plus: ^5.0.0
   path_provider: ^2.1.1
   csv: ^8.0.0
+  geolocator: ^10.1.0
+  geocoding: ^5.0.0
 
 dev_dependencies:
   flutter_test:
