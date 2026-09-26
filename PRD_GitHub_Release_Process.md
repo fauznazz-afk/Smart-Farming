@@ -2,9 +2,10 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
-**Dokumen:** 1.0
+**Dokumen:** 1.1
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.2.3 (build 7), tag `v1.2.3`
+**Rilis acuan:** 1.4.0 (build 10), tag `v1.4.0` — procedures in this document
+were all exercised successfully for that release
 
 ---
 

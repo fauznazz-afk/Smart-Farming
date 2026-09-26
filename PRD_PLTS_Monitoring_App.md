@@ -2,9 +2,10 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
-**Versi aplikasi saat ini:** 1.3.0 (build 8; belum dirilis)
-**Versi dokumen:** 1.2
-**Status:** Implementasi lokal per 24 September 2026; rilis 1.3.0 belum diterbitkan
+**Versi aplikasi saat ini:** 1.4.0 (build 10; sudah diterbitkan, tag `v1.4.0`)
+**Versi dokumen:** 1.3
+**Status:** Rilis 1.4.0 terbit 26 September 2026. Build pertamanya dari Linux,
+tanpa NDK dan CMake.
 
 ---
 
@@ -12,7 +13,7 @@
 
 EnerGrow adalah aplikasi mobile untuk memantau sistem energi hybrid di lahan pertanian/hidroponik. Aplikasi mengambil telemetry dari tiga perangkat ThingsBoard: baterai, PZEM (PV dan AC), serta sensor lingkungan. Aplikasi juga menyediakan histori grafik, ringkasan energi, laporan, pengaturan, dan halaman CCTV.
 
-Aplikasi merupakan client untuk infrastruktur IoT yang sudah berjalan. Backend utama adalah ThingsBoard CE; aplikasi tidak memiliki backend bisnis tersendiri. Dokumen ini mencatat perilaku produk pada kode 1.3.0 yang belum dirilis dan pekerjaan lanjutan yang disarankan.
+Aplikasi merupakan client untuk infrastruktur IoT yang sudah berjalan. Backend utama adalah ThingsBoard CE; aplikasi tidak memiliki backend bisnis tersendiri. Dokumen ini mencatat perilaku produk pada kode 1.4.0 dan pekerjaan lanjutan yang disarankan.
 
 ## 2. Pengguna dan tujuan
 
@@ -38,7 +39,7 @@ Tujuan produk:
 
 Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push service, atau subscription telemetry WebSocket di versi ini.
 
-## 4. Fitur dan status implementasi versi 1.2.3
+## 4. Fitur dan status implementasi versi 1.4.0
 
 ### 4.1 Autentikasi dan sesi
 
@@ -76,7 +77,7 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 
 ### 4.4 Ringkasan dan laporan energi
 
-**Status: Diimplementasikan pada versi 1.2.3.**
+**Status: Diimplementasikan.**
 
 - Overview menampilkan estimasi produksi PV dan konsumsi AC untuk periode harian atau tujuh hari, dengan perbandingan periode sebelumnya.
 - Halaman laporan menyediakan analisis energi pada rentang harian/bulanan dan ekspor CSV.
@@ -85,7 +86,7 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 
 ### 4.5 Peringatan lokal dan data stale
 
-**Status: Diimplementasikan secara lokal; perlu masuk release 1.3.0.**
+**Status: Diimplementasikan secara lokal.**
 
 - Peringatan lokal muncul untuk SOC baterai rendah dan telemetry yang melewati ambang usia.
 - Pengguna dapat mengaktifkan/menonaktifkan peringatan dan mengatur ambang SOC serta usia telemetry di Settings.

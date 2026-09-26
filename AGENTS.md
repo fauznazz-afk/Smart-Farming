@@ -18,8 +18,9 @@ ESP32 sensor → ESP-NOW → ESP32 gateway → MQTT → ThingsBoard CE (Orange P
 Battery telemetry does **not** go through the ESP32. It is read from a Bluetooth
 BMS and publishes to its own ThingsBoard device.
 
-Version lives in `pubspec.yaml` (`1.3.1+9`). `package_info_plus` reads it at
-runtime, so never hardcode a version string in the UI.
+Version lives in `pubspec.yaml` (`1.4.0+10` as of 26 September 2026).
+`package_info_plus` reads it at runtime, so never hardcode a version string in
+the UI.
 
 ## Architecture rule
 
@@ -278,7 +279,12 @@ after each load.
 
 ## Documentation hygiene
 
-`CHANGELOG.md` currently has **three** `[Unreleased]` headers and three
-conflicting `1.3.0` headings left over from merges. It needs consolidating into
-one `[Unreleased]` block before the next release. `pubspec.yaml` is the single
-source of truth for the version number.
+`CHANGELOG.md` was consolidated during the 1.4.0 release: it had three
+`[Unreleased]` headers and three conflicting `1.3.0` headings from an unclean
+merge. Keep exactly one `[Unreleased]`, and map it to a version at release time
+rather than letting it grow. `pubspec.yaml` is the single source of truth for
+the version number.
+
+`PRD_PLTS_Monitoring_App.md` and `PRD_GitHub_Release_Process.md` both still
+quote 1.3.0 and 1.2.3 respectively. They are living documents, not release
+records, so bring their version headers up to date when cutting a release.
