@@ -20,10 +20,11 @@ class _EnvSpec {
   final String? metric;
 }
 
-/// Labels are kept short because the card is a third of the screen width and
-/// the status icon takes what the text was using. "Ambient Temp" ellipsised to
-/// "Ambient T..." as soon as a verdict appeared, which is exactly when the user
-/// most needed to know which sensor it was.
+/// Labels are Indonesian and short. "Ambient Temp" used to ellipsise to
+/// "Ambient T..." in a third-width card, which cost the reader the one thing
+/// they needed most; the labels were shortened before a status icon was added,
+/// and the icon has since been removed, so there is room to grow them back if
+/// the cards ever get wider.
 const _envSpecs = [
   _EnvSpec('temp_dht', 'Suhu', '°C', Icons.thermostat, metric: 'temp_dht'),
   _EnvSpec('humidity_dht', 'Kelembapan', '%', Icons.water_drop,
@@ -100,20 +101,20 @@ class EnvironmentGrid extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            // Only speaks up when there is something wrong. The green "Semua
+            // normal" state with a tick was the other half of the checklist
+            // effect: five sensors always in range is the boring case, and
+            // asserting it permanently put a permanent badge on the screen.
             if (verdicts.isStale)
               _Tag(
-                icon: Icons.schedule,
                 text: 'Data lama',
                 color: statusWarn(isDark),
                 isDark: isDark,
               )
-            else if (monitored.isNotEmpty)
+            else if (breached > 0)
               _Tag(
-                icon: breached == 0 ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-                text: breached == 0
-                    ? 'Semua normal'
-                    : '$breached di luar batas',
-                color: breached == 0 ? statusOk(isDark) : statusBad(isDark),
+                text: '$breached di luar batas',
+                color: statusBad(isDark),
                 isDark: isDark,
               ),
           ],
@@ -211,36 +212,23 @@ class _Verdicts {
   }
 }
 
-/// A small pill used for the grid's overall verdict.
+/// The grid's single verdict, shown only when something is wrong.
 class _Tag extends StatelessWidget {
-  const _Tag({
-    required this.icon,
-    required this.text,
-    required this.color,
-    required this.isDark,
-  });
+  const _Tag({required this.text, required this.color, required this.isDark});
 
-  final IconData icon;
   final String text;
   final Color color;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: color),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
     );
   }
 }
@@ -296,6 +284,11 @@ class _EnvCard extends StatelessWidget {
             children: [
               Icon(spec.icon, size: 14, color: accent),
               const SizedBox(width: 4),
+              // No tick or warning glyph. Out-of-range used to be signalled
+              // three ways on one card — a tick, a warning triangle, and a red
+              // border — which turned a reading into a checklist item. The
+              // coloured border and the range caption below are enough, and they
+              // stay visible in peripheral vision the way an icon did not.
               Expanded(
                 child: Text(
                   spec.label,
@@ -304,14 +297,6 @@ class _EnvCard extends StatelessWidget {
                   style: TextStyle(fontSize: 10, color: faint),
                 ),
               ),
-              if (status != null)
-                Icon(
-                  verdict == true
-                      ? Icons.check_circle_outline
-                      : Icons.warning_amber_rounded,
-                  size: 12,
-                  color: status,
-                ),
             ],
           ),
           const SizedBox(height: 6),

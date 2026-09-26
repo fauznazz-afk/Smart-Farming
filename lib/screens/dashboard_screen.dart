@@ -556,14 +556,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         _persistAlarm(signal, now);
       }
     }
-    if (nextMessages.isNotEmpty && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(nextMessages.join(' · '))));
-      });
-    }
+    // No SnackBar here, deliberately. The same messages already render in
+    // `EnergyAlertBanner` at the top of the list, above the greeting, so the
+    // SnackBar was the same sentence twice — once where the user was already
+    // looking and once over the bottom of the screen, where it covered the
+    // energy card and the navigation bar. Worse, it re-fired on every message
+    // change rather than on every new alarm, so a reading drifting in and out
+    // of range popped a bar every few seconds while the banner just sat there.
+    // The banner is persistent, non-modal, and does not obscure content; that
+    // is the right shape for a condition that is still true.
   }
 
   /// The three devices the rules read, in the shape the evaluator expects.

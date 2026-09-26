@@ -13,27 +13,23 @@ Color themeColor({
       .toColor();
 }
 
-/// How far apart each metric's hue is rotated from the accent.
+/// Creates the accent color for a metric, in the same hue as the theme.
 ///
-/// Around 40 degrees, which is enough to tell green from amber from cyan at a
-/// glance without any of them drifting so far that it stops looking like the
-/// chosen accent. Every palette in the app is derived from one seed, so this is
-/// the only lever that gives the PV, AC and battery pages distinct identities.
-const double _hueStep = 0.11; // 360 * 0.11 ≈ 40 degrees
-
-/// Creates the accent color for a given metric index and theme.
+/// [index] is accepted and deliberately ignored. It used to rotate the hue by
+/// 40 degrees per index, so the PV, AC and battery pages each got a different
+/// colour for the same accent. That was tried because the pages were hard to
+/// tell apart, and it was reverted: a colour the user did not choose is a
+/// colour they cannot predict, and the app looked arbitrary rather than themed.
 ///
-/// [index] used to be accepted and ignored, so every metric in the app rendered
-/// in the same hue and the PV, AC and battery page headers were told apart only
-/// by their icon. Rotating the hue per index is what the parameter always meant.
+/// The pages are told apart by their title and icon, which is unambiguous. If
+/// per-page colour is ever wanted, it should be a setting the user picks, not a
+/// default that silently changes what "Ocean cyan" means.
 Color metricColor({
   required Color seedColor,
   required int index,
   required bool isDark,
 }) {
-  final base = HSLColor.fromColor(seedColor);
-  return base
-      .withHue((base.hue + index * _hueStep) % 1.0)
+  return HSLColor.fromColor(seedColor)
       .withSaturation(isDark ? 0.64 : 0.72)
       .withLightness(isDark ? 0.68 : 0.40)
       .toColor();
@@ -45,9 +41,7 @@ Color strongMetricColor({
   required int index,
   required bool isDark,
 }) {
-  final base = HSLColor.fromColor(seedColor);
-  return base
-      .withHue((base.hue + index * _hueStep) % 1.0)
+  return HSLColor.fromColor(seedColor)
       .withSaturation(isDark ? 0.78 : 0.86)
       .withLightness(isDark ? 0.64 : 0.36)
       .toColor();
@@ -63,11 +57,15 @@ Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>
 ///
 /// The pair this replaces, `Colors.white54` on dark and `Colors.black45` on
 /// light, fails WCAG AA on the surfaces actually used here — about 3.4:1 in light
-/// mode against white, for text as small as 9dp. These two clear 5:1 on their
-/// respective surfaces, and the difference is visible as legibility rather than
-/// as a colour change.
+/// mode against white, for text as small as 9dp.
+///
+/// The light value was `0xFF6B7671` and was still wrong: measured against the
+/// glass card fill `#F2F5F3` it is 4.29:1, and these captions really are 9 to
+/// 11dp. `0xFF606A65` measures 5.11:1 on the same surface. The dark value clears
+/// 7.5:1 and was already fine. `test/color_helpers_test.dart` checks all four
+/// against the real surfaces, so this cannot silently regress again.
 const Color _faintDark = Color(0xFFA8B3AC);
-const Color _faintLight = Color(0xFF6B7671);
+const Color _faintLight = Color(0xFF606A65);
 
 Color faintColor(bool isDark) => isDark ? _faintDark : _faintLight;
 
@@ -75,11 +73,17 @@ Color faintColor(bool isDark) => isDark ? _faintDark : _faintLight;
 ///
 /// Those are tuned for large fills, not for small text on a near-white
 /// surface: `Colors.green` at 9dp measures about 2.3:1. These clear AA.
+///
+/// The light values were originally `0xFF2E7D32` and `0xFFB26500`, and the amber
+/// one was the worst thing in this file: 4.02:1 on the glass card fill, well
+/// under the 4.5:1 that WCAG AA requires for text this small. `0xFF9A5500`
+/// measures 5.21:1 and still reads as amber rather than brown. Green was raised
+/// to `0xFF2A7530` for margin, from 4.67:1 to 5.19:1.
 Color statusOk(bool isDark) =>
-    isDark ? const Color(0xFF6DD58C) : const Color(0xFF2E7D32);
+    isDark ? const Color(0xFF6DD58C) : const Color(0xFF2A7530);
 
 Color statusWarn(bool isDark) =>
-    isDark ? const Color(0xFFFFCA6B) : const Color(0xFFB26500);
+    isDark ? const Color(0xFFFFCA6B) : const Color(0xFF9A5500);
 
 Color statusBad(bool isDark) =>
     isDark ? const Color(0xFFFF8A80) : const Color(0xFFC62828);

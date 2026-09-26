@@ -40,6 +40,41 @@ Three layers, consistently applied:
 `Bound` widget (`screens/dashboard/utils/bound.dart`) for granular rebuilds.
 Do not introduce `provider` without a reason to migrate the whole app.
 
+### Colour is never varied automatically
+
+A user picks one accent in Settings. Everything derived from it stays that hue.
+`metricColor` and `strongMetricColor` take an `index` parameter and **ignore it**,
+and `test/color_helpers_test.dart` fails if they start using it.
+
+This is not an oversight. A 40-degree hue rotation per index was implemented so
+the PV, AC and battery pages would be distinguishable by colour, and it was
+reverted: the user reported the app as uglier, and they were right about the
+reason. A colour the user did not choose is a colour they cannot predict, and the
+screens stopped looking themed and started looking arbitrary. The pages are
+distinguished by their title and icon, which is unambiguous.
+
+The same reasoning applies to `kAccentPalette`. It has four entries, two of which
+are genuinely close in hue, and separating them by moving `Ocean cyan` was also
+tried and reverted — that would silently change what an existing setting means.
+**If colour needs to vary, it becomes a setting the user picks.** Do not invent a
+default that reshapes the colour they already chose.
+
+Two related rules, both learned by getting them wrong:
+
+- **Never signal the same state three ways.** The environment cards had a tick, a
+  warning triangle *and* a coloured border all at once, and it read as a
+  checklist rather than a reading.
+- **Say nothing when nothing is wrong.** A permanent green "semua normal" badge
+  on the environment grid asserted a condition that is boring when true, and
+  permanently occupied the space where a real warning needs to go.
+
+Contrast claims are measured, not asserted. The `faintColor` and `status*` values
+were documented as passing AA while the light-mode amber was actually at 4.02:1
+on the glass card fill. `test/color_helpers_test.dart` now measures each one
+against the real surfaces from `main.dart` and `liquid_glass.dart`, not against
+white, and 8-bit quantisation is why the hue tolerances there are 0.5° rather
+than exact.
+
 ### Polling and rebuilds
 
 `dashboard_screen.dart` polls every `_refreshSeconds` (default 10). To avoid
@@ -394,7 +429,7 @@ actually bitten:
 
 ```
 flutter analyze     # must stay clean
-flutter test        # 217 tests
+flutter test        # 227 tests
 cd android && ./gradlew :app:testDebugUnitTest   # 11 tests, alarm parity + host allowlist
 ```
 

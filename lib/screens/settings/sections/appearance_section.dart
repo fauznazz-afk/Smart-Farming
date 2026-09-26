@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 import '../settings_controller.dart';
 
 /// Accent colours the user can pick from.
-/// The four are at least 45 degrees apart in hue.
 ///
-/// `Ocean cyan` and `Forest teal` used to sit 19 degrees apart, and since every
-/// surface colour is derived from the seed they rendered almost identically.
-/// Anything closer than this reads as the same colour choice.
+/// These are four explicit choices, and changing one changes what an existing
+/// setting means. `Ocean cyan` and `Forest teal` do sit close in hue, which was
+/// made worse by moving `Ocean cyan` to `0xFF2E9BD6` to separate them. That
+/// separation was reverted: a user who already picked "Ocean cyan" would have
+/// silently been given a different colour, which is worse than two swatches
+/// looking similar. Picking a different accent is done in this screen, not by
+/// the app deciding.
 const Map<String, Color> kAccentPalette = {
-  'EnerGrow green': Color(0xFF35A968), // ~143
-  'Solar amber': Color(0xFFF4B942), // ~40
-  'Ocean cyan': Color(0xFF2E9BD6), // ~199
-  'Forest teal': Color(0xFF2E7D65), // ~157
+  'EnerGrow green': Color(0xFF35A968),
+  'Solar amber': Color(0xFFF4B942),
+  'Ocean cyan': Color(0xFF2AA7A1),
+  'Forest teal': Color(0xFF2E7D65),
 };
 
 /// Theme mode selector plus accent colour picker.
