@@ -1,0 +1,30 @@
+# Normalise line endings so the same file does not show up as modified just
+# because it was checked out on a different operating system. The project was
+# originally developed on Windows, which is how 126 files ended up with CRLF in
+# the working tree while Git stored them as LF.
+#
+# `eol=lf` is deliberate: Dart, Kotlin, Gradle, YAML, and XML are all parsed
+# with LF assumptions on Linux, and CRLF breaks the odd shell script.
+
+* text=auto eol=lf
+
+# Windows-only tooling keeps CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+gradlew.bat text eol=crlf
+
+# Binary assets and build artefacts must never be touched.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.jks   binary
+*.jar   binary
+*.keystore binary
+*.apk   binary
+*.so    binary
+*.aot   binary
+
+# Gradle wrapper jar and Flutter's generated files.
+android/gradle/wrapper/gradle-wrapper.jar binary
+**/generated_plugin_registrant.dart text eol=lf
