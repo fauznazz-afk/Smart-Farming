@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased] - 2026-09-26
+
+### Added
+
+- Added modular architecture for Energy Report screen with extracted widgets (PeriodSelector, TotalsCard, ChartCard, DataNote, EmptyAndErrorViews, ExportButton) and utilities (format_helpers, csv_builder, chart_helpers)
+- Added modular architecture for Dashboard screen with extracted chart utilities (MetricDef, SeriesStats, ChartSeries, ChartBounds, processSpots) and helpers (alarm_helpers, bound, color_helpers, date_helpers)
+- Added modular architecture for Settings screen with extracted _RangeControllers, _Section, static builder functions, and shared helpers
+- Added Energi Analytics title for Energy Report screen (replaced "Laporan energi")
+- Added comprehensive CHANGELOG documentation for all refactoring changes
+
+### Changed
+
+- Refactored Energy Report screen from 809 lines to 251 lines (-69%) with modular widget/utility structure
+- Refactored Dashboard screen from 3,072 lines to 2,550 lines (-17%) with ~500 lines extracted to reusable utilities
+- Refactored Settings screen from 816 lines to 470 lines (-42%) with consolidated validation, persistence, and builder patterns
+- Renamed Energy Report screen title from "Laporan energi" to "Energi Analytics"
+- Moved `await loadCctvUrl()` outside `setState` in `_loadPreferences` to fix async context issue
+- Restructured all three screens to use modular widget/utility architecture with clear separation of concerns
+
+### Fixed
+
+- Fixed async context error in Dashboard `_loadPreferences` by moving `await loadCctvUrl()` outside `setState` callback
+- Resolved merge conflicts in settings_screen.dart and energy_report_screen.dart keeping refactored versions
+- Fixed import paths in all extracted utility/widget files for correct module resolution
+
+### Improved
+
+- Reduced total codebase by ~1,000 lines through modular extraction while preserving all functionality
+- Improved maintainability with clear separation of concerns (widgets, utils, charts, helpers)
+- Enhanced testability with pure functions in utility files
+- Enhanced reusability of chart helpers, date formatters, color helpers, and alarm helpers across screens
+- Zero breaking changes - all functionality preserved
+
+### Validation
+
+- `flutter analyze` passes with no issues (full project)
+- All functionality preserved: Settings (8 categories), Dashboard (5 tabs + realtime), Energy Report (period selection, chart, CSV export)
+- Zero breaking changes
+
 ## [Unreleased] - 2026-09-25
 
 ### Improved
