@@ -6,9 +6,14 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Added `dart_test.yaml` capping test concurrency at 2, fixing "did not complete" failures that hit every test in a file once the suite grew past six files
 - Added `SettingsKeys` (`lib/models/settings_keys.dart`) as the single source of truth for `SharedPreferences` keys shared by the Settings screen, Dashboard, and background alarm service
 - Added `SettingsController` (`lib/screens/settings/settings_controller.dart`) owning all settings state, validation, and persistence
+- Added `CctvStatus` (`lib/screens/cctv/utils/cctv_status.dart`) deriving the stream state from the player flags
+- Added `PeriodTotals` plus `bucketsForPeriod`, `previousPeriodTotals`, `totalsOf`, and `totalSampleCount` (`lib/screens/energy_report/utils/period_buckets.dart`)
 - Added unit tests for the extracted settings validation (`test/settings_validation_test.dart`)
+- Added unit tests for the CCTV status model and the `parseAllowedCctvUrl` host allowlist (`test/cctv_test.dart`)
+- Added unit tests for the energy report period and chart helpers (`test/energy_report_helpers_test.dart`)
 - Added widget tests for the settings browser (`test/settings_screen_test.dart`) covering category listing, section drill-down, back navigation, and CCTV URL rejection
 - Added unit tests for the extracted dashboard helpers (`test/dashboard_helpers_test.dart`) covering history window resolution, sampling intervals, energy integration, cached telemetry partitioning, and telemetry comparison
 - Added `glassDividerColor` helper so divider tinting stays consistent across glass cards
@@ -17,10 +22,20 @@ All notable changes to this project are documented here.
 
 - Fixed the CCTV stream URL set in Settings never taking effect: it was written to `SharedPreferences` while the Dashboard reads it from secure storage, so the edit was silently discarded. Settings now persists it through `saveCctvUrl()` and loads it through `loadCctvUrl()`
 - Fixed a duplicate `defaultCctvUrl` constant in Settings that shadowed `defaultAllowedCctvUrl` from `cctv_url.dart`
+- Fixed the embedded and full screen CCTV layouts maintaining two copies of the video/standby/loading/error stack, which could drift apart
 - Fixed the expanded and collapsed glass nav bars keeping duplicate icon/label literals by sharing one `kNavDestinations` list
+
+### Removed
+
+- Removed the unused `active` parameter from `CctvScreen`
 
 ### Changed
 
+- Refactored CCTV screen from 480 lines to 319 lines (-34%), sharing one `CctvViewport` between the embedded and full screen layouts
+- Refactored Energy Report screen from 233 lines to 174 lines (-25%), moving period bucketing and comparison totals into pure helpers
+- Extracted `_SelectedBucketReadout` and `_BucketStepper` from the energy report chart card, which had duplicated the touched-index clamping in two listeners
+- Replaced the opaque `(double, double)?` totals record with a named `PeriodTotals` class
+- Simplified `calculateMaxY`, which used a four-branch nested ternary fold
 - Refactored Settings screen from 754 lines to 157 lines (-79%), splitting it into a controller, shared field widgets, and one file per settings group
 - Extracted dashboard presentation widgets into `lib/screens/dashboard/widgets/`: `GlassNavBar`, `LivePowerCard`, `DualStatusCards`, `EnvironmentGrid`, `GreetingHeader`, `DateStrip`, `TelemetryCard`, `TelemetryChartCard`, `ChartSectionHeader`, and the banner set (`ConnectionStatusBanner`, `OfflineBanner`, `EnergyAlertBanner`, `TelemetryErrorView`)
 - Extracted dashboard logic into pure helpers under `lib/screens/dashboard/utils/`: `history_range.dart`, `energy_helpers.dart`, `telemetry_helpers.dart`

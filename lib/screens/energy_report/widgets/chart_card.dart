@@ -38,52 +38,11 @@ class ChartCard extends StatelessWidget {
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
-              ValueListenableBuilder<int?>(
-                valueListenable: touchedBucketNotifier,
-                builder: (context, touchedIndex, _) {
-                  final selectedIndex = (touchedIndex ?? 0)
-                      .clamp(0, buckets.length - 1)
-                      .toInt();
-                  final selectedBucket = buckets[selectedIndex];
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.07)
-                          : Colors.black.withValues(alpha: 0.045),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            monthly
-                                ? formatDateLabel(selectedBucket.hour)
-                                : formatHourLabel(selectedBucket.hour),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        _LegendValue(
-                          label: 'PV',
-                          value: selectedBucket.pvKwh,
-                          color: const Color(0xFFFFC857),
-                        ),
-                        const SizedBox(width: 12),
-                        _LegendValue(
-                          label: 'AC',
-                          value: selectedBucket.acKwh,
-                          color: const Color(0xFF69B7FF),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+              _SelectedBucketReadout(
+                isDark: isDark,
+                monthly: monthly,
+                buckets: buckets,
+                touchedBucketNotifier: touchedBucketNotifier,
               ),
               const SizedBox(height: 14),
               RepaintBoundary(
@@ -146,47 +105,10 @@ class ChartCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               if (buckets.length > 1)
-                ValueListenableBuilder<int?>(
-                  valueListenable: touchedBucketNotifier,
-                  builder: (context, touchedIndex, _) {
-                    final selectedIndex = (touchedIndex ?? 0)
-                        .clamp(0, buckets.length - 1)
-                        .toInt();
-                    final selectedBucket = buckets[selectedIndex];
-                    return Row(
-                      children: [
-                        IconButton(
-                          tooltip: 'Interval sebelumnya',
-                          onPressed: selectedIndex == 0
-                              ? null
-                              : () => touchedBucketNotifier.value =
-                                    selectedIndex - 1,
-                          icon: const Icon(Icons.chevron_left_rounded),
-                        ),
-                        Expanded(
-                          child: Slider(
-                            min: 0,
-                            max: (buckets.length - 1).toDouble(),
-                            divisions: buckets.length - 1,
-                            value: selectedIndex.toDouble(),
-                            label: monthly
-                                ? formatDateLabel(selectedBucket.hour)
-                                : formatHourLabel(selectedBucket.hour),
-                            onChanged: (value) =>
-                                touchedBucketNotifier.value = value.round(),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Interval berikutnya',
-                          onPressed: selectedIndex >= buckets.length - 1
-                              ? null
-                              : () => touchedBucketNotifier.value =
-                                    selectedIndex + 1,
-                          icon: const Icon(Icons.chevron_right_rounded),
-                        ),
-                      ],
-                    );
-                  },
+                _BucketStepper(
+                  monthly: monthly,
+                  buckets: buckets,
+                  touchedBucketNotifier: touchedBucketNotifier,
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -200,6 +122,122 @@ class ChartCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Readout of the currently selected (touched) interval above the chart.
+class _SelectedBucketReadout extends StatelessWidget {
+  const _SelectedBucketReadout({
+    required this.isDark,
+    required this.monthly,
+    required this.buckets,
+    required this.touchedBucketNotifier,
+  });
+
+  final bool isDark;
+  final bool monthly;
+  final List<EnergyBucket> buckets;
+  final ValueNotifier<int?> touchedBucketNotifier;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int?>(
+      valueListenable: touchedBucketNotifier,
+      builder: (context, touchedIndex, _) {
+        final bucket = buckets[clampBucketIndex(touchedIndex, buckets.length)];
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.black.withValues(alpha: 0.045),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  monthly
+                      ? formatDateLabel(bucket.hour)
+                      : formatHourLabel(bucket.hour),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              _LegendValue(
+                label: 'PV',
+                value: bucket.pvKwh,
+                color: const Color(0xFFFFC857),
+              ),
+              const SizedBox(width: 12),
+              _LegendValue(
+                label: 'AC',
+                value: bucket.acKwh,
+                color: const Color(0xFF69B7FF),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Previous/next stepper plus slider for moving between intervals.
+class _BucketStepper extends StatelessWidget {
+  const _BucketStepper({
+    required this.monthly,
+    required this.buckets,
+    required this.touchedBucketNotifier,
+  });
+
+  final bool monthly;
+  final List<EnergyBucket> buckets;
+  final ValueNotifier<int?> touchedBucketNotifier;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int?>(
+      valueListenable: touchedBucketNotifier,
+      builder: (context, touchedIndex, _) {
+        final selectedIndex = clampBucketIndex(touchedIndex, buckets.length);
+        final bucket = buckets[selectedIndex];
+        final label = monthly
+            ? formatDateLabel(bucket.hour)
+            : formatHourLabel(bucket.hour);
+        return Row(
+          children: [
+            IconButton(
+              tooltip: 'Interval sebelumnya',
+              onPressed: selectedIndex == 0
+                  ? null
+                  : () => touchedBucketNotifier.value = selectedIndex - 1,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: Slider(
+                min: 0,
+                max: (buckets.length - 1).toDouble(),
+                divisions: buckets.length - 1,
+                value: selectedIndex.toDouble(),
+                label: label,
+                onChanged: (value) =>
+                    touchedBucketNotifier.value = value.round(),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Interval berikutnya',
+              onPressed: selectedIndex >= buckets.length - 1
+                  ? null
+                  : () => touchedBucketNotifier.value = selectedIndex + 1,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        );
+      },
     );
   }
 }

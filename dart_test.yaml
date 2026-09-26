@@ -1,0 +1,7 @@
+# Each widget test file spins up its own Flutter binding. Running every file at
+# once exhausts memory on smaller dev machines, which surfaces as
+# "did not complete" for every test in whichever file loses the race.
+#
+# Raise this if your machine has headroom, but keep it well below the core count
+# when tests are run on CI runners or containers.
+concurrency: 2

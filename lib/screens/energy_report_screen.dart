@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/energy_report_service.dart';
 import '../services/thingsboard_api.dart';
 import '../widgets/liquid_glass.dart';
+import 'energy_report/utils/period_buckets.dart';
 import 'energy_report/widgets/period_selector.dart';
 import 'energy_report/widgets/totals_card.dart';
 import 'energy_report/widgets/chart_card.dart';
@@ -92,69 +93,21 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     if (monthChanged) await _load();
   }
 
-  List<EnergyBucket> _periodBuckets() {
-    final buckets = _data?.buckets ?? const <EnergyBucket>[];
-    if (!_monthly) {
-      return buckets
-          .where(
-            (item) =>
-                item.hour.year == _selectedDate.year &&
-                item.hour.month == _selectedDate.month &&
-                item.hour.day == _selectedDate.day,
-          )
-          .toList(growable: false);
-    }
-    final byDay = <DateTime, EnergyBucket>{};
-    for (final item in buckets) {
-      if (item.hour.year != _selectedDate.year ||
-          item.hour.month != _selectedDate.month) {
-        continue;
-      }
-      final day = DateTime(item.hour.year, item.hour.month, item.hour.day);
-      final old = byDay[day];
-      byDay[day] = EnergyBucket(
-        hour: day,
-        pvKwh: (old?.pvKwh ?? 0) + item.pvKwh,
-        acKwh: (old?.acKwh ?? 0) + item.acKwh,
-        sampleCount: (old?.sampleCount ?? 0) + item.sampleCount,
-      );
-    }
-    return byDay.values.toList()..sort((a, b) => a.hour.compareTo(b.hour));
-  }
-
-  (double, double)? _previousPeriodTotals() {
-    final source = _data?.buckets;
-    if (source == null) return null;
-    final previousStart = _monthly
-        ? DateTime(_selectedDate.year, _selectedDate.month - 1, 1)
-        : DateTime(
-            _selectedDate.year,
-            _selectedDate.month,
-            _selectedDate.day - 1,
-          );
-    final previous = source.where(
-      (item) => _monthly
-          ? item.hour.year == previousStart.year &&
-                item.hour.month == previousStart.month
-          : item.hour.year == previousStart.year &&
-                item.hour.month == previousStart.month &&
-                item.hour.day == previousStart.day,
-    );
-    if (previous.isEmpty) return null;
-    return (
-      previous.fold<double>(0, (sum, item) => sum + item.pvKwh),
-      previous.fold<double>(0, (sum, item) => sum + item.acKwh),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final data = _data;
-    final buckets = _periodBuckets();
-    final pvKwh = buckets.fold<double>(0, (sum, item) => sum + item.pvKwh);
-    final acKwh = buckets.fold<double>(0, (sum, item) => sum + item.acKwh);
-    final previousTotals = _previousPeriodTotals();
+    final buckets = bucketsForPeriod(
+      buckets: data?.buckets ?? const <EnergyBucket>[],
+      selectedDate: _selectedDate,
+      monthly: _monthly,
+    );
+    final totals = totalsOf(buckets);
+    final previousTotals = previousPeriodTotals(
+      buckets: data?.buckets ?? const <EnergyBucket>[],
+      selectedDate: _selectedDate,
+      monthly: _monthly,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -199,8 +152,8 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                         isDark: isDark,
                         monthly: _monthly,
                         selectedDate: _selectedDate,
-                        pvKwh: pvKwh,
-                        acKwh: acKwh,
+                        pvKwh: totals.pvKwh,
+                        acKwh: totals.acKwh,
                         buckets: buckets,
                         previousTotals: previousTotals,
                       ),

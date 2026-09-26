@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/format_helpers.dart';
+import '../utils/period_buckets.dart';
 import '../../../services/energy_report_service.dart';
 
 class TotalsCard extends StatelessWidget {
@@ -21,7 +22,7 @@ class TotalsCard extends StatelessWidget {
   final double pvKwh;
   final double acKwh;
   final List<EnergyBucket> buckets;
-  final (double, double)? previousTotals;
+  final PeriodTotals? previousTotals;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +45,7 @@ class TotalsCard extends StatelessWidget {
                   isDark: isDark,
                   label: 'Produksi PV',
                   value: pvKwh,
-                  previous: previousTotals?.$1,
+                  previous: previousTotals?.pvKwh,
                   color: const Color(0xFFFFC857),
                   icon: Icons.wb_sunny_outlined,
                 ),
@@ -53,7 +54,7 @@ class TotalsCard extends StatelessWidget {
                   isDark: isDark,
                   label: 'Pemakaian AC',
                   value: acKwh,
-                  previous: previousTotals?.$2,
+                  previous: previousTotals?.acKwh,
                   color: const Color(0xFF69B7FF),
                   icon: Icons.electrical_services_outlined,
                 ),
@@ -61,7 +62,7 @@ class TotalsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '${buckets.fold<int>(0, (sum, item) => sum + item.sampleCount)} sampel • ${buckets.length} ${monthly ? 'hari' : 'jam'} dengan data',
+              '${totalSampleCount(buckets)} sampel • ${buckets.length} ${monthly ? 'hari' : 'jam'} dengan data',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white60 : Colors.black54,

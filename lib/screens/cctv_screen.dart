@@ -3,51 +3,51 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
+import 'cctv/utils/cctv_status.dart';
+import 'cctv/widgets/cctv_viewport.dart';
 
+/// Web view player for the go2rtc stream page.
+///
+/// The stream is never started automatically unless [fullScreen] is set, so
+/// the embedded view does not consume bandwidth while the user browses other
+/// dashboard tabs.
 class CctvScreen extends StatefulWidget {
-  final String streamUrl;
-  final bool active;
-  final bool fullScreen;
+  const CctvScreen({super.key, required this.streamUrl, this.fullScreen = false});
 
-  const CctvScreen({
-    super.key,
-    required this.streamUrl,
-    this.active = true,
-    this.fullScreen = false,
-  });
+  final String streamUrl;
+
+  /// Locks to landscape and hides system bars, starting playback immediately.
+  final bool fullScreen;
 
   @override
   State<CctvScreen> createState() => _CctvScreenState();
 }
 
 class _CctvScreenState extends State<CctvScreen> {
+  static const _pageBackground = Color(0xFF080D0A);
+
   WebViewController? _controller;
   bool _playing = false;
   bool _loading = false;
   bool _failed = false;
 
+  CctvStatus get _status =>
+      cctvStatusOf(playing: _playing, loading: _loading, failed: _failed);
+
   @override
   void initState() {
     super.initState();
-    if (widget.fullScreen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        SystemChrome.setPreferredOrientations(const [
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-        _startStream();
-      });
-    }
+    if (!widget.fullScreen) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _enterImmersiveMode();
+      _startStream();
+    });
   }
 
   @override
   void dispose() {
-    if (widget.fullScreen) {
-      SystemChrome.setPreferredOrientations(const []);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    }
+    if (widget.fullScreen) _exitImmersiveMode();
     super.dispose();
   }
 
@@ -57,6 +57,19 @@ class _CctvScreenState extends State<CctvScreen> {
     if (oldWidget.streamUrl != widget.streamUrl && _playing) {
       _startStream();
     }
+  }
+
+  static void _enterImmersiveMode() {
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  static void _exitImmersiveMode() {
+    SystemChrome.setPreferredOrientations(const []);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
   void _startStream() {
@@ -78,7 +91,7 @@ class _CctvScreenState extends State<CctvScreen> {
     });
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF080D0A))
+      ..setBackgroundColor(_pageBackground)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -87,6 +100,8 @@ class _CctvScreenState extends State<CctvScreen> {
           onPageFinished: (_) {
             if (mounted) setState(() => _loading = false);
           },
+          // The stream page is the only host we allow, so the web view cannot
+          // be navigated off the official camera origin.
           onNavigationRequest: (request) =>
               parseAllowedCctvUrl(request.url) == null
               ? NavigationDecision.prevent
@@ -114,13 +129,59 @@ class _CctvScreenState extends State<CctvScreen> {
     });
   }
 
+  void _openFullScreen() {
+    // Release the embedded player first; the full screen route opens its own.
+    _stopStream();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            CctvScreen(streamUrl: widget.streamUrl, fullScreen: true),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.fullScreen) return _buildFullScreen(context);
+    return _buildEmbedded(context);
+  }
+
+  Widget _buildFullScreen(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: _buildViewport(context),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: CctvRoundControl(
+              icon: Icons.close_rounded,
+              tooltip: 'Tutup layar penuh',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: CctvStatusPill(status: _status),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmbedded(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primary = theme.colorScheme.primary;
-
-    if (widget.fullScreen) return _fullScreenView();
+    final status = _status;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +211,7 @@ class _CctvScreenState extends State<CctvScreen> {
                       ),
                     ),
                   ),
-                  _statusPill(isDark),
+                  CctvStatusPill(status: status),
                 ],
               ),
               Padding(
@@ -171,36 +232,25 @@ class _CctvScreenState extends State<CctvScreen> {
           borderRadius: BorderRadius.circular(22),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: Container(
-              width: double.infinity,
-              color: const Color(0xFF080D0A),
+            child: ColoredBox(
+              color: _pageBackground,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (_controller != null && _playing)
-                    WebViewWidget(controller: _controller!),
-                  if (!_playing) _standby(primary),
-                  if (_loading && _playing)
-                    ColoredBox(
-                      color: Colors.black.withValues(alpha: 0.56),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                    ),
-                  if (_failed) _errorOverlay(),
-                  if (_playing && !_loading && !_failed)
+                  _buildViewport(context),
+                  if (status == CctvStatus.live)
                     Positioned(
                       top: 12,
                       right: 12,
                       child: Row(
                         children: [
-                          _roundControl(
+                          CctvRoundControl(
                             icon: Icons.fullscreen_rounded,
                             tooltip: 'Layar penuh',
                             onPressed: _openFullScreen,
                           ),
                           const SizedBox(width: 8),
-                          _roundControl(
+                          CctvRoundControl(
                             icon: Icons.stop_rounded,
                             tooltip: 'Stop stream',
                             onPressed: _stopStream,
@@ -214,267 +264,81 @@ class _CctvScreenState extends State<CctvScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1B211E) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: (isDark ? Colors.white : Colors.black).withValues(
-                alpha: 0.06,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 19,
-                color: primary.withValues(alpha: 0.9),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _playing
-                      ? 'Stream aktif menggunakan koneksi internet.'
-                      : 'Tekan Play saat Anda siap melihat kamera.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-              if (_playing && !_loading)
-                IconButton(
-                  tooltip: 'Muat ulang kamera',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _controller?.reload,
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-            ],
-          ),
+        _InfoBar(
+          isDark: isDark,
+          primary: primary,
+          isPlaying: _playing,
+          showReload: _playing && !_loading,
+          onReload: _controller?.reload,
         ),
       ],
     );
   }
 
-  Widget _fullScreenView() => Scaffold(
-    backgroundColor: Colors.black,
-    body: Stack(
-      fit: StackFit.expand,
-      children: [
-        Center(
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (_controller != null && _playing)
-                  WebViewWidget(controller: _controller!),
-                if (!_playing) _standby(Theme.of(context).colorScheme.primary),
-                if (_loading && _playing)
-                  const ColoredBox(
-                    color: Colors.black54,
-                    child: Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                  ),
-                if (_failed) _errorOverlay(),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          top: 16,
-          right: 16,
-          child: _roundControl(
-            icon: Icons.close_rounded,
-            tooltip: 'Tutup layar penuh',
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-        Positioned(top: 16, left: 16, child: _statusPill(true)),
-      ],
-    ),
-  );
-
-  void _openFullScreen() {
-    _stopStream();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            CctvScreen(streamUrl: widget.streamUrl, fullScreen: true),
-      ),
+  Widget _buildViewport(BuildContext context) {
+    return CctvViewport(
+      controller: _controller,
+      status: _status,
+      primary: Theme.of(context).colorScheme.primary,
+      onStart: _startStream,
+      onStop: _stopStream,
     );
   }
+}
 
-  Widget _statusPill(bool isDark) {
-    final color = _failed
-        ? const Color(0xFFFF765E)
-        : _playing && !_loading
-        ? const Color(0xFF58D68D)
-        : const Color(0xFFFFC857);
-    final label = _failed
-        ? 'OFFLINE'
-        : _playing && !_loading
-        ? 'LIVE'
-        : _playing
-        ? 'CONNECTING'
-        : 'STANDBY';
-    return Semantics(
-      label: 'CCTV status: ${label.toLowerCase()}',
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ExcludeSemantics(
-              child: Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-            ),
-            const SizedBox(width: 6),
-            ExcludeSemantics(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.7,
-                ),
-              ),
-            ),
-          ],
+/// Explanatory text below the player, with a reload action while live.
+class _InfoBar extends StatelessWidget {
+  const _InfoBar({
+    required this.isDark,
+    required this.primary,
+    required this.isPlaying,
+    required this.showReload,
+    required this.onReload,
+  });
+
+  final bool isDark;
+  final Color primary;
+  final bool isPlaying;
+  final bool showReload;
+  final VoidCallback? onReload;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B211E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
         ),
       ),
-    );
-  }
-
-  Widget _standby(Color primary) => Stack(
-    fit: StackFit.expand,
-    children: [
-      Positioned(
-        left: -70,
-        top: -110,
-        child: Container(
-          width: 190,
-          height: 190,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: primary.withValues(alpha: 0.09),
-          ),
-        ),
-      ),
-      Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.09),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              ),
-              child: const Icon(
-                Icons.videocam_outlined,
-                size: 30,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Kamera siap ditampilkan',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Stream tidak berjalan sebelum Anda menekan Play',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _startStream,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Play kamera'),
-              style: FilledButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-
-  Widget _errorOverlay() => ColoredBox(
-    color: Colors.black.withValues(alpha: 0.82),
-    child: Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          const Icon(
-            Icons.videocam_off_rounded,
-            color: Colors.white70,
-            size: 34,
+          Icon(
+            Icons.info_outline_rounded,
+            size: 19,
+            color: primary.withValues(alpha: 0.9),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Kamera tidak dapat dimuat',
-            style: TextStyle(color: Colors.white),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isPlaying
+                  ? 'Stream aktif menggunakan koneksi internet.'
+                  : 'Tekan Play saat Anda siap melihat kamera.',
+              style: theme.textTheme.bodySmall,
+            ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _startStream,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Coba lagi'),
-              ),
-              TextButton(onPressed: _stopStream, child: const Text('Kembali')),
-            ],
-          ),
+          if (showReload && onReload != null)
+            IconButton(
+              tooltip: 'Muat ulang kamera',
+              visualDensity: VisualDensity.compact,
+              onPressed: onReload,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
         ],
       ),
-    ),
-  );
-
-  Widget _roundControl({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) => Semantics(
-    button: true,
-    label: tooltip,
-    child: Material(
-      color: Colors.black.withValues(alpha: 0.55),
-      shape: const CircleBorder(),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        color: Colors.white,
-        icon: Icon(icon),
-      ),
-    ),
-  );
+    );
+  }
 }

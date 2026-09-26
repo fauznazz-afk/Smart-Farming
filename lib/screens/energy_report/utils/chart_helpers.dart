@@ -5,11 +5,20 @@ import '../../../services/energy_report_service.dart';
 
 /// Calculates the maximum Y value for the chart with 25% padding.
 double calculateMaxY(List<EnergyBucket> buckets) {
-  final maxValue = buckets.fold<double>(
-    0,
-    (max, item) => max > item.pvKwh ? (max > item.acKwh ? max : item.acKwh) : (item.pvKwh > item.acKwh ? item.pvKwh : item.acKwh),
-  );
+  var maxValue = 0.0;
+  for (final bucket in buckets) {
+    if (bucket.pvKwh > maxValue) maxValue = bucket.pvKwh;
+    if (bucket.acKwh > maxValue) maxValue = bucket.acKwh;
+  }
   return maxValue <= 0 ? 1.0 : maxValue * 1.25;
+}
+
+/// Clamps a touched bucket index into the valid range for [buckets].
+///
+/// Returns 0 for an empty list so callers always have a safe index.
+int clampBucketIndex(int? index, int length) {
+  if (length <= 0) return 0;
+  return (index ?? 0).clamp(0, length - 1);
 }
 
 /// Calculates the chart width based on number of buckets.
