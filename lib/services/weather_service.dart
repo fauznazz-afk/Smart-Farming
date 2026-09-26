@@ -379,12 +379,15 @@ class WeatherService {
     if (!hasApiKey) return [];
 
     try {
+      // HTTPS, like every other call in this service. This one was on
+      // cleartext, which put the API key on the wire in the clear and is
+      // blocked outright on Android 9 and later.
       final url = Uri.parse(
-        'http://api.openweathermap.org/geo/1.0/direct?q=$query&limit=5&appid=$_apiKey',
+        'https://api.openweathermap.org/geo/1.0/direct?q=$query&limit=5&appid=$_apiKey',
       );
-      
+
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         return data.map((e) => {
