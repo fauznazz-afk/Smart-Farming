@@ -49,16 +49,29 @@ https://dashboard.mbkm20262027.tech
 
 ```
 lib/
- ├── main.dart                      # Entry point, cek token & routing awal
+ ├── main.dart                      # Entry point, cek token, biometrik, routing awal
  ├── models/
  │    └── telemetry_model.dart      # Model parsing response telemetry
- ├── services/
- │    └── thingsboard_api.dart      # Semua fungsi HTTP ke ThingsBoard (login, fetch data)
+ ├── services/                      # Integrasi eksternal (ThingsBoard, cuaca, alarm)
  ├── screens/
- │    ├── login_screen.dart         # Halaman login
- │    └── dashboard_screen.dart     # Dashboard utama (3 section card)
- └── widgets/                       # (reserved untuk komponen reusable ke depannya)
+ │    ├── login_screen.dart
+ │    ├── dashboard_screen.dart     # State container + komposisi 5 tab
+ │    ├── dashboard/
+ │    │    ├── charts/chart_data.dart   # Series, statistik, bounds, downsampling
+ │    │    ├── utils/                   # Helper murni (energy, history range, warna, banner)
+ │    │    └── widgets/                 # Komponen presentasi per bagian dashboard
+ │    ├── energy_report_screen.dart
+ │    ├── energy_report/            # Widget & util modul untuk laporan energi
+ │    ├── settings_screen.dart
+ │    ├── alarm_history_screen.dart
+ │    └── cctv_screen.dart
+ ├── theme/app_theme_controller.dart
+ └── widgets/                       # Glass design system + kartu ringkasan
 ```
+
+Dashboard sengaja dipisah menjadi tiga lapis: `dashboard_screen.dart` memegang
+state dan orkestrasi, `dashboard/widgets/` menangani tampilan, dan
+`dashboard/utils/` berisi logika murni yang bisa diuji tanpa widget.
 
 ---
 

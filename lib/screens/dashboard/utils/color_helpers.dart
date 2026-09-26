@@ -26,6 +26,12 @@ Color metricColor({
       .toColor();
 }
 
+/// Returns the hairline divider color for glass surfaces.
+Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>
+    isDark
+    ? Colors.white.withValues(alpha: opacity)
+    : Colors.black.withValues(alpha: opacity);
+
 /// Creates a strong metric color for the given index and theme.
 Color strongMetricColor({
   required Color seedColor,

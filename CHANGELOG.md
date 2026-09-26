@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added unit tests for the extracted dashboard helpers (`test/dashboard_helpers_test.dart`) covering history window resolution, sampling intervals, energy integration, cached telemetry partitioning, and telemetry comparison
+- Added `glassDividerColor` helper so divider tinting stays consistent across glass cards
+
+### Changed
+
+- Refactored Dashboard screen from 3,046 lines to 1,384 lines (-55%), leaving the screen as a state container plus page composition
+- Extracted dashboard presentation widgets into `lib/screens/dashboard/widgets/`: `GlassNavBar`, `LivePowerCard`, `DualStatusCards`, `EnvironmentGrid`, `GreetingHeader`, `DateStrip`, `TelemetryCard`, `TelemetryChartCard`, `ChartSectionHeader`, and the banner set (`ConnectionStatusBanner`, `OfflineBanner`, `EnergyAlertBanner`, `TelemetryErrorView`)
+- Extracted dashboard logic into pure helpers under `lib/screens/dashboard/utils/`: `history_range.dart`, `energy_helpers.dart`, `telemetry_helpers.dart`
+- Replaced the positional prefix/icon/label nav literals with a shared `kNavDestinations` list so the expanded and collapsed nav bars cannot drift apart
+- Moved threshold parsing in `_loadPreferences` into a single `_readDouble` helper
+
+### Fixed
+
+- Fixed the expanded and collapsed glass nav bars keeping duplicate icon/label literals by sharing one `kNavDestinations` list
+
 ## [1.3.1] - 2026-09-26
 
 ### Added

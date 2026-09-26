@@ -48,6 +48,10 @@ app.*.map.json
 # Android release signing material (keep private and back up securely)
 /android/key.properties
 /android/upload-keystore.jks
+/android/*.jks
+
+# Locally built release APKs — distribute via GitHub Releases, not the repo
+/*.apk
 
 # Widget Preview related
 .widget_preview/
