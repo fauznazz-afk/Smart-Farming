@@ -223,6 +223,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _loadPreferences() async {
     final preferences = await SharedPreferences.getInstance();
     if (!mounted) return;
+    final cctvUrl = await loadCctvUrl();
+    if (!mounted) return;
     setState(() {
       _autoRefresh = preferences.getBool('auto_refresh') ?? true;
       _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
@@ -254,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _dailyProductionTargetKwh = double.tryParse(
         preferences.getString('daily_production_target_kwh') ?? '',
       );
-      _cctvUrl = await CctvUrl.loadCctvUrl();
+      _cctvUrl = cctvUrl;
     });
     _restartRefreshTimer();
     _evaluateEnergyAlerts();
