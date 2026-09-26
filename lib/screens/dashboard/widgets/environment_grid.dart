@@ -20,13 +20,16 @@ class _EnvSpec {
   final String? metric;
 }
 
+/// Labels are kept short because the card is a third of the screen width and
+/// the status icon takes what the text was using. "Ambient Temp" ellipsised to
+/// "Ambient T..." as soon as a verdict appeared, which is exactly when the user
+/// most needed to know which sensor it was.
 const _envSpecs = [
-  _EnvSpec('temp_dht', 'Ambient Temp', '°C', Icons.thermostat,
-      metric: 'temp_dht'),
-  _EnvSpec('humidity_dht', 'Humidity', '%', Icons.water_drop,
+  _EnvSpec('temp_dht', 'Suhu', '°C', Icons.thermostat, metric: 'temp_dht'),
+  _EnvSpec('humidity_dht', 'Kelembapan', '%', Icons.water_drop,
       metric: 'humidity_dht'),
-  _EnvSpec('temp_ds18b20', 'PV Temp', '°C', Icons.device_thermostat),
-  _EnvSpec('lux', 'Illuminance', 'lx', Icons.light_mode),
+  _EnvSpec('temp_ds18b20', 'Suhu PV', '°C', Icons.device_thermostat),
+  _EnvSpec('lux', 'Cahaya', 'lx', Icons.light_mode),
   _EnvSpec('tds_ppm', 'TDS', 'ppm', Icons.science, metric: 'tds_ppm'),
 ];
 

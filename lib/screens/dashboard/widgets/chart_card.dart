@@ -26,6 +26,8 @@ class ChartSectionHeader extends StatelessWidget {
     required this.rangeEnd,
     required this.realtimeConnected,
     required this.onPickRange,
+    this.metric,
+    this.onMetricChanged,
   });
 
   final String title;
@@ -35,6 +37,17 @@ class ChartSectionHeader extends StatelessWidget {
   final DateTime? rangeEnd;
   final bool realtimeConnected;
   final VoidCallback onPickRange;
+
+  /// The metric currently plotted, and how to change it.
+  ///
+  /// The chart used to draw Voltage, Current and Power on one shared Y axis.
+  /// They are three different units on three completely different scales, so
+  /// only the largest was ever legible: for PV, Power runs to a few hundred
+  /// watts while Current stays under 3 A, and the current trace collapsed onto
+  /// the X axis. The legend made all three look equally available. Picking one
+  /// metric at a time is the only way three units fit on an axis.
+  final ChartMetric? metric;
+  final ValueChanged<ChartMetric>? onMetricChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +126,25 @@ class ChartSectionHeader extends StatelessWidget {
   }
 }
 
-/// Glass card plotting Voltage, Current, and Power for one device prefix.
+/// One of the three metrics a device chart can plot.
+enum ChartMetric {
+  voltage('Voltage', 'V', 'volt'),
+  current('Current', 'A', 'ampere'),
+  power('Power', 'W', 'watt');
+
+  const ChartMetric(this.label, this.unit, this.keyFragment);
+
+  final String label;
+  final String unit;
+
+  /// Matches the suffix `historyKeysForPrefix` uses, e.g. `power_dc` or `power`.
+  final String keyFragment;
+
+  /// The history key for a page prefix, e.g. `pv` + power -> `power_dc`.
+  String keyFor(String prefix) => prefix == 'battery' ? 'power' : 'power_$prefix';
+}
+
+/// Glass card plotting one metric for one device prefix.
 ///
 /// The [points], [spots], [stats] and [boundsCache] maps are owned by the
 /// caller so that downsampling and bounds stay memoized across rebuilds.
@@ -132,11 +163,22 @@ class TelemetryChartCard extends StatelessWidget {
     required this.rangeStart,
     required this.rangeEnd,
     required this.onPointerActive,
+    required this.seedColor,
+    required this.onMetricChanged,
+    this.metric = ChartMetric.power,
   });
 
   final String prefix;
+
+  /// The theme accent, so the plotted series follows the chosen palette.
+  final Color seedColor;
   final bool isDark;
   final bool performanceMode;
+
+  /// Which metric to plot. The card plots exactly one, see [ChartMetric].
+  final ChartMetric metric;
+
+  final ValueChanged<ChartMetric> onMetricChanged;
   final Map<String, List<TelemetryPoint>> points;
   final Map<String, List<FlSpot>> spots;
   final Map<String, SeriesStats?> stats;
@@ -164,20 +206,38 @@ class TelemetryChartCard extends StatelessWidget {
       // height; reserving it pushed everything below the fold for nothing.
       height: (loading || !hasData) ? 170 : 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel: '$title Voltage, Current, and Power chart showing '
+      semanticLabel: '$title ${metric.label} chart showing '
           '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
       child: loading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
-          ? const Center(child: Text('No historical data available'))
+          ? const Center(child: Text('Tidak ada data untuk rentang ini'))
           : Column(
               children: [
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: series.map(_ChartLegend.new).toList(),
+                // Picks which single metric is plotted. Three units on one
+                // shared axis was the problem this replaces.
+                Row(
+                  children: [
+                    for (final option in ChartMetric.values) ...[
+                      if (option != ChartMetric.values.first)
+                        const SizedBox(width: 8),
+                      _MetricChip(
+                        metric: option,
+                        selected: option == metric,
+                        isDark: isDark,
+                        color: option == metric
+                            ? strongMetricColor(
+                                seedColor: seedColor,
+                                index: ChartMetric.values.indexOf(option),
+                                isDark: isDark,
+                              )
+                            : null,
+                        onTap: () => onMetricChanged(option),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 Expanded(
                   child: Listener(
                     onPointerDown: (_) => onPointerActive(true),
@@ -198,26 +258,19 @@ class TelemetryChartCard extends StatelessWidget {
     );
   }
 
-  List<ChartSeries> _buildSeries() {
-    Color tint(bool isDark, Color light, Color dark) => isDark ? dark : light;
-    return [
-      _seriesFor(
-        'Voltage',
-        'V',
-        tint(isDark, const Color(0xFFE53935), const Color(0xFFFF5252)),
-      ),
-      _seriesFor(
-        'Current',
-        'A',
-        tint(isDark, const Color(0xFF43A047), const Color(0xFF69F0AE)),
-      ),
-      _seriesFor(
-        'Power',
-        'W',
-        tint(isDark, const Color(0xFF1E88E5), const Color(0xFF448AFF)),
-      ),
-    ];
+  /// The colour the plotted metric gets, derived from the theme accent.
+  ///
+  /// The three series used to be hard-coded Material red, green and blue, which
+  /// meant picking the "Ocean cyan" accent changed the cards but left the chart
+  /// exactly as it was. It was the one place the theme was ignored.
+  Color get _seriesColor {
+    final index = ChartMetric.values.indexOf(metric);
+    return strongMetricColor(seedColor: seedColor, index: index, isDark: isDark);
   }
+
+  List<ChartSeries> _buildSeries() => [
+    _seriesFor(metric.label, metric.unit, _seriesColor),
+  ];
 
   ChartSeries _seriesFor(String label, String unit, Color color) {
     final key = '${prefix}_${label.toLowerCase()}';
@@ -375,29 +428,12 @@ class TelemetryChartCard extends StatelessWidget {
     return 0;
   }
 }
-
-class _ChartLegend extends StatelessWidget {
-  const _ChartLegend(this.series);
-
-  final ChartSeries series;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(color: series.color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text('${series.label} (${series.unit})', style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-}
-
+/// Latest, average and range for the plotted series.
+///
+/// Was five lines at 9dp in English. Nine dp is below the point where text
+/// stops being readable, and five rows of numbers competed with the chart for
+/// attention without adding anything, since the range is the only part that is
+/// not already visible in the plot.
 class _SeriesStatistics extends StatelessWidget {
   const _SeriesStatistics(this.series);
 
@@ -415,27 +451,90 @@ class _SeriesStatistics extends StatelessWidget {
             '${series.label} (${series.unit})',
             style: TextStyle(
               color: series.color,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
-            'Latest ${formatAxisNumber(stats.latest)} ${series.unit}',
-            style: const TextStyle(fontSize: 9),
+            'Terakhir ${formatAxisNumber(stats.latest)} · '
+            'rata-rata ${formatAxisNumber(stats.average)} ${series.unit}',
+            style: const TextStyle(fontSize: 11),
           ),
           Text(
-            'Avg ${formatAxisNumber(stats.average)} ${series.unit}',
-            style: const TextStyle(fontSize: 9),
-          ),
-          Text(
-            'Min ${formatAxisNumber(stats.minimum)} ${series.unit}',
-            style: const TextStyle(fontSize: 9),
-          ),
-          Text(
-            'Max ${formatAxisNumber(stats.maximum)} ${series.unit}',
-            style: const TextStyle(fontSize: 9),
+            '↓ ${formatAxisNumber(stats.minimum)}  '
+            '↑ ${formatAxisNumber(stats.maximum)} ${series.unit}',
+            style: const TextStyle(fontSize: 11),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One tappable metric choice, sitting where the legend used to be.
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({
+    required this.metric,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+    this.color,
+  });
+
+  final ChartMetric metric;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  /// Overrides the accent when selected, so the chip matches the plotted line.
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = color ?? faintColor(isDark);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Show ${metric.label}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              width: 1,
+              color: selected
+                  ? accent.withValues(alpha: 0.55)
+                  : (isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.10)),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                metric.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? accent : faintColor(isDark),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                metric.unit,
+                style: TextStyle(fontSize: 10, color: faintColor(isDark)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

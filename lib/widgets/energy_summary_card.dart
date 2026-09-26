@@ -214,7 +214,7 @@ class EnergySummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Forecast',
+            'Prediksi',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -236,7 +236,7 @@ class EnergySummaryCard extends StatelessWidget {
               Expanded(
                 child: _forecastMetric(
                   context,
-                  'Peak usage',
+                  'Puncak pakai',
                   result.peakUsageWatts == null
                       ? 'Unavailable'
                       : '${result.peakUsageWatts!.toStringAsFixed(0)} W',

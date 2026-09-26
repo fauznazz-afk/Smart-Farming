@@ -33,7 +33,7 @@ import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/date_strip.dart';
-import 'dashboard/widgets/dual_status_cards.dart';
+import 'dashboard/widgets/system_status_strip.dart';
 import 'dashboard/widgets/environment_grid.dart';
 import 'dashboard/widgets/greeting_header.dart';
 import 'dashboard/widgets/live_power_card.dart';
@@ -148,6 +148,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// how the same setting came to default to different values in different
   /// readers.
   AlarmThresholds _thresholds = AlarmThresholds.defaults;
+
+  /// Which metric the device charts plot. Shared across pages so the choice
+  /// sticks while moving between PV, AC and Battery.
+  ChartMetric _chartMetric = ChartMetric.power;
+
+  void _selectChartMetric(ChartMetric metric) {
+    if (metric == _chartMetric) return;
+    setState(() => _chartMetric = metric);
+  }
 
   List<AlarmRule> get _alarmRules => buildAlarmRules(_thresholds);
 
@@ -1289,7 +1298,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _dualCards(bool isDark) {
-    return DualStatusCards(
+    return SystemStatusStrip(
+      lowSocThreshold: _thresholds.lowSoc,
+      activeAlerts: _activeAlertIds.length,
       battery: (
         soc: _battery?.latestValues['soc'] ?? 0.0,
         voltage: _battery?.latestValues['voltage'] ?? 0.0,
@@ -1476,6 +1487,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     return TelemetryChartCard(
       prefix: prefix,
       isDark: isDark,
+      seedColor: _seedColor,
+      metric: _chartMetric,
+      onMetricChanged: _selectChartMetric,
       performanceMode: _performanceMode,
       points: _history,
       spots: _chartSpots,
