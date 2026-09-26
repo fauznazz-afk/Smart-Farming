@@ -386,6 +386,14 @@ Test suite: 119 → **139**.
 | CCTV (go2rtc) | HTTP 200, video decode `c2.mtk.avc.decoder` berjalan |
 | Biometric gate | sidik jari |
 | Estimasi baterai | 40.6 jam, cocok dengan perhitungan manual |
+| Chart label ikut tanggal | header `25/9/2026`, bukan "Last 24 hours" |
+| Field TDS 4 digit | menerima `1200` / `2500` |
+| Release build 1.4.0 | cold launch **1038 ms**, fingerprint cocok PRD §3, APK di GitHub identik byte-per-byte dengan build lokal |
+
+**Catatan tentang Weather.** Sesi build Linux (26 September 2026) mengosongkan
+data aplikasi saat uninstall, jadi API key OpenWeatherMap ikut hilang. Keberadaan
+fitur ini terverifikasi di sesi sebelumnya, tetapi kelanjutannya belum diuji
+ulang di perangkat. Isi ulang API key di Settings → Weather untuk mengonfirmasi.
 
 ---
 

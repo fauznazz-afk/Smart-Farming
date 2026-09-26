@@ -193,12 +193,26 @@ Aplikasi ini dirancang untuk login memakai **Customer User**, bukan Tenant Admin
 
 ### Terverifikasi di perangkat (Android 16, API 36)
 
-- [x] ThingsBoard REST + WebSocket real-time
-- [x] OpenWeatherMap (Kertapati, ID)
-- [x] go2rtc CCTV live
-- [x] Release build dari Linux: cold launch 1038 ms, signature terverifikasi
-- [x] `flutter analyze` bersih, 139 test lulus
+Semua dicek di Xiaomi 24090RA29G. Rincian per-area ada di `progress.md` §7.
+
+- [x] ThingsBoard REST + WebSocket real-time, indikator "Live" hijau
+- [x] Login Customer User, display name dari server tampil
+- [x] Tab PV / AC / Battery dengan chart 3 seri
+- [x] Energy analytics, termasuk proyeksi runtime baterai
+- [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
+- [x] Biometric gate (sidik jari)
+- [x] go2rtc CCTV live, video decode berjalan
+- [ ] OpenWeatherMap — **fitur ada dan terpasang, belum diisi API key** di perangkat uji
 - [ ] Push notification untuk alarm (menunggu `flutter_local_notifications` stabil di Android 14+)
+
+Release build 1.4.0 dibangun di Linux: cold launch 1038 ms, fingerprint signing
+terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3, dan berkas APK di
+GitHub Release dibandingkan byte-per-byte dengan hasil build lokal.
+
+> Weather pernah terverifikasi pada sesi sebelumnya (Kertapati, 31.0 °C, 55
+> persen, 4.6 m/s) sebelum sesi build Linux mengosongkan data aplikasi saat
+> uninstall. Keberadaannya terverifikasi; kelanjutannya perlu diisi ulang API key
+> untuk diuji ulang.
 
 ---
 
