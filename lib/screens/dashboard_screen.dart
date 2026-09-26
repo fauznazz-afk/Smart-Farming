@@ -21,6 +21,11 @@ import 'cctv_screen.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
+import 'dashboard/charts/chart_data.dart';
+import 'dashboard/utils/alarm_helpers.dart';
+import 'dashboard/utils/bound.dart';
+import 'dashboard/utils/color_helpers.dart';
+import 'dashboard/utils/date_helpers.dart';
 
 // ── File-level accent colours & tint helpers ──────────────────────────────────
 
@@ -49,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   DeviceTelemetry? _sensor;
   final Map<String, List<TelemetryPoint>> _history = {};
   final Map<String, List<TelemetryPoint>> _energyHistory = {};
-  final _chartBounds = <String, _ChartBounds>{};
+  final _chartBounds = <String, ChartBounds>{};
   int _selectedIndex = 0;
   bool _loading = true;
   bool _chartLoading = true;
@@ -64,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ValueNotifier<bool> _connectionStatusVisible = ValueNotifier(false);
   final ValueNotifier<List<String>> _alertMessages = ValueNotifier(const []);
   final Map<String, List<FlSpot>> _chartSpots = {};
-  final Map<String, _SeriesStats?> _chartStats = {};
+  final Map<String, SeriesStats?> _chartStats = {};
   double _solarKwh = 0.0;
   double _previousSolarKwh = 0.0;
   double _loadKwh = 0.0;
@@ -172,30 +177,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   bool get _performanceMode => widget.themeController.performanceMode;
-
-  Color _themeColor({required double lightness, double saturation = 0.62}) {
-    final hsl = HSLColor.fromColor(widget.themeController.seedColor);
-    return hsl
-        .withSaturation(saturation.clamp(0.0, 1.0))
-        .withLightness(lightness.clamp(0.0, 1.0))
-        .toColor();
-  }
-
-  Color _metricColor(int index, bool isDark) {
-    final base = HSLColor.fromColor(widget.themeController.seedColor);
-    return base
-        .withSaturation(isDark ? 0.64 : 0.72)
-        .withLightness(isDark ? 0.68 : 0.40)
-        .toColor();
-  }
-
-  Color _strongMetricColor(int index, bool isDark) {
-    final base = HSLColor.fromColor(widget.themeController.seedColor);
-    return base
-        .withSaturation(isDark ? 0.78 : 0.86)
-        .withLightness(isDark ? 0.64 : 0.36)
-        .toColor();
-  }
 
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
@@ -646,9 +627,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (newEntries.isNotEmpty) {
       final now = DateTime.now();
       for (final entry in newEntries) {
-        final type = _alarmTypeFromId(entry.key);
-        final severity = _alarmSeverityFromId(entry.key);
-        final value = _alarmValueFromId(entry.key);
+        final type = alarmTypeFromId(entry.key);
+        final severity = alarmSeverityFromId(entry.key);
+        final value = alarmValueFromId(
+          entry.key,
+          batteryValues: _battery?.latestValues,
+          sensorValues: _sensor?.latestValues,
+        );
         unawaited(
           _alarmHistoryService.addAlarm(
             AlarmRecord(
@@ -711,59 +696,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       alerts['environment_${id}_high'] =
           '$label tinggi: ${value.toStringAsFixed(1)} $unit (batas $maximum $unit)';
     }
-  }
-
-  /// Maps an alert ID string to an [AlarmType].
-  AlarmType _alarmTypeFromId(String id) {
-    if (id == 'low_soc') return AlarmType.lowSoc;
-    if (id.startsWith('stale_')) return AlarmType.staleTelemetry;
-    if (id.startsWith('environment_ambient_temp')) {
-      return AlarmType.environmentTemp;
-    }
-    if (id.startsWith('environment_humidity')) {
-      return AlarmType.environmentHumidity;
-    }
-    if (id.startsWith('environment_tds')) return AlarmType.environmentTds;
-    return AlarmType.deviceOffline;
-  }
-
-  /// Determines severity from the alert ID.
-  AlarmSeverity _alarmSeverityFromId(String id) {
-    // Low SOC and device offline are critical; others are warnings.
-    if (id == 'low_soc') return AlarmSeverity.critical;
-    if (id.startsWith('stale_')) return AlarmSeverity.warning;
-    return AlarmSeverity.warning;
-  }
-
-  /// Extracts the triggering numeric value from the alert ID.
-  double? _alarmValueFromId(String id) {
-    if (id == 'low_soc') return _battery?.latestValues['soc'];
-    if (id.startsWith('environment_ambient_temp')) {
-      return _sensor?.latestValues['temp_dht'];
-    }
-    if (id.startsWith('environment_humidity')) {
-      return _sensor?.latestValues['humidity_dht'];
-    }
-    if (id.startsWith('environment_tds')) {
-      return _sensor?.latestValues['tds_ppm'];
-    }
-    return null;
-  }
-
-  List<String> _staleDeviceNames() {
-    final devices = <(String, DeviceTelemetry?)>[
-      ('Baterai', _battery),
-      ('PZEM', _pzem),
-      ('Sensor lingkungan', _sensor),
-    ];
-    return devices
-        .where(
-          (entry) =>
-              entry.$2 != null &&
-              entry.$2!.isStale(minutes: _staleTelemetryMinutes),
-        )
-        .map((entry) => entry.$1)
-        .toList();
   }
 
   String _formatClock(DateTime value) =>
@@ -941,18 +873,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       final vPoints = histories[keys.$1] ?? [];
       final cPoints = histories[keys.$2] ?? [];
       final pPoints = histories[keys.$3] ?? [];
-      final vSpots = _processSpots(vPoints);
-      final cSpots = _processSpots(cPoints);
-      final pSpots = _processSpots(pPoints);
+      final vSpots = processSpots(vPoints);
+      final cSpots = processSpots(cPoints);
+      final pSpots = processSpots(pPoints);
       _history['${prefix}_voltage'] = vPoints;
       _history['${prefix}_current'] = cPoints;
       _history['${prefix}_power'] = pPoints;
       _chartSpots['${prefix}_voltage'] = vSpots;
       _chartSpots['${prefix}_current'] = cSpots;
       _chartSpots['${prefix}_power'] = pSpots;
-      _chartStats['${prefix}_voltage'] = _SeriesStats.fromPoints(vPoints);
-      _chartStats['${prefix}_current'] = _SeriesStats.fromPoints(cPoints);
-      _chartStats['${prefix}_power'] = _SeriesStats.fromPoints(pPoints);
+      _chartStats['${prefix}_voltage'] = SeriesStats.fromPoints(vPoints);
+      _chartStats['${prefix}_current'] = SeriesStats.fromPoints(cPoints);
+      _chartStats['${prefix}_power'] = SeriesStats.fromPoints(pPoints);
       _chartBounds.remove(prefix);
       _historyLoaded.add(prefix);
       _chartLoading = false;
@@ -1236,7 +1168,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       valueListenable: _navCollapsed,
       builder: (context, collapsed, _) {
         final page = _selectedIndex.toDouble();
-        final primary = _strongMetricColor(_selectedIndex, isDark);
+        final primary = strongMetricColor(seedColor: widget.themeController.seedColor, index: _selectedIndex, isDark: isDark);
         return SafeArea(
           top: false,
           minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1460,9 +1392,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Icon(
                             icon,
                             size: 20,
-                            color: _metricColor(
-                              index,
-                              isDark,
+                            color: metricColor(
+                              seedColor: widget.themeController.seedColor,
+                              index: index,
+                              isDark: isDark,
                             ).withValues(alpha: 0.72),
                           ),
                           const SizedBox(height: 2),
@@ -1471,9 +1404,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                             maxLines: 1,
                             style: TextStyle(
                               fontSize: 9,
-                              color: _metricColor(
-                                index,
-                                isDark,
+                              color: metricColor(
+                                seedColor: widget.themeController.seedColor,
+                                index: index,
+                                isDark: isDark,
                               ).withValues(alpha: 0.72),
                               fontWeight: FontWeight.w600,
                             ),
@@ -1500,7 +1434,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     bool isDark,
     Widget Function() builder,
   ) {
-    return _Bound(
+    return Bound(
       listenable: listenable,
       token: Object.hash(_visualToken, isDark),
       builder: builder,
@@ -1600,7 +1534,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       2 => _acPage(isDark),
       3 => _batteryPage(isDark),
       4 => [
-        () => _Bound(
+        () => Bound(
           listenable: _cctvKeepAlive,
           token: _cctvUrl,
           builder: () => CctvScreen(streamUrl: _cctvUrl),
@@ -1709,7 +1643,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
               ),
               Text(
-                '${_dayNameFull(now.weekday)}, ${now.day} ${_monthName(now.month)} ${now.year}',
+                '${dayNameFull(now.weekday)}, ${now.day} ${monthName(now.month)} ${now.year}',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? Colors.white54 : Colors.black45,
@@ -1727,14 +1661,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     final first = days.first;
     final last = days.last;
     final dateRange = _selectedRangeStart != null && _selectedRangeEnd != null
-        ? '${_selectedRangeStart!.day} ${_monthName(_selectedRangeStart!.month)} '
+        ? '${_selectedRangeStart!.day} ${monthName(_selectedRangeStart!.month)} '
               '${_selectedRangeStart!.year} – '
-              '${_selectedRangeEnd!.day} ${_monthName(_selectedRangeEnd!.month)} '
+              '${_selectedRangeEnd!.day} ${monthName(_selectedRangeEnd!.month)} '
               '${_selectedRangeEnd!.year}'
         : first.month == last.month
-        ? '${first.day}–${last.day} ${_monthName(last.month)} ${last.year}'
-        : '${first.day} ${_monthName(first.month)} – '
-              '${last.day} ${_monthName(last.month)} ${last.year}';
+        ? '${first.day}–${last.day} ${monthName(last.month)} ${last.year}'
+        : '${first.day} ${monthName(first.month)} – '
+              '${last.day} ${monthName(last.month)} ${last.year}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1796,7 +1730,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     width: chipWidth,
                     child: GlassDateChip(
                       width: chipWidth,
-                      dayName: _dayNameShort(days[i].weekday),
+                      dayName: dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
                       isSelected:
                           _selectedRangeStart == null &&
@@ -1804,7 +1738,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           days[i].month == _selectedDate.month &&
                           days[i].day == _selectedDate.day,
                       isDark: isDark,
-                      accentColor: _strongMetricColor(0, isDark),
+                      accentColor: strongMetricColor(seedColor: widget.themeController.seedColor, index: 0, isDark: isDark),
                       onTap: () => _selectDate(days[i]),
                       performanceMode: _performanceMode,
                     ),
@@ -1837,7 +1771,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               Icon(
                 Icons.wb_sunny_rounded,
                 size: 18,
-                color: _metricColor(2, isDark),
+                color: metricColor(seedColor: widget.themeController.seedColor, index: 2, isDark: isDark),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1947,7 +1881,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       label: 'PV Output',
                       value: pvPower?.toStringAsFixed(0) ?? '--',
                       unit: 'W',
-                      accentColor: _themeColor(lightness: isDark ? 0.72 : 0.42),
+                      accentColor: themeColor(seedColor: widget.themeController.seedColor, lightness: isDark ? 0.72 : 0.42),
                       progress: ((pvPower ?? 0) / 300).clamp(0.0, 1.0),
                       isDark: isDark,
                       performanceMode: _performanceMode,
@@ -1962,7 +1896,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       label: 'AC Load',
                       value: acPower.toStringAsFixed(0),
                       unit: 'W',
-                      accentColor: _themeColor(
+                      accentColor: themeColor(
+                        seedColor: widget.themeController.seedColor,
                         lightness: isDark ? 0.64 : 0.36,
                         saturation: 0.48,
                       ),
@@ -2026,7 +1961,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         Icon(
                           Icons.battery_charging_full,
                           size: 14,
-                          color: _metricColor(0, isDark),
+                          color: metricColor(seedColor: widget.themeController.seedColor, index: 0, isDark: isDark),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -2098,7 +2033,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         Icon(
                           Icons.power,
                           size: 14,
-                          color: _metricColor(2, isDark),
+                          color: metricColor(seedColor: widget.themeController.seedColor, index: 2, isDark: isDark),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -2259,7 +2194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: _metricColor(3, isDark)),
+              Icon(icon, size: 16, color: metricColor(seedColor: widget.themeController.seedColor, index: 3, isDark: isDark)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -2305,18 +2240,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _glassPageHeader(
       'PV Status',
       Icons.wb_sunny,
-      _strongMetricColor(0, isDark),
+      strongMetricColor(seedColor: widget.themeController.seedColor, index: 0, isDark: isDark),
       isDark,
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
       _liveRevision,
       isDark,
-      () => _glassTelemetryCard(_pzem, isDark, _metricColor(0, isDark), [
-        _MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
-        _MetricDef('current_dc', 'Current', 'A', Icons.swap_horiz),
-        _MetricDef('power_dc', 'Power', 'W', Icons.wb_sunny),
-        _MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
+      () => _glassTelemetryCard(_pzem, isDark, metricColor(seedColor: widget.themeController.seedColor, index: 0, isDark: isDark), [
+        MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
+        MetricDef('current_dc', 'Current', 'A', Icons.swap_horiz),
+        MetricDef('power_dc', 'Power', 'W', Icons.wb_sunny),
+        MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
       ]),
     ),
     () => const SizedBox(height: 16),
@@ -2333,20 +2268,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _glassPageHeader(
       'AC Status',
       Icons.power,
-      _strongMetricColor(1, isDark),
+      strongMetricColor(seedColor: widget.themeController.seedColor, index: 1, isDark: isDark),
       isDark,
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
       _liveRevision,
       isDark,
-      () => _glassTelemetryCard(_pzem, isDark, _metricColor(1, isDark), [
-        _MetricDef('voltage_ac', 'Voltage', 'V', Icons.bolt),
-        _MetricDef('current_ac', 'Current', 'A', Icons.swap_horiz),
-        _MetricDef('power_ac', 'Power', 'W', Icons.power),
-        _MetricDef('frequency_ac', 'Frequency', 'Hz', Icons.graphic_eq),
-        _MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
-        _MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
+      () => _glassTelemetryCard(_pzem, isDark, metricColor(seedColor: widget.themeController.seedColor, index: 1, isDark: isDark), [
+        MetricDef('voltage_ac', 'Voltage', 'V', Icons.bolt),
+        MetricDef('current_ac', 'Current', 'A', Icons.swap_horiz),
+        MetricDef('power_ac', 'Power', 'W', Icons.power),
+        MetricDef('frequency_ac', 'Frequency', 'Hz', Icons.graphic_eq),
+        MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
+        MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
       ]),
     ),
     () => const SizedBox(height: 16),
@@ -2363,20 +2298,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _glassPageHeader(
       'Battery Status',
       Icons.battery_charging_full,
-      _strongMetricColor(2, isDark),
+      strongMetricColor(seedColor: widget.themeController.seedColor, index: 2, isDark: isDark),
       isDark,
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
       _liveRevision,
       isDark,
-      () => _glassTelemetryCard(_battery, isDark, _metricColor(2, isDark), [
-        _MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
-        _MetricDef('current', 'Current', 'A', Icons.swap_horiz),
-        _MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
-        _MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full),
-        _MetricDef('cycles', 'Cycles', '', Icons.refresh),
-        _MetricDef(
+      () => _glassTelemetryCard(_battery, isDark, metricColor(seedColor: widget.themeController.seedColor, index: 2, isDark: isDark), [
+        MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
+        MetricDef('current', 'Current', 'A', Icons.swap_horiz),
+        MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
+        MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full),
+        MetricDef('cycles', 'Cycles', '', Icons.refresh),
+        MetricDef(
           'remain_capacity_ah',
           'Remaining Capacity',
           'Ah',
@@ -2502,7 +2437,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     DeviceTelemetry? data,
     bool isDark,
     Color accent,
-    List<_MetricDef> metrics,
+    List<MetricDef> metrics,
   ) {
     final stale = data?.isStale(minutes: _staleTelemetryMinutes) ?? true;
     return LiquidGlassCard(
@@ -2553,7 +2488,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             child: Icon(
                               metric.icon,
                               size: 19,
-                              color: _metricColor(index, isDark),
+                              color: metricColor(seedColor: widget.themeController.seedColor, index: index, isDark: isDark),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -2600,46 +2535,46 @@ class _DashboardScreenState extends State<DashboardScreen>
     final pPoints = _history['${prefix}_power'] ?? const [];
     final vSpots = _chartSpots.putIfAbsent(
       '${prefix}_voltage',
-      () => _processSpots(vPoints),
+      () => processSpots(vPoints),
     );
     final cSpots = _chartSpots.putIfAbsent(
       '${prefix}_current',
-      () => _processSpots(cPoints),
+      () => processSpots(cPoints),
     );
     final pSpots = _chartSpots.putIfAbsent(
       '${prefix}_power',
-      () => _processSpots(pPoints),
+      () => processSpots(pPoints),
     );
 
     final series = [
-      _ChartSeries(
+      ChartSeries(
         'Voltage',
         'V',
         vPoints,
         vSpots,
         isDark ? const Color(0xFFFF5252) : const Color(0xFFE53935),
-        _chartStats['${prefix}_voltage'] ?? _SeriesStats.fromPoints(vPoints),
+        _chartStats['${prefix}_voltage'] ?? SeriesStats.fromPoints(vPoints),
       ),
-      _ChartSeries(
+      ChartSeries(
         'Current',
         'A',
         cPoints,
         cSpots,
         isDark ? const Color(0xFF69F0AE) : const Color(0xFF43A047),
-        _chartStats['${prefix}_current'] ?? _SeriesStats.fromPoints(cPoints),
+        _chartStats['${prefix}_current'] ?? SeriesStats.fromPoints(cPoints),
       ),
-      _ChartSeries(
+      ChartSeries(
         'Power',
         'W',
         pPoints,
         pSpots,
         isDark ? const Color(0xFF448AFF) : const Color(0xFF1E88E5),
-        _chartStats['${prefix}_power'] ?? _SeriesStats.fromPoints(pPoints),
+        _chartStats['${prefix}_power'] ?? SeriesStats.fromPoints(pPoints),
       ),
     ];
     final bounds = _chartBounds.putIfAbsent(
       prefix,
-      () => _ChartBounds.fromSeries(series),
+      () => ChartBounds.fromSeries(series),
     );
     final hasData = series.any((item) => item.points.isNotEmpty);
 
@@ -2721,7 +2656,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       axisSide: meta.axisSide,
                                       space: 4,
                                       child: Text(
-                                        _axisNumber(value),
+                                        formatAxisNumber(value),
                                         style: TextStyle(
                                           fontSize: 8,
                                           color: isDark
@@ -2744,7 +2679,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       child: SizedBox(
                                         width: 32,
                                         child: Text(
-                                          _axisTime(value),
+                                          formatAxisTime(value),
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontSize: 8,
@@ -2781,11 +2716,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 if (touchedSpots.isEmpty) {
                                   return const [];
                                 }
-                                final time = _axisTime(touchedSpots.first.x);
+                                final time = formatAxisTime(touchedSpots.first.x);
                                 final values = <String>[];
                                 for (final spot in touchedSpots) {
                                   values.add(
-                                    '${_axisNumber(spot.y)} ${series[spot.barIndex].unit}',
+                                    '${formatAxisNumber(spot.y)} ${series[spot.barIndex].unit}',
                                   );
                                 }
                                 final tooltip = LineTooltipItem(
@@ -2923,7 +2858,15 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _connectionStatusBanner() {
     final failed = _error != null;
-    final staleNames = _staleDeviceNames();
+    final staleNames = staleDeviceNames(
+      batteryValues: _battery?.latestValues,
+      batteryLastUpdate: _battery?.lastUpdate,
+      pzemValues: _pzem?.latestValues,
+      pzemLastUpdate: _pzem?.lastUpdate,
+      sensorValues: _sensor?.latestValues,
+      sensorLastUpdate: _sensor?.lastUpdate,
+      staleMinutes: _staleTelemetryMinutes,
+    );
     final stale = !failed && staleNames.isNotEmpty;
     final color = failed
         ? Colors.deepOrange
@@ -3075,18 +3018,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ),
   );
 
-  // ── Chart stat / legend helpers ───────────────────────────────────────────────
-  String _axisNumber(double value) {
-    final formatted = value.toStringAsFixed(2);
-    return formatted.replaceFirst(RegExp(r'\.?0+$'), '');
-  }
-
-  String _axisTime(double value) {
-    final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  Widget _statistics(_ChartSeries series) {
+  Widget _statistics(ChartSeries series) {
     final stats = series.stats;
     if (stats == null) return const Expanded(child: SizedBox.shrink());
     return Expanded(
@@ -3102,19 +3034,19 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
           Text(
-            'Latest ${_axisNumber(stats.latest)} ${series.unit}',
+            'Latest ${formatAxisNumber(stats.latest)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Avg ${_axisNumber(stats.average)} ${series.unit}',
+            'Avg ${formatAxisNumber(stats.average)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Min ${_axisNumber(stats.minimum)} ${series.unit}',
+            'Min ${formatAxisNumber(stats.minimum)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
           Text(
-            'Max ${_axisNumber(stats.maximum)} ${series.unit}',
+            'Max ${formatAxisNumber(stats.maximum)} ${series.unit}',
             style: const TextStyle(fontSize: 9),
           ),
         ],
@@ -3122,7 +3054,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _legend(_ChartSeries series, Color color) => Row(
+  Widget _legend(ChartSeries series, Color color) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
       Container(
@@ -3137,260 +3069,4 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ],
   );
-
-  // ── Date / time name helpers ──────────────────────────────────────────────────
-  String _dayNameShort(int weekday) => const [
-    'Sen',
-    'Sel',
-    'Rab',
-    'Kam',
-    'Jum',
-    'Sab',
-    'Min',
-  ][(weekday - 1) % 7];
-
-  String _dayNameFull(int weekday) => const [
-    'Senin',
-    'Selasa',
-    'Rabu',
-    'Kamis',
-    'Jumat',
-    'Sabtu',
-    'Minggu',
-  ][(weekday - 1) % 7];
-
-  String _monthName(int month) => const [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
-  ][month - 1];
-}
-
-// ── Data helpers ──────────────────────────────────────────────────────────────
-
-class _MetricDef {
-  final String key;
-  final String label;
-  final String unit;
-  final IconData icon;
-  _MetricDef(this.key, this.label, this.unit, this.icon);
-}
-
-List<FlSpot> _processSpots(List<TelemetryPoint> points) {
-  if (points.isEmpty) return const <FlSpot>[];
-  if (points.length <= 180) {
-    return points
-        .map(
-          (p) => FlSpot(p.timestamp.millisecondsSinceEpoch.toDouble(), p.value),
-        )
-        .toList(growable: false);
-  }
-
-  const targetBuckets = 90;
-  final bucketSize = points.length / targetBuckets;
-  final spots = <FlSpot>[];
-
-  void addSpot(TelemetryPoint point) {
-    final x = point.timestamp.millisecondsSinceEpoch.toDouble();
-    if (spots.isEmpty || x > spots.last.x) {
-      spots.add(FlSpot(x, point.value));
-    }
-  }
-
-  addSpot(points.first);
-
-  for (var b = 0; b < targetBuckets; b++) {
-    final startIdx = (b * bucketSize).floor();
-    var endIdx = ((b + 1) * bucketSize).floor();
-    if (endIdx > points.length) endIdx = points.length;
-    if (startIdx >= endIdx) continue;
-
-    var minIdx = startIdx;
-    var maxIdx = startIdx;
-    for (var i = startIdx + 1; i < endIdx; i++) {
-      if (points[i].value < points[minIdx].value) minIdx = i;
-      if (points[i].value > points[maxIdx].value) maxIdx = i;
-    }
-
-    final firstIdx = minIdx < maxIdx ? minIdx : maxIdx;
-    final secondIdx = minIdx < maxIdx ? maxIdx : minIdx;
-
-    addSpot(points[firstIdx]);
-    if (secondIdx != firstIdx) {
-      addSpot(points[secondIdx]);
-    }
-  }
-
-  final lastX = points.last.timestamp.millisecondsSinceEpoch.toDouble();
-  if (spots.isNotEmpty && spots.last.x == lastX) {
-    spots[spots.length - 1] = FlSpot(lastX, points.last.value);
-  } else {
-    spots.add(FlSpot(lastX, points.last.value));
-  }
-
-  return spots;
-}
-
-class _SeriesStats {
-  final double latest;
-  final double average;
-  final double minimum;
-  final double maximum;
-
-  const _SeriesStats({
-    required this.latest,
-    required this.average,
-    required this.minimum,
-    required this.maximum,
-  });
-
-  static _SeriesStats? fromPoints(List<TelemetryPoint> points) {
-    if (points.isEmpty) return null;
-    var latest = points.first;
-    var sum = 0.0;
-    var minimum = points.first.value;
-    var maximum = points.first.value;
-    for (final point in points) {
-      sum += point.value;
-      if (point.value < minimum) minimum = point.value;
-      if (point.value > maximum) maximum = point.value;
-      if (point.timestamp.isAfter(latest.timestamp)) latest = point;
-    }
-    return _SeriesStats(
-      latest: latest.value,
-      average: sum / points.length,
-      minimum: minimum,
-      maximum: maximum,
-    );
-  }
-}
-
-class _Bound extends StatefulWidget {
-  const _Bound({
-    required this.listenable,
-    required this.token,
-    required this.builder,
-  });
-
-  final Listenable listenable;
-  final Object token;
-  final Widget Function() builder;
-
-  @override
-  State<_Bound> createState() => _BoundState();
-}
-
-class _BoundState extends State<_Bound> {
-  late Widget _child;
-
-  @override
-  void initState() {
-    super.initState();
-    _child = widget.builder();
-    widget.listenable.addListener(_refresh);
-  }
-
-  @override
-  void didUpdateWidget(_Bound oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.listenable != widget.listenable) {
-      oldWidget.listenable.removeListener(_refresh);
-      widget.listenable.addListener(_refresh);
-      _child = widget.builder();
-    } else if (oldWidget.token != widget.token) {
-      _child = widget.builder();
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.listenable.removeListener(_refresh);
-    super.dispose();
-  }
-
-  void _refresh() {
-    _child = widget.builder();
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) => _child;
-}
-
-class _ChartSeries {
-  final String label;
-  final String unit;
-  final List<TelemetryPoint> points;
-  final List<FlSpot> spots;
-  final Color color;
-  final _SeriesStats? stats;
-  _ChartSeries(
-    this.label,
-    this.unit,
-    this.points,
-    this.spots,
-    this.color,
-    this.stats,
-  );
-}
-
-class _ChartBounds {
-  final double minX;
-  final double maxX;
-  final double minY;
-  final double maxY;
-  final double chartInterval;
-  final double timeInterval;
-
-  const _ChartBounds({
-    required this.minX,
-    required this.maxX,
-    required this.minY,
-    required this.maxY,
-    required this.chartInterval,
-    required this.timeInterval,
-  });
-
-  factory _ChartBounds.fromSeries(List<_ChartSeries> series) {
-    final points = series.expand((item) => item.points).toList();
-    if (points.isEmpty) {
-      return const _ChartBounds(
-        minX: 0,
-        maxX: 1,
-        minY: 0,
-        maxY: 1,
-        chartInterval: 1,
-        timeInterval: 1,
-      );
-    }
-    final xValues = points
-        .map((point) => point.timestamp.millisecondsSinceEpoch.toDouble())
-        .toList();
-    final yValues = points.map((point) => point.value).toList();
-    final minX = xValues.reduce((a, b) => a < b ? a : b);
-    final maxX = xValues.reduce((a, b) => a > b ? a : b);
-    final minimum = yValues.reduce((a, b) => a < b ? a : b);
-    final maximum = yValues.reduce((a, b) => a > b ? a : b);
-    final minY = minimum < 0 ? minimum * 1.1 : 0.0;
-    final maxY = maximum <= 0 ? 1.0 : maximum * 1.1;
-    final chartInterval = (maxY - minY) / 3;
-    final timeInterval = (maxX - minX) / 3;
-    return _ChartBounds(
-      minX: minX,
-      maxX: maxX,
-      minY: minY,
-      maxY: maxY,
-      chartInterval: chartInterval == 0 ? 1 : chartInterval,
-      timeInterval: timeInterval == 0 ? 1 : timeInterval,
-    );
-  }
 }
