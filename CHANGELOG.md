@@ -1,8 +1,12 @@
+## [Unreleased]
+
+Nothing yet.
+
 # Changelog
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [1.4.0] - 2026-09-26
 
 ### Added
 

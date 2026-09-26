@@ -22,7 +22,7 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **CCTV layar penuh** dalam orientasi landscape
 - **(Roadmap)** Push notification
 
-Versi pengembangan saat ini: **1.3.1 (build 9)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md). Release 1.3.1 belum diterbitkan.
+Versi saat ini: **1.4.0 (build 10)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md), ringkasan rilis di [RELEASE_NOTES_v1.4.0.md](./RELEASE_NOTES_v1.4.0.md). Rilis 1.4.0 sudah terbit; pasang APK-nya dari halaman GitHub Releases.
 
 ---
 
@@ -196,6 +196,8 @@ Aplikasi ini dirancang untuk login memakai **Customer User**, bukan Tenant Admin
 - [x] ThingsBoard REST + WebSocket real-time
 - [x] OpenWeatherMap (Kertapati, ID)
 - [x] go2rtc CCTV live
+- [x] Release build dari Linux: cold launch 1038 ms, signature terverifikasi
+- [x] `flutter analyze` bersih, 139 test lulus
 - [ ] Push notification untuk alarm (menunggu `flutter_local_notifications` stabil di Android 14+)
 
 ---
