@@ -79,34 +79,12 @@ class ThingsBoardRealtimeService {
   void _sendSubscriptions(WebSocketChannel channel) {
     _subscriptionDevices.clear();
     final commands = <Map<String, dynamic>>[
-      _subscriptionCommand(ThingsBoardApi.deviceBattery, const [
-        'current',
-        'power',
-        'soc',
-        'voltage',
-        'cycles',
-        'remain_capacity_ah',
-        'full_capacity_ah',
-      ]),
-      _subscriptionCommand(ThingsBoardApi.devicePzem, const [
-        'voltage_ac',
-        'voltage_dc',
-        'current_ac',
-        'current_dc',
-        'power_ac',
-        'power_dc',
-        'energy_ac',
-        'energy_dc',
-        'frequency_ac',
-        'pf_ac',
-      ]),
-      _subscriptionCommand(ThingsBoardApi.deviceSensor, const [
-        'humidity_dht',
-        'lux',
-        'tds_ppm',
-        'temp_dht',
-        'temp_ds18b20',
-      ]),
+      // Key list diambil dari ThingsBoardApi, bukan ditulis ulang di sini, supaya
+      // polling REST dan langganan WebSocket tidak mungkin asks for different
+      // sets. Lihat komentar di ThingsBoardApi.batteryKeys.
+      _subscriptionCommand(ThingsBoardApi.deviceBattery, ThingsBoardApi.batteryKeys),
+      _subscriptionCommand(ThingsBoardApi.devicePzem, ThingsBoardApi.pzemKeys),
+      _subscriptionCommand(ThingsBoardApi.deviceSensor, ThingsBoardApi.sensorKeys),
     ];
     channel.sink.add(
       jsonEncode({

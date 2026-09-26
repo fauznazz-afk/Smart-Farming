@@ -27,6 +27,43 @@ class ThingsBoardApi {
   static const String deviceSensor = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
   static const String devicePzem = 'af9531a0-ac44-11f1-841c-f5914d050259';
 
+  // Kunci telemetry per device. Sengaja declared di sini dan dipakai bersama oleh
+  // polling REST (fetchBatteryData dan friends) dan langganan WebSocket di
+  // ThingsBoardRealtimeService.
+  //
+  // Sebelumnya kedua sisi menulis ulang literalnya masing-masing. Kalau satu
+  // ditambah dan yang lain tidak, metriknya tetap masuk lewat polling tapi
+  // tidak pernah live-update, dan tidak ada error maupun crash yang menandakan
+  // itu. Satu sumber, jadi mustahil lepas.
+  static const List<String> batteryKeys = [
+    'current',
+    'power',
+    'soc',
+    'voltage',
+    'cycles',
+    'remain_capacity_ah',
+    'full_capacity_ah',
+  ];
+  static const List<String> pzemKeys = [
+    'voltage_ac',
+    'voltage_dc',
+    'current_ac',
+    'current_dc',
+    'power_ac',
+    'power_dc',
+    'energy_ac',
+    'energy_dc',
+    'frequency_ac',
+    'pf_ac',
+  ];
+  static const List<String> sensorKeys = [
+    'humidity_dht',
+    'lux',
+    'tds_ppm',
+    'temp_dht',
+    'temp_ds18b20',
+  ];
+
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
   String? _refreshToken;
@@ -470,39 +507,14 @@ class ThingsBoardApi {
   // ── Shortcut methods per device, sesuai key yang udah dikonfirmasi ──
 
   Future<DeviceTelemetry> fetchBatteryData() {
-    return fetchLatestTelemetry(deviceBattery, [
-      'current',
-      'power',
-      'soc',
-      'voltage',
-      'cycles',
-      'remain_capacity_ah',
-      'full_capacity_ah',
-    ]);
+    return fetchLatestTelemetry(deviceBattery, batteryKeys);
   }
 
   Future<DeviceTelemetry> fetchPzemData() {
-    return fetchLatestTelemetry(devicePzem, [
-      'voltage_ac',
-      'voltage_dc',
-      'current_ac',
-      'current_dc',
-      'power_ac',
-      'power_dc',
-      'energy_ac',
-      'energy_dc',
-      'frequency_ac',
-      'pf_ac',
-    ]);
+    return fetchLatestTelemetry(devicePzem, pzemKeys);
   }
 
   Future<DeviceTelemetry> fetchSensorData() {
-    return fetchLatestTelemetry(deviceSensor, [
-      'humidity_dht',
-      'lux',
-      'tds_ppm',
-      'temp_dht',
-      'temp_ds18b20',
-    ]);
+    return fetchLatestTelemetry(deviceSensor, sensorKeys);
   }
 }
