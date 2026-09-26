@@ -122,7 +122,7 @@ class _CardTitle extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white54 : Colors.black45,
+            color: faintColor(isDark),
           ),
         ),
         const Spacer(),

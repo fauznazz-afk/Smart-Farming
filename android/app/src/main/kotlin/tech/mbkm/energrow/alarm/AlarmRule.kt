@@ -1,6 +1,8 @@
 package tech.mbkm.energrow.alarm
 
 import org.json.JSONObject
+import java.net.URI
+import java.net.URISyntaxException
 
 /**
  * The alarm rule contract, mirroring `lib/utils/alarm_rules.dart`.
@@ -30,7 +32,8 @@ enum class AlarmDevice(val wireName: String) {
 enum class AlarmComparison {
     LESS_THAN,
     GREATER_THAN,
-    STALE;
+    STALE,
+    OFFLINE;
 
     companion object {
         /** Parses the Dart enum name, e.g. `lessThan`. */
@@ -38,6 +41,7 @@ enum class AlarmComparison {
             "lessThan" -> LESS_THAN
             "greaterThan" -> GREATER_THAN
             "stale" -> STALE
+            "offline" -> OFFLINE
             else -> null
         }
     }
@@ -47,6 +51,7 @@ enum class AlarmComparison {
 enum class AlarmMessageKind {
     LOW_SOC,
     STALE,
+    OFFLINE,
     RANGE_LOW,
     RANGE_HIGH;
 
@@ -54,6 +59,7 @@ enum class AlarmMessageKind {
         fun fromName(value: String): AlarmMessageKind? = when (value) {
             "lowSoc" -> LOW_SOC
             "stale" -> STALE
+            "offline" -> OFFLINE
             "rangeLow" -> RANGE_LOW
             "rangeHigh" -> RANGE_HIGH
             else -> null
@@ -139,14 +145,10 @@ fun parseAlarmConfig(payload: JSONObject): AlarmConfig {
     if (version != SUPPORTED_VERSION) {
         throw AlarmConfigException("unsupported alarm config version $version")
     }
-    val baseUrl = payload.optString("baseUrl").takeIf { it.isNotBlank() }
-        ?: throw AlarmConfigException("alarm config has no baseUrl")
-    if (!baseUrl.startsWith("https://")) {
-        // The Dart side only ever sends this constant. Refusing plain HTTP here
-        // means a token can never be sent in clear, even if a future build
-        // assembles the URL differently.
-        throw AlarmConfigException("alarm config baseUrl must be https")
-    }
+    val baseUrl = requireAllowedThingsBoardHost(
+        payload.optString("baseUrl").takeIf { it.isNotBlank() }
+            ?: throw AlarmConfigException("alarm config has no baseUrl"),
+    )
 
     val rawDevices = payload.optJSONArray("devices")
         ?: throw AlarmConfigException("alarm config has no devices")
@@ -231,4 +233,50 @@ private fun parseAlarmRule(json: JSONObject): AlarmRule {
         staleMinutes = json.optInt("staleMinutes", 10),
         requireFreshSensor = json.optBoolean("requireFreshSensor", false),
     )
+}
+
+/**
+ * The only host this module will send a ThingsBoard token to.
+ *
+ * Checking for an `https://` prefix is not enough, and the difference matters:
+ * a prefix test accepts *any* TLS host, so the moment the base URL becomes
+ * configurable — a normal request for an app like this — a mistyped or
+ * malicious host would receive a live bearer token with no warning. An exact
+ * host list turns that into a startup failure instead.
+ *
+ * This mirrors `parseAllowedCctvUrl` on the Dart side, which already does it
+ * properly. If the ThingsBoard instance ever moves, change it in one place here
+ * and one there.
+ */
+private const val ALLOWED_THINGSBOARD_HOST = "dashboard.mbkm20262027.tech"
+
+internal fun requireAllowedThingsBoardHost(baseUrl: String): String {
+    val uri = try {
+        URI(baseUrl)
+    } catch (error: URISyntaxException) {
+        throw AlarmConfigException("alarm config baseUrl is not a valid URL")
+    }
+    if (!uri.scheme.equals("https", ignoreCase = true)) {
+        throw AlarmConfigException("alarm config baseUrl must be https")
+    }
+    // Userinfo is the classic way to smuggle a second host past a naive check:
+    // https://allowed.host@evil.example/ has evil.example as the real host.
+    if (uri.userInfo != null) {
+        throw AlarmConfigException("alarm config baseUrl must not carry credentials")
+    }
+    if (!uri.host.equals(ALLOWED_THINGSBOARD_HOST, ignoreCase = true)) {
+        throw AlarmConfigException(
+            "alarm config baseUrl host \"${uri.host}\" is not $ALLOWED_THINGSBOARD_HOST",
+        )
+    }
+    if (uri.port != -1 && uri.port != 443) {
+        throw AlarmConfigException("alarm config baseUrl must use port 443")
+    }
+    // A path here would be prepended to /api/... and quietly address a different
+    // service on the same host.
+    val path = uri.path.orEmpty()
+    if (path.isNotEmpty() && path != "/") {
+        throw AlarmConfigException("alarm config baseUrl must not have a path")
+    }
+    return "https://$ALLOWED_THINGSBOARD_HOST"
 }

@@ -158,6 +158,17 @@ class AlarmBridge {
   Future<void> setForeground(bool value) =>
       _invoke<void>('setForeground', {'value': value});
 
+  /// Whether Android already exempts the app from battery optimisation.
+  Future<bool> isExemptFromBatteryOptimisations() async =>
+      await _invoke<bool>('isIgnoringBatteryOptimizations') ?? false;
+
+  /// Opens the system screen that can exempt the app from battery optimisation.
+  ///
+  /// Returns false when the platform has no such screen, or when the app is
+  /// already exempt, in which case there is nothing to do.
+  Future<bool> requestIgnoreBatteryOptimizations() async =>
+      await _invoke<bool>('requestIgnoreBatteryOptimizations') ?? false;
+
   /// The alarm the app was opened for, when a notification was tapped.
   Future<String?> launchAlarmId() => _invoke<String>('launchAlarmId');
 

@@ -89,12 +89,6 @@ class AlarmHistoryService {
       .firstOrNull ??
       AlarmType.deviceOffline;
 
-  /// Returns alarm records since [since], newest first.
-  Future<List<AlarmRecord>> getAlarmsSince(DateTime since) async {
-    final all = await getAlarms();
-    return all.where((a) => a.timestamp.isAfter(since)).toList();
-  }
-
   /// Removes all alarm records from storage, on both sides.
   Future<void> clearAlarms() async {
     final prefs = await SharedPreferences.getInstance();
@@ -119,28 +113,6 @@ class AlarmHistoryService {
         await AlarmBridge.instance.acknowledge(record.id);
       }
     }
-  }
-
-  Future<void> acknowledgeAlarm(String id) async {
-    final alarm = await _find(id);
-    if (alarm != null) {
-      await updateAlarm(alarm.copyWith(acknowledged: true));
-    }
-  }
-
-  Future<void> resolveAlarm(String id) async {
-    final alarm = await _find(id);
-    if (alarm != null) {
-      await updateAlarm(alarm.copyWith(acknowledged: true, resolved: true));
-    }
-  }
-
-  Future<AlarmRecord?> _find(String id) async {
-    final alarms = await getAlarms();
-    for (final alarm in alarms) {
-      if (alarm.id == id) return alarm;
-    }
-    return null;
   }
 
   List<AlarmRecord> _decode(List<String>? raw) {

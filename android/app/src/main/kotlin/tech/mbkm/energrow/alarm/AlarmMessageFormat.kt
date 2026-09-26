@@ -21,6 +21,8 @@ object AlarmMessageFormat {
             "SOC baterai rendah: ${fixed(value ?: 0.0, rule.decimals)}%"
         AlarmMessageKind.STALE ->
             "Data ${rule.label} belum diperbarui"
+        AlarmMessageKind.OFFLINE ->
+            "${rule.label} berhenti mengirim data"
         AlarmMessageKind.RANGE_LOW ->
             "${rule.label} rendah: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
                 "(batas ${plain(rule.limit)} ${rule.unit})"

@@ -2,6 +2,10 @@ package tech.mbkm.energrow.alarm
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -68,6 +72,55 @@ class AlarmBridgePlugin :
 
     private fun state(ctx: Context): AlarmStateStore = AlarmStateStore(ctx)
 
+    /**
+     * Asks the user to exempt the app from battery optimisation.
+     *
+     * This is the one reliability lever left. Both alarm triggers are permission
+     * free and survive a lot, but a vendor power manager can still drop them, and
+     * when that happens the background check simply stops with nothing to show
+     * for it. Exempting the app is a user decision, so the app only offers the
+     * route and never assumes the answer.
+     *
+     * Returns false when already exempt, so the caller can show the status
+     * instead of prompting for no reason.
+     */
+    private fun requestIgnoreBatteryOptimizations(
+        ctx: Context,
+        result: MethodChannel.Result,
+    ) {
+        if (isExemptFromBatteryOptimisations(ctx)) {
+            result.success(false)
+            return
+        }
+        val intent = Intent(
+            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:${ctx.packageName}"),
+        )
+        try {
+            result.success(intent.resolveActivity(ctx.packageManager) != null && startIntent(ctx, intent))
+        } catch (error: Exception) {
+            // Some builds ship without the screen. Fall back to the list, which
+            // always exists, rather than leaving the user with nothing.
+            Log.w(TAG, "direct request screen unavailable; opening the app list", error)
+            val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            result.success(startIntent(ctx, fallback))
+        }
+    }
+
+    private fun startIntent(ctx: Context, intent: Intent): Boolean = try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(intent)
+        true
+    } catch (error: Exception) {
+        Log.w(TAG, "could not open ${intent.action}", error)
+        false
+    }
+
+    private fun isExemptFromBatteryOptimisations(ctx: Context): Boolean {
+        val power = ctx.getSystemService(PowerManager::class.java) ?: return false
+        return power.isIgnoringBatteryOptimizations(ctx.packageName)
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         val ctx = context
         if (ctx == null) {
@@ -90,6 +143,10 @@ class AlarmBridgePlugin :
                 "isScheduled" -> result.success(AlarmScheduler.isScheduled(ctx))
                 "checkNow" -> checkNow(ctx, result)
                 "status" -> status(ctx, result)
+                "requestIgnoreBatteryOptimizations" ->
+                    requestIgnoreBatteryOptimizations(ctx, result)
+                "isIgnoringBatteryOptimizations" ->
+                    result.success(isExemptFromBatteryOptimisations(ctx))
                 "setForeground" -> {
                     state(ctx).setForeground(call.argument<Boolean>("value") == true)
                     result.success(null)
@@ -202,7 +259,9 @@ class AlarmBridgePlugin :
     private fun checkNow(ctx: Context, result: MethodChannel.Result) {
         executor.execute {
             try {
-                AlarmCheckRunner(ctx).run()
+                // Forced: the user pressed the button while looking at the app, so
+                // standing down for being foregrounded would be the wrong answer.
+                AlarmCheckRunner(ctx).run(force = true)
             } catch (error: Exception) {
                 Log.e(TAG, "manual alarm check failed", error)
             }

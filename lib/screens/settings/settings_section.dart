@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'sections/about_section.dart';
 import 'sections/alerts_section.dart';
+import 'sections/background_status_section.dart';
 import 'sections/appearance_section.dart';
 import 'sections/monitoring_section.dart';
 import 'sections/weather_section.dart';
@@ -71,6 +72,12 @@ List<SettingsSection> buildSettingsSections({
         subtitle: 'Tune glass effects for smoother scrolling.',
         icon: Icons.speed_outlined,
         builder: (_, settings) => PerformanceSection(settings: settings),
+      ),
+      SettingsSection(
+        title: 'Background checks',
+        subtitle: 'Is the alarm check running, and can Android delay it?',
+        icon: Icons.schedule_send_outlined,
+        builder: (_, settings) => const BackgroundStatusSection(),
       ),
       SettingsSection(
         title: 'About',

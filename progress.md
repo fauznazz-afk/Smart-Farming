@@ -675,6 +675,72 @@ sebagai "alarm tidak muncul" atau "alarm muncul saat app dibuka".
 - MIUI masih bisa lebih agresif dari dua trigger itu. Jika alarm diam di
   perangkat lain, cek `dumpsys alarm` dulu sebelum conclude apa pun.
 
+### 10.5c Review keamanan dan perapian (27 September 2026)
+
+Tiga subagent read-only dipakai: audit keamanan, review kualitas kode, dan
+audit UI dashboard. Temuan keamanan di kode baru ini sendiri:
+
+- **Budget receiver terlampaui.** Worst case ~48 detik melawan ~10 detik yang
+  diizinkan `BroadcastReceiver`, dan jalur lambat itu justru yang **diharapkan**
+  setiap kali access token kedaluwarsa. Kalau proses dibunuh di tengah tulis,
+  active set tidak pernah diperbarui → tick berikutnya menganggap alarm yang
+  sama itu baru → notifikasi dobel. Deadlines 8 detik + timeout per request
+  dibatasi + refresh dilewati kalau budget habis.
+- **Tiga runner tanpa mutual exclusion.** Receiver, tombol "check now", dan
+  debug trigger jalan di thread masing-masing tanpa guard bersama, jadi dua bisa
+  membaca active set yang sama dan sama-sama memutuskan alarm itu baru. Satu
+  `AtomicBoolean` proses-wide sekarang menutup semuanya.
+- **Tombol "check now" tidak melakukan apa-apa.** Manual trigger mewarisi
+  stand-down foreground, jadi ditekan saat app terlihat malah dilewati.
+- **`allowBackup="false"` tidak menutup D2D** sejak Android 12. Ditambah
+  `dataExtraction_rules.xml` + `backup_rules.xml`.
+- **Host ThingsBoard hanya dicek prefix `https://`.** Prefix menerima host TLS
+  apa pun, jadi begitu base URL jadi configurable, token bocor ke host salah.
+  Sekarang allowlist host persis, menolak userinfo, port bukan 443, dan path.
+- **Fragment JWT bisa masuk logcat** lewat pesan error `org.json` di jalur
+  refresh. Sekarang hanya nama kelas yang di-log.
+
+Semua sudah diperbaiki dan diberi test. Tidak ada temuan Critical.
+
+### 10.5d Yang dibongkar di review kualitas kode
+
+- `geocoding`, `csv`, `cupertino_icons` — dependency mati. `geocoding` bahkan
+  pernah di-upgrade khusus kompatibilitas Android 14, untuk kode yang tak
+  pernah dipakai, dan menarik satu plugin Android ke build.
+- `searchCities`, `getAlarmsSince`, `acknowledgeAlarm`, `resolveAlarm`,
+  `_find`, `alarmValueFromId`, `clearCctvUrl`, `fetchHistory`,
+  `DashboardShortcut`, dan seluruh file `energy_forecast_card.dart`.
+- 22 literal telemetry key yang diduplikasi di dua file.
+
+**Satu klaim dari review kode salah**, dan hampir ikut terhapus karena
+terdengar meyakinkan. `_history` di `dashboard_screen.dart` disebut dead code
+plus memory leak; kenyataannya `TelemetryChartCard` menerimanya di baris 1460,
+jadi field itu hidup. Yang salah adalah klaimnya, bukan kodenya.
+
+### 10.5e Yang diperbaiki di UI dashboard
+
+Lima temuan terbesar dari audit UI:
+
+- **`metricColor` mengabaikan `index`** → semua metrik satu warna. Sekarang
+  rotasi hue 40° per index, sesuai niat parameter itu sejak awal.
+- **Tiga banner bertentangan** → offline menampilkan hijau "polling active"
+  di atas oranye "offline". Sekarang satu strip dengan presedensi.
+- **Label date strip salah** → menyebut rentang 7 chip, bukan hari yang
+  dipilih, jadi berbeda dengan halaman detail untuk state yang sama.
+- **Kartu environment tanpa status** → lima angka tanpa acuan. Sekarang
+  menampilkan batas, ikon status, dan verdict keseluruhan.
+- **22 lokasi kontras gagal WCAG AA** (`black45` ≈ 3.4:1 untuk teks 9dp).
+
+Plus: desimal tidak masuk akal (`Cycles 12.00` → `12`), label DC/AC ambigu,
+indikator kesegaran data yang selalu terlihat, kapasitas penuh baterai yang
+sudah di-fetch tapi tidak pernah ditampilkan, 4 warna aksen yang hampir sama,
+dan toggle "Smooth Glass" yang menyalakan blur saat dimatikan.
+
+**Belum dikerjakan** (agak besar, perlu keputusan terpisah): mengganti
+`DualStatusCards` dengan strip status, dan mengganti chart 3-seri-berbeda-
+satuan dengan satu metrik terpilih lewat segmented button. Keduanya bagus, tapi
+menyentuh layout substantially.
+
 ### 10.6 Utang KGP - jika someday dikerjakan
 
 Lihat §9A. Ringkasnya: **tiga paket** (`share_plus` → 13,

@@ -9,15 +9,28 @@
       not worth the coupling.
     -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+      Only to show the system dialog that exempts the app from battery
+      optimisation. Nothing is granted silently: the user is asked, and the app
+      works without it, it just may be less reliable about waking up on time.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!--
+      Not requested at runtime and not needed. Geolocator asks for fine or
+      approximate location only, and the alarm module takes no wake lock: the
+      receiver is given its window by the platform. Background location is one
+      of the permissions a store review treats as sensitive, so it is not worth
+      declaring for something the app never does.
+    -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/energrow_launcher"
         android:roundIcon="@drawable/energrow_launcher">
         <!--

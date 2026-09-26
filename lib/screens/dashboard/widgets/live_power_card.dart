@@ -157,29 +157,34 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          'Live Active Power',
+          'Daya PV',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white54 : Colors.black45,
+            color: faintColor(isDark),
           ),
         ),
         const Spacer(),
-        if (pzemStale)
+        // Always shown, not only when stale. There was no persistent indication
+        // of liveness anywhere in the Overview, so a dashboard that had quietly
+        // stopped updating looked exactly like a live one until something else
+        // failed. Stale now means amber, fresh means quiet.
+        if (ageLabel != null)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.schedule,
+                pzemStale ? Icons.warning_amber_rounded : Icons.schedule,
                 size: 12,
-                color: isDark ? Colors.white38 : Colors.black38,
+                color: pzemStale ? statusWarn(isDark) : faintColor(isDark),
               ),
               const SizedBox(width: 4),
               Text(
-                ageLabel ?? 'No update',
+                ageLabel!,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isDark ? Colors.white38 : Colors.black38,
+                  fontWeight: pzemStale ? FontWeight.w600 : FontWeight.w400,
+                  color: pzemStale ? statusWarn(isDark) : faintColor(isDark),
                 ),
               ),
             ],
@@ -204,7 +209,7 @@ class _ValueRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final faint = isDark ? Colors.white54 : Colors.black45;
+    final faint = faintColor(isDark);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [

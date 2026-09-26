@@ -8,9 +8,14 @@ class EnvRangeSetting {
     required this.unit,
     this.minAllowed,
     this.maxAllowed,
-  });
+    this.minKey,
+    this.maxKey,
+    double? defaultMin,
+    double? defaultMax,
+  }) : min = TextEditingController(text: _format(defaultMin)),
+       max = TextEditingController(text: _format(defaultMax));
 
-  /// Stable id used to build the preference keys (`environment_<id>_min`).
+  /// Stable id of the sensor, e.g. `temp`.
   final String id;
 
   /// Human readable sensor name shown above the fields.
@@ -25,18 +30,30 @@ class EnvRangeSetting {
   /// Optional upper bound accepted by validation.
   final double? maxAllowed;
 
-  final TextEditingController min = TextEditingController();
-  final TextEditingController max = TextEditingController();
+  /// Preference keys, passed in from `SettingsController`.
+  ///
+  /// They used to be built here by interpolating [id], which duplicated
+  /// `SettingsKeys` and meant the two lists could drift with nothing to catch it.
+  /// The caller now names the keys explicitly.
+  final String? minKey;
+  final String? maxKey;
 
-  String get minKey => 'environment_${id}_min';
-
-  String get maxKey => 'environment_${id}_max';
+  final TextEditingController min;
+  final TextEditingController max;
 
   bool get isEmpty => min.text.trim().isEmpty && max.text.trim().isEmpty;
 
   void dispose() {
     min.dispose();
     max.dispose();
+  }
+
+  /// Renders a default limit for the editor, without a trailing `.0`.
+  static String? _format(double? value) {
+    if (value == null) return '';
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
   }
 }
 

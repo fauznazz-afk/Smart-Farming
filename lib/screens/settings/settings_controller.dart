@@ -3,9 +3,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/settings_keys.dart';
+import '../../services/alarm_settings.dart';
 import '../../services/cctv_url.dart';
 import '../../services/weather_service.dart';
 import '../../theme/app_theme_controller.dart';
+import '../../utils/alarm_rules.dart';
 import 'utils/settings_validation.dart';
 
 /// Owns every user-configurable setting: text controllers, plain values,
@@ -30,29 +32,46 @@ class SettingsController extends ChangeNotifier {
       id: 'temp',
       label: 'Ambient temperature',
       unit: '°C',
+      minKey: SettingsKeys.environmentTempMin,
+      maxKey: SettingsKeys.environmentTempMax,
       minAllowed: -40,
       maxAllowed: 100,
+      defaultMin: AlarmThresholds.defaultTempMin,
+      defaultMax: AlarmThresholds.defaultTempMax,
     ),
     EnvRangeSetting(
       id: 'humidity',
       label: 'Humidity',
       unit: '%',
+      minKey: SettingsKeys.environmentHumidityMin,
+      maxKey: SettingsKeys.environmentHumidityMax,
       minAllowed: 0,
       maxAllowed: 100,
+      defaultMin: AlarmThresholds.defaultHumidityMin,
+      defaultMax: AlarmThresholds.defaultHumidityMax,
     ),
     // Lower bound only: nutrient solutions run 800-2000 ppm and sea water is
     // ~35000 ppm, so any upper cap low enough to be safe would block real
     // readings.
-    EnvRangeSetting(id: 'tds', label: 'Water TDS', unit: 'ppm', minAllowed: 0),
+    EnvRangeSetting(
+      id: 'tds',
+      label: 'Water TDS',
+      unit: 'ppm',
+      minKey: SettingsKeys.environmentTdsMin,
+      maxKey: SettingsKeys.environmentTdsMax,
+      minAllowed: 0,
+      defaultMin: AlarmThresholds.defaultTdsMin,
+    ),
   ];
 
   // ── Plain values ────────────────────────────────────────────────────────────
   bool autoRefresh = true;
   int refreshSeconds = 10;
   bool energyAlerts = true;
-  bool envAlerts = false;
-  int lowSoc = 20;
-  int staleMinutes = 10;
+  bool envAlerts = true;
+  int lowSoc = AlarmThresholds.defaultLowSoc;
+  int staleMinutes = AlarmThresholds.defaultStaleMinutes;
+  int offlineMinutes = AlarmThresholds.defaultOfflineMinutes;
   Color selectedSeed = AppThemeController.defaultSeed;
 
   // ── Transient status ────────────────────────────────────────────────────────
@@ -77,10 +96,16 @@ class SettingsController extends ChangeNotifier {
     final savedCctvUrl = await loadCctvUrl();
     autoRefresh = p.getBool(SettingsKeys.autoRefresh) ?? true;
     refreshSeconds = p.getInt(SettingsKeys.refreshSeconds) ?? 10;
-    energyAlerts = p.getBool(SettingsKeys.energyAlertsEnabled) ?? true;
-    envAlerts = p.getBool(SettingsKeys.environmentAlertsEnabled) ?? false;
-    lowSoc = p.getInt(SettingsKeys.lowSocThreshold) ?? 20;
-    staleMinutes = p.getInt(SettingsKeys.staleTelemetryMinutes) ?? 10;
+    // One reader for the alert defaults. This used to repeat the same five
+    // lookups and fallbacks that readAlarmThresholds does, which is how a
+    // setting ended up defaulting one way for the settings screen and another
+    // way for the dashboard.
+    final thresholds = readAlarmThresholds(p);
+    energyAlerts = thresholds.energyAlerts;
+    envAlerts = thresholds.environmentAlerts;
+    lowSoc = thresholds.lowSoc.round();
+    staleMinutes = thresholds.staleMinutes;
+    offlineMinutes = thresholds.offlineMinutes;
     dailyTarget.text = p.getString(SettingsKeys.dailyProductionTargetKwh) ?? '';
     weatherApiKey.text = p.getString(SettingsKeys.weatherApiKey) ?? '';
     weatherLocationName = p.getString(SettingsKeys.weatherLocationName);
@@ -89,8 +114,8 @@ class SettingsController extends ChangeNotifier {
     weatherLongitude = p.getDouble(SettingsKeys.weatherLocationLon);
     cctvUrl.text = savedCctvUrl;
     for (final range in envRanges) {
-      range.min.text = p.getString(range.minKey) ?? '';
-      range.max.text = p.getString(range.maxKey) ?? '';
+      range.min.text = p.getString(range.minKey!) ?? range.min.text;
+      range.max.text = p.getString(range.maxKey!) ?? range.max.text;
     }
     selectedSeed = themeController.seedColor;
     notifyListeners();
@@ -144,6 +169,7 @@ class SettingsController extends ChangeNotifier {
       await p.setBool(SettingsKeys.environmentAlertsEnabled, envAlerts);
       await p.setInt(SettingsKeys.lowSocThreshold, lowSoc);
       await p.setInt(SettingsKeys.staleTelemetryMinutes, staleMinutes);
+    await p.setInt(SettingsKeys.offlineTelemetryMinutes, offlineMinutes);
       await p.setString(SettingsKeys.weatherApiKey, weatherApiKey.text.trim());
       await p.setString(
         SettingsKeys.weatherLocationName,
@@ -151,8 +177,8 @@ class SettingsController extends ChangeNotifier {
       );
       await _saveDailyTarget(p);
       for (final range in envRanges) {
-        await _saveIfNotEmpty(p, range.minKey, range.min.text);
-        await _saveIfNotEmpty(p, range.maxKey, range.max.text);
+        await _saveIfNotEmpty(p, range.minKey!, range.min.text);
+        await _saveIfNotEmpty(p, range.maxKey!, range.max.text);
       }
       // The dashboard reads the stream URL from secure storage, not prefs.
       await saveCctvUrl(cctvUrl.text.trim());

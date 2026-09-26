@@ -39,7 +39,7 @@ class AlarmParityTest {
             val config = parseAlarmConfig(
                 JSONObject().apply {
                     put("version", SUPPORTED_VERSION)
-                    put("baseUrl", BASE_URL)
+                    put("baseUrl", "https://$BASE_URL")
                     put("devices", devicesFor(scenario.getJSONArray("rules")))
                     put("rules", scenario.getJSONArray("rules"))
                 },
@@ -89,7 +89,7 @@ class AlarmParityTest {
     fun `a config without a rule list is rejected instead of silently ignored`() {
         val failure = runCatching {
             parseAlarmConfig(
-                JSONObject().put("version", SUPPORTED_VERSION).put("baseUrl", BASE_URL),
+                JSONObject().put("version", SUPPORTED_VERSION).put("baseUrl", "https://$BASE_URL"),
             )
         }.exceptionOrNull()
         assertTrue("expected a rejection, got $failure", failure is AlarmConfigException)
@@ -101,7 +101,7 @@ class AlarmParityTest {
             parseAlarmConfig(
                 JSONObject()
                     .put("version", SUPPORTED_VERSION + 1)
-                    .put("baseUrl", BASE_URL)
+                    .put("baseUrl", "https://$BASE_URL")
                     .put("devices", JSONArray())
                     .put("rules", JSONArray()),
             )
@@ -111,16 +111,57 @@ class AlarmParityTest {
 
     @Test
     fun `a plain http base url is refused so a token is never sent in clear`() {
+        assertRejected("http://$BASE_URL")
+    }
+
+    @Test
+    fun `a different https host is refused so a token cannot be exfiltrated`() {
+        // The important half of the check. A prefix test would accept this, and
+        // the result would be a live bearer token posted to someone else's
+        // server the first time the base URL became configurable.
+        assertRejected("https://evil.example.com")
+        assertRejected("https://dashboard.mbkm20262027.tech.evil.example")
+        assertRejected("https://notdashboard.mbkm20262027.tech")
+    }
+
+    @Test
+    fun `userinfo cannot smuggle a second host past the check`() {
+        assertRejected("https://$BASE_URL@evil.example.com")
+    }
+
+    @Test
+    fun `a non default port is refused`() {
+        assertRejected("https://$BASE_URL:8443")
+    }
+
+    @Test
+    fun `a path is refused so the api prefix cannot be redirected`() {
+        assertRejected("https://$BASE_URL/somewhere-else")
+    }
+
+    @Test
+    fun `the real host is accepted and normalised`() {
+        val config = parseAlarmConfig(
+            JSONObject()
+                .put("version", SUPPORTED_VERSION)
+                .put("baseUrl", "https://$BASE_URL/")
+                .put("devices", JSONArray())
+                .put("rules", JSONArray()),
+        )
+        assertEquals("https://$BASE_URL", config.baseUrl)
+    }
+
+    private fun assertRejected(baseUrl: String) {
         val failure = runCatching {
             parseAlarmConfig(
                 JSONObject()
                     .put("version", SUPPORTED_VERSION)
-                    .put("baseUrl", "http://dashboard.example.com")
+                    .put("baseUrl", baseUrl)
                     .put("devices", JSONArray())
                     .put("rules", JSONArray()),
             )
         }.exceptionOrNull()
-        assertTrue(failure is AlarmConfigException)
+        assertTrue("expected \"$baseUrl\" to be rejected, got $failure", failure is AlarmConfigException)
     }
 
     private fun scenario(scenarios: JSONArray, name: String): JSONObject {
@@ -178,6 +219,6 @@ class AlarmParityTest {
 
     private companion object {
         const val FIXTURE = "alarm_parity_vectors.json"
-        const val BASE_URL = "https://dashboard.mbkm20262027.tech"
+        const val BASE_URL = "dashboard.mbkm20262027.tech"
     }
 }

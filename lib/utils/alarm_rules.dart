@@ -62,6 +62,15 @@ enum AlarmComparison {
   /// Active while the device's last telemetry is older than `staleMinutes`.
   /// `metric` and `limit` are unused.
   stale,
+
+  /// The same test as [stale] with a longer window and a different meaning: the
+  /// device is not merely behind, it has stopped responding.
+  ///
+  /// A separate comparison rather than a shared one because each carries its own
+  /// `staleMinutes`, and the two alarms are deliberately distinct: a ten minute
+  /// gap is a hiccup worth a warning, an hour is a dead sensor worth a critical
+  /// one.
+  offline,
 }
 
 /// Which wording to render, so the Dart and Kotlin formatters stay in step.
@@ -71,6 +80,9 @@ enum AlarmMessageKind {
 
   /// `Data Baterai belum diperbarui`
   stale,
+
+  /// `PZEM berhenti mengirim data`
+  offline,
 
   /// `Suhu lingkungan rendah: 12.4 °C (batas 18.0 °C)`
   rangeLow,
@@ -192,6 +204,7 @@ class AlarmThresholds {
     required this.environmentAlerts,
     required this.lowSoc,
     required this.staleMinutes,
+    required this.offlineMinutes,
     this.tempMin,
     this.tempMax,
     this.humidityMin,
@@ -204,19 +217,62 @@ class AlarmThresholds {
   final bool environmentAlerts;
   final double lowSoc;
   final int staleMinutes;
+
+  /// How long a device must be silent before it counts as dead.
+  ///
+  /// Deliberately much longer than [staleMinutes]. Ten minutes of silence is a
+  /// hiccup in an MQTT pipeline; an hour is a sensor or gateway that has stopped,
+  /// which is a different thing to be told about and a different thing to go fix.
+  final int offlineMinutes;
+
   final double? tempMin;
   final double? tempMax;
   final double? humidityMin;
   final double? humidityMax;
   final double? tdsMin;
+
+  /// Intentionally absent. See [defaultTdsMin]: there is no safe upper bound for
+  /// TDS, and a low one makes the alert unreachable.
   final double? tdsMax;
+
+  // Default environment limits, chosen for a tropical greenhouse and stated here
+  // so the settings screen, the dashboard and the background check cannot
+  // disagree about them.
+  //
+  // Night temperatures in a tropical greenhouse sit around 15-18 C and daytime
+  // peaks pass 35 C, so the range is wide on purpose: a tighter window would
+  // alarm on ordinary weather. Humidity above 85 percent is where fungal disease
+  // starts, below 40 percent is where the plants start to suffer.
+  static const double defaultTempMin = 15;
+  static const double defaultTempMax = 35;
+  static const double defaultHumidityMin = 40;
+  static const double defaultHumidityMax = 85;
+
+  /// Hydroponic nutrient solution runs 800-2000 ppm.
+  ///
+  /// Only a floor. An upper bound low enough to look safe would be crossed by
+  /// every reading, and sea water sits near 35000 ppm, so any cap at all would
+  /// be wrong for some legitimate input. This is the exact regression the
+  /// `sensor bounds` tests in `test/settings_validation_test.dart` exist to
+  /// catch, so it is recorded here too.
+  static const double defaultTdsMin = 800;
+
+  static const int defaultLowSoc = 20;
+  static const int defaultStaleMinutes = 10;
+  static const int defaultOfflineMinutes = 60;
 
   /// The default configuration, matching every `?? fallback` in the app.
   static const AlarmThresholds defaults = AlarmThresholds(
     energyAlerts: true,
-    environmentAlerts: false,
+    environmentAlerts: true,
     lowSoc: 20,
-    staleMinutes: 10,
+    staleMinutes: defaultStaleMinutes,
+    offlineMinutes: defaultOfflineMinutes,
+    tempMin: defaultTempMin,
+    tempMax: defaultTempMax,
+    humidityMin: defaultHumidityMin,
+    humidityMax: defaultHumidityMax,
+    tdsMin: defaultTdsMin,
   );
 }
 
@@ -283,6 +339,23 @@ List<AlarmRule> buildAlarmRules(AlarmThresholds thresholds) {
       ),
     );
     for (final device in AlarmDevice.values) {
+      rules.add(
+        AlarmRule(
+          id: 'offline_${device.wireName}',
+          type: AlarmType.deviceOffline,
+          severity: AlarmSeverity.critical,
+          group: AlarmGroup.energy,
+          device: device,
+          metric: null,
+          comparison: AlarmComparison.offline,
+          limit: null,
+          label: device.label,
+          unit: '',
+          decimals: 0,
+          message: AlarmMessageKind.offline,
+          staleMinutes: thresholds.offlineMinutes,
+        ),
+      );
       rules.add(
         AlarmRule(
           id: 'stale_${device.wireName}',
@@ -400,7 +473,8 @@ List<AlarmSignal> evaluateAlarmRules({
     // differs from a stale device, which does: staleness is the alarm.
     if (reading == null) continue;
 
-    if (rule.comparison == AlarmComparison.stale) {
+    if (rule.comparison == AlarmComparison.stale ||
+        rule.comparison == AlarmComparison.offline) {
       if (reading.isStale(rule.staleMinutes, now)) {
         signals.add(
           AlarmSignal(
@@ -427,7 +501,8 @@ List<AlarmSignal> evaluateAlarmRules({
     final breached = switch (rule.comparison) {
       AlarmComparison.lessThan => value < limit,
       AlarmComparison.greaterThan => value > limit,
-      AlarmComparison.stale => false,
+      AlarmComparison.stale ||
+      AlarmComparison.offline => false,
     };
     if (!breached) continue;
 
@@ -472,6 +547,7 @@ String formatAlarmMessage(AlarmRule rule, {required double? value}) {
     AlarmMessageKind.lowSoc =>
       'SOC baterai rendah: ${_fixed(value ?? 0, rule.decimals)}%',
     AlarmMessageKind.stale => 'Data ${rule.label} belum diperbarui',
+    AlarmMessageKind.offline => '${rule.label} berhenti mengirim data',
     AlarmMessageKind.rangeLow =>
       '${rule.label} rendah: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
           '(batas ${rule.limit} ${rule.unit})',

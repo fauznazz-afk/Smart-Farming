@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  Excludes everything from both cloud backup and device-to-device transfer.
+
+  `android:allowBackup="false"` is not enough on its own. Since Android 12 it
+  turns off Google Drive backup but *not* D2D transfer, so a device-to-device
+  migration would otherwise carry the app's private storage to the new phone.
+  That storage holds the ThingsBoard display name, the cached telemetry, the
+  alarm thresholds, the alarm history, and the OpenWeatherMap key in plaintext
+  preferences.
+
+  The two encrypted stores are not the concern here and are not reachable by
+  this rule anyway: the ThingsBoard JWT lives in `flutter_secure_storage` and the
+  background copy in an AndroidKeyStore-encrypted file, and the keystore key
+  itself is not migrated, so both would be unreadable on the new device. The
+  plaintext preferences are.
+
+  Excluding `root` also stops the encrypted stores, which is deliberate: their
+  ciphertext is dead weight on a new device anyway.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

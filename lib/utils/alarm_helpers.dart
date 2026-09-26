@@ -1,4 +1,5 @@
 import '../models/alarm_record.dart';
+import 'alarm_rules.dart';
 
 /// Maps an alert ID string to an [AlarmType].
 ///
@@ -7,6 +8,9 @@ import '../models/alarm_record.dart';
 AlarmType alarmTypeFromId(String id) {
   if (id == 'low_soc') return AlarmType.lowSoc;
   if (id.startsWith('stale_')) return AlarmType.staleTelemetry;
+  // Named rather than left to the fallback, so a typo in a rule id shows up here
+  // instead of being silently reported as an offline device.
+  if (id.startsWith('offline_')) return AlarmType.deviceOffline;
   if (id.startsWith('environment_ambient_temp')) {
     return AlarmType.environmentTemp;
   }
@@ -19,58 +23,30 @@ AlarmType alarmTypeFromId(String id) {
 
 /// Determines severity from the alert ID.
 AlarmSeverity alarmSeverityFromId(String id) {
-  // Low SOC and device offline are critical; others are warnings.
-  if (id == 'low_soc') return AlarmSeverity.critical;
-  if (id.startsWith('stale_')) return AlarmSeverity.warning;
+  // Critical means "act on this now": a low battery, or a device that has
+  // stopped reporting entirely. Everything else is a warning.
+  if (id == 'low_soc' || id.startsWith('offline_')) {
+    return AlarmSeverity.critical;
+  }
   return AlarmSeverity.warning;
 }
 
-/// Extracts the triggering numeric value from the alert ID.
-double? alarmValueFromId(
-  String id, {
-  required Map<String, double>? batteryValues,
-  required Map<String, double>? sensorValues,
-}) {
-  if (id == 'low_soc') return batteryValues?['soc'];
-  if (id.startsWith('environment_ambient_temp')) {
-    return sensorValues?['temp_dht'];
-  }
-  if (id.startsWith('environment_humidity')) {
-    return sensorValues?['humidity_dht'];
-  }
-  if (id.startsWith('environment_tds')) {
-    return sensorValues?['tds_ppm'];
-  }
-  return null;
-}
-
-/// Returns names of devices with stale telemetry.
+/// Returns names of devices whose telemetry is stale.
 ///
-/// This drives the connection banner, which lists devices that stopped
-/// reporting. It deliberately reports nothing for a device that has never been
-/// read, so the banner does not claim three devices are offline before the
-/// first poll has returned.
+/// Takes the same readings the rule engine uses, so the banner and the alarms
+/// cannot disagree about which devices stopped reporting. Three of the six
+/// parameters this used to take were read only as a "was this device read at
+/// all" proxy, and the three device names were spelled out again here rather
+/// than taken from [AlarmDevice].
 List<String> staleDeviceNames({
-  required Map<String, double>? batteryValues,
-  required DateTime? batteryLastUpdate,
-  required Map<String, double>? pzemValues,
-  required DateTime? pzemLastUpdate,
-  required Map<String, double>? sensorValues,
-  required DateTime? sensorLastUpdate,
+  required List<AlarmReading> readings,
   required int staleMinutes,
+  DateTime? now,
 }) {
-  final devices = <(String, Map<String, double>?, DateTime?)>[
-    ('Baterai', batteryValues, batteryLastUpdate),
-    ('PZEM', pzemValues, pzemLastUpdate),
-    ('Sensor lingkungan', sensorValues, sensorLastUpdate),
+  final at = now ?? DateTime.now();
+  return [
+    for (final reading in readings)
+      if (reading.lastUpdate != null && reading.isStale(staleMinutes, at))
+        reading.device.label,
   ];
-  return devices
-      .where(
-        (entry) =>
-            entry.$2 != null &&
-            entry.$3 != null &&
-            DateTime.now().difference(entry.$3!).inMinutes > staleMinutes,
-      )
-      .map((entry) => entry.$1)
-      .toList();
 }

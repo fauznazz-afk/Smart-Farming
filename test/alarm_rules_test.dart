@@ -13,21 +13,31 @@ void main() {
   group('buildAlarmRules', () {
     test('arms low SOC and one stale rule per device for energy alerts', () {
       final rules = buildAlarmRules(_energy);
-      expect(
-        rules.map((rule) => rule.id),
-        [
-          'low_soc',
-          'stale_battery',
-          'stale_pzem',
-          'stale_sensor',
-        ],
-      );
+      expect(rules.map((rule) => rule.id), [
+        'low_soc',
+        'offline_battery',
+        'stale_battery',
+        'offline_pzem',
+        'stale_pzem',
+        'offline_sensor',
+        'stale_sensor',
+      ]);
       final lowSoc = rules.first;
       expect(lowSoc.type, AlarmType.lowSoc);
       expect(lowSoc.severity, AlarmSeverity.critical);
       expect(lowSoc.metric, 'soc');
       expect(lowSoc.limit, 20);
-      expect(rules.skip(1).every((rule) => rule.severity == AlarmSeverity.warning), isTrue);
+
+      // A device that has stopped is critical; one that is merely behind is a
+      // warning. Both exist because the two need different responses, and a short
+      // hiccup must not escalate on its own.
+      final offline = rules.firstWhere((rule) => rule.id == 'offline_pzem');
+      expect(offline.type, AlarmType.deviceOffline);
+      expect(offline.severity, AlarmSeverity.critical);
+      expect(offline.comparison, AlarmComparison.offline);
+      final stale = rules.firstWhere((rule) => rule.id == 'stale_pzem');
+      expect(stale.severity, AlarmSeverity.warning);
+      expect(offline.staleMinutes, greaterThan(stale.staleMinutes));
     });
 
     test('omits every rule when both toggles are off', () {
@@ -41,6 +51,7 @@ void main() {
           environmentAlerts: true,
           lowSoc: 20,
           staleMinutes: 10,
+          offlineMinutes: 60,
           tempMax: 30,
         ),
       );
@@ -56,6 +67,7 @@ void main() {
           environmentAlerts: true,
           lowSoc: 20,
           staleMinutes: 10,
+          offlineMinutes: 60,
           humidityMin: 40,
           humidityMax: 80,
         ),
@@ -80,6 +92,7 @@ void main() {
           environmentAlerts: true,
           lowSoc: 20,
           staleMinutes: 10,
+          offlineMinutes: 60,
           tdsMin: 800,
         ),
       );
@@ -94,9 +107,15 @@ void main() {
           environmentAlerts: false,
           lowSoc: 20,
           staleMinutes: 45,
+          offlineMinutes: 300,
         ),
       );
-      expect(rules.every((rule) => rule.staleMinutes == 45), isTrue);
+      // The native side cannot read the app's settings, so every window travels
+      // with its rule, and each rule only ever uses its own.
+      AlarmRule ruleFor(String id) => rules.firstWhere((r) => r.id == id);
+      expect(ruleFor('stale_pzem').staleMinutes, 45);
+      expect(ruleFor('offline_pzem').staleMinutes, 300);
+      expect(ruleFor('low_soc').staleMinutes, 45);
     });
   });
 
@@ -143,8 +162,15 @@ void main() {
         ],
         now: now,
       );
-      expect(signals.map((signal) => signal.id), ['stale_pzem']);
-      expect(signals.single.value, isNull);
+      // Both, not just stale: a device that has never reported is past both
+      // windows at once, and "stopped sending data" is the more useful of the
+      // two things to be told.
+      expect(signals.map((signal) => signal.id), ['offline_pzem', 'stale_pzem']);
+      expect(signals.every((signal) => signal.value == null), isTrue);
+      expect(
+        signals.firstWhere((s) => s.id == 'offline_pzem').severity,
+        AlarmSeverity.critical,
+      );
     });
 
     test('ignores a timestamp in the future instead of calling it stale', () {
@@ -168,6 +194,7 @@ void main() {
         environmentAlerts: true,
         lowSoc: 20,
         staleMinutes: 10,
+        offlineMinutes: 60,
         tdsMin: 800,
         tdsMax: 2000,
       );
@@ -277,6 +304,7 @@ void main() {
           environmentAlerts: true,
           lowSoc: 15,
           staleMinutes: 5,
+          offlineMinutes: 60,
           tempMin: 10,
           tempMax: 30,
           humidityMax: 80,
@@ -335,6 +363,7 @@ void main() {
             environmentAlerts: true,
             lowSoc: 20,
             staleMinutes: 10,
+            offlineMinutes: 60,
             tempMax: 30,
             tdsMin: 800,
             humidityMax: 80,
@@ -355,16 +384,32 @@ void main() {
     });
 
     test('lists stale devices for the banner but never an unread one', () {
-      final names = staleDeviceNames(
-        batteryValues: const {'soc': 50},
-        batteryLastUpdate: DateTime.now().subtract(const Duration(minutes: 30)),
-        pzemValues: const {'power_ac': 100},
-        pzemLastUpdate: DateTime.now(),
-        sensorValues: null,
-        sensorLastUpdate: null,
+      final now = DateTime.utc(2026, 9, 27, 10);
+      List<String> names({
+        required Map<String, double> values,
+        required DateTime? lastUpdate,
+      }) => staleDeviceNames(
+        readings: [
+          AlarmReading(
+            device: AlarmDevice.battery,
+            values: values,
+            lastUpdate: lastUpdate,
+          ),
+        ],
         staleMinutes: 10,
+        now: now,
       );
-      expect(names, ['Baterai']);
+
+      expect(names(values: const {'soc': 50}, lastUpdate: now), isEmpty);
+      expect(
+        names(
+          values: const {'soc': 50},
+          lastUpdate: now.subtract(const Duration(minutes: 30)),
+        ),
+        ['Baterai'],
+      );
+      // Never read at all: silence before the first poll is not staleness.
+      expect(names(values: const {}, lastUpdate: null), isEmpty);
     });
   });
 }
@@ -374,6 +419,7 @@ const _energy = AlarmThresholds(
   environmentAlerts: false,
   lowSoc: 20,
   staleMinutes: 10,
+  offlineMinutes: 60,
 );
 
 const _none = AlarmThresholds(
@@ -381,4 +427,5 @@ const _none = AlarmThresholds(
   environmentAlerts: false,
   lowSoc: 20,
   staleMinutes: 10,
+  offlineMinutes: 60,
 );

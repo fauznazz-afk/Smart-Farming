@@ -33,15 +33,19 @@ class ThingsBoardClient(
      * HTTP failure, so the caller can treat a failed fetch as "no information"
      * rather than as stale telemetry.
      */
-    fun fetch(device: AlarmDevice, config: AlarmDeviceConfig): AlarmReading {
+    fun fetch(
+        device: AlarmDevice,
+        config: AlarmDeviceConfig,
+        deadlineMs: Long = Long.MAX_VALUE,
+    ): AlarmReading {
         val url = URL(
             "$baseUrl/api/plugins/telemetry/DEVICE/${config.deviceId}" +
                 "/values/timeseries?keys=${config.keys.joinToString(",")}",
         )
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
+            connectTimeout = timeoutMs(deadlineMs, CONNECT_TIMEOUT_MS)
+            readTimeout = timeoutMs(deadlineMs, READ_TIMEOUT_MS)
             setRequestProperty("X-Authorization", "Bearer $token")
             setRequestProperty("Accept", "application/json")
             useCaches = false
@@ -83,12 +87,12 @@ class ThingsBoardClient(
      * A rejected refresh token raises [RefreshRejectedException] instead, because
      * retrying it is pointless: the session is over.
      */
-    fun refresh(refreshToken: String): TokenRefresh? {
+    fun refresh(refreshToken: String, deadlineMs: Long): TokenRefresh? {
         val url = URL("$baseUrl/api/auth/token")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
+            connectTimeout = timeoutMs(deadlineMs, CONNECT_TIMEOUT_MS)
+            readTimeout = timeoutMs(deadlineMs, READ_TIMEOUT_MS)
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
@@ -132,7 +136,9 @@ class ThingsBoardClient(
         } catch (error: RefreshRejectedException) {
             throw error
         } catch (error: Exception) {
-            Log.w(TAG, "ThingsBoard token refresh failed", error)
+            // The class only, not the object: an org.json parse error embeds a
+            // fragment of the unconsumed response, which for this call is the JWT.
+            Log.w(TAG, "ThingsBoard token refresh failed: ${error.javaClass.simpleName}")
             null
         } finally {
             connection.disconnect()
@@ -141,8 +147,14 @@ class ThingsBoardClient(
 
     companion object {
         private const val TAG = "EnerGrowAlarmTb"
-        private const val CONNECT_TIMEOUT_MS = 5_000
-        private const val READ_TIMEOUT_MS = 5_000
+
+        /** The smaller of the caller's deadline and our own cap. */
+        private fun timeoutMs(deadlineMs: Long, capMs: Int): Int =
+            if (deadlineMs <= 0L) 1 else minOf(capMs.toLong(), deadlineMs).toInt()
+        private const val CONNECT_TIMEOUT_MS = 4_000
+        private const val READ_TIMEOUT_MS = 4_000
+
+        /** Never let one request eat the receiver's whole window. */
 
         /**
          * Reads the first point of each series, matching `DeviceTelemetry`.

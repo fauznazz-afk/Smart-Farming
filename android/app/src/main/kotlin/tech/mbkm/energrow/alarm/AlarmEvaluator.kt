@@ -42,7 +42,9 @@ object AlarmEvaluator {
             // staleness is the alarm, silence is not.
             if (reading == null) continue
 
-            if (rule.comparison == AlarmComparison.STALE) {
+            if (rule.comparison == AlarmComparison.STALE ||
+                rule.comparison == AlarmComparison.OFFLINE
+            ) {
                 if (isStale(reading, rule.staleMinutes, nowMs)) {
                     signals += AlarmSignal(rule, AlarmMessageFormat.format(rule, null), null)
                 }
@@ -61,7 +63,7 @@ object AlarmEvaluator {
             val breached = when (rule.comparison) {
                 AlarmComparison.LESS_THAN -> value < limit
                 AlarmComparison.GREATER_THAN -> value > limit
-                AlarmComparison.STALE -> false
+                AlarmComparison.STALE, AlarmComparison.OFFLINE -> false
             }
             if (!breached) continue
 

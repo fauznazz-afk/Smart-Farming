@@ -1,3 +1,4 @@
+import '../screens/dashboard/utils/color_helpers.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -134,6 +135,7 @@ class LiquidGlassCard extends StatelessWidget {
     required this.isDark,
     this.performanceMode = true,
     this.tintColor,
+    this.borderColor,
     this.width,
     this.height,
     this.semanticLabel,
@@ -145,6 +147,10 @@ class LiquidGlassCard extends StatelessWidget {
   final bool isDark;
   final bool performanceMode;
   final Color? tintColor;
+
+  /// Overrides the hairline border, used to outline a card that has crossed a
+  /// limit. Null keeps the neutral border.
+  final Color? borderColor;
   final double? width;
   final double? height;
   final String? semanticLabel;
@@ -154,11 +160,16 @@ class LiquidGlassCard extends StatelessWidget {
     final surface =
         tintColor ?? (isDark ? const Color(0xFF202020) : Colors.white);
 
+    // A white border on a near-white card is not a border. Light mode uses a
+    // faint black hairline instead, which is what GlassDateChip in this same
+    // file already did.
     final border = Border.all(
       width: 1.2,
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.13)
-          : Colors.white.withValues(alpha: 0.85),
+      color:
+          borderColor ??
+          (isDark
+              ? Colors.white.withValues(alpha: 0.13)
+              : Colors.black.withValues(alpha: 0.07)),
     );
 
     final shadows = [
@@ -276,7 +287,7 @@ class GlassCapsule extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white54 : Colors.black45,
+              color: faintColor(isDark),
             ),
           ),
           const SizedBox(height: 4),
@@ -298,7 +309,7 @@ class GlassCapsule extends StatelessWidget {
                 unit,
                 style: TextStyle(
                   fontSize: 10,
-                  color: isDark ? Colors.white54 : Colors.black45,
+                  color: faintColor(isDark),
                 ),
               ),
             ],
@@ -544,6 +555,7 @@ class GlassDateChip extends StatelessWidget {
               decoration: decoration,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
                     height: 13,
@@ -556,7 +568,7 @@ class GlassDateChip extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: isSelected
                               ? Colors.white
-                              : (isDark ? Colors.white54 : Colors.black45),
+                              : (faintColor(isDark)),
                         ),
                       ),
                     ),

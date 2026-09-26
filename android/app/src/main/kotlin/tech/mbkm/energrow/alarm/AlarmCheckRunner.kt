@@ -35,14 +35,45 @@ class AlarmCheckRunner(context: Context) {
      */
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
 
-    fun run() {
+    /**
+     * Runs one check, unless another one is already in flight.
+     *
+     * Three entry points reach this class: the scheduled receiver, the "check
+     * now" bridge call, and the debug trigger. They used to have separate
+     * threads with no shared guard, so two of them could read the same
+     * previously-active set and both decide an alarm was new, which is exactly
+     * the duplicate notification the active set exists to prevent. One
+     * process-wide lock fixes it for all of them.
+     *
+     * [force] exists for the manual trigger: a user pressing "check now" while
+     * the app is on screen means it, so it bypasses the foreground stand-down.
+     */
+    fun run(force: Boolean = false) {
+        if (!running.compareAndSet(false, true)) {
+            Log.i(TAG, "a check is already running; skipping")
+            return
+        }
+        // Everything below has to finish inside the receiver's window, or the
+        // process is killed mid-write and the next tick reports the same alarms
+        // again. The deadline is enforced rather than assumed: an expired access
+        // token is the normal reason to hit the slow path, and that is exactly
+        // when the window runs out.
+        val deadline = System.currentTimeMillis() + BUDGET_MS
+        try {
+            runGuarded(force, deadline)
+        } finally {
+            running.set(false)
+        }
+    }
+
+    private fun runGuarded(force: Boolean, deadline: Long) {
         Log.i(TAG, "check started")
         // Re-arm first, so a check that then fails or ends the session still
         // leaves a scheduled trigger behind. A vendor power manager that dropped
         // the alarm cannot be recovered from here directly, but every successful
         // run repairs it.
         AlarmScheduler.rearm(context)
-        if (state.isForeground()) {
+        if (!force && state.isForeground()) {
             // The dashboard is on screen and evaluating the same rules against
             // the same ThingsBoard devices on a much shorter poll. Doing the work
             // twice would double the request rate for no new information, and it
@@ -61,7 +92,7 @@ class AlarmCheckRunner(context: Context) {
             return finish("no credentials stored")
         }
 
-        val readings = readDevices(config, token)
+        val readings = readDevices(config, token, deadline)
             ?: return endSession("session ended; background check disabled")
         if (readings.isEmpty()) {
             // No device produced data. That is a network or credential problem,
@@ -132,12 +163,17 @@ class AlarmCheckRunner(context: Context) {
     private fun readDevices(
         config: AlarmConfig,
         token: String,
+        deadline: Long,
     ): Map<AlarmDevice, AlarmReading>? {
-        val first = readAll(config, ThingsBoardClient(config.baseUrl, token))
+        val first = readAll(config, ThingsBoardClient(config.baseUrl, token), deadline)
         val unauthorized = first.unauthorizedDevices
         if (unauthorized.isEmpty()) return first.readings
 
-        val refreshed = refreshToken(config) ?: return first.readings
+        if (System.currentTimeMillis() >= deadline) {
+            Log.w(TAG, "out of time before the token refresh; retrying next tick")
+            return first.readings
+        }
+        val refreshed = refreshToken(config, deadline) ?: return first.readings
         Log.i(TAG, "refreshed the access token and retrying ${unauthorized.size} device(s)")
         val client = ThingsBoardClient(config.baseUrl, refreshed.accessToken)
         AlarmTokenStore.put(
@@ -148,6 +184,10 @@ class AlarmCheckRunner(context: Context) {
         val readings = first.readings.toMutableMap()
         for (deviceConfig in config.devices) {
             if (deviceConfig.device !in unauthorized) continue
+            if (System.currentTimeMillis() >= deadline) {
+                Log.w(TAG, "out of time before retrying every device; deferring to next tick")
+                break
+            }
             try {
                 readings[deviceConfig.device] = client.fetch(deviceConfig.device, deviceConfig)
             } catch (error: Exception) {
@@ -161,14 +201,14 @@ class AlarmCheckRunner(context: Context) {
     }
 
     /** Refreshes the access token, or returns null when it could not be renewed. */
-    private fun refreshToken(config: AlarmConfig): TokenRefresh? {
+    private fun refreshToken(config: AlarmConfig, deadline: Long): TokenRefresh? {
         val refreshToken = AlarmTokenStore.refreshToken(context) ?: run {
             Log.i(TAG, "no refresh token stored; cannot renew the access token")
             return null
         }
         val client = ThingsBoardClient(config.baseUrl, AlarmTokenStore.accessToken(context).orEmpty())
         return try {
-            client.refresh(refreshToken)
+            client.refresh(refreshToken, deadline)
         } catch (error: RefreshRejectedException) {
             // The session ended somewhere else, most likely the user signed out.
             // Nothing here should keep polling with a token the user expects to
@@ -195,6 +235,7 @@ class AlarmCheckRunner(context: Context) {
     private fun readAll(
         config: AlarmConfig,
         client: ThingsBoardClient,
+        deadline: Long,
     ): ReadAttempt {
         val executor = Executors.newFixedThreadPool(config.devices.size.coerceAtLeast(1))
         return try {
@@ -228,7 +269,7 @@ class AlarmCheckRunner(context: Context) {
             val unauthorized = mutableSetOf<AlarmDevice>()
             for (future in futures) {
                 try {
-                    when (val result = future.get(DEVICE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    when (val result = future.get(remainingMs(deadline), TimeUnit.MILLISECONDS)) {
                         is Fetched -> readings[result.device] = result.reading
                         is Unauthorized -> unauthorized += result.device
                         else -> Unit
@@ -266,8 +307,23 @@ class AlarmCheckRunner(context: Context) {
         notifier.notify(signal)
     }
 
+    /** Milliseconds left for a device read, never more than the budget. */
+    private fun remainingMs(deadline: Long): Long =
+        (deadline - System.currentTimeMillis()).coerceAtLeast(1L)
+
     private companion object {
         const val TAG = "EnerGrowAlarmCheck"
-        const val DEVICE_TIMEOUT_SECONDS = 8L
+
+        /**
+         * A manifest `BroadcastReceiver` is allowed roughly ten seconds before
+         * the process is killed, and being killed mid-write is worse than not
+         * checking: the active set never gets updated, so the next tick sees the
+         * same alarms as new and notifies again. The budget is deliberately
+         * under the platform's allowance, leaving room for the finish() call.
+         */
+        const val BUDGET_MS = 8_000L
+
+        /** Shared by every entry point, see [run]. */
+        val running = java.util.concurrent.atomic.AtomicBoolean(false)
     }
 }

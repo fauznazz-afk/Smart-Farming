@@ -64,7 +64,7 @@ class AlarmDebugReceiver : BroadcastReceiver() {
         }
         executor.execute {
             try {
-                AlarmCheckRunner(appContext).run()
+                AlarmCheckRunner(appContext).run(force = true)
             } catch (error: Throwable) {
                 Log.e(TAG, "debug-triggered check failed", error)
             } finally {

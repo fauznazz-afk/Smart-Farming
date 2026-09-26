@@ -13,6 +13,7 @@ abstract final class SettingsKeys {
   static const environmentAlertsEnabled = 'environment_alerts_enabled';
   static const lowSocThreshold = 'low_soc_threshold';
   static const staleTelemetryMinutes = 'stale_telemetry_minutes';
+  static const offlineTelemetryMinutes = 'offline_telemetry_minutes';
   static const dailyProductionTargetKwh = 'daily_production_target_kwh';
 
   // Environment alert limits

@@ -40,15 +40,12 @@ dependencies:
   shared_preferences: ^2.2.0
   fl_chart: ^0.68.0
   intl: ^0.20.3
-  cupertino_icons: ^1.0.8
   webview_flutter: ^4.13.0
   share_plus: ^12.0.2
   web_socket_channel: ^3.0.3
   flutter_local_notifications: ^19.4.1
   path_provider: ^2.1.1
-  csv: ^8.0.0
   geolocator: ^10.1.0
-  geocoding: ^5.0.0
 
 # path_provider_android 2.3.0 rewrote its Kotlin side on top of the `jni` package,
 # which makes Gradle pull in a full NDK and CMake toolchain to build a 130 KB

@@ -1,3 +1,4 @@
+import '../utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/date_helpers.dart';
@@ -62,7 +63,7 @@ class GreetingHeader extends StatelessWidget {
                 '${dayNameFull(now.weekday)}, ${now.day} ${monthName(now.month)} ${now.year}',
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark ? Colors.white54 : Colors.black45,
+                  color: faintColor(isDark),
                 ),
               ),
             ],

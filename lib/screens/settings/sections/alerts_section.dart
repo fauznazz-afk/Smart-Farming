@@ -9,6 +9,12 @@ const List<int> kLowSocOptions = [10, 15, 20, 25, 30, 40, 50];
 /// Selectable stale-telemetry thresholds, in minutes.
 const List<int> kStaleMinutesOptions = [5, 10, 15, 30, 60];
 
+/// Selectable "device has stopped responding" thresholds, in minutes.
+///
+/// Deliberately far above [kStaleMinutesOptions]: ten minutes of silence in an
+/// MQTT pipeline is a hiccup, an hour is a dead sensor.
+const List<int> kOfflineMinutesOptions = [15, 30, 60, 120, 240, 480];
+
 /// Battery and telemetry staleness warnings plus the daily production target.
 class EnergyAlertsSection extends StatelessWidget {
   const EnergyAlertsSection({super.key, required this.settings});
@@ -24,7 +30,8 @@ class EnergyAlertsSection extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           title: const Text('Enable energy alerts'),
           subtitle: const Text(
-            'In-app alerts appear while the dashboard is open.',
+            'Checked in the background too, so a low battery is reported '
+            'without opening the app.',
           ),
           value: settings.energyAlerts,
           onChanged: (value) =>
@@ -51,6 +58,19 @@ class EnergyAlertsSection extends StatelessWidget {
           onChanged: (value) {
             if (value != null) {
               settings.update(() => settings.staleMinutes = value);
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        LabeledDropdown(
+          label: 'Report a device as stopped after',
+          value: settings.offlineMinutes,
+          options: kOfflineMinutesOptions,
+          enabled: settings.energyAlerts,
+          suffix: ' minutes',
+          onChanged: (value) {
+            if (value != null) {
+              settings.update(() => settings.offlineMinutes = value);
             }
           },
         ),
@@ -84,7 +104,8 @@ class EnvironmentAlertsSection extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           title: const Text('Enable environment alerts'),
           subtitle: const Text(
-            'Alerts appear in the app when fresh sensor values cross a limit.',
+            'Only fresh readings are judged, so an alert always describes the '
+            'current state rather than one that has already ended.',
           ),
           value: settings.envAlerts,
           onChanged: (value) =>

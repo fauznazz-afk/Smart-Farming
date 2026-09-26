@@ -122,7 +122,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _refreshSeconds = 10;
   Timer? _refreshTimer;
   final _connectionHealth = ConnectionHealthService();
-  bool _connectionStatusInitialized = false;
   final ValueNotifier<bool> _connectionStatusVisible = ValueNotifier(false);
   Timer? _connectionStatusTimer;
   late final Listenable _connectionChromeListenable = Listenable.merge([
@@ -350,9 +349,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]);
       if (!mounted) return;
       final now = DateTime.now();
-      final statusChanged = !_connectionStatusInitialized || _error != null;
-      _connectionStatusInitialized = true;
-      if (statusChanged) _showConnectionStatus();
       final wasLoading = _loading;
       final changed =
           _loading ||
@@ -396,9 +392,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       await _applyOfflineFallback();
       final message = error.toString();
-      final statusChanged = !_connectionStatusInitialized || _error == null;
-      _connectionStatusInitialized = true;
-      if (statusChanged) _showConnectionStatus();
       if (_error != message || _loading) {
         final wasLoading = _loading;
         _error = message;
@@ -627,17 +620,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         critical: signal.isCritical,
       ),
     );
-  }
-
-  void _showConnectionStatus() {
-    _connectionStatusTimer?.cancel();
-    if (mounted && !_connectionStatusVisible.value) {
-      _connectionStatusVisible.value = true;
-    }
-    _connectionStatusTimer = Timer(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      _connectionStatusVisible.value = false;
-    });
   }
 
   // ── Energy summary ───────────────────────────────────────────────────────────
@@ -1079,10 +1061,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildPage(int index, bool isDark) {
+    // One status strip, not three. They used to stack, and a phone in offline
+    // mode showed a green "polling active" line directly above an orange
+    // "offline" line, which is two opposite claims about the same connection
+    // stacked on top of each other before any content appeared.
     final items = <Widget Function()>[
-      _connectionStatusBannerBuilder,
-      _offlineBannerBuilder,
-      _energyAlertBannerBuilder,
+      () => _statusStripBuilder(isDark),
       ..._pageContentFor(index, isDark),
     ];
     return RepaintBoundary(
@@ -1148,50 +1132,76 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _connectionStatusBannerBuilder() {
+  /// One status line for everything the user needs to know about liveness.
+  ///
+  /// Replaces three stacked banners with strict precedence: a fetch failure
+  /// beats offline mode, which beats an active alarm, which beats stale devices.
+  /// Only the most important thing is ever shown, so the strip cannot contradict
+  /// itself and does not push the page content off screen.
+  Widget _statusStripBuilder(bool isDark) {
     return _bindRevision(
       _connectionChromeListenable,
-      Theme.of(context).brightness == Brightness.dark,
-      () => ConnectionStatusBannerSwitcher(
-        visible: _connectionStatusVisible.value,
-        builder: () => ConnectionStatusBanner(
-          failed: _error != null,
-          staleNames: _staleDeviceNames(),
-          health: _connectionHealth.health,
-          lastSuccessfulAt: _lastSuccessfulTelemetryAt,
-          errorMessage: _error,
-          isDark: Theme.of(context).brightness == Brightness.dark,
-          onRetry: _fetchAll,
-        ),
-      ),
+      isDark,
+      () {
+        final failed = _error != null;
+        final offline = _isOfflineMode;
+        final alerts = _alertMessages.value;
+        final stale = _staleDeviceNames();
+
+        if (failed) {
+          return ConnectionStatusBanner(
+            failed: true,
+            staleNames: stale,
+            health: _connectionHealth.health,
+            lastSuccessfulAt: _lastSuccessfulTelemetryAt,
+            errorMessage: _error,
+            isDark: isDark,
+            onRetry: _fetchAll,
+          );
+        }
+        if (offline) {
+          return _bindRevision(
+            _liveRevision,
+            isDark,
+            () => OfflineBanner(
+              cacheTime: _cachedTelemetryTime,
+              onRetry: _fetchAll,
+            ),
+          );
+        }
+        if (alerts.isNotEmpty) {
+          return _bindRevision(
+            _alertMessages,
+            isDark,
+            () => alerts.isEmpty
+                ? const SizedBox.shrink()
+                : EnergyAlertBanner(messages: alerts),
+          );
+        }
+        if (stale.isNotEmpty) {
+          return ConnectionStatusBanner(
+            failed: false,
+            staleNames: stale,
+            health: _connectionHealth.health,
+            lastSuccessfulAt: _lastSuccessfulTelemetryAt,
+            errorMessage: null,
+            isDark: isDark,
+            onRetry: _fetchAll,
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 
+  /// Feeds the same readings the rule engine uses, so the banner and the alarms
+  /// can never disagree about which devices stopped reporting.
   List<String> _staleDeviceNames() => staleDeviceNames(
-    batteryValues: _battery?.latestValues,
-    batteryLastUpdate: _battery?.lastUpdate,
-    pzemValues: _pzem?.latestValues,
-    pzemLastUpdate: _pzem?.lastUpdate,
-    sensorValues: _sensor?.latestValues,
-    sensorLastUpdate: _sensor?.lastUpdate,
+    readings: _alarmReadings,
     staleMinutes: _staleTelemetryMinutes,
   );
 
-  Widget _energyAlertBannerBuilder() {
-    return _bindRevision(_alertMessages, true, () {
-      final messages = _alertMessages.value;
-      return messages.isEmpty
-          ? const SizedBox.shrink()
-          : EnergyAlertBanner(messages: messages);
-    });
-  }
 
-  Widget _offlineBannerBuilder() {
-    return _bindRevision(_liveRevision, true, () {
-      if (!_isOfflineMode) return const SizedBox.shrink();
-      return OfflineBanner(cacheTime: _cachedTelemetryTime, onRetry: _fetchAll);
-    });
-  }
 
   // ── Overview page ────────────────────────────────────────────────────────────
   List<Widget Function()> _overviewPage(bool isDark) {
@@ -1304,6 +1314,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       isDark: isDark,
       seedColor: _seedColor,
       performanceMode: _performanceMode,
+      // The grid grades each reading against the same thresholds the alarms use,
+      // so a number on screen always has something to be read against.
+      thresholds: _thresholds,
+      staleMinutes: _staleTelemetryMinutes,
+      lastUpdate: _sensor?.lastUpdate,
     );
   }
 
@@ -1327,9 +1342,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         _pzem,
         isDark,
         const [
-          MetricDef('voltage_dc', 'Voltage', 'V', Icons.bolt),
-          MetricDef('current_dc', 'Current', 'A', Icons.swap_horiz),
-          MetricDef('power_dc', 'Power', 'W', Icons.wb_sunny),
+          MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
+          MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
+          MetricDef('power_dc', 'Power DC', 'W', Icons.wb_sunny),
           MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
         ],
       ),
@@ -1363,10 +1378,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         _pzem,
         isDark,
         const [
-          MetricDef('voltage_ac', 'Voltage', 'V', Icons.bolt),
-          MetricDef('current_ac', 'Current', 'A', Icons.swap_horiz),
-          MetricDef('power_ac', 'Power', 'W', Icons.power),
-          MetricDef('frequency_ac', 'Frequency', 'Hz', Icons.graphic_eq),
+          MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
+          MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
+          MetricDef('power_ac', 'Power AC', 'W', Icons.power, decimals: 1),
+          MetricDef('frequency_ac', 'Frequency', 'Hz', Icons.graphic_eq, decimals: 1),
           MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
           MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
         ],
@@ -1403,15 +1418,20 @@ class _DashboardScreenState extends State<DashboardScreen>
         const [
           MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
           MetricDef('current', 'Current', 'A', Icons.swap_horiz),
-          MetricDef('power', 'Power', 'W', Icons.bolt_outlined),
-          MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full),
-          MetricDef('cycles', 'Cycles', '', Icons.refresh),
+          MetricDef('power', 'Power', 'W', Icons.bolt_outlined, decimals: 1),
+          MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full, decimals: 0),
+          MetricDef('cycles', 'Cycles', '', Icons.refresh, decimals: 0),
           MetricDef(
             'remain_capacity_ah',
             'Remaining Capacity',
             'Ah',
             Icons.battery_3_bar,
+            decimals: 1,
           ),
+          // The full capacity was already being fetched and displayed nowhere.
+          // A remaining charge with no reference to the original size is just a
+          // number, so the pack size goes next to it.
+          MetricDef('full_capacity_ah', 'Full Capacity', 'Ah', Icons.battery_full),
         ],
       ),
     ),

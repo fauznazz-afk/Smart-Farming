@@ -9,6 +9,7 @@
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -34,6 +35,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -50,6 +67,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -63,6 +96,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -107,6 +156,7 @@
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -132,6 +182,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -148,6 +214,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -161,6 +243,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -200,6 +298,7 @@
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -225,6 +324,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -241,6 +356,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -254,6 +385,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -298,6 +445,7 @@
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -323,6 +471,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -339,6 +503,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -352,6 +532,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -396,6 +592,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": 30.0,
         "humidityMin": null,
@@ -421,6 +618,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -437,6 +650,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -450,6 +679,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -533,6 +778,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": 30.0,
         "humidityMin": null,
@@ -585,6 +831,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": 30.0,
         "humidityMin": null,
@@ -610,6 +857,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -626,6 +889,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -639,6 +918,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -722,6 +1017,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": 30.0,
         "humidityMin": null,
@@ -747,6 +1043,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -763,6 +1075,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -776,6 +1104,22 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {
@@ -859,6 +1203,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -909,6 +1254,7 @@
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -937,6 +1283,7 @@
         "environmentAlerts": true,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 60,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -957,14 +1304,15 @@
       "expected": []
     },
     {
-      "name": "device_that_never_reported_is_not_an_alarm",
-      "description": "Silence from a device that was never read is missing data, not stale telemetry, and must not raise an alarm.",
+      "name": "dead_sensor_raises_offline_not_only_stale",
+      "description": "A device silent past the offline window is a critical alarm in its own right, on top of the stale warning, because \"behind\" and \"stopped\" need different responses.",
       "now": "2026-09-27T10:00:00.000Z",
       "thresholds": {
         "energyAlerts": true,
         "environmentAlerts": false,
         "lowSoc": 20.0,
         "staleMinutes": 10,
+        "offlineMinutes": 30,
         "tempMin": null,
         "tempMax": null,
         "humidityMin": null,
@@ -990,6 +1338,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 30,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_battery",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -1006,6 +1370,22 @@
           "requireFreshSensor": false
         },
         {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 30,
+          "requireFreshSensor": false
+        },
+        {
           "id": "stale_pzem",
           "type": "staleTelemetry",
           "severity": "warning",
@@ -1019,6 +1399,348 @@
           "decimals": 0,
           "message": "stale",
           "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 30,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        }
+      ],
+      "readings": [
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:15:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "offline_sensor",
+          "message": "Sensor lingkungan berhenti mengirim data"
+        },
+        {
+          "id": "stale_sensor",
+          "message": "Data Sensor lingkungan belum diperbarui"
+        }
+      ]
+    },
+    {
+      "name": "device_silent_but_within_both_windows_is_only_stale",
+      "description": "The same gap does not escalate until the longer window is crossed, so a brief hiccup never becomes a critical alarm.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Baterai",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        }
+      ],
+      "readings": [
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:35:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "stale_pzem",
+          "message": "Data PZEM belum diperbarui"
+        }
+      ]
+    },
+    {
+      "name": "device_that_never_reported_is_not_an_alarm",
+      "description": "Silence from a device that was never read is missing data, not stale telemetry, and must not raise an alarm.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Baterai",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Baterai",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Sensor lingkungan",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
           "requireFreshSensor": false
         },
         {

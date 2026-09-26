@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-212%20Dart%20%2B%206%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-217%20Dart%20%2B%2011%20Kotlin-4CAF50">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
@@ -93,6 +93,12 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 - **Pengecekan latar belakang tiap menit** (lihat di atas) — native, hemat RAM
 - Ambang yang bisa diatur: SOC baterai, usia telemetry, serta batas minimum/maksimum
   suhu, kelembapan, dan TDS
+- **Deteksi perangkat mati** — telemetry yang diam 10 menit memberi peringatan,
+  dan diam lebih lama (default 60 menit) memberi alarm kritis tersendiri, karena
+  "telat" dan "mati" butuh tindakan yang berbeda
+- Batas lingkungan sudah terisi secara default (suhu 15–35 °C, kelembapan
+  40–85 %, TDS ≥ 800 ppm) dan setiap kartu menampilkan apakah nilainya berada
+  di dalam batas
 - Batas kosong berarti "tidak dipantau"; alert lingkungan hanya dievaluasi dari data
   sensor yang **masih segar**, supaya tidak ada alarm untuk kondisi yang sudah berakhir
 - **Riwayat alarm** dengan acknowledge, resolve, dan reopen

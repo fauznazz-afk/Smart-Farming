@@ -1,3 +1,4 @@
+import '../utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../../../widgets/liquid_glass.dart';
@@ -70,11 +71,8 @@ class DateStrip extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                rangeStart != null ? 'Custom range' : 'Last 7 days',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark ? Colors.white54 : Colors.black45,
-                ),
+                rangeStart != null ? 'Rentang' : 'Pilih hari',
+                style: TextStyle(fontSize: 11, color: faintColor(isDark)),
               ),
             ],
           ),
@@ -111,18 +109,24 @@ class DateStrip extends StatelessWidget {
     );
   }
 
+  /// States what the charts are actually showing.
+  ///
+  /// This used to describe the span of the seven chips instead, so tapping a
+  /// chip left the label reading a range that no longer matched the selection,
+  /// while the detail pages showed the correct single day. Two screens
+  /// disagreed about the same state, and the Overview one was the wrong one.
   String _rangeLabel() {
     if (rangeStart != null && rangeEnd != null) {
       return '${rangeStart!.day} ${monthName(rangeStart!.month)} '
           '${rangeStart!.year} – '
           '${rangeEnd!.day} ${monthName(rangeEnd!.month)} ${rangeEnd!.year}';
     }
-    final first = days.first;
-    final last = days.last;
-    if (first.month == last.month) {
-      return '${first.day}–${last.day} ${monthName(last.month)} ${last.year}';
+    final today = DateTime.now();
+    if (_isSameDay(selectedDate, today)) return 'Hari ini';
+    if (_isSameDay(selectedDate, today.subtract(const Duration(days: 1)))) {
+      return 'Kemarin';
     }
-    return '${first.day} ${monthName(first.month)} – '
-        '${last.day} ${monthName(last.month)} ${last.year}';
+    return '${dayNameFull(selectedDate.weekday)}, '
+        '${selectedDate.day} ${monthName(selectedDate.month)} ${selectedDate.year}';
   }
 }

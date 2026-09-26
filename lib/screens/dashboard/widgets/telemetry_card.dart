@@ -116,14 +116,14 @@ class _StaleNotice extends StatelessWidget {
           Icon(
             Icons.schedule,
             size: 15,
-            color: isDark ? Colors.white54 : Colors.black45,
+            color: faintColor(isDark),
           ),
           const SizedBox(width: 6),
           Text(
             ageLabel ?? 'No update received',
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? Colors.white54 : Colors.black45,
+              color: faintColor(isDark),
             ),
           ),
         ],
@@ -148,9 +148,12 @@ class _MetricRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unit = metric.unit;
+    final decimals = metric.decimals;
     final displayValue = value == null
         ? (unit.isEmpty ? '--' : '-- $unit')
-        : (unit.isEmpty ? value!.toStringAsFixed(2) : '${value!.toStringAsFixed(2)} $unit');
+        : (unit.isEmpty
+              ? value!.toStringAsFixed(decimals)
+              : '${value!.toStringAsFixed(decimals)} $unit');
     return MergeSemantics(
       child: Semantics(
         label: '$metric: $displayValue',
@@ -225,7 +228,7 @@ class GlassMetricRow extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDark ? Colors.white54 : Colors.black45,
+                  color: faintColor(isDark),
                 ),
               ),
               const Spacer(),
@@ -278,7 +281,7 @@ class MiniMetric extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: isDark ? Colors.white54 : Colors.black45,
+                color: faintColor(isDark),
               ),
             ),
           ],

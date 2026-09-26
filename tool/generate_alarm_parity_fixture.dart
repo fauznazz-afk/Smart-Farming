@@ -72,6 +72,7 @@ Map<String, dynamic> _thresholdsToJson(AlarmThresholds t) => {
   'environmentAlerts': t.environmentAlerts,
   'lowSoc': t.lowSoc,
   'staleMinutes': t.staleMinutes,
+  'offlineMinutes': t.offlineMinutes,
   'tempMin': t.tempMin,
   'tempMax': t.tempMax,
   'humidityMin': t.humidityMin,
@@ -86,12 +87,14 @@ void main() {
     environmentAlerts: false,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
   );
   const energyWithEnvironment = AlarmThresholds(
     energyAlerts: true,
     environmentAlerts: true,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
     tempMax: 30,
     tdsMin: 800,
   );
@@ -100,6 +103,7 @@ void main() {
     environmentAlerts: true,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
     tempMax: 30,
   );
   const environmentOnly = AlarmThresholds(
@@ -107,6 +111,7 @@ void main() {
     environmentAlerts: true,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
     humidityMax: 80,
   );
   const none = AlarmThresholds(
@@ -114,12 +119,14 @@ void main() {
     environmentAlerts: false,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
   );
   const blankLimits = AlarmThresholds(
     energyAlerts: false,
     environmentAlerts: true,
     lowSoc: 20,
     staleMinutes: 10,
+    offlineMinutes: 60,
   );
 
   final fresh = Duration(minutes: 1);
@@ -246,6 +253,57 @@ void main() {
       blankLimits,
       [reading(AlarmDevice.sensor, {'temp_dht': 55}, fresh)],
       [],
+    ),
+    scenario(
+      'dead_sensor_raises_offline_not_only_stale',
+      'A device silent past the offline window is a critical alarm in its own '
+          'right, on top of the stale warning, because "behind" and "stopped" '
+          'need different responses.',
+      const AlarmThresholds(
+        energyAlerts: true,
+        environmentAlerts: false,
+        lowSoc: 20,
+        staleMinutes: 10,
+        offlineMinutes: 30,
+      ),
+      [
+        reading(AlarmDevice.sensor, {'temp_dht': 26.5}, const Duration(minutes: 45)),
+        reading(AlarmDevice.battery, {'soc': 77}, fresh),
+        reading(AlarmDevice.pzem, {'power_ac': 15.8}, fresh),
+      ],
+      [
+        {
+          'id': 'offline_sensor',
+          'message': 'Sensor lingkungan berhenti mengirim data',
+        },
+        {
+          'id': 'stale_sensor',
+          'message': 'Data Sensor lingkungan belum diperbarui',
+        },
+      ],
+    ),
+    scenario(
+      'device_silent_but_within_both_windows_is_only_stale',
+      'The same gap does not escalate until the longer window is crossed, so a '
+          'brief hiccup never becomes a critical alarm.',
+      const AlarmThresholds(
+        energyAlerts: true,
+        environmentAlerts: false,
+        lowSoc: 20,
+        staleMinutes: 10,
+        offlineMinutes: 60,
+      ),
+      [
+        reading(AlarmDevice.pzem, {'power_ac': 15.8}, const Duration(minutes: 25)),
+        reading(AlarmDevice.battery, {'soc': 77}, fresh),
+        reading(AlarmDevice.sensor, {'temp_dht': 26.5}, fresh),
+      ],
+      [
+        {
+          'id': 'stale_pzem',
+          'message': 'Data PZEM belum diperbarui',
+        },
+      ],
     ),
     scenario(
       'device_that_never_reported_is_not_an_alarm',

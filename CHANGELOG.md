@@ -2,6 +2,13 @@
 
 ### Fixed
 
+- **Fixed a background check that could be killed mid-write.** The worst case ran about 48 seconds against the ~10 seconds a manifest `BroadcastReceiver` is allowed, and the slow path was the *expected* one whenever the access token had expired. Being killed between writing credentials and saving the active set made the next tick treat the same alarms as new, which is the duplicate notification the design exists to prevent. A wall-clock budget is now enforced, per-request timeouts are capped below it, and the token refresh is skipped rather than started when the budget is already spent.
+- **Fixed three independent check runners with no mutual exclusion.** The scheduled receiver, the "check now" button and the debug trigger each ran on their own thread, so two could read the same active set and both decide an alarm was new. One process-wide guard now covers all three.
+- **Fixed "check now" silently doing nothing.** The manual trigger inherited the foreground stand-down, so pressing the button while looking at the app skipped the check. It now bypasses the stand-down, which is what a user pressing it means.
+- **Fixed `allowBackup="false"` not covering device-to-device transfer.** Since Android 12 that attribute disables cloud backup but not D2D, so a phone-to-phone migration would have carried the plaintext preferences to the new device, including the OpenWeatherMap key. `dataExtractionRules.xml` and `backup_rules.xml` now exclude everything from both paths.
+- **Fixed the ThingsBoard host being validated only by an `https://` prefix.** A prefix test accepts *any* TLS host, so the first time the base URL became configurable — a normal request for an app like this — a mistyped or malicious host would have received a live bearer token. It is now an exact host allowlist, rejecting userinfo, non-443 ports and paths, which mirrors what `parseAllowedCctvUrl` already did correctly.
+- **Fixed the OpenWeatherMap key going into logcat by accident.** An `org.json` parse error on the token refresh path embeds a fragment of the unconsumed response, which for that request is the JWT. Only the exception class is logged now.
+- **Removed two unused permissions.** `WAKE_LOCK` was never acquired and `ACCESS_BACKGROUND_LOCATION` is never requested at runtime; the second is one a store review treats as sensitive.
 - **Fixed background alarms never firing at all.** `android_alarm_manager_plus` requires its `AlarmService` and `AlarmBroadcastReceiver` to be declared in the app manifest, and neither was. The 15-minute alarm was therefore registered but never delivered, which is why `progress.md` recorded "never a real alarm appeared" as untested rather than broken. The dependency is removed entirely and replaced by native Kotlin; see the Added entry below.
 - **Fixed a duplicate notification on every cold start.** The active-alarm set was read from the native module *asynchronously, after* the dashboard had already decided an alarm was new, so opening the app re-announced alarms the background had already reported. The set is now read before the first evaluation, and notifications are held back until it arrives. Covered by `test/alarm_rules_test.dart` via `newlyActiveSignals`.
 - **Fixed the background alarm being dropped by vendor power management.** The repeating alarm fired six times and then silently disappeared from `dumpsys alarm` on MIUI/HyperOS, with `com.miui.powerkeeper` in the same output, so alarms simply stopped arriving with nothing to indicate why. A second `setAndAllowWhileIdle` trigger, re-armed after every run, now backs it up.
@@ -21,13 +28,31 @@
 - Added environment limits to the background check. Previously the periodic check only looked at low SOC and stale telemetry, so temperature, humidity and TDS alarms never produced a notification no matter how they were configured.
 - Added `android/app/src/test/resources/alarm_parity_vectors.json`, replayed by `test/alarm_parity_test.dart` and by `AlarmParityTest.kt`, which pins the Dart and Kotlin evaluators to the same messages. The two implementations exist because Dart is not running during a background check; the shared fixture is what keeps them honest. Regenerate with `dart run tool/generate_alarm_parity_fixture.dart`.
 - Added `test/alarm_rules_test.dart` — 20 tests covering rule construction, evaluation, freshness gating, announce-once semantics and JSON round-tripping, including the guard that TDS keeps no upper bound.
-- Added `AlarmBridgeStatus` and the bridge `status` / `checkNow` / `isScheduled` calls, so a background check can be inspected instead of guessed at.
+- **Added a "device has stopped responding" alarm** for every device, critical and separate from the stale warning. Ten minutes of silence in an MQTT pipeline is a hiccup; an hour is a sensor or gateway that has stopped, and the two need different responses. The threshold is configurable in Settings and defaults to 60 minutes, deliberately far above the stale window so a brief gap never escalates on its own.
+- **Added working environment limits out of the box.** Temperature 15–35 °C, humidity 40–85 %, TDS ≥ 800 ppm, and environment alerts now default to on. Previously the feature existed but shipped empty, so the grid showed five numbers with nothing to read them against. The values suit a tropical greenhouse and live in `AlarmThresholds` as named constants, with the Settings screen and the engine both reading them.
+- **Added a Background checks section to Settings** showing whether the check is armed, whether credentials are stored, when it last ran and what it found, plus a "check now" button and a shortcut to the battery optimisation screen. This exists because the failure mode is invisible by construction: a dropped alarm looks exactly like nothing to report, and this project spent several sessions guessing between the two.
+- Added `AlarmBridgeStatus` and the bridge `status` / `checkNow` / `isScheduled` / `isIgnoringBatteryOptimizations` calls, so a background check can be inspected instead of guessed at.
 - Added a second notification channel for critical alarms, letting the user silence warnings while keeping a low-battery alert.
 - Added `WeatherService.dispose()` to release GPS handle and cached coordinates. Dashboard now calls it in its own `dispose()`.
 - Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
 - Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
 
 ### Changed
+
+- **Environment cards now show whether each reading is inside its limit**, with the configured range printed under the value and a single verdict for the whole grid. Five numbers with nothing to read them against is what the feature looked like before; a reading of 38 °C was visually identical to a healthy one until an alert banner appeared elsewhere on the screen. A stale sensor now says so instead of claiming everything is fine.
+- **One status strip replaces three stacked banners.** Offline mode used to show a green "polling active" line directly above an orange "offline" line — two opposite claims about the same connection, stacked before any content. Precedence is now failure > offline > alert > stale, and the strip no longer auto-hides after three seconds, because a 3-second flash was the only connection indicator there was.
+- **The dashboard's date strip now states the selected day** rather than the span of the seven chips. Tapping a chip left the label describing a range that no longer matched the selection, while the detail pages showed the correct single day, so two screens disagreed about the same state.
+- **Telemetry values no longer all show two decimals.** A count and a percentage do not have hundredths, so the battery page read "Cycles 12.00" and "State of Charge 45.00 %". `MetricDef` takes a `decimals` and SOC, cycles and power now use one. DC and AC metrics are also labelled by side, so "Voltage" on the PV page is no longer ambiguous.
+- **A fresh-data indicator is now always visible** on the hero card, quiet when current and amber when stale. There was no persistent sign of liveness anywhere in the Overview, so a dashboard that had quietly stopped updating looked exactly like a live one.
+- **Metric colours are now actually different per index.** The `index` parameter was accepted and ignored, so every surface in the app rendered in one hue and the PV, AC and battery page headers were told apart only by icon.
+- **Secondary text now passes WCAG AA.** The `Colors.white54` / `Colors.black45` pair measured about 3.4:1 on the light surface for text as small as 9dp, in 22 places. A contrast-checked pair replaced it, and small status colours moved off the Material defaults, which measure 2.3:1 at that size.
+- **A white border on a white card is now a faint black one**, matching what the date chip already did in the same file.
+- The four accent colours are now at least 45° apart in hue. `Ocean cyan` and `Forest teal` sat 19° apart and rendered almost identically.
+- The glass toggle is now named for what it does. "Smooth Glass Mode" turned the blur *off* when switched on, the opposite of what the name promised.
+- An empty or loading chart no longer reserves a full plot's height, and chart axis labels moved from 8dp to 10dp.
+- The full battery capacity was already being fetched and displayed nowhere, so "Remaining Capacity 50.0 Ah" appeared with nothing to compare it to. It now sits next to the pack size.
+- Health messages reach the UI translated, instead of the whole interface being half English.
+- The environment range keys are named from `SettingsKeys` by the settings controller rather than re-derived from a sensor id, so the two can no longer drift apart uncaught.
 
 - **Alarms are reported once per occurrence, not on every check.** The active alarm set is shared between the dashboard and the native module, so an ongoing low-battery condition produces one notification rather than one per interval. The previous implementation de-duplicated with a five-minute timer, which is *longer* than the check interval and so never actually prevented a repeat.
 - Background alarm tokens are stored encrypted under a hardware-backed AndroidKeyStore key instead of being readable only by `flutter_secure_storage`, which cannot be reached without a Flutter engine. Dart keeps the canonical copies and re-pushes on launch; a refresh performed in the background updates only the native copy.
@@ -44,13 +69,20 @@
 - Improved stale device label from "stale:" to "data lama:".
 - Made dashboard overview page more compact: reduced card spacing from 12–20px to 8px, reduced internal padding across all dashboard cards (LivePowerCard 18→14, DualStatusCards 14→10, EnergySummaryCard 14→10, WeatherCard 12→10), changed EnvironmentGrid layout from 2+2+1 to 3+2 for better space efficiency.
 
+### Removed
+
+- Removed the `geocoding`, `csv` and `cupertino_icons` dependencies. None of them was imported anywhere, and `geocoding` was still pulling a full Android plugin into the build for no reason — it had even been upgraded once specifically for Android 14 compatibility, for a code path nothing used.
+- Removed `WeatherService.searchCities`, `AlarmHistoryService.getAlarmsSince` / `acknowledgeAlarm` / `resolveAlarm` / `_find`, `alarmValueFromId`, `clearCctvUrl`, `fetchHistory` and the `DashboardShortcut` widget, plus the unused `EnergyForecastCard` file. All were verified to have no callers before removal.
+- Removed the 22 telemetry key literals duplicated in `telemetry_helpers.dart`. They were written out a second time despite a comment on the originals stating that one source makes it impossible for them to come apart, which is exactly what would have happened.
+
 ### Documentation
 
 - Documented the native alarm module in `AGENTS.md`: the one-rule-list contract, why `AlarmManager` is inexact and why there are two triggers, the foreground stand-down, the token handover, the debug trigger, and the parity fixture that keeps the two evaluators in agreement.
 - Rewrote `README.md` around the background alarm capability, with the measured cost of a native check against a Flutter isolate, and corrected the stale "push notification belum tersedia" claims.
 - Corrected `PRD_PLTS_Monitoring_App.md` §4.5, §6 and §7, which still claimed no alert reaches the user while the app is closed.
 - Replaced `progress.md` §10.5, which had recorded the old Dart alarm as merely untested. It was broken, and the reason was a missing manifest declaration.
-- Updated `AGENTS.md` with current test coverage (212 Dart tests, 6 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
+- Recorded the security review outcome in `AGENTS.md`, including the two findings that were real defects in brand-new code: the receiver time budget and the missing mutual exclusion between check entry points.
+- Updated `AGENTS.md` with current test coverage (217 Dart tests, 11 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
 
 # Changelog
 

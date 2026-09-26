@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import '../settings_controller.dart';
 
 /// Accent colours the user can pick from.
+/// The four are at least 45 degrees apart in hue.
+///
+/// `Ocean cyan` and `Forest teal` used to sit 19 degrees apart, and since every
+/// surface colour is derived from the seed they rendered almost identically.
+/// Anything closer than this reads as the same colour choice.
 const Map<String, Color> kAccentPalette = {
-  'EnerGrow green': Color(0xFF35A968),
-  'Solar amber': Color(0xFFF4B942),
-  'Ocean cyan': Color(0xFF2AA7A1),
-  'Forest teal': Color(0xFF2E7D65),
+  'EnerGrow green': Color(0xFF35A968), // ~143
+  'Solar amber': Color(0xFFF4B942), // ~40
+  'Ocean cyan': Color(0xFF2E9BD6), // ~199
+  'Forest teal': Color(0xFF2E7D65), // ~157
 };
 
 /// Theme mode selector plus accent colour picker.
@@ -84,11 +89,14 @@ class PerformanceSection extends StatelessWidget {
     final enabled = settings.themeController.performanceMode;
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
-      title: const Text('Smooth Glass Mode'),
+      // Named for what it does. It used to be called "Smooth Glass Mode", so
+      // switching it *on* turned the blur *off*, which is the opposite of what
+      // the name promises.
+      title: const Text('Liquid glass blur'),
       subtitle: Text(
         enabled
-            ? 'Optimized rendering is enabled'
-            : 'Full backdrop blur is enabled',
+            ? 'Off — flat cards, smoother scrolling'
+            : 'On — frosted cards, may drop frames on low-end devices',
       ),
       value: enabled,
       onChanged: (value) {

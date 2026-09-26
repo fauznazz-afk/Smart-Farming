@@ -427,35 +427,6 @@ class WeatherService {
     }
   }
 
-  /// Search cities
-  Future<List<Map<String, dynamic>>> searchCities(String query) async {
-    if (!hasApiKey) return [];
-
-    try {
-      // HTTPS, like every other call in this service. This one was on
-      // cleartext, which put the API key on the wire in the clear and is
-      // blocked outright on Android 9 and later.
-      final url = Uri.parse(
-        'https://api.openweathermap.org/geo/1.0/direct?q=$query&limit=5&appid=$_apiKey',
-      );
-
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        return data.map((e) => {
-          'name': e['name'] as String,
-          'country': e['country'] as String,
-          'lat': (e['lat'] as num).toDouble(),
-          'lon': (e['lon'] as num).toDouble(),
-        }).toList();
-      }
-    } catch (e) {
-      return [];
-    }
-    
-    return [];
-  }
 
   /// Get cached weather
   Future<WeatherData?> _getCachedWeather() async {

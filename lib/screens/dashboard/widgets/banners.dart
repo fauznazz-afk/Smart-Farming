@@ -1,32 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/connection_health_service.dart';
+import '../utils/color_helpers.dart';
 import '../utils/telemetry_helpers.dart';
 
 const Color _alertAccent = Color(0xFFE66A45);
-
-/// Wraps a dashboard card so tapping it jumps to the matching detail tab.
-class DashboardShortcut extends StatelessWidget {
-  const DashboardShortcut({
-    super.key,
-    required this.pageIndex,
-    required this.onSelect,
-    required this.child,
-  });
-
-  final int pageIndex;
-  final ValueChanged<int> onSelect;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onSelect(pageIndex),
-      child: child,
-    );
-  }
-}
 
 /// Full-screen placeholder shown when the first telemetry fetch fails.
 class TelemetryErrorView extends StatelessWidget {
@@ -179,15 +157,15 @@ class ConnectionStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final stale = !failed && staleNames.isNotEmpty;
     final color = failed
-        ? Colors.deepOrange
+        ? statusBad(isDark)
         : stale
-        ? Colors.orange.shade800
-        : Colors.green;
+        ? statusWarn(isDark)
+        : statusOk(isDark);
     final label = failed
         ? 'ThingsBoard gagal'
         : stale
         ? 'Terhubung · data lama: ${staleNames.join(', ')}'
-        : health.statusMessage;
+        : _id(health.statusMessage);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AnimatedSwitcher(
@@ -302,3 +280,21 @@ class ConnectionStatusBannerSwitcher extends StatelessWidget {
     );
   }
 }
+
+/// Indonesian wording for a transport health message.
+///
+/// The strings come from `ConnectionHealthService` in English because that is a
+/// model, but they reach the user directly as the banner's label, so the whole
+/// UI was briefly half-translated. Translating at the edge keeps the model
+/// language-neutral without duplicating its logic.
+String _id(String message) => switch (message) {
+  'Live WebSocket connected' => 'Live WebSocket tersambung',
+  'Polling active' => 'Polling aktif',
+  'REST connected' => 'REST tersambung',
+  'Connecting…' => 'Menghubungkan…',
+  'Connection degraded' => 'Koneksi menurun',
+  'Connection error' => 'Koneksi bermasalah',
+  'Not connected' => 'Belum tersambung',
+  'Disconnected' => 'Terputus',
+  _ => message,
+};

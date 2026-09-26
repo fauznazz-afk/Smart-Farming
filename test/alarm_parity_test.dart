@@ -84,10 +84,12 @@ AlarmThresholds _thresholdsOf(Map<String, dynamic> json) => AlarmThresholds(
   environmentAlerts: json['environmentAlerts'] as bool,
   lowSoc: (json['lowSoc'] as num).toDouble(),
   staleMinutes: (json['staleMinutes'] as num).toInt(),
+  offlineMinutes: (json['offlineMinutes'] as num?)?.toInt() ?? 60,
   tempMin: (json['tempMin'] as num?)?.toDouble(),
   tempMax: (json['tempMax'] as num?)?.toDouble(),
   humidityMin: (json['humidityMin'] as num?)?.toDouble(),
   humidityMax: (json['humidityMax'] as num?)?.toDouble(),
   tdsMin: (json['tdsMin'] as num?)?.toDouble(),
   tdsMax: (json['tdsMax'] as num?)?.toDouble(),
+
 );

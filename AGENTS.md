@@ -119,6 +119,24 @@ ThingsBoard requests a day, three per tick, and each check finishes in about
 0.45 s. `AlarmScheduler.INTERVAL_MINUTES` is the one place to change it; 5 is a
 reasonable value if the ThingsBoard instance is a shared Orange Pi.
 
+**The check has a wall-clock budget, and it is enforced, not assumed.**
+`AlarmCheckRunner.BUDGET_MS` is 8 s, deliberately under the ~10 s a manifest
+`BroadcastReceiver` gets. Every step is skipped rather than started once the
+budget is spent, and `ThingsBoardClient` caps its own timeouts below what is
+left. This is not defensive padding: the slow path is the *expected* one
+whenever the access token has expired, and being killed between writing
+credentials and saving the active set makes the next tick treat the same alarms
+as new. That is the duplicate notification the whole active-set design exists to
+prevent, reached by a different route.
+
+**One lock guards every entry point.** `AlarmCheckReceiver`, the "check now"
+bridge call and the debug trigger all call `AlarmCheckRunner.run()`, which takes
+a process-wide `AtomicBoolean`. They used to have separate threads with no shared
+guard, so two could read the same previously-active set and both decide an alarm
+was new. `run(force: true)` is for the manual trigger: a user pressing "check
+now" while looking at the app means it, so it bypasses the foreground
+stand-down. Without `force` the button is a no-op, which is not discoverable.
+
 **Do not try to test the background path with `adb shell am broadcast`.**
 `AlarmCheckReceiver` is `exported="false"`, which is correct, so the shell is
 refused. For a debug build there is `AlarmDebugReceiver`, declared **only** in
@@ -145,6 +163,14 @@ under a hardware-backed AndroidKeyStore key. A refresh performed in the
 background updates only that copy; Dart's stays authoritative and overwrites it
 on the next launch. If a refresh is rejected, the background tears itself down
 rather than retrying a session the user has ended.
+
+**A stopped device is a different alarm from a stale one.** `stale_*` is a
+warning at the user's short window, `offline_*` is critical at a much longer one
+(`AlarmThresholds.offlineMinutes`, default 60). Ten minutes of silence in an
+MQTT pipeline is a hiccup; an hour is a sensor or gateway that has stopped, and
+the two need different responses. They share the same staleness test, which is
+why `AlarmComparison.offline` exists as a separate value rather than reusing
+`stale`: each rule carries its own window.
 
 **One notification per occurrence.** The set of active alarm IDs is shared
 through `AlarmStateStore` and only a newly active ID is announced. The previous
@@ -176,6 +202,44 @@ check finished: ok, no alarms                                  <- nothing breach
 
 `(N new)` is the number that decides whether a notification is posted, so it is
 the line to read first when deciding whether an absence of notifications is a bug.
+
+## Security posture, and what was audited
+
+A full source-level audit ran over the alarm module, the ThingsBoard client, the
+CCTV WebView, the manifest and the Dart services. Verdict: no Critical findings
+and no confirmed credential-exfiltration path. What it confirmed as correct is
+worth keeping, because each of these is easy to break by accident:
+
+- **Tokens.** The canonical JWT lives in `flutter_secure_storage`; the background
+  copy is AES-256-GCM under a hardware-backed AndroidKeyStore key, ciphertext
+  only on disk, and deliberately kept *out* of the config JSON so that file never
+  holds a credential. No method channel call returns a token, and the logs carry
+  presence booleans, never values.
+- **The host allowlist.** `requireAllowedThingsBoardHost` in `AlarmRule.kt` is an
+  exact host list, not an `https://` prefix test. A prefix test accepts *any* TLS
+  host, so the moment the base URL became configurable a mistyped host would
+  have received a live bearer token. It also rejects userinfo, non-443 ports and
+  paths, which is the `https://allowed.host@evil.example` trick. `AlarmParityTest`
+  pins all five cases. `parseAllowedCctvUrl` does the same thing on the Dart side.
+- **Nothing is exported that should not be.** `AlarmCheckReceiver` and
+  `AlarmBootReceiver` are `exported="false"`; `AlarmDebugReceiver` exists only in
+  the debug manifest *and* refuses unless the app is debuggable. Both production
+  `PendingIntent`s are `FLAG_IMMUTABLE`, so there is no hijack surface. Verify
+  the release APK has no debug component:
+  `aapt2 dump xmltree app-release.apk --file AndroidManifest.xml | grep AlarmDebugReceiver`
+- **No cleartext, no TLS bypass.** `usesCleartextTraffic` is never set and no
+  custom `networkSecurityConfig` exists, so the platform default denies cleartext
+  at `targetSdk` 36. No `TrustManager` or `HostnameVerifier` override exists
+  anywhere, which is a common and quiet way to ship a broken TLS check.
+- **Backup and transfer.** `allowBackup="false"` does **not** cover device-to-device
+  transfer on Android 12+. `res/xml/data_extraction_rules.xml` and
+  `backup_rules.xml` exclude everything from both paths.
+- **Logging.** `org.json` embeds a fragment of the unconsumed response in its
+  parse errors, and on the token refresh path that response is the JWT. Log the
+  exception class, never the object.
+
+Do not relax any of these without re-reading the reasoning above. Two of the
+findings that mattered most were in code written the same week.
 
 ## Environment (CachyOS / Arch)
 
@@ -330,8 +394,8 @@ actually bitten:
 
 ```
 flutter analyze     # must stay clean
-flutter test        # 229 tests
-cd android && ./gradlew :app:testDebugUnitTest   # 6 tests, alarm parity
+flutter test        # 217 tests
+cd android && ./gradlew :app:testDebugUnitTest   # 11 tests, alarm parity + host allowlist
 ```
 
 The Gradle unit tests need `JAVA_HOME` and `ANDROID_HOME` exported. They exist to
@@ -436,9 +500,14 @@ after each load.
   exist because the alternative is a monitor that is silently blind to a
   condition, which is the failure mode this whole feature keeps running into.
 - `progress.md` is a handoff document. §8 (manual device verification of the chart
-  date label and the TDS field) was completed on 26 September 2026; the rest of
-  the document is still current, except §5B.1 and §10.5, which describe the
-  `android_alarm_manager_plus` setup that has been replaced.
+  date label and the TDS field) was completed on 26 September 2026. §5B.1, §10.5
+  and everything after describe the `android_alarm_manager_plus` setup that has
+  been replaced; read them for the reasoning, not for the wiring.
+- A code-review agent claimed `dashboard_screen._history` was dead code and a
+  memory leak. It was wrong — `TelemetryChartCard` reads it — and acting on that
+  claim without a grep would have deleted a live field. **Verify a "dead code"
+  claim with a search before removing anything.** A confident, well-argued report
+  is still a report.
 
 ## Documentation hygiene
 

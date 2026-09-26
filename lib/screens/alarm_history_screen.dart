@@ -1,3 +1,4 @@
+import './dashboard/utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
@@ -161,7 +162,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white54 : Colors.black45,
+              color: faintColor(isDark),
             ),
           ),
         ],
@@ -175,7 +176,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       return Center(
         child: Text(
           'Tidak ada alarm yang cocok dengan filter ini',
-          style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+          style: TextStyle(color: faintColor(isDark)),
         ),
       );
     }
@@ -248,7 +249,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                             _formatTimestamp(alarm.timestamp),
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? Colors.white54 : Colors.black45,
+                              color: faintColor(isDark),
                             ),
                           ),
                           if (isExpanded && alarm.value != null) ...[
@@ -268,7 +269,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                               'Tipe: ${alarm.type.label}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.white54 : Colors.black45,
+                                color: faintColor(isDark),
                               ),
                             ),
                           ],

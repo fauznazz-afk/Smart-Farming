@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runs one background alarm check.
@@ -20,13 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 class AlarmCheckReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val appContext = context.applicationContext
-        // The alarm manager can deliver a second tick while a slow one is still
-        // in flight. Dropping the overlap is better than running two checks that
-        // would each notify for the same condition.
-        if (!running.compareAndSet(false, true)) {
-            Log.d(TAG, "a check is already running; skipping this tick")
-            return
-        }
         val pendingResult = goAsync()
         val executor = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "energrow-alarm-check")
@@ -40,7 +32,6 @@ class AlarmCheckReceiver : BroadcastReceiver() {
                 // diagnose. Log instead.
                 Log.e(TAG, "background alarm check failed", error)
             } finally {
-                running.set(false)
                 executor.shutdown()
                 pendingResult.finish()
             }
@@ -49,6 +40,5 @@ class AlarmCheckReceiver : BroadcastReceiver() {
 
     private companion object {
         const val TAG = "EnerGrowAlarmCheck"
-        val running = AtomicBoolean(false)
     }
 }

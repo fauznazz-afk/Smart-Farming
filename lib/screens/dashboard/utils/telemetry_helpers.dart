@@ -1,4 +1,5 @@
 import '../../../models/telemetry_model.dart';
+import '../../../services/thingsboard_api.dart';
 
 /// Formats a [DateTime] as a 24-hour `HH:MM` clock string.
 String formatClock(DateTime value) =>
@@ -33,40 +34,6 @@ String describeCacheAge(DateTime? cacheTime) {
   return '${age.inDays} hari lalu';
 }
 
-/// Telemetry keys that belong to the battery device.
-const Set<String> batteryTelemetryKeys = {
-  'current',
-  'power',
-  'soc',
-  'voltage',
-  'cycles',
-  'remain_capacity_ah',
-  'full_capacity_ah',
-};
-
-/// Telemetry keys that belong to the PZEM device.
-const Set<String> pzemTelemetryKeys = {
-  'voltage_ac',
-  'voltage_dc',
-  'current_ac',
-  'current_dc',
-  'power_ac',
-  'power_dc',
-  'energy_ac',
-  'energy_dc',
-  'frequency_ac',
-  'pf_ac',
-};
-
-/// Telemetry keys that belong to the environment sensor device.
-const Set<String> sensorTelemetryKeys = {
-  'humidity_dht',
-  'lux',
-  'tds_ppm',
-  'temp_dht',
-  'temp_ds18b20',
-};
-
 /// Cached telemetry values partitioned per device slot.
 typedef CachedTelemetrySplit = ({
   Map<String, double> battery,
@@ -80,11 +47,15 @@ CachedTelemetrySplit splitCachedTelemetry(Map<String, double> values) {
   final pzem = <String, double>{};
   final sensor = <String, double>{};
   values.forEach((key, value) {
-    if (batteryTelemetryKeys.contains(key)) {
+    // The three key lists live on ThingsBoardApi and nowhere else. They used to
+    // be written out here a second time, which is precisely the duplication the
+    // comment on those constants exists to prevent: adding a key to one side
+    // would silently drop it from the offline cache with no error anywhere.
+    if (ThingsBoardApi.batteryKeys.contains(key)) {
       battery[key] = value;
-    } else if (pzemTelemetryKeys.contains(key)) {
+    } else if (ThingsBoardApi.pzemKeys.contains(key)) {
       pzem[key] = value;
-    } else if (sensorTelemetryKeys.contains(key)) {
+    } else if (ThingsBoardApi.sensorKeys.contains(key)) {
       sensor[key] = value;
     }
   });

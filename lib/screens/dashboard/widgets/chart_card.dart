@@ -1,3 +1,4 @@
+import '../utils/color_helpers.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -66,7 +67,7 @@ class ChartSectionHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white54 : Colors.black45,
+                    color: faintColor(isDark),
                   ),
                 ),
               ),
@@ -95,7 +96,7 @@ class ChartSectionHeader extends StatelessWidget {
           size: 13,
           color: realtimeConnected
               ? Colors.green
-              : (isDark ? Colors.white38 : Colors.black38),
+              : (faintColor(isDark)),
         ),
         const SizedBox(width: 3),
         Text(
@@ -104,7 +105,7 @@ class ChartSectionHeader extends StatelessWidget {
             fontSize: 10,
             color: realtimeConnected
                 ? Colors.green
-                : (isDark ? Colors.white54 : Colors.black45),
+                : (faintColor(isDark)),
           ),
         ),
       ],
@@ -159,7 +160,9 @@ class TelemetryChartCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      height: 400,
+      // A loading spinner or an empty message does not need a full plot's worth of
+      // height; reserving it pushed everything below the fold for nothing.
+      height: (loading || !hasData) ? 170 : 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
       semanticLabel: '$title Voltage, Current, and Power chart showing '
           '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
@@ -312,7 +315,7 @@ class TelemetryChartCard extends StatelessWidget {
 
   FlTitlesData _titlesData(ChartBounds bounds) {
     final labelStyle = TextStyle(
-      fontSize: 8,
+      fontSize: 10,
       color: isDark ? const Color(0xFFB7C4BD) : const Color(0xFF64748B),
     );
     return FlTitlesData(
@@ -325,7 +328,7 @@ class TelemetryChartCard extends StatelessWidget {
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 48,
+          reservedSize: 36,
           interval: bounds.chartInterval,
           getTitlesWidget: (value, meta) => SideTitleWidget(
             axisSide: meta.axisSide,
@@ -364,7 +367,7 @@ class TelemetryChartCard extends StatelessWidget {
   ///
   /// Uses the pixel position rather than the axis value, so the guard holds
   /// regardless of how the bounds were aligned.
-  double _edgeShift(TitleMeta meta) {    const halfLabelWidth = 14.0;
+  double _edgeShift(TitleMeta meta) {    const halfLabelWidth = 16.0;
     if (meta.axisPosition < halfLabelWidth) return halfLabelWidth;
     if (meta.axisPosition > meta.parentAxisSize - halfLabelWidth) {
       return -halfLabelWidth;

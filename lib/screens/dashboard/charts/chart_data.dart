@@ -10,7 +10,14 @@ class MetricDef {
   final String unit;
   final IconData icon;
 
-  const MetricDef(this.key, this.label, this.unit, this.icon);
+  /// Decimal places for the displayed value.
+  ///
+  /// Everything used to be two, which is right for a current in amperes and
+  /// absurd for anything else: the battery page read "Cycles 12.00" and
+  /// "State of Charge 45.00 %". A count and a percentage do not have hundredths.
+  final int decimals;
+
+  const MetricDef(this.key, this.label, this.unit, this.icon, {this.decimals = 2});
 }
 
 /// Statistics for a series of telemetry points.

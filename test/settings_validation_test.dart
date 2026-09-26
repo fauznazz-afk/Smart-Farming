@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/settings/settings_controller.dart';
+import 'package:plts_monitoring/models/settings_keys.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
+import 'package:plts_monitoring/utils/alarm_rules.dart';
 import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -157,19 +159,68 @@ void main() {
   });
 
   group('EnvRangeSetting preference keys', () {
-    test('derive keys from the id', () {
+    test('blank fields count as not monitored', () {
       final setting = EnvRangeSetting(
         id: 'humidity',
         label: 'Humidity',
         unit: '%',
+        minKey: SettingsKeys.environmentHumidityMin,
+        maxKey: SettingsKeys.environmentHumidityMax,
       );
-      expect(setting.minKey, 'environment_humidity_min');
-      expect(setting.maxKey, 'environment_humidity_max');
       expect(setting.isEmpty, isTrue);
       setting.min.text = '  ';
       expect(setting.isEmpty, isTrue, reason: 'whitespace counts as blank');
       setting.min.text = '40';
       expect(setting.isEmpty, isFalse);
+    });
+
+    test('every range uses the shared SettingsKeys contract', () {
+      // The keys used to be built here by interpolating the id, which duplicated
+      // SettingsKeys and could drift with nothing to catch it. They are now passed
+      // in, so this is where the two are pinned together.
+      final keys = {
+        for (final range in _controller.envRanges)
+          range.id: (range.minKey, range.maxKey),
+      };
+      expect(keys['temp'], (
+        SettingsKeys.environmentTempMin,
+        SettingsKeys.environmentTempMax,
+      ));
+      expect(keys['humidity'], (
+        SettingsKeys.environmentHumidityMin,
+        SettingsKeys.environmentHumidityMax,
+      ));
+      expect(keys['tds'], (
+        SettingsKeys.environmentTdsMin,
+        SettingsKeys.environmentTdsMax,
+      ));
+    });
+
+    test('prefilled limits match what the alarm engine defaults to', () {
+      // The editor and the engine must start from the same numbers, or a user who
+      // never opens Settings would be protected by different limits than the one
+      // shown to them.
+      for (final range in _controller.envRanges) {
+        expect(range.min.text, isNotEmpty, reason: '${range.id} min');
+      }
+      // TDS is the exception and always will be: a sane upper cap does not exist.
+      for (final id in ['temp', 'humidity']) {
+        final range = _controller.envRanges.firstWhere((r) => r.id == id);
+        expect(range.max.text, isNotEmpty, reason: '$id max');
+      }
+      expect(_controller.envAlerts, isTrue, reason: 'environment alerts are on by default');
+      expect(
+        _controller.offlineMinutes,
+        AlarmThresholds.defaultOfflineMinutes,
+      );
+    });
+
+    test('TDS starts with a lower limit and no upper limit', () {
+      // Guard for the regression recorded in AGENTS.md: an upper bound low enough
+      // to look safe would make the TDS alarm unreachable.
+      final tds = _controller.envRanges.firstWhere((r) => r.id == 'tds');
+      expect(tds.max.text, isEmpty);
+      expect(tds.min.text, '${AlarmThresholds.defaultTdsMin.toInt()}');
     });
   });
 
