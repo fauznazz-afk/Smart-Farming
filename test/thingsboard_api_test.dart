@@ -1,10 +1,60 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/services/thingsboard_api.dart';
 import 'package:plts_monitoring/services/thingsboard_realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// A secure storage that fails the way a real keystore does.
+///
+/// The encryption key lives in the Android keystore, so an entry that cannot be
+/// decrypted surfaces as a cipher exception rather than a null. This reproduces
+/// that so the handling can be tested.
+class _ThrowingSecureStorage extends FlutterSecureStoragePlatform {
+  @override
+  Future<String?> read({
+    required String key,
+    required Map<String, String> options,
+  }) async =>
+      throw PlatformExceptionStub();
+
+  @override
+  Future<void> write({
+    required String key,
+    required String value,
+    required Map<String, String> options,
+  }) async =>
+      throw PlatformExceptionStub();
+
+  @override
+  Future<void> delete({
+    required String key,
+    required Map<String, String> options,
+  }) async {}
+
+  @override
+  Future<bool> containsKey({
+    required String key,
+    required Map<String, String> options,
+  }) async =>
+      false;
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async {}
+
+  @override
+  Future<Map<String, String>> readAll({
+    required Map<String, String> options,
+  }) async =>
+      {};
+}
+
+class PlatformExceptionStub implements Exception {
+  @override
+  String toString() => 'PlatformException(corruptedKey, keystore read failed)';
+}
 
 /// Tests for the ThingsBoard integration layer.
 ///
@@ -14,6 +64,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// both depend on.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  tearDown(() {
+    // Always hand the real mock back, otherwise a throwing platform leaks into
+    // every later test file.
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -103,6 +159,57 @@ void main() {
       await api.loadSavedToken();
 
       expect(api.accessToken, 'current-jwt');
+    });
+  });
+
+  group('unreadable secure storage', () {
+    // Regression: an unreadable keystore used to hang the app on the splash
+    // screen forever. loadSavedToken had no error handling, _SplashRouterState
+    // awaited it before choosing a screen, and a cipher failure left the Future
+    // never completing. No error, no login prompt, only a reinstall.
+    test('loadSavedToken reports no session instead of throwing', () async {
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStorage();
+
+      final api = ThingsBoardApi();
+      await expectLater(api.loadSavedToken(), completion(isFalse));
+      expect(api.isLoggedIn, isFalse);
+    });
+
+    test('falls back to a legacy token when secure storage fails', () async {
+      SharedPreferences.setMockInitialValues({
+        'tb_token': 'legacy-jwt',
+        'tb_refresh_token': 'legacy-refresh',
+      });
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStorage();
+
+      final api = ThingsBoardApi();
+      expect(await api.loadSavedToken(), isTrue);
+      expect(api.accessToken, 'legacy-jwt');
+    });
+
+    test('does not delete the legacy copies it could not migrate', () async {
+      // Purging the plaintext fallback before knowing whether secure storage
+      // works would destroy the only recoverable copy of the session.
+      SharedPreferences.setMockInitialValues({'tb_token': 'legacy-jwt'});
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStorage();
+
+      await ThingsBoardApi().loadSavedToken();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('tb_token'), 'legacy-jwt');
+    });
+
+    test('logout still clears the in-memory session', () async {
+      FlutterSecureStorage.setMockInitialValues({'tb_token': 'jwt'});
+      final api = ThingsBoardApi();
+      await api.loadSavedToken();
+      expect(api.isLoggedIn, isTrue);
+
+      FlutterSecureStoragePlatform.instance = _ThrowingSecureStorage();
+      await api.logout();
+
+      expect(api.isLoggedIn, isFalse);
+      expect(api.accessToken, isNull);
     });
   });
 

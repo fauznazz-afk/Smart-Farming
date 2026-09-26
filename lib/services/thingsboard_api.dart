@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -110,34 +111,72 @@ class ThingsBoardApi {
   }
 
   /// Load the saved session without discarding it when the network is offline.
+  ///
+  /// Secure storage can throw, and it does throw in practice: the encryption
+  /// key lives in the Android keystore, so an unreadable entry surfaces as a
+  /// cipher failure rather than a null. That used to be fatal. loadSavedToken
+  /// had no error handling, _SplashRouterState awaited it before deciding which
+  /// screen to show, and the app therefore sat on the splash forever with no
+  /// error and no way forward short of reinstalling.
+  ///
+  /// A read failure is treated as "no session", so the user lands on Login and
+  /// can sign in again. Legacy SharedPreferences copies are only purged once
+  /// secure storage has actually been read, so a transient failure cannot
+  /// destroy the last recoverable token.
   Future<bool> loadSavedToken() async {
     final preferences = await SharedPreferences.getInstance();
-    final secureToken = await _secureStorage.read(key: 'tb_token');
-    final secureRefreshToken = await _secureStorage.read(
-      key: 'tb_refresh_token',
-    );
-    _token = secureToken ?? preferences.getString('tb_token');
-    _refreshToken =
-        secureRefreshToken ?? preferences.getString('tb_refresh_token');
-    if (_token != null && secureToken == null) {
-      await _secureStorage.write(key: 'tb_token', value: _token);
+
+    String? secureToken;
+    String? secureRefreshToken;
+    var secureStorageReadable = false;
+    try {
+      secureToken = await _secureStorage.read(key: 'tb_token');
+      secureRefreshToken = await _secureStorage.read(
+        key: 'tb_refresh_token',
+      );
+      secureStorageReadable = true;
+    } catch (e) {
+      debugPrint('ThingsBoardApi: secure storage unreadable ($e)');
     }
-    if (_refreshToken != null && secureRefreshToken == null) {
-      await _secureStorage.write(key: 'tb_refresh_token', value: _refreshToken);
+
+    final legacyToken = preferences.getString('tb_token');
+    final legacyRefresh = preferences.getString('tb_refresh_token');
+
+    _token = secureToken ?? legacyToken;
+    _refreshToken = secureRefreshToken ?? legacyRefresh;
+
+    if (secureStorageReadable) {
+      if (_token != null && secureToken == null) {
+        await _secureStorage.write(key: 'tb_token', value: _token);
+      }
+      if (_refreshToken != null && secureRefreshToken == null) {
+        await _secureStorage.write(
+          key: 'tb_refresh_token',
+          value: _refreshToken,
+        );
+      }
+      // Only now is it safe to drop the plaintext copies.
+      await _removeLegacyCredentials(preferences);
     }
-    await _removeLegacyCredentials(preferences);
+
     return _token != null && _token!.isNotEmpty;
   }
 
   Future<void> logout() async {
     _sessionVersion++;
-    await _secureStorage.delete(key: 'tb_token');
-    await _secureStorage.delete(key: 'tb_refresh_token');
+    // A storage failure must not leave the in-memory session alive, so the
+    // local state is cleared first and the deletes are best effort after it.
+    _token = null;
+    _refreshToken = null;
+    try {
+      await _secureStorage.delete(key: 'tb_token');
+      await _secureStorage.delete(key: 'tb_refresh_token');
+    } catch (e) {
+      debugPrint('ThingsBoardApi: could not clear secure storage ($e)');
+    }
     await _removeLegacyCredentials();
     await clearUserCache();
     await clearCachedTelemetry();
-    _token = null;
-    _refreshToken = null;
   }
 
   /// Fetches and caches the display name for the logged-in user.

@@ -11,7 +11,30 @@
         android:label="EnerGrow"
         android:name="${applicationName}"
         android:allowBackup="false"
-        android:icon="@drawable/energrow_launcher">
+        android:icon="@drawable/energrow_launcher"
+        android:roundIcon="@drawable/energrow_launcher">
+        <!--
+          Declared here so the release build keeps the drawable alive.
+
+          AlarmNotificationService passes @drawable/ic_energrow to
+          flutter_local_notifications, but that reference lives in a Dart string
+          and is therefore invisible to the Android resource shrinker. Every
+          resource reachable only from Dart was stripped, and the release build
+          then failed at startup with:
+
+            PlatformException(invalid_icon, The resource @drawable/ic_energrow
+            could not be found)
+
+          which main.dart swallowed, so alarm notifications silently never
+          appeared. This line is the reference the shrinker does read. Verify
+          with:
+
+            aapt2 dump resources build/app/outputs/flutter-apk/app-release.apk \
+              | grep ic_energrow
+        -->
+        <meta-data
+            android:name="com.energrow.notification_icon"
+            android:resource="@drawable/ic_energrow" />
         <receiver
             android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
             android:enabled="true"

@@ -72,6 +72,10 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Imported directly by test/thingsboard_api_test.dart to install a secure
+  # storage platform that throws, which is the only way to reproduce an
+  # unreadable Android keystore. Test-only, never referenced from lib/.
+  flutter_secure_storage_platform_interface: ^1.1.2
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

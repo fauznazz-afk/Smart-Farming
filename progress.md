@@ -5,8 +5,77 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026
-- **Status saat ini**: `main` bersih dan sinkron dengan `origin/main`, analyze bersih, 119 test lulus
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 26 September 2026 (sesi kedua)
+- **Status**: rilis 1.4.0 terbit. `main` sinkron dengan `origin/main`, **tapi ada
+  perubahan yang belum di-commit** (lihat §0)
+
+---
+
+## 0. ⚠️ MULAI DI SINI - Yang Belum Selesai
+
+**Satu commit besar menunggu di working tree.** Jangan mulai kerja lain sebelum
+menyimpulkan ini.
+
+```
+ M android/app/src/main/AndroidManifest.xml   fix ikon notifikasi
+ M lib/services/thingsboard_api.dart          fix splash hang
+ M pubspec.yaml / pubspec.lock                dev dependency baru
+ M test/thingsboard_api_test.dart             +4 test
+```
+
+Dua bug ditemukan **setelah** rilis 1.4.0 terbit, keduanya sudah diperbaiki dan
+terverifikasi di perangkat, tapi belum di-commit. Detail di §5B.
+
+### Langkah pertama sesi baru
+
+```bash
+cd /run/media/fzn/Data/POLSRI/SEMESTER_7/AndroidDashboard/plts_monitoring
+export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
+export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+
+flutter analyze          # harus: No issues found
+flutter test             # harus: 143/143
+git diff                 # baca dulu sebelum commit
+```
+
+Kalau akan meng-commit, dua commit terpisah lebih masuk akal daripada satu:
+`fix: keep the notification icon in release builds` dan
+`fix: survive an unreadable secure storage instead of hanging on the splash`.
+
+### Yang masih harus dilakukan manual
+
+**Login ulang di perangkat.** Sesi ThingsBoard di HP hilang karena keystore
+rusak, dan itu memang terjadi (lihat §5B). Build yang sudah diperbaiki
+memperbaiki gejalanya, tapi data yang rusak tidak akan pulih dengan sendirinya.
+Pengguna harus login ulang.
+
+---
+
+## 0A. Ringkasan Dua Sesi
+
+### Sesi kedua (26 Sep sore/malam) - build Linux + rilis 1.4.0
+
+| Commit | Isi |
+|---|---|
+| `cb377fb` | Build Linux: `.gitattributes` ( CRLF), Gradle heap 12 GB → 1,5 GB, wrapper `-all` → `-bin` |
+| `2af6d68` | NDK + CMake dihilangkan lewat `dependency_overrides: path_provider_android: 2.2.23` |
+| `c1f5b44` | `AGENTS.md` baru, `CHANGELOG.md` dirapikan, `progress.md` §8 ditutup |
+| `a24d6f8` | Test `thingsboard_api.dart` (0 → 20), key set dideduplikasi |
+| `f6d50ee` | Dokumentasi cakupan test |
+| `77633ef` | **Rilis 1.4.0 (build 10)**, tag `v1.4.0` |
+| `34e3671` | Rekonsiliasi README vs progress.md soal verifikasi perangkat |
+| `daf6a58` | Header versi di PRD + AGENTS.md brought up to date |
+| `1ecafc5` | Geocoding endpoint HTTP → HTTPS |
+| _(uncommitted)_ | Ikon notifikasi + splash hang, lihat §5B |
+
+**Pencapaian**: dari nol (tidak ada Flutter/Dart/Java/Android SDK) sampai rilis
+terpublikasi. Test 119 → 143. Android SDK untuk setup bersih 7,5 GB → 732 MB.
+Cold launch 911–1176 ms.
+
+### Sesi pertama (26 Sep pagi) - refactor + 8 bug
+
+Delapan commit refactor, dashboard 3.046 → 1.490 baris, settings 754 → 157,
+CCTV dan energy report dipecah, plus 8 bug diperbaiki (§5C).
 
 ---
 
@@ -184,7 +253,87 @@ lib/                                    62 file, 11.445 baris
 
 ## 5. Bug yang Ditemukan dan Diperbaiki
 
-### 5.1 URL CCTV di Settings tidak pernah berlaku
+### 5B. Dua Bug Setelah Rilis 1.4.0 - SUDAH DIPERBAIKI, BELUM DI-COMMIT
+
+Keduanya ditemukan pada 26 September 2026, **setelah** 1.4.0 terbit, dan
+keduanya hanya muncul di build **release**.
+
+#### 5B.1 Ikon notifikasi hilang dari APK release
+
+**Gejala**: setiap kali app start di release,
+`PlatformException(invalid_icon, The resource @drawable/ic_energrow could not
+be found)`. Tidak terlihat user karena `main.dart` menangkap exception itu
+diam-diam. Efeknya: **alarm SOC rendah tidak pernah muncul**.
+
+**Akar masalah**: `AlarmNotificationService` meneruskan
+`@drawable/ic_energrow` sebagai string Dart. Resource shrinker tidak bisa
+melihat string Dart, jadi resource yang hanya terjangkau dari Dart terhapus
+dari APK.
+
+Buktinya dengan membandingkan mana yang dirujuk dari manifest:
+
+| Resource | Dirus dari | Hasil |
+|---|---|---|
+| `launch_background` | manifest (theme) | ada |
+| `energrow_launcher` | manifest (`android:icon`) | ada |
+| `ic_energrow` | string Dart saja | **hilang** |
+
+**Perbaikan**: declare di `AndroidManifest.xml` lewat
+`<meta-data android:resource="@drawable/ic_energrow" />`, satu-satunya tempat
+yang selalu dibaca shrinker.
+
+**Verifikasi**: `aapt2 dump resources` → `ic_energrow` ✅ ada; di perangkat,
+`invalid_icon` = 0 kemunculan; ikon EnerGrow muncul di status bar.
+
+#### 5B.2 Splash hang selamanya kalau secure storage tidak terbaca
+
+**Gejala**: app **menggantung di logo tanpa jalan keluar**. Tidak ada error, tidak
+ada login, tidak ada tombol. Satu-satunya jalan keluar: uninstall.
+
+**Akar masalah**: `ThingsBoardApi.loadSavedToken()` memanggil
+`FlutterSecureStorage.read()` **tanpa `try/catch`**. `_SplashRouterState`
+menunggu Future itu sebelum memilih layar. Waktu secure storage melempar,
+Future tidak pernah selesai, jadi splash tidak pernah adjourn.
+
+```
+#2  ThingsBoardApi.loadSavedToken   (thingsboard_api.dart:115)
+#3  _SplashRouterState._checkToken  (main.dart:153)
+  at OpenSSLEvpCipher.engineDoFinal / javax.crypto.Cipher.doFinal
+```
+
+Ada **dua** bug, dan yang kedua lebih berbahaya:
+
+1. Tidak ada penanganan error → hang permanen
+2. `_removeLegacyCredentials()` dipanggil **sebelum** diketahui apakah secure
+   storage berhasil dibaca, jadi **backup plaintext dihapus** justru saat itu
+   satu-satunya salinan yang tersisa
+
+**Perbaikan**: `try/catch` di `loadSavedToken()` (kegagalan = "tidak ada
+sesi", user sampai ke Login); pemindahan `_removeLegacyCredentials()` agar
+hanya jalan setelah read terbukti berhasil; `logout()` dibenahi agar state
+in-memory dibersihkan lebih dulu dan delete jadi best-effort.
+
+**Verifikasi**: 4 test baru memakai platform yang **selalu melempar**.
+Dipastikan menangkap bug: dengan fix di-stash 3 test gagal, dengan fix semua
+lulus.
+
+#### Jebakan yang-biaya mahal
+
+Sequential ini hampir selesai salah:
+
+1. `ic_energrow` **tidak terbaca di APK** → disimpulkan file-nya tidak ada (**salah**)
+2. Disimpulkan resource shrinker (**benar**)
+3. Remedy: alias di `res/values/` (**tidak berhasil**, karena alias juga
+   hanya dirujuk dari resource, bukan manifest)
+4. Baru benar setelah **mengukur** mana resource yang bertahan
+
+Pelajarannya: dua klaim pertama salah, dan yang kedua benar tapi remedynya
+naif. Resource shrinker harus dibuktikan dengan `aapt2 dump resources`, bukan
+dengan reasoning.
+
+### 5C. Bug dari sesi pertama (refactor, 8 item - semua sudah diverifikasi)
+
+#### 5.1 URL CCTV di Settings tidak pernah berlaku
 
 **Ditemukan**: selama investigasi refactor.
 
@@ -321,7 +470,7 @@ Langkah 3: sebuah jam dianggap "malam" hanya bila **semua** sampel solar di jam 
 
 ```
 flutter analyze  ->  No issues found
-flutter test     ->  139 tests, All tests passed
+flutter test     ->  143 tests, All tests passed
 ```
 
 | File | Test | Cakupan |
@@ -329,7 +478,7 @@ flutter test     ->  139 tests, All tests passed
 | `cctv_test.dart` | 22 | status model, overlay, host allowlist `parseAllowedCctvUrl` |
 | `dashboard_helpers_test.dart` | 22 | history window, interval, integrasi energi, cache split, `describeHistoryRange` |
 | `energy_report_helpers_test.dart` | 21 | bucketing harian dan bulanan, lintas batas bulan dan tahun, skala chart |
-| `thingsboard_api_test.dart` | 20 | URI WebSocket, state sesi, migrasi token, cache offline, key set |
+| `thingsboard_api_test.dart` | 24 | URI WebSocket, state sesi, migrasi token, cache offline, key set |
 | `settings_validation_test.dart` | 18 | validasi range, target harian, batas sensor |
 | `chart_bounds_test.dart` | 16 | `niceStep`, `niceTimeStep`, alignment sumbu X, tick multi-hari |
 | `energy_forecast_service_test.dart` | 13 | produksi harian, proyeksi runtime baterai |
@@ -368,7 +517,8 @@ literalnya sekarang tinggal di satu tempat sebagai
 mengacunya. Test sisanya menjaga daftar itu dari duplikat, key yang tumpang
 tindih antar device, dan mutasi.
 
-Test suite: 119 → **139**.
+Test suite: 119 → **143** (20 untuk `thingsboard_api`, lalu +4 untuk
+secure storage yang gagal dibaca).
 
 ---
 
@@ -547,7 +697,77 @@ Sudah tercatat di README bagian Known Issues:
 
 ---
 
+## 9A. Percobaan yang Gagal - Jangan Diulang
+
+Bagian ini sengaja ada. Semuanya sudah dicoba dan gagal, dan knowing ini
+menghemat satu sesi penuh.
+
+### Upgrade KGP (BATAL, sudah di-revert)
+
+**Tujuan**: menghilangkan peringatan
+`WARNING: plugins that apply Kotlin Gradle Plugin (KGP): package_info_plus,
+share_plus. Future versions of Flutter will fail to build`.
+
+**Kenapa battal**: bukan karena gagal build. Build **sukses** dan peringatan
+**hilang**. Dibatalkan karena:
+
+1. **Bukti keamanannya tidak lengkap.** `flutter_secure_storage` 9 → 11
+   menyimpan JWT ThingsBoard. Sesi tidak terbaca setelah upgrade, dan tidak
+   bisa dibedakan apakah itu karena upgrade atau karena sesi sudah hilang dari
+   uninstall sebelumnya.
+2. **Biarnya bukan 2 paket tapi 3**, termasuk `flutter_secure_storage` major 9→11.
+3. **Tidak menghapus kerusakan nyata**, hanya warning.
+
+**Rantainya** (ini yang tidak jelas dari `flutter pub add`):
+
+```
+share_plus 13.x              → win32 ^6
+flutter_secure_storage 9.x   → flutter_secure_storage_windows 3.x → win32 ^5
+                               ↑ bentrok, harus naik ke 11.2.0
+```
+
+Kalau someday dikerjakan: **tiga paket**, dan `flutter_secure_storage` wajib
+ikut naik. Plus `share_plus` 13.x memindahkan `XFile` dari `cross_file` ke
+package `file` - itu perubahan kode nyata di
+`lib/screens/energy_report/utils/csv_builder.dart`, bukan ganti nomor.
+
+Diff percobaan tersimpan di `/tmp/opencode/kgp-upgrade.patch` (239 baris)
+- **hilang** kalau `/tmp` sudah dibersihkan.
+
+### Remedy ikon yang gagal
+
+Alias di `res/values/ic_launcher_aliases.xml` **tidak mencegah stripping**,
+karena alias itu sendiri hanya dirujuk dari resource, bukan dari manifest.
+Jawabannya ada di `AndroidManifest.xml` (§5B.1).
+
+### Kesalahan lain yang communistsaten biaya
+
+- **`pkill -f "flutter_tools.snapshot build"` membunuh shell-nya sendiri**,
+  dua kali, karena pattern-nya ada di command line shell itu. Pakai
+  `[f]lutter_tools` (kurung siku) supaya tidak self-match.
+- **`adb install` gagal `INSTALL_FAILED_UPDATE_INCOMPATIBLE`** karena HP punya
+  build **debug** (flag `DEBUGGABLE`), sedangkan yang dibangun release.
+  Delete dan install ulang wajib. Bukan masalah signature.
+- **`am start` tidak selalu bring app ke depan.** Widget jadi dibangun, activity
+  jalan, tapi top activity bisa tetap aplikasi lain. Selalu cek
+  `topResumedActivity` sebelum `screencap` - kalau tidak, screenshot bisa
+  menangkap konten pribadi pengguna. Ini benar-benar terjadi sekali di sesi ini.
+- **`grep -oE '[0-9.]+'` juga mencocokkan titik di `Pkg.Revision`**, jadi
+  parsing versi menghasilkan `.`. Pakai `sed` yang meng-anchor ke kunci.
+
+---
+
 ## 10. Langkah Berikutnya
+
+### 10.0 Commit perbaikan yang tertunda - PRIORITAS TERTINGGI
+
+Dua bug di §5B sudah diperbaiki dan terverifikasi di perangkat, tapi masih
+uncommitted. Suggested messages:
+
+```
+fix: keep the notification icon in release builds
+fix: survive an unreadable secure storage instead of hanging on the splash
+```
 
 ### 10.1 ~~Verifikasi dua hal yang tertunda~~ - SELESAI 26 September 2026
 
@@ -579,25 +799,37 @@ File terbesar yang masih belum disentuh:
 | `screens/alarm_history_screen.dart` | 382 | belum pernah di-refactor |
 | `screens/dashboard/widgets/weather_card.dart` | 318 | belum pernah di-refactor |
 | `screens/energy_report/widgets/chart_card.dart` | 280 | sudah dipisah, tapi masih satu widget besar |
-| `services/thingsboard_api.dart` | 455 | jantung integrasi, tanpa test |
 
-Folder `services/` sama sekali belum disentuh dan sekarang jadi file terbesar di luar widgets.
+`thingsboard_api.dart` **tidak lagi tanpa test** - ditutup 26 September 2026
+(§6). `services/` masih jadi file terbesar di luar widgets.
 
 ### 10.4 Menambah cakupan test
 
 Masih tipis di:
 
-- `thingsboard_realtime_service.dart` (WebSocket) - baru sebagian tertutup; yang
-  diuji adalah guard, bukan parsing frame
-- `weather_service.dart` - **belum ada test sama sekali**
+- `weather_service.dart` - **belum ada test sama sekali**, sekarang gap
+  terbesar
+- `thingsboard_realtime_service.dart` - baru sebagian tertutup; yang diuji
+  guard, bukan parsing frame
 - `energy_report_service.dart` - test hanya untuk helper, bukan service-nya
-- `alarm_notification_service.dart` - logika background check belum teruji
+- `alarm_notification_service.dart` - logika background check belum teruji.
+  **Catatan**: `initialize()`-nya dulu gagal total karena ikon hilang (§5B.1),
+  jadi sebelum tes logika, pastikan ikonnya benar-benar ada di APK release.
 
-`thingsboard_api.dart` **sudah ditutup** 26 September 2026, lihat section 6.
+`thingsboard_api.dart` **sudah ditutup** 26 September 2026, lihat §6.
 
-### 10.5 Push notification
+### 10.5 ~~Push notification belum teruji~~ - MASIH BENAR
 
-Sudah ada `flutter_local_notifications`, `android_alarm_manager_plus`, dan service alarm background yang jalan, tapi notifikasi belum pernah diuji di Android 14 ke atas.
+`flutter_local_notifications` dan `android_alarm_manager_plus` sudah hooked
+dengan benar sejak §5B.1 diperbaiki, tapi **belum pernah ada alarm sungguhan
+yang muncul di layar**. Itu perlu diuji dengan SOC di bawah ambang.
+
+### 10.6 Utang KGP - jika someday dikerjakan
+
+Lihat §9A. Ringkasnya: **tiga paket** (`share_plus` → 13,
+`package_info_plus` → 10, `flutter_secure_storage` → 11), plus `XFile` pindah
+dari `cross_file` ke `file` di `csv_builder.dart`. Dan wajib diuji di perangkat
+karena menyangkut penyimpanan sesi.
 
 ---
 
@@ -659,25 +891,74 @@ Bug TDS dan humidity di section 5.6 lahir dari menyalin angka batas saat meminda
 git show <commit-sebelum-refactor>:lib/screens/settings_screen.dart
 ```
 
-### 11.7 CHANGELOG `[Unreleased]` sudah sangat panjang
+### 11.7 ~~CHANGELOG `[Unreleased]` sudah sangat panjang~~ - SUDAH SELESAI
 
-Saat mau rilis, **petakan** isinya ke versi baru (misalnya 1.4.0) dan pindahkan, jangan biarkan menumpuk.
+Sudah diselesaikan saat rilis 1.4.0: tiga header `[Unreleased]` dan tiga
+heading `1.3.0` yang bertentangan digabung, dan blok
+`[Unreleased] - 2026-09-25` diverifikasi terhadap git tag lalu dipindahkan ke
+1.3.1. Aturannya sekarang: **tepat satu** `[Unreleased]`, dipetakan ke versi
+saat rilis.
+
+### 11.8 Resource hanya terjangkau dari Dart akan terhapus di release
+
+`flutter_local_notifications` dan plugin serupa meneruskan nama resource
+sebagai **string Dart**. Resource shrinker tidak bisa melihat string itu, jadi
+resource-nya hilang dari APK **release** saja (build debug tidak Strip).
+Gejalanya `PlatformException(invalid_icon, ...)` yang tertelan `try/catch`.
+
+Sudah diperbaiki di §5B.1 lewat deklarasi di `AndroidManifest.xml`. Kalau
+muncul gejala serupa, cek dulu:
+
+```bash
+aapt2 dump resources build/app/outputs/flutter-apk/app-release.apk | grep <nama>
+```
+
+### 11.9 Future yang di-await sebelum menampilkan UI bisa menggantung
+
+`loadSavedToken()` tidak pernah melempar saat normal, jadi tidak ada yang
+sadar ia perlu `try/catch`. Waktu ia **melempar**, `_SplashRouterState` yang
+menunggu Future-nya tidak pernah selesai, dan aplikasi diam di splash tanpa
+error dan tanpa jalan keluar.
+
+Aturan: Future yang dibaca sebelum menentukan UI harus punya error handling,
+dan harus ada test dengan platform yang melempar. Sudah ada di
+`test/thingsboard_api_test.dart` (`_ThrowingSecureStorage`).
 
 ---
 
 ## 12. Referensi Cepat
 
+### Setup environment (dipakai di shell fish, bukan bash)
+
+```bash
+export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
+export ANDROID_HOME=/home/fzn/Android/Sdk
+export ANDROID_SDK_ROOT=/home/fzn/Android/Sdk
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+```
+
+Permanen di `~/.config/fish/conf.d/energrow-toolchain.fish`. Shell aktif user
+adalah **fish**, bukan bash.
+
 ### Perintah
 
 ```bash
-flutter analyze                                   # harus bersih
-flutter test                                      # 119 test
-flutter run -d "192.168.18.44:42057" --no-version-check
-flutter build apk --release
+flutter analyze                    # harus: No issues found
+flutter test                       # harus: 143/143
+flutter build apk --release        # warm ~2-3 menit
+
+# Perangkat (HP Xiaomi 24090RA29G, Android 16)
+adb connect 192.168.18.44:<port>
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb -s 192.168.18.44:<port> logcat -d | grep -i flutter
 
 # Struktur dan status
 git log --oneline -20
 git status -sb
+
+# Toolchain
+~/dev/setup-energrow.sh --check    # audit, read-only
+~/dev/setup-energrow.sh            # install idempotent
 ```
 
 ### Endpoint
@@ -689,14 +970,30 @@ git status -sb
 | CCTV | `https://cctv.mbkm20262027.tech/stream.html?src=cam1` |
 | OpenWeatherMap | `https://api.openweathermap.org` (key di SharedPreferences `weather_api_key`) |
 
+### Toolchain
+
+```
+Flutter 3.47.5 · Dart 3.13.4 · OpenJDK 21.0.12
+Android SDK 36.0.0 · build-tools 36.0.0 · adb 37.0.1 · Gradle 9.3.1
+```
+
+Semua di `$HOME` (`~/dev/flutter`, `~/Android/Sdk`); hanya JDK perlu sudo.
+
+### ⚠️ `dl.google.com` di-throttle di mesin ini
+
+AGP/Gradle mengunduh 65-114 KB/s; `curl -L` 7-44 MB/s. Untuk build pertama
+di mesin baru, pre-stage dengan skrip. Detail dan tabel pengukuran di §8A.
+
 ### Dokumentasi lain
 
 | File | Isi |
 |---|---|
+| `AGENTS.md` | catatan kerja untuk agent: arsitektur, konvensi, gotcha |
 | `README.md` | overview, arsitektur, setup, install, known issues |
 | `PRD_PLTS_Monitoring_App.md` | requirement lengkap dan roadmap |
 | `PRD_GitHub_Release_Process.md` | langkah signing dan GitHub Release |
 | `CHANGELOG.md` | riwayat perubahan lengkap |
+| `RELEASE_NOTES_v1.4.0.md` | ringkasan rilis terakhir |
 | `.github/agents/` | agent prompt: `security-qa-evaluator`, `ui-ux-performance` |
 
 ---
