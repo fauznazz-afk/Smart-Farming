@@ -85,6 +85,11 @@ class ChartBounds {
     required this.timeInterval,
   });
 
+  /// Whether the x range covers more than a single day, in which case axis
+  /// labels should show a date rather than a clock time.
+  bool get spansMultipleDays =>
+      (maxX - minX) > const Duration(days: 1).inMilliseconds;
+
   factory ChartBounds.fromSeries(List<ChartSeries> series) {
     final points = series.expand((item) => item.points).toList();
     if (points.isEmpty) {
@@ -97,27 +102,97 @@ class ChartBounds {
         timeInterval: 1,
       );
     }
-    final xValues = points
-        .map((point) => point.timestamp.millisecondsSinceEpoch.toDouble())
-        .toList();
-    final yValues = points.map((point) => point.value).toList();
-    final minX = xValues.reduce((a, b) => a < b ? a : b);
-    final maxX = xValues.reduce((a, b) => a > b ? a : b);
-    final minimum = yValues.reduce((a, b) => a < b ? a : b);
-    final maximum = yValues.reduce((a, b) => a > b ? a : b);
+    var minX = double.infinity;
+    var maxX = double.negativeInfinity;
+    var minimum = double.infinity;
+    var maximum = double.negativeInfinity;
+    for (final point in points) {
+      final x = point.timestamp.millisecondsSinceEpoch.toDouble();
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (point.value < minimum) minimum = point.value;
+      if (point.value > maximum) maximum = point.value;
+    }
+
+    // Snap the x axis to round clock boundaries so tick labels land on
+    // readable times (:00, :30) instead of whatever the first sample was.
+    final rawTimeStep = (maxX - minX) / _targetTicks;
+    final timeInterval = niceTimeStep(rawTimeStep);
+    minX = (minX / timeInterval).floorToDouble() * timeInterval;
+    maxX = (maxX / timeInterval).ceilToDouble() * timeInterval;
+
     final minY = minimum < 0 ? minimum * 1.1 : 0.0;
     final maxY = maximum <= 0 ? 1.0 : maximum * 1.1;
-    final chartInterval = (maxY - minY) / 3;
-    final timeInterval = (maxX - minX) / 3;
     return ChartBounds(
       minX: minX,
       maxX: maxX,
       minY: minY,
       maxY: maxY,
-      chartInterval: chartInterval == 0 ? 1 : chartInterval,
-      timeInterval: timeInterval == 0 ? 1 : timeInterval,
+      chartInterval: niceStep(maxY - minY, divisions: _targetTicks),
+      timeInterval: timeInterval,
     );
   }
+
+  /// Number of intervals we aim to fit along each axis.
+  static const _targetTicks = 4;
+}
+
+/// Rounds a raw axis step up to the next 1 / 2 / 2.5 / 5 x 10^n value.
+///
+/// Keeps y axis labels on human-friendly numbers such as 0.5 or 25 instead of
+/// arbitrary values like 111.45.
+double niceStep(double raw, {int divisions = 4}) {
+  if (!raw.isFinite || raw <= 0) return 1;
+  final target = raw / divisions;
+  final magnitude = _pow10Floor(target);
+  final normalized = target / magnitude;
+  final double step;
+  if (normalized <= 1) {
+    step = 1;
+  } else if (normalized <= 2) {
+    step = 2;
+  } else if (normalized <= 2.5) {
+    step = 2.5;
+  } else if (normalized <= 5) {
+    step = 5;
+  } else {
+    step = 10;
+  }
+  return step * magnitude;
+}
+
+const double _minuteMs = 60000;
+
+/// Candidate axis steps in minutes: sub-hour through multi-day.
+const _timeStepMinutes = <double>[
+  1, 2, 5, 10, 15, 30, //
+  60, 120, 180, 360, 720, 1440, //
+  2880, 4320, 10080, 20160, 43200, 129600, 259200, 525600,
+];
+
+/// Rounds a raw time step (in milliseconds) up to a whole number of minutes.
+///
+/// The step is always rounded up, never down, so a tick never lands closer
+/// together than the caller asked for. Steps beyond a year fall back to one
+/// year, which keeps very long custom ranges from collapsing to a single tick.
+double niceTimeStep(double rawMs) {
+  if (!rawMs.isFinite || rawMs <= 0) return _minuteMs;
+  final minutes = rawMs / _minuteMs;
+  for (final candidate in _timeStepMinutes) {
+    if (minutes <= candidate) return candidate * _minuteMs;
+  }
+  return _timeStepMinutes.last * _minuteMs;
+}
+
+double _pow10Floor(double value) {
+  var magnitude = 1.0;
+  while (magnitude * 10 <= value) {
+    magnitude *= 10;
+  }
+  while (magnitude > value && magnitude > 1e-9) {
+    magnitude /= 10;
+  }
+  return magnitude;
 }
 
 /// Processes telemetry points into chart spots with downsampling.

@@ -10,6 +10,18 @@ String formatAxisTime(double value) {
   return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 }
 
+/// Formats a timestamp for an axis spanning more than one day.
+///
+/// A clock time is ambiguous across a multi-day range, so fall back to a date.
+String formatAxisDate(double value) {
+  final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+}
+
+/// Formats an axis tick, choosing a clock time or a date for the range.
+String formatAxisTick(double value, {required bool spansMultipleDays}) =>
+    spansMultipleDays ? formatAxisDate(value) : formatAxisTime(value);
+
 /// Returns the short Indonesian day name (Sen, Sel, Rab, etc.).
 String dayNameShort(int weekday) => const [
   'Sen',

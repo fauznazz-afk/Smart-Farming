@@ -13,7 +13,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.plts_monitoring"
+    namespace = "tech.mbkm.energrow"
     compileSdk = 36
     ndkVersion = "30.0.16248370"
 
@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.plts_monitoring"
+        applicationId = "tech.mbkm.energrow"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

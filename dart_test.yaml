@@ -1,7 +1,10 @@
-# Each widget test file spins up its own Flutter binding. Running every file at
-# once exhausts memory on smaller dev machines, which surfaces as
-# "did not complete" for every test in whichever file loses the race.
+# Each test file runs in its own isolate with a full Flutter binding. On a
+# low-memory machine the Dart compiler and the test isolate compete for RAM and
+# one of them gets killed mid-run, which the reporter surfaces as
+# "did not complete" for the rest of that file (including pure synchronous
+# tests) or as a bare "loading <file>.dart" failure.
 #
-# Raise this if your machine has headroom, but keep it well below the core count
-# when tests are run on CI runners or containers.
-concurrency: 2
+# Serialising the suite keeps the peak footprint to a single compile plus a
+# single isolate. The whole run takes well under a minute, so this is a cheap
+# trade. Raise the value if your machine has plenty of headroom.
+concurrency: 1

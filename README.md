@@ -22,7 +22,7 @@ Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga S
 - **CCTV layar penuh** dalam orientasi landscape
 - **(Roadmap)** Push notification
 
-Versi pengembangan saat ini: **1.3.0 (build 8)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md). Release 1.3.0 belum diterbitkan.
+Versi pengembangan saat ini: **1.3.1 (build 9)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md). Release 1.3.1 belum diterbitkan.
 
 ---
 
@@ -136,6 +136,11 @@ Untuk membangun APK sendiri:
 flutter build apk --release
 ```
 
+> ℹ️ `applicationId` sudah diubah dari `com.example.plts_monitoring` menjadi
+> `tech.mbkm.energrow`. Android akan menganggapnya sebagai aplikasi berbeda,
+> jadi versi lama harus di-uninstall lebih dulu sebelum memasang build
+> baru — token login dan preferensi tersimpan tidak ikut terbawa.
+
 File hasil build:
 
 ```text
@@ -182,8 +187,16 @@ Aplikasi ini dirancang untuk login memakai **Customer User**, bukan Tenant Admin
 ## Known Issues
 
 - **PZEM-017 (DC) stale data** — nilai kadang tidak update karena silent read failure di firmware ESP32; belum sepenuhnya teratasi di level hardware. Aplikasi menampilkan data apa adanya dari ThingsBoard.
-- **CCTV belum aktif** — fitur ini menunggu setup `go2rtc` di sisi Orange Pi selesai.
 - **Ketergantungan pada Orange Pi tunggal** — tidak ada redundansi backend; jika Orange Pi/Cloudflare Tunnel down, aplikasi tidak bisa fetch data sama sekali.
+- **Video CCTV membebani baterai** — WebView decoding berjalan di perangkat, sementara dashboard tetap polling tiap 10 detik selama video tampil. Aktifkan *Smooth Glass Mode* di Pengaturan untuk mengurangi beban render.
+- **Sumbu Y dibulatkan** — label sumbu memakai angka bersih (1 / 2 / 2,5 / 5), jadi nilai ekstrem bisa membuat label berbeda dari angka yang benar-benar tercatat.
+
+### Terverifikasi di perangkat (Android 16, API 36)
+
+- [x] ThingsBoard REST + WebSocket real-time
+- [x] OpenWeatherMap (Kertapati, ID)
+- [x] go2rtc CCTV live
+- [ ] Push notification untuk alarm (menunggu `flutter_local_notifications` stabil di Android 14+)
 
 ---
 

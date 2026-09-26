@@ -341,11 +341,15 @@ class TelemetryChartCard extends StatelessWidget {
           getTitlesWidget: (value, meta) => SideTitleWidget(
             axisSide: meta.axisSide,
             space: 6,
-            child: SizedBox(
-              width: 32,
+            // A tick sitting exactly on the plot edge would be half clipped, so
+            // nudge the first and last labels back inside the chart.
+            child: Transform.translate(
+              offset: Offset(_edgeShift(meta), 0),
               child: Text(
-                formatAxisTime(value),
-                textAlign: TextAlign.center,
+                formatAxisTick(
+                  value,
+                  spansMultipleDays: bounds.spansMultipleDays,
+                ),
                 style: labelStyle,
               ),
             ),
@@ -353,6 +357,18 @@ class TelemetryChartCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Pixels to shift a bottom-axis label so it stays inside the plot area.
+  ///
+  /// Uses the pixel position rather than the axis value, so the guard holds
+  /// regardless of how the bounds were aligned.
+  double _edgeShift(TitleMeta meta) {    const halfLabelWidth = 14.0;
+    if (meta.axisPosition < halfLabelWidth) return halfLabelWidth;
+    if (meta.axisPosition > meta.parentAxisSize - halfLabelWidth) {
+      return -halfLabelWidth;
+    }
+    return 0;
   }
 }
 

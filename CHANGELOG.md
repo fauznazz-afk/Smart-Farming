@@ -6,20 +6,32 @@ All notable changes to this project are documented here.
 
 ### Added
 
-- Added `dart_test.yaml` capping test concurrency at 2, fixing "did not complete" failures that hit every test in a file once the suite grew past six files
+- Added `dart_test.yaml` serialising the test suite, which keeps the Dart compiler and the test isolate from competing for memory on low-RAM machines
 - Added `SettingsKeys` (`lib/models/settings_keys.dart`) as the single source of truth for `SharedPreferences` keys shared by the Settings screen, Dashboard, and background alarm service
 - Added `SettingsController` (`lib/screens/settings/settings_controller.dart`) owning all settings state, validation, and persistence
 - Added `CctvStatus` (`lib/screens/cctv/utils/cctv_status.dart`) deriving the stream state from the player flags
 - Added `PeriodTotals` plus `bucketsForPeriod`, `previousPeriodTotals`, `totalsOf`, and `totalSampleCount` (`lib/screens/energy_report/utils/period_buckets.dart`)
+- Added `niceStep` and `niceTimeStep` (`lib/screens/dashboard/charts/chart_data.dart`) for human-friendly axis intervals
+- Added `formatAxisDate` and `formatAxisTick` for axis ticks that span more than one day
 - Added unit tests for the extracted settings validation (`test/settings_validation_test.dart`)
 - Added unit tests for the CCTV status model and the `parseAllowedCctvUrl` host allowlist (`test/cctv_test.dart`)
 - Added unit tests for the energy report period and chart helpers (`test/energy_report_helpers_test.dart`)
+- Added unit tests for the chart axis interval logic (`test/chart_bounds_test.dart`)
 - Added widget tests for the settings browser (`test/settings_screen_test.dart`) covering category listing, section drill-down, back navigation, and CCTV URL rejection
 - Added unit tests for the extracted dashboard helpers (`test/dashboard_helpers_test.dart`) covering history window resolution, sampling intervals, energy integration, cached telemetry partitioning, and telemetry comparison
 - Added `glassDividerColor` helper so divider tinting stays consistent across glass cards
 
+### Changed
+
+- Changed the Android `applicationId` and `namespace` from `com.example.plts_monitoring` to `tech.mbkm.energrow`, and moved `MainActivity` to the matching package path
+- Changed chart axis intervals to snap to round values, so a 24-hour view now labels ticks on the hour instead of at arbitrary offsets such as 02:10
+
 ### Fixed
 
+- Fixed telemetry chart axis labels being clipped or overlapping at the plot edges, by nudging the first and last bottom-axis labels back inside the chart
+- Fixed multi-day chart ranges labelling every tick with a clock time, which made a week view show `00:00` repeatedly; ticks now show a date instead
+- Fixed a test in `cctv_test.dart` that called `tester.getSemantics` without enabling semantics, which could hang the isolate and mark every later test in the file as "did not complete"
+- Fixed that same test matching a `Semantics` node owned by `Scaffold` instead of the one under test
 - Fixed the CCTV stream URL set in Settings never taking effect: it was written to `SharedPreferences` while the Dashboard reads it from secure storage, so the edit was silently discarded. Settings now persists it through `saveCctvUrl()` and loads it through `loadCctvUrl()`
 - Fixed a duplicate `defaultCctvUrl` constant in Settings that shadowed `defaultAllowedCctvUrl` from `cctv_url.dart`
 - Fixed the embedded and full screen CCTV layouts maintaining two copies of the video/standby/loading/error stack, which could drift apart
@@ -29,7 +41,13 @@ All notable changes to this project are documented here.
 
 - Removed the unused `active` parameter from `CctvScreen`
 
-### Changed
+### Documentation
+
+- Updated the README Known Issues: the CCTV stream is now live, so the pending `go2rtc` note was replaced with the actual caveats (WebView battery cost while polling continues, rounded Y axis labels)
+- Documented that changing `applicationId` requires uninstalling the previous build, and that the stored session does not carry over
+- Recorded the features verified on a physical Android 16 device
+
+### Refactoring
 
 - Refactored CCTV screen from 480 lines to 319 lines (-34%), sharing one `CctvViewport` between the embedded and full screen layouts
 - Refactored Energy Report screen from 233 lines to 174 lines (-25%), moving period bucketing and comparison totals into pure helpers

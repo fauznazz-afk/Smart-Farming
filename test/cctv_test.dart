@@ -81,10 +81,31 @@ void main() {
       );
 
       expect(find.text('LIVE'), findsOneWidget);
-      expect(
-        tester.getSemantics(find.text('LIVE')),
-        matchesSemantics(label: 'CCTV status: live', isLiveRegion: true),
+      // Assert on the Semantics widget rather than the semantics tree, which
+      // would require enabling semantics for the whole test. Scaffold and
+      // MaterialApp insert their own Semantics nodes, so scope the search to
+      // the descendants of the pill itself.
+      final pillSemantics = tester.widget<Semantics>(
+        find
+            .descendant(
+              of: find.byType(CctvStatusPill),
+              matching: find.byType(Semantics),
+            )
+            .first,
       );
+      expect(pillSemantics.properties.label, 'CCTV status: live');
+      expect(pillSemantics.properties.liveRegion, isTrue);
+    });
+
+    testWidgets('renders each status label', (tester) async {
+      for (final status in CctvStatus.values) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: CctvStatusPill(status: status)),
+          ),
+        );
+        expect(find.text(status.label), findsOneWidget);
+      }
     });
   });
 
