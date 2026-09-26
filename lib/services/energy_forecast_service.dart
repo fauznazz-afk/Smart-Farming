@@ -147,16 +147,21 @@ class EnergyForecastService {
     );
   }
 
-  /// Estimates the power the battery is actually delivering, in watts.
+  /// Estimates the power flowing through the battery, in watts.
   ///
   /// Runtime has to be projected from the battery's own discharge. Using the
   /// AC peak is wrong twice over: a load peak often lands while PV is covering
   /// it, when the battery is not discharging at all, and a peak is the worst
   /// case rather than a typical draw, so it inflates the runtime estimate.
   ///
+  /// The battery is a Bluetooth BMS, and vendors disagree on sign conventions:
+  /// some report power as positive while discharging, others while charging.
+  /// Only the magnitude is used here so the estimate does not depend on which
+  /// convention this pack happens to follow.
+  ///
   /// Preference order:
-  ///   1. the battery device's own `power` telemetry
-  ///   2. `voltage` x `current` from the battery
+  ///   1. the battery device's own `power` telemetry, by magnitude
+  ///   2. `voltage` x `current` from the battery, by magnitude
   ///   3. the average AC load across hours with no PV, which the battery
   ///      necessarily covered
   ///   4. the AC peak, as a last resort
@@ -165,13 +170,13 @@ class EnergyForecastService {
     required List<TelemetryPoint> solar,
     required List<TelemetryPoint> usage,
   }) {
-    final reported = latest['power'];
+    final reported = latest['power']?.abs();
     if (reported != null && reported > 0) return reported;
 
     final voltageValue = latest['voltage'];
     final currentValue = latest['current'];
     if (voltageValue != null && currentValue != null) {
-      final watts = voltageValue * currentValue;
+      final watts = (voltageValue * currentValue).abs();
       if (watts > 0) return watts;
     }
 

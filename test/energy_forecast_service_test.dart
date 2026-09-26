@@ -58,10 +58,34 @@ void main() {
       );
     });
 
-    test('ignores a non-positive reported power, as when charging', () {
+    test('ignores the sign convention a Bluetooth BMS uses for power', () {
+      // Vendors disagree: some report power positive while discharging, others
+      // positive while charging. Only the magnitude may be used.
       expect(
         EnergyForecastService.estimateBatteryDischargeWatts(
-          latest: const {'power': -45, 'voltage': 48, 'current': 0.6},
+          latest: const {'power': -30},
+          solar: [at(12, 200)],
+          usage: [at(20, 16)],
+        ),
+        30,
+      );
+    });
+
+    test('falls back to voltage times current, by magnitude', () {
+      expect(
+        EnergyForecastService.estimateBatteryDischargeWatts(
+          latest: const {'voltage': 48, 'current': -0.625},
+          solar: [at(12, 200)],
+          usage: [at(20, 16)],
+        ),
+        closeTo(30, 1e-9),
+      );
+    });
+
+    test('ignores a non-positive reported power, as when idle', () {
+      expect(
+        EnergyForecastService.estimateBatteryDischargeWatts(
+          latest: const {'power': 0, 'voltage': 48, 'current': 0.6},
           solar: [at(12, 200)],
           usage: [at(20, 16)],
         ),
