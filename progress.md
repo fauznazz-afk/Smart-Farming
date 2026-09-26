@@ -321,7 +321,7 @@ Langkah 3: sebuah jam dianggap "malam" hanya bila **semua** sampel solar di jam 
 
 ```
 flutter analyze  ->  No issues found
-flutter test     ->  119 tests, All tests passed
+flutter test     ->  139 tests, All tests passed
 ```
 
 | File | Test | Cakupan |
@@ -329,13 +329,46 @@ flutter test     ->  119 tests, All tests passed
 | `cctv_test.dart` | 22 | status model, overlay, host allowlist `parseAllowedCctvUrl` |
 | `dashboard_helpers_test.dart` | 22 | history window, interval, integrasi energi, cache split, `describeHistoryRange` |
 | `energy_report_helpers_test.dart` | 21 | bucketing harian dan bulanan, lintas batas bulan dan tahun, skala chart |
+| `thingsboard_api_test.dart` | 20 | URI WebSocket, state sesi, migrasi token, cache offline, key set |
 | `settings_validation_test.dart` | 18 | validasi range, target harian, batas sensor |
 | `chart_bounds_test.dart` | 16 | `niceStep`, `niceTimeStep`, alignment sumbu X, tick multi-hari |
 | `energy_forecast_service_test.dart` | 13 | produksi harian, proyeksi runtime baterai |
 | `settings_screen_test.dart` | 5 | widget test: daftar category, drill-down, navigasi back, penolakan URL |
 | `widget_test.dart` | 2 | smoke test |
 
-Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas **hanya ketahuan** karena test penjaga.
+Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
+**hanya ketahuan** karena test penjaga.
+
+### `thingsboard_api_test.dart` - 26 September 2026
+
+Service ini 500 baris dan dulunya **nol test**, padahal itu jantung integrasi.
+Ironisnya bug `describeHistoryRange` yang lolos ke produksi justru karena kedua
+fungsi yang dibandingkan tidak punya test.
+
+Yang ditutup (tanpa network):
+
+- URI WebSocket: `https` → `wss`, path plugin telemetry, dan **token tidak
+  dikirim sama sekali** kalau belum login (bukan `token=` kosong)
+- State sesi: token kosong bukan sesi, secure storage menang atas legacy yang
+  basi, dan token legacy **dimigrasikan lalu dihapus** dari SharedPreferences
+- Cache offline: round-trip, clear, dan JSON rusak → `null`, bukan crash
+- Realtime service tidak membuka socket tanpa token
+- Key set telemetry, device ID, dan base URL
+
+### Key set sempat diduplikasi - sudah dirapikan
+
+Saat menulis test di atas, ternyata daftar key **ditulis dua kali**: di fetcher
+REST dan di langganan WebSocket. Kalau satu ditambah dan yang lain tidak,
+metriknya tetap masuk lewat polling tapi **tidak pernah live-update**, dan
+tidak ada apa pun di log yang menjelaskannya.
+
+Kelas bug yang sama sudah menyerang project ini dua kali (§5.6 dan §11.6). Jadi
+literalnya sekarang tinggal di satu tempat sebagai
+`ThingsBoardApi.batteryKeys` / `pzemKeys` / `sensorKeys`, dan kedua transport
+mengacunya. Test sisanya menjaga daftar itu dari duplikat, key yang tumpang
+tindih antar device, dan mutasi.
+
+Test suite: 119 → **139**.
 
 ---
 
@@ -546,10 +579,13 @@ Folder `services/` sama sekali belum disentuh dan sekarang jadi file terbesar di
 
 Masih tipis di:
 
-- `thingsboard_api.dart` (455 baris) - **belum ada test sama sekali**, padahal ini jantung integrasi
-- `thingsboard_realtime_service.dart` (WebSocket)
-- `weather_service.dart`
+- `thingsboard_realtime_service.dart` (WebSocket) - baru sebagian tertutup; yang
+  diuji adalah guard, bukan parsing frame
+- `weather_service.dart` - **belum ada test sama sekali**
 - `energy_report_service.dart` - test hanya untuk helper, bukan service-nya
+- `alarm_notification_service.dart` - logika background check belum teruji
+
+`thingsboard_api.dart` **sudah ditutup** 26 September 2026, lihat section 6.
 
 ### 10.5 Push notification
 
