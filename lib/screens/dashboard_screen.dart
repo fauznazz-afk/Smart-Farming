@@ -195,6 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _refreshTimer?.cancel();
     _connectionStatusTimer?.cancel();
     unawaited(_realtimeService.stop());
+    _weatherService.dispose();
     super.dispose();
   }
 

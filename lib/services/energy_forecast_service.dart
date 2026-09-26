@@ -159,6 +159,17 @@ class EnergyForecastService {
   /// Only the magnitude is used here so the estimate does not depend on which
   /// convention this pack happens to follow.
   ///
+  /// **Sign convention**: the BMS may report `power` as positive (discharge) or
+  /// negative (charge), or the reverse depending on firmware. This function
+  /// uses `.abs()` to get the magnitude regardless of convention. The same
+  /// applies to `voltage x current` — the product may be negative depending on
+  /// current direction, so `.abs()` is applied there too.
+  ///
+  /// **Note**: This means the estimate cannot distinguish between charging and
+  /// discharging. For runtime projection this is acceptable — we want to know
+  /// how long the battery can sustain the load, which depends on discharge
+  /// power magnitude.
+  ///
   /// Preference order:
   ///   1. the battery device's own `power` telemetry, by magnitude
   ///   2. `voltage` x `current` from the battery, by magnitude

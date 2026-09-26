@@ -37,6 +37,48 @@ class WeatherData {
     required this.longitude,
   });
 
+  /// Parse a single entry from the One Call API (hourly or daily).
+  ///
+  /// The One Call payload uses a different shape than the current-weather
+  /// endpoint: `temp` is a scalar in hourly but an object with `day`/`min`/
+  /// `max` in daily, `wind_speed` is snake_case at the top level (not
+  /// nested under `wind`), and there is no `name` or `coord` per entry.
+  factory WeatherData.fromOneCallJson(Map<String, dynamic> json) {
+    final temp = json['temp'];
+    final double temperature;
+    if (temp is Map) {
+      // Daily entry: use the day-time temperature.
+      temperature = (temp['day'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      temperature = (temp as num?)?.toDouble() ?? 0.0;
+    }
+
+    final weatherList = json['weather'];
+    final weatherItem = (weatherList is List && weatherList.isNotEmpty)
+        ? weatherList.first as Map<String, dynamic>
+        : const <String, dynamic>{};
+
+    return WeatherData(
+      temperature: temperature,
+      humidity: (json['humidity'] as num?)?.toDouble() ?? 0.0,
+      pressure: (json['pressure'] as num?)?.toDouble() ?? 0.0,
+      windSpeed: (json['wind_speed'] as num?)?.toDouble() ?? 0.0,
+      windDirection: (json['wind_deg'] as num?)?.toDouble() ?? 0.0,
+      cloudCover: (json['clouds'] as num?)?.toDouble() ?? 0.0,
+      solarIrradiance: _estimateSolarIrradiance(json),
+      condition: weatherItem['main'] as String? ?? '',
+      description: weatherItem['description'] as String? ?? '',
+      icon: weatherItem['icon'] as String? ?? '01d',
+      timestamp: DateTime.fromMillisecondsSinceEpoch(
+        (json['dt'] as int? ?? 0) * 1000,
+      ),
+      locationName: '',
+      latitude: 0.0,
+      longitude: 0.0,
+    );
+  }
+
+  /// Parse a single entry from the current-weather endpoint.
   factory WeatherData.fromJson(Map<String, dynamic> json) {
     return WeatherData(
       temperature: (json['main']['temp'] as num).toDouble(),
@@ -57,11 +99,22 @@ class WeatherData {
   }
 
   static double _estimateSolarIrradiance(Map<String, dynamic> json) {
-    // Estimate solar irradiance based on cloud cover and time of day
-    final clouds = (json['clouds']['all'] as num).toDouble();
-    final dt = DateTime.fromMillisecondsSinceEpoch((json['dt'] as int) * 1000);
+    // Estimate solar irradiance based on cloud cover and time of day.
+    // The current-weather endpoint nests clouds under `clouds.all`, while the
+    // One Call endpoint exposes `clouds` as a scalar.
+    final cloudsRaw = json['clouds'];
+    final double clouds;
+    if (cloudsRaw is Map) {
+      clouds = (cloudsRaw['all'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      clouds = (cloudsRaw as num?)?.toDouble() ?? 0.0;
+    }
+    final dtValue = json['dt'];
+    final dt = dtValue is int
+        ? DateTime.fromMillisecondsSinceEpoch(dtValue * 1000)
+        : DateTime.fromMillisecondsSinceEpoch(0);
     final hour = dt.hour + dt.minute / 60.0;
-    
+
     // Simple estimation: clear sky ~1000 W/m² at solar noon, reduced by clouds
     double maxIrradiance = 0;
     if (hour >= 6 && hour <= 18) {
@@ -73,7 +126,7 @@ class WeatherData {
         maxIrradiance = 1000 * (elevation / 90);
       }
     }
-    
+
     // Reduce by cloud cover
     return maxIrradiance * (1 - clouds / 100);
   }
@@ -149,10 +202,10 @@ class WeatherForecast {
   factory WeatherForecast.fromJson(Map<String, dynamic> json) {
     return WeatherForecast(
       hourly: (json['hourly'] as List)
-          .map((e) => WeatherData.fromJson(e))
+          .map((e) => WeatherData.fromOneCallJson(e as Map<String, dynamic>))
           .toList(),
       daily: (json['daily'] as List)
-          .map((e) => WeatherData.fromJson(e))
+          .map((e) => WeatherData.fromOneCallJson(e as Map<String, dynamic>))
           .toList(),
       locationName: json['timezone'] as String,
       latitude: (json['lat'] as num).toDouble(),
@@ -261,23 +314,23 @@ class WeatherService {
       final url = Uri.parse(
         '$_baseUrl/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey&units=metric&lang=id',
       );
-      
+       
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
+       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final weather = WeatherData.fromJson(data);
-        
+         
         // Cache the result
         await _cacheWeather(weather);
-        
+         
         // Cache location
         await _cacheLocation(
           weather.locationName,
           weather.latitude,
           weather.longitude,
         );
-        
+         
         return weather;
       } else if (response.statusCode == 401) {
         throw Exception('Invalid API key. Please check your OpenWeatherMap API key.');
@@ -315,16 +368,16 @@ class WeatherService {
       final url = Uri.parse(
         '$_baseUrl/onecall?lat=${position.latitude}&lon=${position.longitude}&appid=$_apiKey&units=metric&lang=id&exclude=minutely,alerts',
       );
-      
+       
       final response = await http.get(url).timeout(const Duration(seconds: 15));
-      
+       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final forecast = WeatherForecast.fromJson(data);
-        
+         
         // Cache the result
         await _cacheForecast(forecast);
-        
+         
         return forecast;
       } else if (response.statusCode == 401) {
         throw Exception('Invalid API key. Please check your OpenWeatherMap API key.');
@@ -347,20 +400,20 @@ class WeatherService {
       final url = Uri.parse(
         '$_baseUrl/weather?q=$cityName&appid=$_apiKey&units=metric&lang=id',
       );
-      
+       
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
+       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final weather = WeatherData.fromJson(data);
-        
+         
         // Cache location
         await _cacheLocation(
           weather.locationName,
           weather.latitude,
           weather.longitude,
         );
-        
+         
         return weather;
       } else if (response.statusCode == 401) {
         throw Exception('Invalid API key. Please check your OpenWeatherMap API key.');
@@ -477,6 +530,19 @@ class WeatherService {
     await prefs.remove('${_cacheKey}_time');
     await prefs.remove(_forecastCacheKey);
     await prefs.remove('${_forecastCacheKey}_time');
+  }
+
+  /// Release resources held by this service.
+  ///
+  /// The dashboard keeps one instance for its lifetime and recreates it when
+  /// the user logs back in, so without this the old instance's GPS handle
+  /// and cached coordinates would linger.
+  void dispose() {
+    _apiKey = null;
+    _currentPosition = null;
+    _cachedLocationName = null;
+    _cachedLatitude = null;
+    _cachedLongitude = null;
   }
 
   /// Get weather icon URL

@@ -47,18 +47,18 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Alarm History'),
+        title: const Text('Hapus Riwayat Alarm'),
         content: const Text(
-          'Are you sure you want to remove all alarm records? This cannot be undone.',
+          'Apakah Anda yakin ingin menghapus semua catatan alarm? Tindakan ini tidak dapat dibatalkan.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Batal'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -94,14 +94,14 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       'Feb',
       'Mar',
       'Apr',
-      'May',
+      'Mei',
       'Jun',
       'Jul',
-      'Aug',
+      'Agu',
       'Sep',
-      'Oct',
+      'Okt',
       'Nov',
-      'Dec',
+      'Des',
     ];
     final day = dt.day.toString().padLeft(2, '0');
     final month = months[dt.month - 1];
@@ -118,12 +118,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Alarm History'),
+        title: const Text('Riwayat Alarm'),
         centerTitle: true,
         actions: [
           if (_alarms.isNotEmpty)
             IconButton(
-              tooltip: 'Clear all',
+              tooltip: 'Hapus semua',
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _clearAll,
             ),
@@ -157,7 +157,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No alarms recorded',
+            'Tidak ada alarm tercatat',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -174,7 +174,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     if (alarms.isEmpty) {
       return Center(
         child: Text(
-          'No alarms match this filter',
+          'Tidak ada alarm yang cocok dengan filter ini',
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
       );
@@ -254,7 +254,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                           if (isExpanded && alarm.value != null) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Value: ${alarm.value!.toStringAsFixed(2)}',
+                              'Nilai: ${alarm.value!.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white70 : Colors.black54,
@@ -265,7 +265,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                           if (isExpanded) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Type: ${alarm.type.label}',
+                              'Tipe: ${alarm.type.label}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white54 : Colors.black45,
@@ -280,23 +280,23 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       children: [
                         _statusBadge(alarm, severityColor),
                         PopupMenuButton<_AlarmAction>(
-                          tooltip: 'Alarm actions',
+                          tooltip: 'Aksi alarm',
                           onSelected: (action) => _applyAction(action, alarm),
                           itemBuilder: (context) => [
                             if (!alarm.acknowledged)
                               const PopupMenuItem(
                                 value: _AlarmAction.acknowledge,
-                                child: Text('Acknowledge'),
+                                child: Text('Terima'),
                               ),
                             if (!alarm.resolved)
                               const PopupMenuItem(
                                 value: _AlarmAction.resolve,
-                                child: Text('Resolve'),
+                                child: Text('Selesaikan'),
                               ),
                             if (alarm.acknowledged || alarm.resolved)
                               const PopupMenuItem(
                                 value: _AlarmAction.reopen,
-                                child: Text('Reopen'),
+                                child: Text('Buka Kembali'),
                               ),
                           ],
                         ),
@@ -338,12 +338,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 
   Widget _statusBadge(AlarmRecord alarm, Color severityColor) {
     final label = alarm.resolved
-        ? 'Resolved'
+        ? 'Selesai'
         : alarm.acknowledged
-        ? 'Acknowledged'
+        ? 'Diterima'
         : alarm.severity == AlarmSeverity.critical
-        ? 'Critical'
-        : 'Warning';
+        ? 'Kritis'
+        : 'Peringatan';
     final color = alarm.resolved
         ? Colors.green
         : alarm.acknowledged
@@ -388,12 +388,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 }
 
 enum _AlarmFilter {
-  all('All'),
-  active('Active'),
-  acknowledged('Acknowledged'),
-  resolved('Resolved'),
-  critical('Critical'),
-  warning('Warning');
+  all('Semua'),
+  active('Aktif'),
+  acknowledged('Diterima'),
+  resolved('Selesai'),
+  critical('Kritis'),
+  warning('Peringatan');
 
   const _AlarmFilter(this.label);
   final String label;

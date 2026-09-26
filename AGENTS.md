@@ -261,15 +261,24 @@ after each load.
 
 - `package_info_plus` and `share_plus` still apply the legacy Kotlin Gradle
   Plugin. Flutter 3.47.5 now warns that future versions will **fail to build**
-  with them. Upgrade before it becomes a hard break.
-- `thingsboard_api.dart` (~500 lines) is the integration core and has **no tests
-  at all**. `thingsboard_realtime_service.dart` and `weather_service.dart` are
-  also untested.
-- `WeatherForecast.fromJson` parses One Call payloads with `WeatherData.fromJson`,
-  which reads `main.temp` / `wind.speed` / `coord` — keys that do not exist in
-  that format. It only works because it is fed its own re-serialised cache.
-- `WeatherService.searchCities` calls the geocoding endpoint over **cleartext
-  HTTP**, unlike every other call in the app.
+  with them. Upgrading to `package_info_plus` 10.x requires `win32 ^6.0.1`,
+  but `flutter_secure_storage_windows` 3.x still requires `win32 ^5.0.0`.
+  Upgrading `flutter_secure_storage` to 11.x would require also upgrading
+  `flutter_secure_storage_platform_interface` (pinned in dev_dependencies
+  for testing). This is a **coordinated upgrade** — do not attempt it piecemeal.
+- `thingsboard_api.dart` (~500 lines) is the integration core and has 24 tests
+  covering token/session handling, WebSocket URI construction, telemetry key
+  sets, and offline caching. `thingsboard_realtime_service.dart` has 21 tests
+  covering service lifecycle, device configuration, and telemetry models.
+  `weather_service.dart` has 15 tests covering both current-weather and One
+  Call API parsing, serialization, and computed properties.
+- `WeatherForecast.fromJson` now uses `WeatherData.fromOneCallJson` to correctly
+  parse One Call API payloads. Previously it used `WeatherData.fromJson` which read
+  `main.temp` / `wind.speed` / `coord` — keys that do not exist in that format.
+- `WeatherService.searchCities` calls the geocoding endpoint over HTTPS (was
+  cleartext HTTP, fixed in commit 1ecafc5).
+- `WeatherService` now has a `dispose()` method that releases the GPS handle
+  and cached coordinates. The dashboard calls it in its own `dispose()`.
 - `dart_test.yaml`, the JVM heap in `gradle.properties`, and the
   `gradle-wrapper` `-bin` distribution are Linux-motivated but tracked in git, so
   they affect Windows builds too.

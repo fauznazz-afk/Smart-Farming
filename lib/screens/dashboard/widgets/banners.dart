@@ -52,7 +52,7 @@ class TelemetryErrorView extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: const Text('Coba lagi'),
             ),
           ],
         ),
@@ -186,7 +186,7 @@ class ConnectionStatusBanner extends StatelessWidget {
     final label = failed
         ? 'ThingsBoard gagal'
         : stale
-        ? 'Terhubung · stale: ${staleNames.join(', ')}'
+        ? 'Terhubung · data lama: ${staleNames.join(', ')}'
         : health.statusMessage;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
