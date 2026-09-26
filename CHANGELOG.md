@@ -50,6 +50,8 @@ All notable changes to this project are documented here.
 - Zero breaking changes - all functionality preserved
 - Better error handling in WeatherService with descriptive messages for API errors (401, 404, etc.)
 - Weather service now properly throws exceptions for GPS permission issues instead of silently failing
+- **Weather card compact redesign**: Single card with all metrics (temperature, humidity, wind, cloud cover) in one row; removed solar irradiance section; reduced padding and spacing; uses theme colors (primary, secondary, tertiary, outline) that adapt to accent color from Settings
+- **Fixed humidity text overflow**: Reduced font sizes (value: 14→12, label: 12→9), added ellipsis handling, smaller icons (20→18), optimized padding
 
 ### Changed
 

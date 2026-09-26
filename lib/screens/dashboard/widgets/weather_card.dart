@@ -27,16 +27,20 @@ class WeatherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final seedColor = colorScheme.primary;
+
     // Handle loading state
     if (isLoading) {
       return LiquidGlassCard(
         isDark: isDark,
         performanceMode: performanceMode,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: const Center(
           child: SizedBox(
-            width: 24,
-            height: 24,
+            width: 20,
+            height: 20,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
@@ -48,37 +52,41 @@ class WeatherCard extends StatelessWidget {
       return LiquidGlassCard(
         isDark: isDark,
         performanceMode: performanceMode,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.cloud_off,
-              size: 32,
-              color: isDark ? Colors.orange : Colors.deepOrange,
+              size: 24,
+              color: colorScheme.error,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'Cuaca tidak tersedia',
-              style: TextStyle(
-                fontSize: 14,
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
+                color: colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               error!,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.white60 : Colors.black54,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: onRefresh,
-              icon: const Icon(Icons.refresh, size: 16),
+              icon: const Icon(Icons.refresh, size: 14),
               label: const Text('Coba Lagi'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ],
         ),
@@ -86,7 +94,7 @@ class WeatherCard extends StatelessWidget {
     }
 
     if (weather == null) {
-      return _buildNoDataCard();
+      return _buildNoDataCard(context, colorScheme);
     }
 
     final weatherData = weather!;
@@ -95,70 +103,74 @@ class WeatherCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
+          // Header with location and condition
           Row(
             children: [
               Image.network(
                 WeatherService.getIconUrl(weather!.icon),
-                width: 40,
-                height: 40,
+                width: 32,
+                height: 32,
                 errorBuilder: (_, _, _) => Icon(
                   Icons.wb_sunny,
-                  size: 32,
-                  color: isDark ? Colors.amber : Colors.orange,
+                  size: 24,
+                  color: seedColor,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       weather!.locationName,
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : Colors.black87,
+                        color: colorScheme.onSurface,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       '${weather!.condition} - ${weather!.description}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white60 : Colors.black54,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isGoodForSolar
-                      ? Colors.green.withValues(alpha: 0.2)
-                      : Colors.orange.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                      ? Colors.green.withValues(alpha: 0.15)
+                      : Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   isGoodForSolar ? 'Bagus untuk Solar' : 'Kurang Optimal',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600,
                     color: isGoodForSolar ? Colors.green : Colors.orange,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               IconButton(
                 onPressed: onRefresh,
                 icon: Icon(
                   Icons.refresh,
-                  size: 20,
-                  color: isDark ? Colors.white70 : Colors.black54,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
                 ),
                 tooltip: 'Refresh weather',
                 padding: EdgeInsets.zero,
@@ -166,8 +178,8 @@ class WeatherCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Main metrics
+          const SizedBox(height: 10),
+          // All metrics in a single compact row
           Row(
             children: [
               Expanded(
@@ -175,166 +187,87 @@ class WeatherCard extends StatelessWidget {
                   label: 'Suhu',
                   value: '${weather!.temperature.toStringAsFixed(1)}°C',
                   icon: Icons.thermostat,
-                  color: isDark ? Colors.red : Colors.redAccent,
+                  color: colorScheme.tertiary,
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
                   label: 'Kelembapan',
                   value: '${weather!.humidity.toStringAsFixed(0)}%',
                   icon: Icons.water_drop,
-                  color: isDark ? Colors.blue : Colors.blueAccent,
+                  color: colorScheme.secondary,
                   isDark: isDark,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+              const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
                   label: 'Angin',
                   value: '${weather!.windSpeed.toStringAsFixed(1)} m/s',
                   icon: Icons.air,
-                  color: isDark ? Colors.cyan : Colors.cyanAccent,
+                  color: colorScheme.primary,
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
                   label: 'Awan',
                   value: '${weather!.cloudCover.toStringAsFixed(0)}%',
                   icon: Icons.cloud,
-                  color: isDark ? Colors.grey : Colors.grey,
+                  color: colorScheme.outline,
                   isDark: isDark,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Solar irradiance
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: (isDark ? Colors.amber : Colors.amber).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: (isDark ? Colors.amber : Colors.amber).withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.wb_sunny,
-                  color: isDark ? Colors.amber : Colors.orange,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Iradiansi Matahari',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${weather!.solarIrradiance.toStringAsFixed(0)} W/m²',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.amber : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: CircularProgressIndicator(
-                            value: weather!.solarProductionFactor,
-                            strokeWidth: 4,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isDark ? Colors.amber : Colors.orange,
-                            ),
-                            backgroundColor: (isDark ? Colors.amber : Colors.amber)
-                                .withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Text(
-                          '${(weather!.solarProductionFactor * 100).toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.amber : Colors.orange,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Forecast summary
-          // TODO: Add forecast when available
         ],
       ),
     );
   }
 
-  Widget _buildNoDataCard() {
+  Widget _buildNoDataCard(BuildContext context, ColorScheme colorScheme) {
+    final theme = Theme.of(context);
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: true,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.wb_sunny_outlined,
-            size: 32,
-            color: isDark ? Colors.amber : Colors.orange,
+            size: 24,
+            color: colorScheme.primary,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Data Cuaca',
-            style: TextStyle(
-              fontSize: 14,
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black87,
+              color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
-            'Tambahkan API Key OpenWeatherMap di pengaturan untuk melihat data cuaca',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.white60 : Colors.black54,
+            'Tambahkan API Key OpenWeatherMap di pengaturan',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           FilledButton.icon(
             onPressed: onSettings,
-            icon: const Icon(Icons.settings, size: 16),
+            icon: const Icon(Icons.settings, size: 14),
             label: const Text('Buka Pengaturan'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
         ],
       ),
@@ -359,31 +292,37 @@ class _WeatherMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.15 : 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 2),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : Colors.black87,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+              fontSize: 12,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isDark ? Colors.white60 : Colors.black54,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 9,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
