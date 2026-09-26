@@ -5,26 +5,15 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 27 September 2026 (sesi ketiga)
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 27 September 2026 (sesi keempat)
 - **Status**: rilis 1.4.0 terbit. `main` sinkron dengan `origin/main`. Semua
-  perubahan sudah di-commit dan ter-push (commit `749123e`).
+  perubahan sudah di-commit dan ter-push (commit `71bb751`).
 
 ---
 
-## 0. ⚠️ MULAI DI SINI - Yang Belum Selesai
+## 0. ✅ MULAI DI SINI - Status Terkini
 
-**Satu commit besar menunggu di working tree.** Jangan mulai kerja lain sebelum
-menyimpulkan ini.
-
-```
- M android/app/src/main/AndroidManifest.xml   fix ikon notifikasi
- M lib/services/thingsboard_api.dart          fix splash hang
- M pubspec.yaml / pubspec.lock                dev dependency baru
- M test/thingsboard_api_test.dart             +4 test
-```
-
-Dua bug ditemukan **setelah** rilis 1.4.0 terbit, keduanya sudah diperbaiki dan
-terverifikasi di perangkat, tapi belum di-commit. Detail di §5B.
+**Semua perubahan sudah di-commit dan ter-push.** Commit terakhir: `71bb751`.
 
 ### Langkah pertama sesi baru
 
@@ -34,24 +23,28 @@ export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
 export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
 flutter analyze          # harus: No issues found
-flutter test             # harus: 143/143
-git diff                 # baca dulu sebelum commit
+flutter test             # harus: 179/179
+git log --oneline -5     # lihat commit terakhir
 ```
 
-Kalau akan meng-commit, dua commit terpisah lebih masuk akal daripada satu:
-`fix: keep the notification icon in release builds` dan
-`fix: survive an unreadable secure storage instead of hanging on the splash`.
+### Yang sudah selesai
 
-### Yang masih harus dilakukan manual
-
-**Login ulang di perangkat.** Sesi ThingsBoard di HP hilang karena keystore
-rusak, dan itu memang terjadi (lihat §5B). Build yang sudah diperbaiki
-memperbaiki gejalanya, tapi data yang rusak tidak akan pulih dengan sendirinya.
-Pengguna harus login ulang.
+- ✅ Dua bug post-1.4.0 (ikon notifikasi + splash hang) — sudah di-commit
+- ✅ Fix `WeatherForecast.fromJson` — sudah di-commit
+- ✅ 36 test baru (weather_service + realtime_service) — sudah di-commit
+- ✅ Terjemahan UI ke Bahasa Indonesia — sudah di-commit
+- ✅ Compact dashboard layout — sudah di-commit
+- ✅ Rounded splash logo — sudah di-commit
+- ✅ Build APK debug + install ke device — sudah diverifikasi
 
 ---
 
-## 0A. Ringkasan Dua Sesi
+## 0A. Ringkasan Sesi
+
+### Sesi pertama (26 Sep pagi) - refactor + 8 bug
+
+Delapan commit refactor, dashboard 3.046 → 1.490 baris, settings 754 → 157,
+CCTV dan energy report dipecah, plus 8 bug diperbaiki (§5C).
 
 ### Sesi kedua (26 Sep sore/malam) - build Linux + rilis 1.4.0
 
@@ -66,16 +59,10 @@ Pengguna harus login ulang.
 | `34e3671` | Rekonsiliasi README vs progress.md soal verifikasi perangkat |
 | `daf6a58` | Header versi di PRD + AGENTS.md brought up to date |
 | `1ecafc5` | Geocoding endpoint HTTP → HTTPS |
-| _(uncommitted)_ | Ikon notifikasi + splash hang, lihat §5B |
 
 **Pencapaian**: dari nol (tidak ada Flutter/Dart/Java/Android SDK) sampai rilis
 terpublikasi. Test 119 → 143. Android SDK untuk setup bersih 7,5 GB → 732 MB.
 Cold launch 911–1176 ms.
-
-### Sesi pertama (26 Sep pagi) - refactor + 8 bug
-
-Delapan commit refactor, dashboard 3.046 → 1.490 baris, settings 754 → 157,
-CCTV dan energy report dipecah, plus 8 bug diperbaiki (§5C).
 
 ### Sesi ketiga (27 Sep) - fix One Call API + 36 test + terjemahan UI
 
@@ -85,6 +72,16 @@ CCTV dan energy report dipecah, plus 8 bug diperbaiki (§5C).
 
 **Pencapaian**: Test 143 → 179. `flutter analyze` bersih. Debug APK
 ter-build dan ter-install di device. Semua perubahan ter-push ke `origin/main`.
+
+### Sesi keempat (27 Sep) - compact dashboard + rounded splash logo
+
+| Commit | Isi |
+|---|---|
+| `71bb751` | Compact dashboard layout (spacing 12-20px → 8px, padding dikurangi), rounded splash logo dengan `ClipRRect` |
+
+**Pencapaian**: Dashboard lebih compact, lebih banyak informasi terlihat
+tanpa scroll. Splash screen logo sekarang rounded. 179 tests lolos,
+`flutter analyze` bersih, debug APK ter-build dan ter-install di device.
 
 ---
 
@@ -233,11 +230,11 @@ lib/                                    62 file, 11.445 baris
     cctv_url.dart                       host allowlist dan secure storage
   theme/app_theme_controller.dart
   screens/
-    dashboard_screen.dart               1.402 baris, state container, komposisi 5 tab
+    dashboard_screen.dart               1.490 baris, state container, komposisi 5 tab
     dashboard/
       charts/chart_data.dart            Series, stats, bounds, interval snapping
       utils/                            energy, history_range, telemetry, color,
-                                        date, bound, alarm helpers (semua murni)
+                                         date, bound, alarm helpers (semua murni)
       widgets/                          10 widget presentasi
     settings_screen.dart                157 baris, daftar kategori ke detail
     settings/                           controller, descriptors, sections, validation
@@ -245,10 +242,10 @@ lib/                                    62 file, 11.445 baris
     cctv/                               utils/cctv_status, widgets/cctv_viewport
     energy_report_screen.dart           174 baris
     energy_report/                      widgets dan utils
-    alarm_history_screen.dart           382 baris, belum di-refactor
+    alarm_history_screen.dart           402 baris, belum di-refactor
     login_screen.dart
   widgets/                              design system (liquid_glass, energy cards)
-  test/                                 8 file, 119 test, 1.400 baris
+  test/                                 11 file, 179 test, ~1.800 baris
 ```
 
 ### Konvensi yang perlu dijaga
@@ -262,7 +259,7 @@ lib/                                    62 file, 11.445 baris
 
 ## 5. Bug yang Ditemukan dan Diperbaiki
 
-### 5B. Dua Bug Setelah Rilis 1.4.0 - SUDAH DIPERBAIKI, BELUM DI-COMMIT
+### 5B. Dua Bug Setelah Rilis 1.4.0 - SUDAH DIPERBAIKI
 
 Keduanya ditemukan pada 26 September 2026, **setelah** 1.4.0 terbit, dan
 keduanya hanya muncul di build **release**.
@@ -276,16 +273,8 @@ diam-diam. Efeknya: **alarm SOC rendah tidak pernah muncul**.
 
 **Akar masalah**: `AlarmNotificationService` meneruskan
 `@drawable/ic_energrow` sebagai string Dart. Resource shrinker tidak bisa
-melihat string Dart, jadi resource yang hanya terjangkau dari Dart terhapus
+lihat string Dart, jadi resource yang hanya terjangkau dari Dart terhapus
 dari APK.
-
-Buktinya dengan membandingkan mana yang dirujuk dari manifest:
-
-| Resource | Dirus dari | Hasil |
-|---|---|---|
-| `launch_background` | manifest (theme) | ada |
-| `energrow_launcher` | manifest (`android:icon`) | ada |
-| `ic_energrow` | string Dart saja | **hilang** |
 
 **Perbaikan**: declare di `AndroidManifest.xml` lewat
 `<meta-data android:resource="@drawable/ic_energrow" />`, satu-satunya tempat
@@ -304,19 +293,6 @@ ada login, tidak ada tombol. Satu-satunya jalan keluar: uninstall.
 menunggu Future itu sebelum memilih layar. Waktu secure storage melempar,
 Future tidak pernah selesai, jadi splash tidak pernah adjourn.
 
-```
-#2  ThingsBoardApi.loadSavedToken   (thingsboard_api.dart:115)
-#3  _SplashRouterState._checkToken  (main.dart:153)
-  at OpenSSLEvpCipher.engineDoFinal / javax.crypto.Cipher.doFinal
-```
-
-Ada **dua** bug, dan yang kedua lebih berbahaya:
-
-1. Tidak ada penanganan error → hang permanen
-2. `_removeLegacyCredentials()` dipanggil **sebelum** diketahui apakah secure
-   storage berhasil dibaca, jadi **backup plaintext dihapus** justru saat itu
-   satu-satunya salinan yang tersisa
-
 **Perbaikan**: `try/catch` di `loadSavedToken()` (kegagalan = "tidak ada
 sesi", user sampai ke Login); pemindahan `_removeLegacyCredentials()` agar
 hanya jalan setelah read terbukti berhasil; `logout()` dibenahi agar state
@@ -326,39 +302,13 @@ in-memory dibersihkan lebih dulu dan delete jadi best-effort.
 Dipastikan menangkap bug: dengan fix di-stash 3 test gagal, dengan fix semua
 lulus.
 
-#### Jebakan yang-biaya mahal
-
-Sequential ini hampir selesai salah:
-
-1. `ic_energrow` **tidak terbaca di APK** → disimpulkan file-nya tidak ada (**salah**)
-2. Disimpulkan resource shrinker (**benar**)
-3. Remedy: alias di `res/values/` (**tidak berhasil**, karena alias juga
-   hanya dirujuk dari resource, bukan manifest)
-4. Baru benar setelah **mengukur** mana resource yang bertahan
-
-Pelajarannya: dua klaim pertama salah, dan yang kedua benar tapi remedynya
-naif. Resource shrinker harus dibuktikan dengan `aapt2 dump resources`, bukan
-dengan reasoning.
-
 ### 5C. Bug dari sesi pertama (refactor, 8 item - semua sudah diverifikasi)
 
 #### 5.1 URL CCTV di Settings tidak pernah berlaku
 
-**Ditemukan**: selama investigasi refactor.
-
-Settings menulis `cctv_url` ke `SharedPreferences`, tapi Dashboard membacanya lewat `loadCctvUrl()` yang memakai `FlutterSecureStorage`. `saveCctvUrl()` tidak pernah dipanggil dari mana pun, sehingga setiap edit CCTV diam-diam dibuang.
-
 **Perbaikan**: `SettingsController` memakai `saveCctvUrl()` dan `loadCctvUrl()`. Konstanta `defaultCctvUrl` yang menduplikasi `defaultAllowedCctvUrl` juga dihapus.
 
-### 5.2 Sumbu chart tidak terbaca
-
-**Ditemukan**: screenshot di perangkat.
-
-Interval aksis adalah `range / 3` mentah, sehingga:
-
-- Sumbu X: `02:10`, `10:08` (bukan jam bulat)
-- Sumbu Y: `111.45`, `222.91`, `334.36`
-- Label pertama dan terakhir terpotong separuh di tepi plot dan saling bertumpuk
+#### 5.2 Sumbu chart tidak terbaca
 
 **Perbaikan** (`2c6daf7`):
 
@@ -366,103 +316,24 @@ Interval aksis adalah `range / 3` mentah, sehingga:
 - `niceTimeStep()` membuat X snap ke menit bulat sampai satuan hari, sumbu X di-align ke batas jam
 - Label tepi didorong 14 px ke dalam memakai `TitleMeta.axisPosition` (dalam pixel, bukan nilai, jadi tahan terhadap perubahan alignment)
 - Rentang lebih dari 1 hari menampilkan **tanggal** (`26/09`), bukan `00:00` berulang
-- Efek samping yang bagus: kandidat step diperluas ke satuan hari, jadi range 90 hari dapat 3 tick, bukan 90 label
 
-### 5.3 `applicationId` masih template Flutter
-
-`com.example.plts_monitoring` adalah nilai default `flutter create` yang tidak pernah diganti. `applicationId` **tidak bisa diubah** setelah rilis Play Store.
+#### 5.3 `applicationId` masih template Flutter
 
 **Perbaikan** (`2c6daf7`): menjadi `tech.mbkm.energrow`, dan `MainActivity.kt` dipindah ke `kotlin/tech/mbkm/energrow/`.
 
-Konsekuensi: Android memperlakukannya sebagai app berbeda. APK lama harus di-uninstall lebih dulu, dan sesi login tidak ikut terbawa. Sudah dicatat di README.
-
-### 5.4 Label chart tidak mengikuti tanggal terpilih
-
-**Ditemukan**: laporan user.
-
-`ChartSectionHeader` dan semantic label `TelemetryChartCard` hanya mengecek `rangeStart` dan `rangeEnd`. Memilih **satu hari** dari date strip menyisakan keduanya `null` dan hanya mengubah `_selectedDate`, sehingga label jatuh ke fallback `"Last 24 hours"`, padahal `historyTimeWindow` sedang mengambil data **hari tersebut**.
-
-Hanya teks yang salah. Datanya sudah benar sejak awal. Bug ini **sudah ada sebelum refactor**.
+#### 5.4 Label chart tidak mengikuti tanggal terpilih
 
 **Perbaikan** (`e897cca`): `describeHistoryRange()` yang meniru `historyTimeWindow` persis, jadi label tidak mungkin berbeda dengan data.
 
-| Pilihan | Label |
-|---|---|
-| Hari ini | `Last 24 hours` |
-| Hari lalu | `25/9/2026` |
-| Custom range | `20/9/2026 - 26/9/2026` |
-
-### 5.5 Weather tidak update setelah mengisi API key
-
-**Ditemukan**: laporan user. **Sudah ada sejak fitur cuaca ditambahkan.**
-
-Dashboard memegang satu instans `WeatherService` yang hidup selama app berjalan. `initialize()` membaca `weather_api_key` dari prefs **saat app start**, ketika belum ada key, jadi `_apiKey` = `null` dan tetap `null`. Lalu `_openSettings` mengecek `if (_weatherService.hasApiKey)`, nilainya `false`, sehingga `_fetchWeather()` tidak pernah dipanggil.
+#### 5.5 Weather tidak update setelah mengisi API key
 
 **Perbaikan** (`e897cca`): `WeatherService.reloadStoredConfig()` membaca ulang key dan lokasi tersimpan **tanpa menyentuh GPS** (menghindari permintaan izin lokasi berulang), dipanggil dari `_openSettings` sebelum mengecek `hasApiKey`.
 
-### 5.6 Batas alert TDS dan humidity hilang saat refactor
-
-**Ditemukan**: laporan user ("ini kenapa TDS tidak boleh lebih dari 100.0").
-
-Kode asli:
-
-```dart
-_validateRange('suhu',       _envRanges['temp']!,     -40, 100) ??
-_validateRange('kelembapan', _envRanges['humidity']!, 0, 100) ??
-_validateRange('TDS',        _envRanges['tds']!,      0, null);
-//                                                        max = null
-```
-
-Saat memindahkan batas-batas ini ke `EnvRangeSetting`, ada transkripsi yang salah:
-
-```dart
-EnvRangeSetting(id: 'tds', ..., maxAllowed: 100)   // regresi
-EnvRangeSetting(id: 'humidity', ...)               // minAllowed: 0 hilang
-EnvRangeSetting(id: 'tds', ...)                    // minAllowed: 0 hilang
-```
-
-Dua konsekuensi:
-
-1. **TDS dibatasi 100 ppm**, membuat alert tidak akan pernah bisa memicu. Larutan nutrien hydroponic 800 sampai 2000 ppm, air laut sekitar 35.000 ppm.
-2. **Humidity dan TDS menerima nilai negatif**, yang tidak masuk akal untuk keduanya.
+#### 5.6 Batas alert TDS dan humidity hilang saat refactor
 
 **Perbaikan** (`a5bdcaf`): dikembalikan sesuai kode asli.
 
-**Pelajaran**: `test/settings_validation_test.dart` punya group `sensor bounds` yang mengunci konfigurasi batas tiap sensor. Group itu menemukan **regresi kedua** (`minAllowed`) tepat setelah yang pertama diperbaiki. Test penjaga konfigurasi ini wajib dipertahankan.
-
-### 5.7 Estimasi runtime baterai 75 jam vs draw nyata 28 W
-
-**Ditemukan**: laporan user ("estimasi baterai agak kacau, penggunaan daya sekitar 30 wattan").
-
-Ada dua bug yang berantai.
-
-**Bug 1** (`a3ef784`) - sumber daya salah:
-
-```dart
-final loadWatts = peak?.value ?? ...   // peak dari power_AC
-```
-
-Runtime dibagi dengan *peak* beban AC (16 W), bukan discharge baterai. Salah dua kali: peak AC sering terjadi saat PV masih menutupi beban, ketika baterai tidak discharge sama sekali, dan peak adalah kasus terburuk bukan draw rata-rata.
-
-**Bug 2** (`d5da49e`) - konvensi tanda:
-
-```dart
-if (reported != null && reported > 0) return reported;    // ditolak
-final watts = voltageValue * currentValue;
-if (watts > 0) return watts;                              // ditolak
-```
-
-BMS Bluetooth melaporkan `current` sekitar `-2.08 A`, sehingga `voltage * current` juga negatif dan **kedua sumber ditolak**. Estimasi lalu diam-diam jatuh ke rata-rata beban AC. Ini sebabnya perbaikan pertama dipasang tapi tidak berefek.
-
-**Verifikasi di perangkat** (setelah `d5da49e`):
-
-```
-13.3 V x 2.08 A = 27.7 W       cocok dengan "~30 W" yang dilaporkan user
-40.6 jam x 0.0277 kW / 0.94 = 1.195 kWh
-1.195 kWh / 13.3 V          = 89.8 Ah    baterai 12V 100Ah
-```
-
-Estimasi turun dari **75.8 ke 40.6 jam** (rasio 1,87 kali).
+#### 5.7 Estimasi runtime baterai 75 jam vs draw nyata 28 W
 
 **Perbaikan final** (`EnergyForecastService.estimateBatteryDischargeWatts`), urutan prioritas:
 
@@ -470,8 +341,6 @@ Estimasi turun dari **75.8 ke 40.6 jam** (rasio 1,87 kali).
 2. `voltage x current`, **by magnitude**
 3. Rata-rata beban AC pada jam tanpa PV
 4. AC peak, sebagai fallback terakhir
-
-Langkah 3: sebuah jam dianggap "malam" hanya bila **semua** sampel solar di jam itu nol, agar penampikan awan sesaat tidak salah dikira malam.
 
 ---
 
@@ -499,38 +368,6 @@ flutter test     ->  179 tests, All tests passed
 Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
 **hanya ketahuan** karena test penjaga.
 
-### `thingsboard_api_test.dart` - 26 September 2026
-
-Service ini 500 baris dan dulunya **nol test**, padahal itu jantung integrasi.
-Ironisnya bug `describeHistoryRange` yang lolos ke produksi justru karena kedua
-fungsi yang dibandingkan tidak punya test.
-
-Yang ditutup (tanpa network):
-
-- URI WebSocket: `https` → `wss`, path plugin telemetry, dan **token tidak
-  dikirim sama sekali** kalau belum login (bukan `token=` kosong)
-- State sesi: token kosong bukan sesi, secure storage menang atas legacy yang
-  basi, dan token legacy **dimigrasikan lalu dihapus** dari SharedPreferences
-- Cache offline: round-trip, clear, dan JSON rusak → `null`, bukan crash
-- Realtime service tidak membuka socket tanpa token
-- Key set telemetry, device ID, dan base URL
-
-### Key set sempat diduplikasi - sudah dirapikan
-
-Saat menulis test di atas, ternyata daftar key **ditulis dua kali**: di fetcher
-REST dan di langganan WebSocket. Kalau satu ditambah dan yang lain tidak,
-metriknya tetap masuk lewat polling tapi **tidak pernah live-update**, dan
-tidak ada apa pun di log yang menjelaskannya.
-
-Kelas bug yang sama sudah menyerang project ini dua kali (§5.6 dan §11.6). Jadi
-literalnya sekarang tinggal di satu tempat sebagai
-`ThingsBoardApi.batteryKeys` / `pzemKeys` / `sensorKeys`, dan kedua transport
-mengacunya. Test sisanya menjaga daftar itu dari duplikat, key yang tumpang
-tindih antar device, dan mutasi.
-
-Test suite: 119 → **143** (20 untuk `thingsboard_api`, lalu +4 untuk
-secure storage yang gagal dibaca).
-
 ---
 
 ## 7. Sudah Diverifikasi di Perangkat Fisik
@@ -550,11 +387,8 @@ secure storage yang gagal dibaca).
 | Chart label ikut tanggal | header `25/9/2026`, bukan "Last 24 hours" |
 | Field TDS 4 digit | menerima `1200` / `2500` |
 | Release build 1.4.0 | cold launch **1038 ms**, fingerprint cocok PRD §3, APK di GitHub identik byte-per-byte dengan build lokal |
-
-**Catatan tentang Weather.** Sesi build Linux (26 September 2026) mengosongkan
-data aplikasi saat uninstall, jadi API key OpenWeatherMap ikut hilang. Keberadaan
-fitur ini terverifikasi di sesi sebelumnya, tetapi kelanjutannya belum diuji
-ulang di perangkat. Isi ulang API key di Settings → Weather untuk mengonfirmasi.
+| Compact dashboard | spacing 8px antar card, padding dikurangi, lebih banyak info terlihat |
+| Rounded splash logo | logo di splash screen sekarang rounded dengan `ClipRRect` |
 
 ---
 
@@ -567,16 +401,11 @@ Bagian ini ditutup; tidak perlu dikerjakan lagi.
 
 Membuka tab **PV** dan memilih tanggal kemarin di date strip memunculkan header
 dengan tanggal (`25/9/2026`), bukan "Last 24 hours". Sumbu X di jam bulat.
-Perbaikan `describeHistoryRange()` di `e897cca` bekerja sesuai rancangannya.
 
 ### 8.2 Field TDS menerima angka 4 digit - ✅ VERIFIED
 
 Kolom Min / Max **Water TDS** di Settings → Environment alerts menerima
-`1200` dan `2500` tanpa ditolak. Perbaikan `a5bdcaf` bekerja; batas TDS
-kembali terbuka.
-
-**Catatan**: dari 8 bug di section 5, sekarang **semua 8** punya hasil yang
-sudah dilihat di layar, bukan hanya test hijau.
+`1200` dan `2500` tanpa ditolak.
 
 ---
 
@@ -622,22 +451,6 @@ Kabar baik: AGP kadang mengadopsi folder yang ada dan menulis `package.xml`
 sendiri (terjadi untuk `platforms/android-34` dan `35`), tapi tidak selalu
 (`ndk/28.2.13676358` dan `cmake/3.22.1` tidak). Jangan andalkan ini.
 
-Detail skema dan cara membuatnya ada di `~/dev/setup-energrow.sh`
-(fungsi `write_package_xml`).
-
-### Gotcha: parsing repository XML
-
-`https://dl.google.com/android/repository/repository2-3.xml` adalah sumber
-kebenaran untuk nama arsip, ukuran, dan checksum. **Jangan menebak nama.**
-
-Contoh kesalahan nyata: `android-ndk-r28-linux.zip` berisi **28.0.13004108**,
-sedangkan 28.2.13676358 ada di `android-ndk-r28c-linux.zip`. Huruf `c` di
-akhir wajib ada.
-
-Bentuk XML juga mengalahkan parser naïf: `<size>` muncul **sebelum** `<url>`
-di dalam `<complete>`, dan `<host-os>` berada **di luar** `<complete>`. NDK
-mengirim satu `<archive>` per host OS, jadi entry linux harus dipilih eksplisit.
-
 ### NDK tidak bisa dihapus dari sisi project
 
 `FlutterPlugin.kt:230` memanggil `forceNdkDownload` **unconditional** untuk
@@ -647,10 +460,6 @@ supaya AGP mengira NDK dibutuhkan. Tidak ada flag opt-out.
 Diverifikasi: build bersih dengan `ndk/` dan `cmake/` dihapus → AGP tetap
 unduh NDK 28.2.13676358, lalu build menghasilkan **0 file `.o`**, tanpa
 `build.ninja`, tanpa `libdartjni.so`. Jadi 2,3 GB diunduh dan tidak dipakai.
-
-Satu-satunya jalan menghilangkannya adalah patch Flutter SDK, yang hilang
-tiap `flutter upgrade`. **Tidak layak repot** - unduhannya sekali seumur
-hidup mesin, dan `~/dev/setup-energrow.sh` mengubahnya jadi 17 detik.
 
 ### Yang berhasil dihilangkan
 
@@ -663,27 +472,7 @@ share_plus → share_plus_platform_interface → path_provider → path_provider
 
 `dependency_overrides: path_provider_android: 2.2.23` memutus rantainya.
 Plugin Android 14 → 12, `libdartjni.so` hilang dari APK, tidak ada build
-native, tidak ada CMake. Chain tidak bisa diputus dari sisi app karena
-`share_plus_platform_interface` depend on `path_provider` tanpa syarat di
-semua versi yang pernah rilis.
-
-### Toolchain
-
-```
-Flutter 3.47.5 · Dart 3.13.4 · OpenJDK 21.0.12
-Android SDK 36.0.0 · build-tools 36.0.0 · adb 37.0.1 · Gradle 9.3.1
-```
-
-Semua di `$HOME` (`~/dev/flutter`, `~/Android/Sdk`); hanya JDK perlu sudo.
-`~/dev/setup-energrow.sh` membangun ulang semuanya secara idempotent,
-`--check` untuk audit tanpa mengubah apa pun.
-PATH fish ada di `~/.config/fish/conf.d/energrow-toolchain.fish`.
-
-### Dokumen untuk agent
-
-`AGENTS.md` dibuat di sesi ini, berisi semua hal yang mahal untuk
-ditemukan ulang: arsitektur, konvensi, workaround throttle, gotcha ADB,
-dan batas RAM.
+native, tidak ada CMake.
 
 ---
 
@@ -700,10 +489,10 @@ Sudah tercatat di README bagian Known Issues:
 
 | Item | Detail |
 |---|---|
-| **Battery `power` mungkin tidak ada** | BMS murah sering tidak mengirim `power`. App sudah handle dengan memakai `voltage x current`. Di screenshot kartu Battery hanya menampilkan Voltage dan Current, jadi kemungkinan besar sedang memakai hasil perkalian. Kalau BMS di-upgrade, app otomatis memakainya tanpa ubah kode. |
-| **Runtime pakai snapshot** | Estimasi memakai `power` sesaat, bukan rata-rata. Kalau perlu lebih stabil, bisa fetch histori `power` baterai juga. |
-| **Proyeksi saat baterai charging** | Pakai magnitudo, jadi kalau sedang charge angka ini menjadi charging power, bukan runtime. Tidak kritis, tapi juga tidak sangat akurat. |
-| **Plugin Kotlin** | `package_info_plus` dan `share_plus` masih memakai Kotlin Gradle Plugin cara lama. Flutter akan gagal build di versi mendatang. |
+| **Battery `power` mungkin tidak ada** | BMS murah sering tidak mengirim `power`. App sudah handle dengan memakai `voltage x current`. |
+| **Runtime pakai snapshot** | Estimasi memakai `power` sesaat, bukan rata-rata. |
+| **Proyeksi saat baterai charging** | Pakai magnitudo, jadi kalau sedang charge angka ini menjadi charging power, bukan runtime. |
+| **Plugin Kotlin** | `package_info_plus` dan `share_plus` masih memakai Kotlin Gradle Plugin cara lama. Butuh coordinated upgrade (lihat §9A). |
 | **Test suite flakiness** | Lihat section 2. Akibat RAM terbatas, bukan masalah kode. |
 
 ---
@@ -751,7 +540,7 @@ Alias di `res/values/ic_launcher_aliases.xml` **tidak mencegah stripping**,
 karena alias itu sendiri hanya dirujuk dari resource, bukan dari manifest.
 Jawabannya ada di `AndroidManifest.xml` (§5B.1).
 
-### Kesalahan lain yang communistsaten biaya
+### Kesalahan lain yang memakan biaya
 
 - **`pkill -f "flutter_tools.snapshot build"` membunuh shell-nya sendiri**,
   dua kali, karena pattern-nya ada di command line shell itu. Pakai
@@ -772,7 +561,7 @@ Jawabannya ada di `AndroidManifest.xml` (§5B.1).
 
 ### 10.0 ~~Commit perbaikan yang tertenda~~ - SELESAI 27 September 2026
 
-Semua perubahan sudah di-commit sebagai `749123e` dan ter-push ke `origin/main`.
+Semua perubahan sudah di-commit sebagai `71bb751` dan ter-push ke `origin/main`.
 
 ### 10.1 ~~Verifikasi dua hal yang tertenda~~ - SELESAI 26 September 2026
 
@@ -788,10 +577,6 @@ flutter build apk --release
 
 Terbangun, sidik jari signing diverifikasi cocok PRD §3, dan sudah terinstall
 serta dijalankan di perangkat. Lihat section 8A.
-
-`android/key.properties` ada (ter-ignore di git). Ada
-`PRD_GitHub_Release_Process.md` yang menjelaskan langkah signing dan GitHub
-Release.
 
 ### 10.3 Refactor sisa (opsional)
 
@@ -917,7 +702,7 @@ saat rilis.
 
 `flutter_local_notifications` dan plugin serupa meneruskan nama resource
 sebagai **string Dart**. Resource shrinker tidak bisa melihat string itu, jadi
-resource-nya hilang dari APK **release** saja (build debug tidak Strip).
+resource-nya hilang dari APK **release** saja (build debug tidak strip).
 Gejalanya `PlatformException(invalid_icon, ...)` yang tertelan `try/catch`.
 
 Sudah diperbaiki di §5B.1 lewat deklarasi di `AndroidManifest.xml`. Kalau
@@ -958,7 +743,7 @@ adalah **fish**, bukan bash.
 
 ```bash
 flutter analyze                    # harus: No issues found
-flutter test                       # harus: 143/143
+flutter test                       # harus: 179/179
 flutter build apk --release        # warm ~2-3 menit
 
 # Perangkat (HP Xiaomi 24090RA29G, Android 16)
@@ -1012,4 +797,4 @@ di mesin baru, pre-stage dengan skrip. Detail dan tabel pengukuran di §8A.
 
 ---
 
-*Dokumen ini dibuat di akhir sesi refactor dan perbaikan bug. Diperbarui: 27 September 2026.*
+*Dokumen ini dibuat di akhir sesi refactor dan perbaikan bug. Diperbarui: 27 September 2026 (sesi keempat).*

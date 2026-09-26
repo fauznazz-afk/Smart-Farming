@@ -4,6 +4,7 @@
 
 - Fixed `WeatherForecast.fromJson` parsing One Call API payloads with `WeatherData.fromJson`, which read `main.temp` / `wind.speed` / `coord` — keys that do not exist in that format. Added `WeatherData.fromOneCallJson` to correctly parse One Call entries (scalar `temp` in hourly, `temp.day` object in daily, snake_case `wind_speed`, no per-entry `name` or `coord`).
 - Fixed `_estimateSolarIrradiance` to handle both current-weather (`clouds.all` nested) and One Call (`clouds` scalar) formats.
+- Fixed splash screen logo not being rounded — wrapped `BrandLogo` in `ClipRRect` for consistency with the biometric unlock screen.
 
 ### Added
 
@@ -17,6 +18,7 @@
 - Documented battery power sign convention in `energy_forecast_service.dart` — `.abs()` is used because BMS vendors disagree on charge/discharge sign.
 - Translated "Try again" to "Coba lagi" in dashboard banners.
 - Improved stale device label from "stale:" to "data lama:".
+- Made dashboard overview page more compact: reduced card spacing from 12–20px to 8px, reduced internal padding across all dashboard cards (LivePowerCard 18→14, DualStatusCards 14→10, EnergySummaryCard 14→10, WeatherCard 12→10), changed EnvironmentGrid layout from 2+2+1 to 3+2 for better space efficiency.
 
 ### Documentation
 
