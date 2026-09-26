@@ -2,15 +2,14 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] - 2026-09-26
+## [1.3.1] - 2026-09-26
 
 ### Added
 
 - Added Weather monitoring feature with OpenWeatherMap API integration
   - New `WeatherService` class for fetching current weather and forecasts
   - New `WeatherData` and `WeatherForecast` data models
-  - Weather card widget on Dashboard showing temperature, humidity, wind, cloud cover, and solar irradiance
-  - Solar production estimation based on weather conditions
+  - Weather card widget on Dashboard showing temperature, humidity, wind, cloud cover
   - Weather settings section in Settings screen with API key and city configuration
   - Test connection button to verify API key and location
   - GPS location support for automatic weather fetching
@@ -53,34 +52,11 @@ All notable changes to this project are documented here.
 - **Weather card compact redesign**: Single card with all metrics (temperature, humidity, wind, cloud cover) in one row; removed solar irradiance section; reduced padding and spacing; uses theme colors (primary, secondary, tertiary, outline) that adapt to accent color from Settings
 - **Fixed humidity text overflow**: Reduced font sizes (value: 14→12, label: 12→9), added ellipsis handling, smaller icons (20→18), optimized padding
 
-### Changed
+## [Unreleased]
 
-- Refactored Energy Report screen from 809 lines to 251 lines (-69%) with modular widget/utility structure
-- Refactored Dashboard screen from 3,072 lines to 2,550 lines (-17%) with ~500 lines extracted to reusable utilities
-- Refactored Settings screen from 816 lines to 470 lines (-42%) with consolidated validation, persistence, and builder patterns
-- Renamed Energy Report screen title from "Laporan energi" to "Energi Analytics"
-- Moved `await loadCctvUrl()` outside `setState` in `_loadPreferences` to fix async context issue
-- Restructured all three screens to use modular widget/utility architecture with clear separation of concerns
+### Added
 
-### Fixed
-
-- Fixed async context error in Dashboard `_loadPreferences` by moving `await loadCctvUrl()` outside `setState` callback
-- Resolved merge conflicts in settings_screen.dart and energy_report_screen.dart keeping refactored versions
-- Fixed import paths in all extracted utility/widget files for correct module resolution
-
-### Improved
-
-- Reduced total codebase by ~1,000 lines through modular extraction while preserving all functionality
-- Improved maintainability with clear separation of concerns (widgets, utils, charts, helpers)
-- Enhanced testability with pure functions in utility files
-- Enhanced reusability of chart helpers, date formatters, color helpers, and alarm helpers across screens
-- Zero breaking changes - all functionality preserved
-
-### Validation
-
-- `flutter analyze` passes with no issues (full project)
-- All functionality preserved: Settings (8 categories), Dashboard (5 tabs + realtime), Energy Report (period selection, chart, CSV export)
-- Zero breaking changes
+- (No unreleased changes at this time)
 
 ## [Unreleased] - 2026-09-25
 
