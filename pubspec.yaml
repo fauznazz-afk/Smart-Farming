@@ -51,6 +51,24 @@ dependencies:
   geolocator: ^10.1.0
   geocoding: ^5.0.0
 
+# path_provider_android 2.3.0 rewrote its Kotlin side on top of the `jni` package,
+# which makes Gradle pull in a full NDK and CMake toolchain to build a 130 KB
+# shared library. 2.2.23 is the last release before that change and it satisfies
+# path_provider's own "^2.2.5" constraint, so nothing else has to move.
+#
+# It is reached here indirectly: the app does not use path_provider, but
+# share_plus_platform_interface depends on it unconditionally, and every
+# published version of that package does, so the chain cannot be cut at the app
+# level. Both 2.2.23 and 2.3.1 target the same
+# path_provider_platform_interface ^2.1.0, so the plugin-facing API is identical
+# and this is a pure implementation swap.
+#
+# Remove this override once 2.3.x stops pulling in the NDK. Expect
+# `flutter pub outdated` to keep reporting 2.2.23 as behind; that is the pin
+# working, not a problem.
+dependency_overrides:
+  path_provider_android: 2.2.23
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

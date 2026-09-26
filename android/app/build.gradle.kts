@@ -15,7 +15,20 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "tech.mbkm.energrow"
     compileSdk = 36
-    ndkVersion = "30.0.16248370"
+
+    // No ndkVersion on purpose, but note it does NOT prevent the download.
+    //
+    // Nothing in this app compiles native code, so pinning 30.0.16248370 here
+    // only made AGP fetch an NDK that nothing uses. Removing the line does not
+    // stop the fetch either: AGP still installs Flutter's default NDK
+    // (28.2.13676358) during configuration. Verified on a clean build with no
+    // ndk/ and no cmake/ in the SDK: both get installed, and the build then
+    // produces zero .o files, no build.ninja, and no libdartjni.so.
+    //
+    // The line stays out so that if a future dependency really needs the NDK, it
+    // resolves to the same version plugins ask for (flutter.ndkVersion) instead
+    // of a second, divergent copy. The download itself is AGP behaviour and is
+    // not avoidable from this file; see AGENTS.md.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
