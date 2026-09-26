@@ -32,6 +32,7 @@ All notable changes to this project are documented here.
 - Added local alarm notifications when alarms are detected during active monitoring.
 - Added periodic Android background alarm checks with local notifications after reboot.
 - Kept the detailed energy report flow for historical charts, custom ranges, and CSV export.
+- Avoided blocking app startup on alarm notification setup by initializing alarm services asynchronously after `runApp` and guarding failures so they no longer prevent the dashboard from launching.
 
 ## [1.3.0] - 2026-09-25
 
