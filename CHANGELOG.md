@@ -6,20 +6,29 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Added `SettingsKeys` (`lib/models/settings_keys.dart`) as the single source of truth for `SharedPreferences` keys shared by the Settings screen, Dashboard, and background alarm service
+- Added `SettingsController` (`lib/screens/settings/settings_controller.dart`) owning all settings state, validation, and persistence
+- Added unit tests for the extracted settings validation (`test/settings_validation_test.dart`)
+- Added widget tests for the settings browser (`test/settings_screen_test.dart`) covering category listing, section drill-down, back navigation, and CCTV URL rejection
 - Added unit tests for the extracted dashboard helpers (`test/dashboard_helpers_test.dart`) covering history window resolution, sampling intervals, energy integration, cached telemetry partitioning, and telemetry comparison
 - Added `glassDividerColor` helper so divider tinting stays consistent across glass cards
 
-### Changed
-
-- Refactored Dashboard screen from 3,046 lines to 1,384 lines (-55%), leaving the screen as a state container plus page composition
-- Extracted dashboard presentation widgets into `lib/screens/dashboard/widgets/`: `GlassNavBar`, `LivePowerCard`, `DualStatusCards`, `EnvironmentGrid`, `GreetingHeader`, `DateStrip`, `TelemetryCard`, `TelemetryChartCard`, `ChartSectionHeader`, and the banner set (`ConnectionStatusBanner`, `OfflineBanner`, `EnergyAlertBanner`, `TelemetryErrorView`)
-- Extracted dashboard logic into pure helpers under `lib/screens/dashboard/utils/`: `history_range.dart`, `energy_helpers.dart`, `telemetry_helpers.dart`
-- Replaced the positional prefix/icon/label nav literals with a shared `kNavDestinations` list so the expanded and collapsed nav bars cannot drift apart
-- Moved threshold parsing in `_loadPreferences` into a single `_readDouble` helper
-
 ### Fixed
 
+- Fixed the CCTV stream URL set in Settings never taking effect: it was written to `SharedPreferences` while the Dashboard reads it from secure storage, so the edit was silently discarded. Settings now persists it through `saveCctvUrl()` and loads it through `loadCctvUrl()`
+- Fixed a duplicate `defaultCctvUrl` constant in Settings that shadowed `defaultAllowedCctvUrl` from `cctv_url.dart`
 - Fixed the expanded and collapsed glass nav bars keeping duplicate icon/label literals by sharing one `kNavDestinations` list
+
+### Changed
+
+- Refactored Settings screen from 754 lines to 157 lines (-79%), splitting it into a controller, shared field widgets, and one file per settings group
+- Extracted dashboard presentation widgets into `lib/screens/dashboard/widgets/`: `GlassNavBar`, `LivePowerCard`, `DualStatusCards`, `EnvironmentGrid`, `GreetingHeader`, `DateStrip`, `TelemetryCard`, `TelemetryChartCard`, `ChartSectionHeader`, and the banner set (`ConnectionStatusBanner`, `OfflineBanner`, `EnergyAlertBanner`, `TelemetryErrorView`)
+- Extracted dashboard logic into pure helpers under `lib/screens/dashboard/utils/`: `history_range.dart`, `energy_helpers.dart`, `telemetry_helpers.dart`
+- Refactored Dashboard screen from 3,046 lines to 1,389 lines (-54%), leaving the screen as a state container plus page composition
+- Replaced the static section builders that reached into `_SettingsScreenState` with widgets that take `SettingsController` explicitly
+- Replaced the `Map<String, _RangeControllers>` of environment limits with a typed `EnvRangeSetting` list that carries its own label, unit, bounds, and preference keys
+- Moved threshold parsing in `_loadPreferences` into a single `_readDouble` helper
+- Extract `_storeHistory` and `_notifyLive` in the dashboard to remove repeated notify branches
 
 ## [1.3.1] - 2026-09-26
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
 import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
@@ -144,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Misc ─────────────────────────────────────────────────────────────────────
   String _displayName = '';
-  String _cctvUrl = defaultCctvUrl;
+  String _cctvUrl = defaultAllowedCctvUrl;
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
   final ValueNotifier<int> _liveRevision = ValueNotifier(0);
   final ValueNotifier<int> _energyRevision = ValueNotifier(0);
@@ -260,30 +261,45 @@ class _DashboardScreenState extends State<DashboardScreen>
     final cctvUrl = await loadCctvUrl();
     if (!mounted) return;
     setState(() {
-      _autoRefresh = preferences.getBool('auto_refresh') ?? true;
-      _refreshSeconds = preferences.getInt('refresh_seconds') ?? 10;
+      _autoRefresh =
+          preferences.getBool(SettingsKeys.autoRefresh) ?? true;
+      _refreshSeconds =
+          preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
       _energyAlertsEnabled =
-          preferences.getBool('energy_alerts_enabled') ?? true;
+          preferences.getBool(SettingsKeys.energyAlertsEnabled) ?? true;
       _environmentAlertsEnabled =
-          preferences.getBool('environment_alerts_enabled') ?? false;
-      _lowSocThreshold = preferences.getInt('low_soc_threshold') ?? 20;
+          preferences.getBool(SettingsKeys.environmentAlertsEnabled) ?? false;
+      _lowSocThreshold =
+          preferences.getInt(SettingsKeys.lowSocThreshold) ?? 20;
       _staleTelemetryMinutes =
-          preferences.getInt('stale_telemetry_minutes') ?? 10;
-      _environmentTempMin = _readDouble(preferences, 'environment_temp_min');
-      _environmentTempMax = _readDouble(preferences, 'environment_temp_max');
+          preferences.getInt(SettingsKeys.staleTelemetryMinutes) ?? 10;
+      _environmentTempMin = _readDouble(
+        preferences,
+        SettingsKeys.environmentTempMin,
+      );
+      _environmentTempMax = _readDouble(
+        preferences,
+        SettingsKeys.environmentTempMax,
+      );
       _environmentHumidityMin = _readDouble(
         preferences,
-        'environment_humidity_min',
+        SettingsKeys.environmentHumidityMin,
       );
       _environmentHumidityMax = _readDouble(
         preferences,
-        'environment_humidity_max',
+        SettingsKeys.environmentHumidityMax,
       );
-      _environmentTdsMin = _readDouble(preferences, 'environment_tds_min');
-      _environmentTdsMax = _readDouble(preferences, 'environment_tds_max');
+      _environmentTdsMin = _readDouble(
+        preferences,
+        SettingsKeys.environmentTdsMin,
+      );
+      _environmentTdsMax = _readDouble(
+        preferences,
+        SettingsKeys.environmentTdsMax,
+      );
       _dailyProductionTargetKwh = _readDouble(
         preferences,
-        'daily_production_target_kwh',
+        SettingsKeys.dailyProductionTargetKwh,
       );
       _cctvUrl = cctvUrl;
     });

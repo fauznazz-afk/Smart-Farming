@@ -4,6 +4,7 @@ import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/settings_keys.dart';
 import 'alarm_history_service.dart';
 import 'thingsboard_api.dart';
 
@@ -76,12 +77,12 @@ class AlarmNotificationService {
     final api = ThingsBoardApi();
     if (!await api.loadSavedToken()) return;
     final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool('energy_alerts_enabled') ?? true)) return;
+    if (!(prefs.getBool(SettingsKeys.energyAlertsEnabled) ?? true)) return;
 
     try {
       final battery = await api.fetchBatteryData();
       final soc = battery.latestValues['soc'];
-      final threshold = prefs.getInt('low_soc_threshold') ?? 20;
+      final threshold = prefs.getInt(SettingsKeys.lowSocThreshold) ?? 20;
       if (soc != null && soc < threshold) {
         final message = 'SOC baterai rendah: ${soc.toStringAsFixed(0)}%';
         await _recordAndNotify(
@@ -93,7 +94,7 @@ class AlarmNotificationService {
         );
       }
 
-      final staleMinutes = prefs.getInt('stale_telemetry_minutes') ?? 10;
+      final staleMinutes = prefs.getInt(SettingsKeys.staleTelemetryMinutes) ?? 10;
       final devices = [
         ('battery', 'Baterai', battery),
         ('pzem', 'PZEM', await api.fetchPzemData()),

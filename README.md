@@ -63,6 +63,7 @@ lib/
  │    ├── energy_report_screen.dart
  │    ├── energy_report/            # Widget & util modul untuk laporan energi
  │    ├── settings_screen.dart
+ │    ├── settings/               # Controller, section descriptors, section widgets
  │    ├── alarm_history_screen.dart
  │    └── cctv_screen.dart
  ├── theme/app_theme_controller.dart
