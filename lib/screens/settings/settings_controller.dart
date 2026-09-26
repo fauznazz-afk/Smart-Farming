@@ -33,8 +33,17 @@ class SettingsController extends ChangeNotifier {
       minAllowed: -40,
       maxAllowed: 100,
     ),
-    EnvRangeSetting(id: 'humidity', label: 'Humidity', unit: '%', maxAllowed: 100),
-    EnvRangeSetting(id: 'tds', label: 'Water TDS', unit: 'ppm', maxAllowed: 100),
+    EnvRangeSetting(
+      id: 'humidity',
+      label: 'Humidity',
+      unit: '%',
+      minAllowed: 0,
+      maxAllowed: 100,
+    ),
+    // Lower bound only: nutrient solutions run 800-2000 ppm and sea water is
+    // ~35000 ppm, so any upper cap low enough to be safe would block real
+    // readings.
+    EnvRangeSetting(id: 'tds', label: 'Water TDS', unit: 'ppm', minAllowed: 0),
   ];
 
   // ── Plain values ────────────────────────────────────────────────────────────

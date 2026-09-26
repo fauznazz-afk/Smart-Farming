@@ -1,5 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/settings/settings_controller.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
+import 'package:plts_monitoring/theme/app_theme_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+late SettingsController _controller;
 
 EnvRangeSetting range({
   String min = '',
@@ -20,6 +25,15 @@ EnvRangeSetting range({
 }
 
 void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final themeController = AppThemeController();
+    await themeController.load();
+    _controller = SettingsController(themeController: themeController);
+  });
+
+  tearDown(() => _controller.dispose());
+
   group('validateEnvRange', () {
     test('accepts blank fields (limit simply not monitored)', () {
       expect(validateEnvRange(range(), errorLabel: 'suhu'), isNull);
@@ -156,6 +170,56 @@ void main() {
       expect(setting.isEmpty, isTrue, reason: 'whitespace counts as blank');
       setting.min.text = '40';
       expect(setting.isEmpty, isFalse);
+    });
+  });
+
+  group('sensor bounds', () {
+    EnvRangeSetting byId(String id) =>
+        _controller.envRanges.firstWhere((setting) => setting.id == id);
+
+    test('exposes the three monitored sensors in display order', () {
+      expect(
+        _controller.envRanges.map((setting) => setting.id),
+        ['temp', 'humidity', 'tds'],
+      );
+    });
+
+    test('caps temperature at a physically plausible range', () {
+      final temp = byId('temp');
+      expect(temp.minAllowed, -40);
+      expect(temp.maxAllowed, 100);
+    });
+
+    test('caps humidity at 100 percent', () {
+      final humidity = byId('humidity');
+      expect(humidity.minAllowed, 0);
+      expect(humidity.maxAllowed, 100);
+    });
+
+    test('does not cap TDS, which is legitimately far above 100 ppm', () {
+      final tds = byId('tds');
+      expect(tds.minAllowed, 0);
+      expect(
+        tds.maxAllowed,
+        isNull,
+        reason: 'nutrient solutions run 800-2000 ppm; a 100 ppm cap would '
+            'make the TDS alert unreachable',
+      );
+      // And the real values must validate.
+      for (final value in ['500', '1200', '2500', '35000']) {
+        tds.min.text = '0';
+        tds.max.text = value;
+        expect(validateEnvRange(tds, errorLabel: 'TDS'), isNull);
+      }
+    });
+
+    test('still rejects negative TDS', () {
+      final tds = byId('tds');
+      tds.min.text = '-5';
+      expect(
+        validateEnvRange(tds, errorLabel: 'TDS'),
+        'TDS tidak boleh kurang dari 0.0.',
+      );
     });
   });
 }
