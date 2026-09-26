@@ -48,6 +48,135 @@ counter (`_liveRevision`, `_energyRevision`, `_chartRevision`) and rebuilding
 through `Bound`. If you add a polling-driven value, follow that pattern instead
 of calling `setState`.
 
+## Background alarms are native Kotlin, and must stay that way
+
+The alarm check that runs while the app is closed lives in
+`android/app/src/main/kotlin/tech/mbkm/energrow/alarm/`. It is plain Kotlin:
+`AlarmManager` → `AlarmCheckReceiver` → `AlarmCheckRunner`, doing its HTTP with
+`HttpURLConnection` and posting with `NotificationCompat`.
+
+**Why not Dart.** This was measured, not assumed. The obvious Dart approach is
+`android_alarm_manager_plus`, which starts a `FlutterEngine` per tick. That
+engine stays resident, so the background cost is tens of megabytes of RAM plus a
+second or more of startup, every fifteen minutes, forever. The Kotlin path costs
+single-digit MB and a fraction of a second. Do not "simplify" this back into a
+Dart background isolate.
+
+**Why it was not working before.** `android_alarm_manager_plus` needs its
+`AlarmService` and `AlarmBroadcastReceiver` declared in the app manifest, and
+neither was. The alarm was registered and never delivered. If you ever see that
+dependency in `pubspec.yaml` again, the manifest entries are missing and the
+feature is dead, not merely untested. `progress.md` recorded this as "never
+observed" for a long time because a check that does not fire produces no logs at
+all.
+
+**One rule list, two evaluators.** `lib/utils/alarm_rules.dart` owns every
+alarm condition. `buildAlarmRules` turns the user's thresholds into rules;
+`evaluateAlarmRules` runs them for the dashboard banner; `alarmRulesToJson`
+ships the same list to the native side, which walks it in `AlarmEvaluator`. That
+is deliberate: a threshold edited in Settings has to change the background
+behaviour too, and the wording in a notification must not drift from the wording
+in the app.
+
+The unavoidable cost is that the message strings exist in both languages
+(`formatAlarmMessage` in Dart, `AlarmMessageFormat.kt` in Kotlin), because Dart
+is not running when a notification is built. They are pinned together by
+`android/app/src/test/resources/alarm_parity_vectors.json`, which
+`test/alarm_parity_test.dart` and `AlarmParityTest.kt` both replay. **If you
+change either formatter, run
+`dart run tool/generate_alarm_parity_fixture.dart` and expect the other
+language's test to fail if you got it wrong.** Two duplicated message strings is
+the price; an unverified duplication is not.
+
+**The alarm is inexact on purpose, and there are two of them.** `setInexactRepeating`,
+not an exact alarm. Exact alarms need `SCHEDULE_EXACT_ALARM` on Android 12+, which
+means asking the user to grant a permission through a settings screen, and
+`USE_EXACT_ALARM` is reserved for clock and calendar apps. A greenhouse does not
+need either. `AlarmScheduler.schedule` also arms a `setAndAllowWhileIdle`
+one-shot that the receiver re-arms after every run, because **a repeating alarm
+is the first thing vendor power managers drop**: on the MIUI/HyperOS test device
+the repeating alarm fired six times and then silently vanished from
+`dumpsys alarm`, with `com.miui.powerkeeper` visible in the same output. The idle
+alarm is exempt from Doze batching, so the two together survive more of what
+real devices do. `dumpsys alarm` confirms both:
+`repeatInterval=60000` for the cadence, `flags=0x8` (`ALLOW_WHILE_IDLE`) for the
+backup. If alarms go quiet on a new device, look there first.
+
+**Being inexact also means Doze may defer a check, sometimes by hours**, so the
+check reads the age of the telemetry rather than assuming a tick happened.
+
+**The check stands down while the app is in the foreground.** The dashboard
+polls every ten seconds and evaluates the same rules, so a background tick on
+top of that is duplicate work against the same ThingsBoard instance and risks the
+two sides disagreeing about which alarms are active. `AlarmBridge.setForeground`
+is called from `DashboardScreen` on init, on every lifecycle change, and in
+`dispose`. At a one minute interval this matters: without it the request rate
+doubles while the app is open.
+
+**The interval is one minute, and that is a deliberate trade.** A greenhouse
+alarm is only useful while the condition still is. It costs roughly 4300
+ThingsBoard requests a day, three per tick, and each check finishes in about
+0.45 s. `AlarmScheduler.INTERVAL_MINUTES` is the one place to change it; 5 is a
+reasonable value if the ThingsBoard instance is a shared Orange Pi.
+
+**Do not try to test the background path with `adb shell am broadcast`.**
+`AlarmCheckReceiver` is `exported="false"`, which is correct, so the shell is
+refused. For a debug build there is `AlarmDebugReceiver`, declared **only** in
+`src/debug/AndroidManifest.xml` and refusing to act unless the app is
+debuggable, so it cannot exist in a release APK:
+
+```
+adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_CHECK_ALARMS \
+  -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_RESET_ALARMS \
+  -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+```
+
+`DEBUG_RESET_ALARMS` forgets which alarms were reported, so the next check
+announces whatever is currently firing. Without it, verifying the notification
+means waiting for a genuinely new condition, which can take hours. Note that a
+debug APK cannot be installed over a release one, because the signing keys
+differ; uninstall first, and expect to sign in again.
+
+**Tokens are handed over, not shared.** The canonical ThingsBoard JWT lives in
+`flutter_secure_storage`, which cannot be read without a Flutter engine. On
+launch and on login, Dart hands a copy to `AlarmTokenStore`, which encrypts it
+under a hardware-backed AndroidKeyStore key. A refresh performed in the
+background updates only that copy; Dart's stays authoritative and overwrites it
+on the next launch. If a refresh is rejected, the background tears itself down
+rather than retrying a session the user has ended.
+
+**One notification per occurrence.** The set of active alarm IDs is shared
+through `AlarmStateStore` and only a newly active ID is announced. The previous
+implementation de-duplicated with a five-minute timer, which is longer than the
+check interval, so it did not actually stop repeats.
+
+**History is stored twice, on purpose.** The Dart store is `SharedPreferences`;
+the native one is a private JSON file. They are merged on read. They are not
+merged on disk because `shared_preferences` encodes a `List<String>` as a Base64
+Java-serialized blob, and reproducing that byte for byte in Kotlin would tie this
+module to a plugin's private encoding. `AlarmHistoryService.getAlarms` is the
+façade.
+
+**Verify on the device, because this cannot be unit tested.** Every outcome is
+logged, including the boring ones; a background job that fails quietly is
+indistinguishable from one that is not running. What a good run looks like:
+
+```
+adb -s <ip>:<port> logcat -s EnerGrowAlarmCheck:* EnerGrowAlarmBridge:* EnerGrowAlarmSchedule:*
+adb -s <ip>:<port> shell dumpsys alarm | grep -A4 CHECK_ALARMS
+```
+
+```
+check started
+check finished: 1 active (1 new): environment_humidity_high   <- first sighting, notifies
+check finished: 1 active (0 new): environment_humidity_high   <- still firing, silent
+check finished: ok, no alarms                                  <- nothing breaching
+```
+
+`(N new)` is the number that decides whether a notification is posted, so it is
+the line to read first when deciding whether an absence of notifications is a bug.
+
 ## Environment (CachyOS / Arch)
 
 Toolchain lives in `$HOME`, only the JDK needs root:
@@ -201,8 +330,16 @@ actually bitten:
 
 ```
 flutter analyze     # must stay clean
-flutter test        # 119 tests
+flutter test        # 229 tests
+cd android && ./gradlew :app:testDebugUnitTest   # 6 tests, alarm parity
 ```
+
+The Gradle unit tests need `JAVA_HOME` and `ANDROID_HOME` exported. They exist to
+replay `alarm_parity_vectors.json` through the Kotlin evaluator, because that
+half of the alarm logic has no other coverage and cannot be reached from
+`flutter test`. `org.json` is a stub in a local unit test classpath and throws,
+which is why `build.gradle.kts` puts a real `org.json` in front of it for the test
+source set only.
 
 `dart_test.yaml` sets `concurrency: 1` **on purpose**. The machine has 7.1 GB RAM
 and only 1.4–2.4 GB free during a test run; the Dart compiler and the test
@@ -225,6 +362,12 @@ Regression guards worth knowing about, all added because of a real bug:
 - `dashboard_helpers_test.dart` — `describeHistoryRange` must agree with
   `historyTimeWindow`
 - `energy_forecast_service_test.dart` — battery discharge sign convention
+- `alarm_rules_test.dart` — a device that produced no reading is not stale, and
+  TDS keeps no upper bound
+- `alarm_parity_test.dart` + `AlarmParityTest.kt` — the Dart and Kotlin alarm
+  evaluators must produce identical messages. When writing a scenario, put the
+  *reason* in `description`; that string is what a failure prints, and it is the
+  only thing that will tell you which assumption broke.
 
 ## Widget tests
 
@@ -282,9 +425,20 @@ after each load.
 - `dart_test.yaml`, the JVM heap in `gradle.properties`, and the
   `gradle-wrapper` `-bin` distribution are Linux-motivated but tracked in git, so
   they affect Windows builds too.
+- The alarm module is Android-only and nothing degrades gracefully yet. On iOS,
+  desktop and web, `AlarmBridge` sees `MissingPluginException`, latches
+  `isUnavailable`, and every call becomes a no-op. That is safe but means
+  background alarms are an Android feature with no equivalent elsewhere, and the
+  `status` read used for diagnostics returns null there. Worth surfacing in the
+  UI before shipping on a second platform.
+- A rule naming a device that is not in the config is rejected by
+  `parseAlarmConfig`, and a config with rules but no devices is rejected. Both
+  exist because the alternative is a monitor that is silently blind to a
+  condition, which is the failure mode this whole feature keeps running into.
 - `progress.md` is a handoff document. §8 (manual device verification of the chart
   date label and the TDS field) was completed on 26 September 2026; the rest of
-  the document is still current.
+  the document is still current, except §5B.1 and §10.5, which describe the
+  `android_alarm_manager_plus` setup that has been replaced.
 
 ## Documentation hygiene
 

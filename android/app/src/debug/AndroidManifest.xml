@@ -4,4 +4,43 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!--
+      Debug-only triggers for the background alarm check, so the background path
+      can be exercised on demand instead of waiting for the schedule. The
+      production trigger is hard to test against: an inexact AlarmManager alarm
+      is batched by Doze and dropped outright by some vendor power managers, so
+      "no alarm appeared" is ambiguous between "nothing to report" and "the check
+      never ran".
+
+      Run one check now:
+
+        adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_CHECK_ALARMS \
+          -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+
+      Forget which alarms have already been reported, so the next check
+      announces whatever is currently firing. Needed because an ongoing
+      condition is correctly silent, and waiting for a new one on its own can
+      take hours:
+
+        adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_RESET_ALARMS \
+          -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+
+      Declared here and not in the main manifest, so this component does not
+      exist in a release APK and no other app can reach it. AlarmCheckReceiver
+      stays exported="false" in both builds; this is a separate component that
+      shares only the runner, and it additionally refuses to act unless the
+      running app is debuggable.
+    -->
+    <application>
+        <receiver
+            android:name="tech.mbkm.energrow.alarm.AlarmDebugReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.mbkm.energrow.action.DEBUG_CHECK_ALARMS" />
+                <action android:name="tech.mbkm.energrow.action.DEBUG_RESET_ALARMS" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>

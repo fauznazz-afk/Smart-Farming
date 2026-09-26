@@ -2,13 +2,20 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      Declared rather than inherited. flutter_local_notifications contributes this
+      permission today, but the native alarm module must keep working if that
+      plugin is ever dropped, and a notification that silently stops vibrating is
+      not worth the coupling.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <application
-        android:label="EnerGrow"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:allowBackup="false"
         android:icon="@drawable/energrow_launcher"
@@ -26,8 +33,9 @@
             could not be found)
 
           which main.dart swallowed, so alarm notifications silently never
-          appeared. This line is the reference the shrinker does read. Verify
-          with:
+          appeared. This line is the reference the shrinker does read. The native
+          alarm module passes the same drawable to NotificationCompat, where the
+          reference is in Kotlin and visible to the shrinker anyway. Verify with:
 
             aapt2 dump resources build/app/outputs/flutter-apk/app-release.apk \
               | grep ic_energrow
@@ -35,10 +43,27 @@
         <meta-data
             android:name="com.energrow.notification_icon"
             android:resource="@drawable/ic_energrow" />
+        <!--
+          Background alarm checks.
+
+          AlarmCheckReceiver is the target of the repeating AlarmManager
+          PendingIntent, so it has to be an explicit exported=false component.
+          AlarmBootReceiver re-arms it, because alarms do not survive a reboot
+          and a schedule that silently stops would be indistinguishable from one
+          that never worked.
+
+          This replaces android_alarm_manager_plus, which needed an <service> and
+          an <receiver> declared by hand and had neither, so its alarms never
+          fired at all. See AGENTS.md.
+        -->
         <receiver
-            android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
+            android:name="tech.mbkm.energrow.alarm.AlarmCheckReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false" />
+        <receiver
+            android:name="tech.mbkm.energrow.alarm.AlarmBootReceiver"
+            android:enabled="true"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>

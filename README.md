@@ -1,32 +1,114 @@
 # EnerGrow
 
-Aplikasi mobile monitoring energi untuk sistem PLTS (Pembangkit Listrik Tenaga Surya) hybrid — bagian dari proyek **FNN-XAI-IoT**, program MBKM. Aplikasi ini menampilkan data real-time dari baterai aki, listrik AC (PZEM), dan panel surya (PV), dikonsumsi langsung dari dashboard [ThingsBoard](https://thingsboard.io/) yang sudah berjalan di infrastruktur IoT lahan.
+<p align="center">
+  <b>Monitoring energi PLTS hybrid untuk smart farming</b><br>
+  <sub>Baterai · Listrik AC · Panel surya — langsung dari ThingsBoard, tanpa backend sendiri</sub>
+</p>
 
-> 📄 Lihat [PRD lengkap](./PRD_PLTS_Monitoring_App.md) untuk detail requirement, scope MVP, dan roadmap.
-> 🚀 Ikuti [panduan rilis GitHub](./PRD_GitHub_Release_Process.md) untuk menyiapkan APK bertanda tangan dan menerbitkan release.
+<p align="center">
+  <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
+  <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-212%20Dart%20%2B%206%20Kotlin-4CAF50">
+</p>
 
----
+Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
+di lahan smart farming. Menampilkan data real-time dari baterai aki, listrik AC (PZEM),
+dan panel surya — semua diambil langsung dari dashboard
+[ThingsBoard](https://thingsboard.io/) yang sudah berjalan di infrastruktur IoT lahan.
 
-## Fitur (MVP)
-
-- **Login** menggunakan akun ThingsBoard (JWT, auto-redirect saat token expired)
-- **Dashboard real-time** dengan navigasi Overview, PV, AC, dan Battery
-- **Chart histori 24 jam** untuk Voltage, Current, dan Power pada tiap sumber energi
-- **Ringkasan energi harian dan mingguan** dengan estimasi produksi PV, pemakaian AC, dan perbandingan terhadap periode sebelumnya
-- **Laporan energi harian dan bulanan** dari histori time-series ThingsBoard, diperbarui otomatis setiap 5 menit dan dapat diekspor ke CSV
-- **Peringatan dalam aplikasi** untuk SOC baterai rendah dan telemetry yang stale, dengan ambang yang bisa diatur
-- **Auto-refresh** tiap 10 detik + pull-to-refresh manual
-- UI dashboard bertab dengan Overview serta halaman PV, AC, Battery, dan CCTV
-- **Dark Mode & Light Mode toggle** di menu Pengaturan dengan penyimpanan preferensi lokal
-- **Indikator data stale** yang menampilkan usia telemetry terakhir
-- **CCTV layar penuh** dalam orientasi landscape
-- **(Roadmap)** Push notification
-
-Versi saat ini: **1.4.0 (build 10)**, mengikuti metadata di `pubspec.yaml`. Catatan perubahan tersedia di [CHANGELOG](./CHANGELOG.md), ringkasan rilis di [RELEASE_NOTES_v1.4.0.md](./RELEASE_NOTES_v1.4.0.md). Rilis 1.4.0 sudah terbit; pasang APK-nya dari halaman GitHub Releases.
+> 📄 Requirement, scope, dan roadmap lengkap: [PRD](./PRD_PLTS_Monitoring_App.md)
+> 🚀 Cara menyiapkan APK bertanda tangan dan menerbitkan release: [Panduan Rilis](./PRD_GitHub_Release_Process.md)
 
 ---
 
-## Arsitektur Singkat
+## ⚡ Alarm jalan di latar belakang, tanpa buka aplikasi
+
+Ini fitur yang paling sering ditanyakan, dan sekarang benar-benar bekerja.
+
+When the app is closed, EnerGrow still watches the greenhouse. Every minute a small
+native Android check reads the battery, the AC meter and the environment sensor, and
+posts a notification the moment a condition is crossed — SOC below threshold, telemetry
+that stopped reporting, or a temperature/humidity/TDS limit breached.
+
+```
+02:56:35.683  check started
+02:56:36.133  check finished: 1 active (1 new): environment_humidity_high
+
+android.title = "EnerGrow: Warning alarm"
+android.text  = "Kelembapan tinggi: 88.9 % (batas 80.0 %)"
+```
+
+**450 milidetik**, dengan aplikasi di background — *lima belas menit* per deteksi, bukan
+setiap sepuluh detik seperti saat aplikasi kebuka.
+
+Yang membuatnya murah adalah karangannya. Pengecekan ini **tidak menjalankan Flutter
+Engine sama sekali** — murni Kotlin, `HttpURLConnection` + `NotificationCompat`, seperti
+yang selalu ada di Android. Pendekatan yang lebih mudah dipahami, yaitu
+`android_alarm_manager_plus`, menjalankan isolate Flutter baru di setiap tick; engine itu
+tinggal di memori, jadi biayanya puluhan MB yang terus ditahan dan detik-detik startup
+yang terulang selamanya.
+
+| |isolate Flutter (lama) | Kotlin native (sekarang) |
+|---|---|---|
+| RAM tertahan | puluhan MB | < 10 MB |
+| Startup per tick | 1–3 detik (engine) | ~0,45 detik total |
+| 3 device, retry | bisa > 3 menit (sekuensial) | 450 ms (paralel, tanpa retry) |
+
+Tiga detail yang membuatnya bisa dipercaya:
+
+- **Satu daftar aturan, dua mesin.** Ambang yang Anda ubah di Settings dipakai dashboard
+  *dan* pengecekan background. Notifikasi dan banner di app tidak mungkin berbeda
+  ombak, karena keduanya membaca `lib/utils/alarm_rules.dart` yang sama.
+- **Satu notifikasi per kemunculan.** SOC yang tetap rendah tidak akan mengirim
+  notifikasi tiap menit. Alarm diumumkan saat *muncul*, lalu diam selama kondisi itu masih berlaku.
+- **Berhenti saat Anda memakai app.** Dashboard sudah polling tiap 10 detik dan
+  mengevaluasi aturan yang sama, jadi pengecekan background mundur agar ThingsBoard
+  tidak dipoll dua kali.
+
+Kalau latar belakang terasa tidak bisa diandalkan, cek `dumpsys alarm` dulu — bukan
+berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background-alarms-are-native-kotlin-and-must-stay-that-way).
+
+---
+
+## Fitur
+
+**Monitoring**
+
+- Dashboard real-time dengan navigasi **Overview**, **PV**, **AC**, **Battery**, dan **CCTV**
+- Chart histori 24 jam untuk Voltage, Current, dan Power tiap sumber energi
+- Update real-time lewat **WebSocket ThingsBoard**, dengan polling REST sebagai cadangan
+- Auto-refresh tiap 10 detik + pull-to-refresh, intervalnya bisa diatur
+- Indikator usia telemetry terakhir, sehingga data basi tidak disamarakan jadi data segar
+
+**Analisis energi**
+
+- Ringkasan harian dan mingguan: estimasi produksi PV, pemakaian AC, dan perbandingan
+  terhadap periode sebelumnya
+- Laporan harian/bulanan dari histori time-series, dapat diekspor ke **CSV**
+- Proyeksi runtime baterai, dengan konvensi tanda discharge BMS yang sering tidak
+  konsisten antar vendor sudah ditangani
+
+**Alarm**
+
+- **Pengecekan latar belakang tiap menit** (lihat di atas) — native, hemat RAM
+- Ambang yang bisa diatur: SOC baterai, usia telemetry, serta batas minimum/maksimum
+  suhu, kelembapan, dan TDS
+- Batas kosong berarti "tidak dipantau"; alert lingkungan hanya dievaluasi dari data
+  sensor yang **masih segar**, supaya tidak ada alarm untuk kondisi yang sudah berakhir
+- **Riwayat alarm** dengan acknowledge, resolve, dan reopen
+
+**Lain-lain**
+
+- Login **Customer User** ThingsBoard dengan token yang disimpan di keystore terenkripsi
+- **Biometric gate** (sidik jari / pengenalan wajah) untuk membuka sesi
+- CCTV layar penuh, dengan status koneksi yang jujur (standby / connecting / live / offline)
+- Dark & light mode, empat pilihan aksen, mode glass yang bisa dipecah untuk scrolling
+  lebih halus
+- Konfigurasi ThingsBoard tersimpan di secure storage, bukan di teks biasa
+
+---
+
+## Arsitektur
 
 ```
 ESP32 (sensor) → ESP-NOW → ESP32 gateway → MQTT (Mosquitto)
@@ -36,12 +118,18 @@ ESP32 (sensor) → ESP-NOW → ESP32 gateway → MQTT (Mosquitto)
                                     REST API (HTTPS via Cloudflare Tunnel)
                                                     ↓
                                           Flutter App (Android)
+                                                    ↓
+                              native Kotlin (AlarmManager + receiver)
+                                                    ↓
+                                          Notifikasi lokal
 ```
 
-Aplikasi ini **tidak punya backend sendiri** — semua data, autentikasi, dan histori diambil langsung dari REST API ThingsBoard yang sudah live di:
-```
-https://dashboard.mbkm20262027.tech
-```
+Aplikasi ini **tidak punya backend sendiri**. Autentikasi, data, dan histori semuanya
+langsung dari ThingsBoard yang sudah live di
+`https://dashboard.mbkm20262027.tech`. Pengecekan alarm background memakai endpoint
+yang sama, dengan token yang diteruskan dari Dart dan disimpan terenkripsi di
+**AndroidKeyStore** — token asli tetap milik `flutter_secure_storage` dan tidak pernah
+pernah ditulis di luar itu.
 
 ---
 
@@ -49,151 +137,135 @@ https://dashboard.mbkm20262027.tech
 
 ```
 lib/
- ├── main.dart                      # Entry point, cek token, biometrik, routing awal
- ├── models/
- │    └── telemetry_model.dart      # Model parsing response telemetry
- ├── services/                      # Integrasi eksternal (ThingsBoard, cuaca, alarm)
- ├── screens/
- │    ├── login_screen.dart
- │    ├── dashboard_screen.dart     # State container + komposisi 5 tab
- │    ├── dashboard/
- │    │    ├── charts/chart_data.dart   # Series, statistik, bounds, downsampling
- │    │    ├── utils/                   # Helper murni (energy, history range, warna, banner)
- │    │    └── widgets/                 # Komponen presentasi per bagian dashboard
- │    ├── energy_report_screen.dart
- │    ├── energy_report/            # Widget & util modul untuk laporan energi
- │    ├── settings_screen.dart
- │    ├── settings/               # Controller, section descriptors, section widgets
- │    ├── cctv_screen.dart
- │    ├── cctv/                   # Status model + shared video viewport
- │    ├── alarm_history_screen.dart
- │    └── cctv_screen.dart
- ├── theme/app_theme_controller.dart
- └── widgets/                       # Glass design system + kartu ringkasan
+├── main.dart                        # Entry point, cek token, biometrik, routing awal
+├── models/
+│   ├── alarm_record.dart            # AlarmType, AlarmSeverity, AlarmRecord (murni)
+│   └── telemetry_model.dart         # Model parsing response telemetry
+├── utils/                           # Logika murni, tanpa widget & tanpa I/O
+│   ├── alarm_rules.dart             # ★ Sumber tunggal: apa yang dihitung sebagai alarm
+│   └── alarm_helpers.dart           # Klasifikasi id alarm, daftar device stale
+├── services/
+│   ├── thingsboard_api.dart         # REST client, refresh token, cache offline
+│   ├── thingsboard_realtime_service.dart
+│   ├── alarm_bridge.dart            # Jembatan ke modul alarm native
+│   ├── alarm_notification_service.dart  # Push aturan + token ke native
+│   ├── alarm_history_service.dart   # Riwayat (gabung store Dart & native)
+│   ├── alarm_settings.dart          # Ambang dari SharedPreferences
+│   ├── weather_service.dart
+│   ├── energy_forecast_service.dart
+│   ├── energy_report_service.dart
+│   └── connection_health_service.dart
+├── screens/                         # Login, dashboard, laporan, settings, CCTV, riwayat
+├── theme/app_theme_controller.dart
+└── widgets/                         # Glass design system + kartu ringkasan
+
+android/app/src/
+├── main/kotlin/tech/mbkm/energrow/
+│   ├── MainActivity.kt
+│   └── alarm/                       # ★ Modul alarm native
+│       ├── AlarmRule.kt             # Kontrak aturan yang dikirim Dart
+│       ├── AlarmEvaluator.kt        # Interpreter — padanan evaluateAlarmRules
+│       ├── AlarmMessageFormat.kt    # Format pesan — padanan formatAlarmMessage
+│       ├── AlarmCheckRunner.kt      # Orkestrasi satu siklus pengecekan
+│       ├── AlarmCheckReceiver.kt    # BroadcastReceiver + goAsync
+│       ├── AlarmScheduler.kt        # AlarmManager (cadence + anti-Doze)
+│       ├── AlarmNotifier.kt         # Channel + notification
+│       ├── AlarmTokenStore.kt       # AES-GCM di AndroidKeyStore
+│       ├── ThingsBoardClient.kt     # HTTP minimal
+│       ├── AlarmStateStore.kt       # Riwayat & state alarm native
+│       ├── AlarmBridgePlugin.kt     # MethodChannel
+│       └── AlarmDebugReceiver.kt    # Trigger manual, build debug saja
+├── main/AndroidManifest.xml
+├── debug/AndroidManifest.xml        # Trigger debug, TIDAK ada di release
+└── test/
+    ├── kotlin/.../AlarmParityTest.kt
+    └── resources/alarm_parity_vectors.json   # ★ Fixture bersama dengan Dart
 ```
 
-Dashboard sengaja dipisah menjadi tiga lapis: `dashboard_screen.dart` memegang
-state dan orkestrasi, `dashboard/widgets/` menangani tampilan, dan
-`dashboard/utils/` berisi logika murni yang bisa diuji tanpa widget.
+Dashboard sengaja dipisah tiga lapis: `dashboard_screen.dart` memegang state dan
+orkestrasi, `dashboard/widgets/` menangani tampilan, dan `dashboard/utils/` berisi
+logika murni yang bisa diuji tanpa widget.
 
 ---
 
 ## Prasyarat
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (channel stable)
-- Android Studio (untuk Android SDK + emulator/device manager)
+- Android Studio (Android SDK + device manager)
 - VS Code dengan extension **Dart** dan **Flutter**
-- Perangkat Android fisik (USB debugging aktif) atau emulator
-- Akun **Customer User** ThingsBoard yang sudah di-assign ke device terkait (bukan akun sysadmin — lihat bagian [Setup ThingsBoard](#setup-thingsboard))
-
-Cek instalasi:
-```bash
-flutter doctor -v
-```
-Pastikan semua item bertanda `[✓]` sebelum lanjut.
-
----
-
-## Instalasi & Menjalankan
-
-1. **Clone / buka project ini di VS Code**
-
-2. **Install dependencies:**
-   ```bash
-   flutter pub get
-   ```
-
-3. **Cek device yang terhubung:**
-   ```bash
-   flutter devices
-   ```
-
-4. **Jalankan dalam mode debug:**
-   ```bash
-   flutter run
-   ```
-
-5. **Build APK release** (untuk install permanen ke HP):
-   ```bash
-   flutter build apk --release
-   ```
-   Hasil APK ada di:
-   ```
-   build/app/outputs/flutter-apk/app-release.apk
-   ```
-   Install ke device yang terhubung langsung via:
-   ```bash
-   flutter install
-   ```
-
-### Instal APK Release
-
-APK release tersedia pada GitHub Release project ini. Unduh file `app-release.apk` dari halaman Releases, lalu buka file tersebut pada perangkat Android. Jika Android meminta izin, aktifkan instalasi dari sumber ini untuk aplikasi yang digunakan membuka APK.
-
-Untuk membangun APK sendiri:
+- Perangkat Android fisik atau emulator
+- Akun **Customer User** ThingsBoard yang sudah di-assign ke device terkait
+  (bukan sysadmin — lihat [Setup ThingsBoard](#setup-thingsboard))
 
 ```bash
-flutter build apk --release
-```
-
-> ℹ️ `applicationId` sudah diubah dari `com.example.plts_monitoring` menjadi
-> `tech.mbkm.energrow`. Android akan menganggapnya sebagai aplikasi berbeda,
-> jadi versi lama harus di-uninstall lebih dulu sebelum memasang build
-> baru — token login dan preferensi tersimpan tidak ikut terbawa.
-
-File hasil build:
-
-```text
-build/app/outputs/flutter-apk/app-release.apk
-```
-
-Checksum SHA-256 dapat dibuat untuk memverifikasi file yang diunduh:
-
-```bash
-certutil -hashfile app-release.apk SHA256
+flutter doctor -v   # pastikan semua [✓]
 ```
 
 ---
 
-## Konfigurasi
+## Menjalankan
 
-Device ID (UUID) dan base URL ThingsBoard di-set di `lib/services/thingsboard_api.dart`:
-
-```dart
-static const String baseUrl = 'https://dashboard.mbkm20262027.tech';
-
-static const String deviceBattery = '9465cf90-b264-11f1-9294-d92385142e6d';
-static const String deviceSensor  = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
-static const String devicePzem    = 'af9531a0-ac44-11f1-841c-f5914d050259';
+```bash
+flutter pub get
+flutter devices
+flutter run                          # mode debug
+flutter build apk --release          # APK untuk dipasang permanen
+flutter install                      # pasang ke device yang terhubung
 ```
 
-Ganti sesuai Device ID dari ThingsBoard kalau ada perubahan device atau deploy ulang instance.
+Hasil build: `build/app/outputs/flutter-apk/app-release.apk`
+
+> ℹ️ `applicationId` adalah `tech.mbkm.energrow`. Android menganggapnya aplikasi berbeda
+> dari versi `com.example.*` yang lama, jadi versi lama harus di-uninstall lebih dulu —
+> token login dan preferensi tidak ikut terbawa.
+
+### Menguji alarm background
+
+Pengecekan normal mengikuti jadwal. Untuk memicunya langsung, pakai build **debug**:
+
+```bash
+adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_CHECK_ALARMS \
+  -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+
+# conditions yang sedang menyala diumumkan ulang
+adb shell am broadcast -a tech.mbkm.energrow.action.DEBUG_RESET_ALARMS \
+  -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver
+```
+
+Receiver ini hanya dideklarasikan di `src/debug/AndroidManifest.xml`, jadi **tidak ada
+di APK release** dan tidak bisa dijangkau aplikasi lain. Build debug juga tidak bisa
+dipasang di atas build release karena signing key-nya berbeda.
 
 ---
 
 ## Setup ThingsBoard
 
-Aplikasi ini dirancang untuk login memakai **Customer User**, bukan Tenant Admin, agar akses tetap terbatas ke device yang relevan saja.
+Aplikasi dirancang untuk login memakai **Customer User**, bukan Tenant Admin, agar akses
+tetap terbatas ke device yang relevan.
 
-1. Login ke ThingsBoard sebagai admin → menu **Customers** → buat customer baru
-2. Menu **Devices** → assign ketiga device (Battery, PZEM, Sensor) ke customer tersebut
-3. Buka customer → tab **Users** → tambah user baru dengan email & password
-4. Gunakan kredensial user ini untuk login di aplikasi
+1. Login sebagai admin → **Customers** → buat customer baru
+2. **Devices** → assign ketiga device (Battery, PZEM, Sensor) ke customer tersebut
+3. Buka customer → **Users** → tambah user dengan email & password
+4. Gunakan kredensial ini untuk login di aplikasi
 
-> ⚠️ Device ID (UUID) berbeda dengan **access token** perangkat (dipakai ESP32 untuk kirim data via MQTT). Ambil Device ID dari tab **Details** pada halaman device, bukan dari token MQTT.
+> ⚠️ Device ID (UUID) berbeda dengan **access token** perangkat (dipakai ESP32 untuk kirim
+> data via MQTT). Ambil Device ID dari tab **Details** halaman device.
+
+Konfigurasi ThingsBoard ada di `lib/services/thingsboard_api.dart`:
+
+```dart
+static const String baseUrl = 'https://dashboard.mbkm20262027.tech';
+static const String deviceBattery = '9465cf90-b264-11f1-9294-d92385142e6d';
+static const String deviceSensor  = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
+static const String devicePzem    = 'af9531a0-ac44-11f1-841c-f5914d050259';
+```
 
 ---
 
-## Known Issues
+## Verifikasi di Perangkat
 
-- **PZEM-017 (DC) stale data** — nilai kadang tidak update karena silent read failure di firmware ESP32; belum sepenuhnya teratasi di level hardware. Aplikasi menampilkan data apa adanya dari ThingsBoard.
-- **Ketergantungan pada Orange Pi tunggal** — tidak ada redundansi backend; jika Orange Pi/Cloudflare Tunnel down, aplikasi tidak bisa fetch data sama sekali.
-- **Video CCTV membebani baterai** — WebView decoding berjalan di perangkat, sementara dashboard tetap polling tiap 10 detik selama video tampil. Aktifkan *Smooth Glass Mode* di Pengaturan untuk mengurangi beban render.
-- **Sumbu Y dibulatkan** — label sumbu memakai angka bersih (1 / 2 / 2,5 / 5), jadi nilai ekstrem bisa membuat label berbeda dari angka yang benar-benar tercatat.
-
-### Terverifikasi di perangkat (Android 16, API 36)
-
-Semua dicek di Xiaomi 24090RA29G. Rincian per-area ada di `progress.md` §7.
+Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
+`progress.md` §7 dan §10.5.
 
 - [x] ThingsBoard REST + WebSocket real-time, indikator "Live" hijau
 - [x] Login Customer User, display name dari server tampil
@@ -202,26 +274,41 @@ Semua dicek di Xiaomi 24090RA29G. Rincian per-area ada di `progress.md` §7.
 - [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
 - [x] Biometric gate (sidik jari)
 - [x] go2rtc CCTV live, video decode berjalan
+- [x] **Alarm background**: notifikasi muncul saat app tertutup, 450 ms, tanpa duplikat
+- [x] Alarm dijalankan ulang setelah reboot (`BOOT_COMPLETED`)
 - [ ] OpenWeatherMap — **fitur ada dan terpasang, belum diisi API key** di perangkat uji
-- [ ] Push notification untuk alarm (menunggu `flutter_local_notifications` stabil di Android 14+)
 
 Release build 1.4.0 dibangun di Linux: cold launch 1038 ms, fingerprint signing
-terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3, dan berkas APK di
-GitHub Release dibandingkan byte-per-byte dengan hasil build lokal.
+terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3, dan berkas APK di GitHub
+Release dibandingkan byte-per-byte dengan hasil build lokal.
 
-> Weather pernah terverifikasi pada sesi sebelumnya (Kertapati, 31.0 °C, 55
-> persen, 4.6 m/s) sebelum sesi build Linux mengosongkan data aplikasi saat
-> uninstall. Keberadaannya terverifikasi; kelanjutannya perlu diisi ulang API key
-> untuk diuji ulang.
+---
+
+## Known Issues
+
+- **PZEM-017 (DC) stale data** — nilai kadang tidak update karena silent read failure di
+  firmware ESP32; belum teratasi di level hardware. Aplikasi menampilkan data apa adanya.
+- **Ketergantungan pada Orange Pi tunggal** — tidak ada redundansi backend. Jika Orange
+  Pi atau Cloudflare Tunnel down, tidak ada data sama sekali. Pengecekan background
+  diam-diam dilewati dalam keadaan ini, bukan melaporkan data basi.
+- **Alarm background bisa ditunda OEM** — `AlarmManager` yang inexact bisa ditunda Doze
+  atau dibuang vendor power manager. Dua trigger dipakai untuk mengurangi risiko ini,
+  dan secara nonaktif battery optimisation untuk EnerGrow di pengaturan Xiaomi.
+- **Video CCTV membebani baterai** — WebView decoding berjalan di perangkat sementara
+  dashboard tetap polling. Aktifkan *Smooth Glass Mode* untuk mengurangi beban render.
+- **Sumbu Y dibulatkan** — label sumbu memakai angka bersih (1 / 2 / 2,5 / 5), jadi nilai
+  ekstrem bisa membuat label berbeda dari angka yang tercatat.
 
 ---
 
 ## Roadmap
 
-Lihat bagian **7. Roadmap Pengembangan Lanjutan** di [PRD](./PRD_PLTS_Monitoring_App.md) untuk daftar lengkap fitur yang direncanakan setelah MVP: push notification, integrasi Google Sheets, mode offline, WebSocket real-time, dan integrasi prediksi FNN+XAI.
+Lihat bagian **7. Roadmap Pengembangan Lanjutan** di
+[PRD](./PRD_PLTS_Monitoring_App.md): push notification dari server, integrasi Google
+Sheets, mode offline, dan integrasi prediksi FNN+XAI.
 
 ---
 
 ## Lisensi
 
-Proyek internal — bagian dari tugas akhir/MBKM di Politeknik Negeri Sriwijaya. Belum ditentukan lisensi publik.
+Proyek internal — bagian dari tugas akhir/MBKM di Politeknik Negeri Sriwijaya.

@@ -2,116 +2,22 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Type of alarm that can be recorded.
-enum AlarmType {
-  lowSoc,
-  staleTelemetry,
-  environmentTemp,
-  environmentHumidity,
-  environmentTds,
-  deviceOffline;
+import '../models/alarm_record.dart';
+import 'alarm_bridge.dart';
 
-  String get label => switch (this) {
-    lowSoc => 'Low SOC',
-    staleTelemetry => 'Stale Telemetry',
-    environmentTemp => 'Environment Temp',
-    environmentHumidity => 'Environment Humidity',
-    environmentTds => 'Environment TDS',
-    deviceOffline => 'Device Offline',
-  };
-}
-
-/// Severity level of an alarm.
-enum AlarmSeverity { warning, critical }
-
-/// A single alarm record persisted in SharedPreferences.
-class AlarmRecord {
-  final String id;
-  final DateTime timestamp;
-  final AlarmType type;
-  final AlarmSeverity severity;
-  final String message;
-  final double? value;
-  final bool acknowledged;
-  final bool resolved;
-
-  const AlarmRecord({
-    required this.id,
-    required this.timestamp,
-    required this.type,
-    required this.severity,
-    required this.message,
-    this.value,
-    this.acknowledged = false,
-    this.resolved = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'timestamp': timestamp.toIso8601String(),
-    'type': type.name,
-    'severity': severity.name,
-    'message': message,
-    if (value != null) 'value': value,
-    'acknowledged': acknowledged,
-    'resolved': resolved,
-  };
-
-  factory AlarmRecord.fromJson(Map<String, dynamic> json) {
-    AlarmType parseType() {
-      final name = json['type'];
-      return AlarmType.values
-              .where((value) => value.name == name)
-              .firstOrNull ??
-          AlarmType.deviceOffline;
-    }
-
-    AlarmSeverity parseSeverity() {
-      final name = json['severity'];
-      return AlarmSeverity.values
-              .where((value) => value.name == name)
-              .firstOrNull ??
-          AlarmSeverity.warning;
-    }
-
-    return AlarmRecord(
-      id: json['id']?.toString() ?? '${DateTime.now().microsecondsSinceEpoch}',
-      timestamp:
-          DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
-      type: parseType(),
-      severity: parseSeverity(),
-      message: json['message']?.toString() ?? 'Unknown alarm',
-      value: (json['value'] as num?)?.toDouble(),
-      acknowledged: json['acknowledged'] == true,
-      resolved: json['resolved'] == true,
-    );
-  }
-
-  AlarmRecord copyWith({
-    String? id,
-    DateTime? timestamp,
-    AlarmType? type,
-    AlarmSeverity? severity,
-    String? message,
-    double? value,
-    bool? acknowledged,
-    bool? resolved,
-  }) {
-    return AlarmRecord(
-      id: id ?? this.id,
-      timestamp: timestamp ?? this.timestamp,
-      type: type ?? this.type,
-      severity: severity ?? this.severity,
-      message: message ?? this.message,
-      value: value ?? this.value,
-      acknowledged: acknowledged ?? this.acknowledged,
-      resolved: resolved ?? this.resolved,
-    );
-  }
-}
+export '../models/alarm_record.dart';
 
 /// Service that persists alarm history to SharedPreferences.
+///
+/// This store is the one the dashboard writes to. Alarms detected by the
+/// background check land in a separate native store, because the Dart and Kotlin
+/// sides cannot share the `SharedPreferences` encoding of a list: the plugin
+/// stores a `List<String>` as a Base64 Java-serialized blob, which the native
+/// module would have to reproduce byte for byte. Reads merge the two, newest
+/// first, so the history screen shows the same timeline either way.
+///
+/// Both stores are capped at [_maxEntries] independently, so the merged list can
+/// hold up to twice that.
 class AlarmHistoryService {
   static const _storageKey = 'alarm_history';
   static const int _maxEntries = 100;
@@ -143,12 +49,45 @@ class AlarmHistoryService {
   }
 
   /// Returns all alarm records, newest first.
+  ///
+  /// Merges the records the background check wrote natively. A record is keyed by
+  /// its id in both stores, so a duplicate would mean the same alarm was
+  /// persisted twice, which the merge drops rather than showing twice.
   Future<List<AlarmRecord>> getAlarms() async {
     final prefs = await SharedPreferences.getInstance();
     final alarms = _decode(prefs.getStringList(_storageKey));
-    alarms.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return alarms;
+    final merged = <String, AlarmRecord>{
+      for (final alarm in alarms) alarm.id: alarm,
+      for (final alarm in await _nativeRecords()) alarm.id: alarm,
+    }.values.toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return merged;
   }
+
+  /// The background module's records, translated into the same model.
+  Future<List<AlarmRecord>> _nativeRecords() async {
+    final native = await AlarmBridge.instance.history();
+    return [
+      for (final record in native)
+        AlarmRecord(
+          id: record.id,
+          timestamp: record.timestamp,
+          type: _typeFromName(record.type),
+          severity: record.severity == 'critical'
+              ? AlarmSeverity.critical
+              : AlarmSeverity.warning,
+          message: record.message,
+          value: record.value,
+          acknowledged: record.acknowledged,
+          resolved: record.resolved,
+        ),
+    ];
+  }
+
+  AlarmType _typeFromName(String name) => AlarmType.values
+      .where((value) => value.name == name)
+      .firstOrNull ??
+      AlarmType.deviceOffline;
 
   /// Returns alarm records since [since], newest first.
   Future<List<AlarmRecord>> getAlarmsSince(DateTime since) async {
@@ -156,19 +95,30 @@ class AlarmHistoryService {
     return all.where((a) => a.timestamp.isAfter(since)).toList();
   }
 
-  /// Removes all alarm records from storage.
+  /// Removes all alarm records from storage, on both sides.
   Future<void> clearAlarms() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
+    await AlarmBridge.instance.clearHistory();
   }
 
   Future<void> updateAlarm(AlarmRecord record) async {
     final prefs = await SharedPreferences.getInstance();
     final alarms = _decode(prefs.getStringList(_storageKey));
     final index = alarms.indexWhere((alarm) => alarm.id == record.id);
-    if (index == -1) return;
-    alarms[index] = record;
-    await _save(prefs, alarms);
+    if (index != -1) {
+      alarms[index] = record;
+      await _save(prefs, alarms);
+    }
+    // An acknowledgement has to reach the native store too, or the badge comes
+    // back the next time the screen reloads from the merged list.
+    if (record.acknowledged) {
+      if (record.resolved) {
+        await AlarmBridge.instance.resolve(record.id);
+      } else {
+        await AlarmBridge.instance.acknowledge(record.id);
+      }
+    }
   }
 
   Future<void> acknowledgeAlarm(String id) async {

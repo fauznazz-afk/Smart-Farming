@@ -93,9 +93,13 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 - Kartu telemetry menampilkan usia update saat stale.
 - Pengguna dapat menentukan batas minimum dan/atau maksimum suhu lingkungan, kelembapan, dan TDS air. Batas kosong diabaikan; alert lingkungan hanya mengevaluasi data sensor yang masih segar.
 - Dashboard membedakan kegagalan fetch ThingsBoard dari perangkat yang telemetry-nya stale dan menunjukkan waktu fetch sukses terakhir.
-- Peringatan tidak dikirim ketika aplikasi ditutup; push notification belum tersedia.
+- Pengecekan juga berjalan saat aplikasi ditutup (Android). Pengecekan dijadwalkan setiap 15 menit oleh modul native dan mengirim notifikasi lokal, sehingga alarm tidak perlu membuka aplikasi. Cakupannya sama dengan alert dalam aplikasi: SOC rendah, telemetry stale, serta batas suhu, kelembapan, dan TDS.
+- Satu notifikasi dikirim per kemunculan alarm, bukan setiap pengecekan, dan hanya untuk alarm yang baru aktif.
+- Push notification dari server belum tersedia. Yang ada adalah pengecekan lokal terjadwal, yang hanya bisa melaporkan kondisi yang sudah tercatat di ThingsBoard.
 
-Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pada kartu telemetry, dan ringkasan Overview.
+Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pada kartu telemetry, dan ringkasan Overview. Aturan yang sama dipakai oleh aplikasi dan oleh pengecekan latar belakang, sehingga mengubah ambang di Settings langsung mengubah keduanya.
+
+Catatan: karena pengecekan terjadwal memakai `setInexactRepeating`, Android dapat menundanya, kadang lama, saat perangkat dalam mode hemat baterai. Keterlambatan ini disengaja. Alarm persis memerlukan izin `SCHEDULE_EXACT_ALARM` yang harus diberikan pengguna lewat pengaturan sistem, dan `USE_EXACT_ALARM` hanya untuk aplikasi jam dan kalender.
 
 ### 4.6 CCTV
 
@@ -127,9 +131,9 @@ Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pad
 
 ## 6. Di luar cakupan versi saat ini
 
-- Push notification saat aplikasi tertutup.
+- Push notification dari server. (Pengecekan lokal terjadwal saat aplikasi tertutup sudah ada sejak modul alarm diganti ke native; lihat §4.5. Yang belum ada adalah alert berbasis event yang dikirim server.)
 - Mode offline dengan cache telemetry lengkap.
-- Subscription WebSocket untuk menggantikan polling REST.
+- Subscription WebSocket untuk menggantikan polling REST. (WebSocket realtime sudah ada sejak 1.3.1, untuk pembaruan selama aplikasi terbuka.)
 - Register dan reset password dari aplikasi.
 - Pengelolaan banyak pengguna/role di aplikasi.
 - Prediksi FNN dan penjelasan XAI di aplikasi.

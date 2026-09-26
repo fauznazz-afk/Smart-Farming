@@ -62,6 +62,23 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // NotificationCompat, for the native alarm module to post an alarm without
+    // starting a Flutter engine. Already on the classpath transitively through
+    // the Flutter embedding and flutter_local_notifications, but declared so the
+    // background alarm feature does not silently depend on a transitive edge.
+    implementation("androidx.core:core-ktx:1.13.1")
+
+    // Runs the parity tests that pin AlarmEvaluator and AlarmMessageFormat to
+    // the same behaviour as their Dart counterparts. Unit tests only, so junit
+    // never reaches the APK.
+    testImplementation("junit:junit:4.13.2")
+
+    // The android.jar on a local unit test classpath is a stub whose org.json
+    // methods throw, which would make every alarm test fail for a reason that
+    // has nothing to do with the alarm code. This puts a real implementation in
+    // front of the stub. Test only; the APK still uses the platform's.
+    testImplementation("org.json:json:20231013")
 }
 
 kotlin {

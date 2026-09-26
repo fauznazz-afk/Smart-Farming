@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
+import '../services/alarm_bridge.dart';
 import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
+import '../services/alarm_settings.dart';
 import '../services/cctv_url.dart';
 import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
@@ -16,12 +18,13 @@ import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_theme_controller.dart';
+import '../utils/alarm_helpers.dart';
+import '../utils/alarm_rules.dart';
 import '../widgets/energy_summary_card.dart';
 import '../widgets/liquid_glass.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
-import 'dashboard/utils/alarm_helpers.dart';
 import 'dashboard/utils/bound.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/energy_helpers.dart';
@@ -131,17 +134,25 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Alerts ───────────────────────────────────────────────────────────────────
   final _alarmHistoryService = AlarmHistoryService();
   final ValueNotifier<List<String>> _alertMessages = ValueNotifier(const []);
+
+  /// Alarms currently raised, and the subset of them already reported.
+  ///
+  /// Seeded from the native alarm module so an alarm the background check
+  /// already notified about is not notified about again here, and published
+  /// back to it so the reverse also holds.
   Set<String> _activeAlertIds = {};
-  bool _energyAlertsEnabled = true;
-  bool _environmentAlertsEnabled = false;
-  int _lowSocThreshold = 20;
-  int _staleTelemetryMinutes = 10;
-  double? _environmentTempMin;
-  double? _environmentTempMax;
-  double? _environmentHumidityMin;
-  double? _environmentHumidityMax;
-  double? _environmentTdsMin;
-  double? _environmentTdsMax;
+
+  /// Thresholds for every alert rule, resolved from settings in one place.
+  ///
+  /// Replaces eight separate fields whose defaults were previously repeated in
+  /// the settings controller, the dashboard and the background service, which is
+  /// how the same setting came to default to different values in different
+  /// readers.
+  AlarmThresholds _thresholds = AlarmThresholds.defaults;
+
+  List<AlarmRule> get _alarmRules => buildAlarmRules(_thresholds);
+
+  int get _staleTelemetryMinutes => _thresholds.staleMinutes;
 
   // ── Misc ─────────────────────────────────────────────────────────────────────
   String _displayName = '';
@@ -175,6 +186,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     _loadPreferences();
     _loadDisplayName();
     _initializeWeatherService();
+    // The screen is already on screen at this point, so the background check
+    // has to stand down before its next tick rather than at the first resume
+    // callback, which may not arrive for a while.
+    unawaited(AlarmBridge.instance.setForeground(true));
   }
 
   @override
@@ -194,6 +209,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     _cctvKeepAlive.dispose();
     _refreshTimer?.cancel();
     _connectionStatusTimer?.cancel();
+    // Nothing is evaluating alarms once this screen is gone, so the background
+    // check has to be allowed to run again.
+    unawaited(AlarmBridge.instance.setForeground(false));
     unawaited(_realtimeService.stop());
     _weatherService.dispose();
     super.dispose();
@@ -203,10 +221,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _restartRefreshTimer();
+      // Tells the background check to stand down: the dashboard polls every ten
+      // seconds and evaluates the same rules, so a background tick on top of that
+      // is duplicate work against the same ThingsBoard instance.
+      unawaited(AlarmBridge.instance.setForeground(true));
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
       _refreshTimer?.cancel();
+      unawaited(AlarmBridge.instance.setForeground(false));
     }
   }
 
@@ -261,43 +284,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!mounted) return;
     final cctvUrl = await loadCctvUrl();
     if (!mounted) return;
+    final thresholds = readAlarmThresholds(preferences);
     setState(() {
-      _autoRefresh =
-          preferences.getBool(SettingsKeys.autoRefresh) ?? true;
+      _autoRefresh = preferences.getBool(SettingsKeys.autoRefresh) ?? true;
       _refreshSeconds =
           preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
-      _energyAlertsEnabled =
-          preferences.getBool(SettingsKeys.energyAlertsEnabled) ?? true;
-      _environmentAlertsEnabled =
-          preferences.getBool(SettingsKeys.environmentAlertsEnabled) ?? false;
-      _lowSocThreshold =
-          preferences.getInt(SettingsKeys.lowSocThreshold) ?? 20;
-      _staleTelemetryMinutes =
-          preferences.getInt(SettingsKeys.staleTelemetryMinutes) ?? 10;
-      _environmentTempMin = _readDouble(
-        preferences,
-        SettingsKeys.environmentTempMin,
-      );
-      _environmentTempMax = _readDouble(
-        preferences,
-        SettingsKeys.environmentTempMax,
-      );
-      _environmentHumidityMin = _readDouble(
-        preferences,
-        SettingsKeys.environmentHumidityMin,
-      );
-      _environmentHumidityMax = _readDouble(
-        preferences,
-        SettingsKeys.environmentHumidityMax,
-      );
-      _environmentTdsMin = _readDouble(
-        preferences,
-        SettingsKeys.environmentTdsMin,
-      );
-      _environmentTdsMax = _readDouble(
-        preferences,
-        SettingsKeys.environmentTdsMax,
-      );
+      _thresholds = thresholds;
       _dailyProductionTargetKwh = _readDouble(
         preferences,
         SettingsKeys.dailyProductionTargetKwh,
@@ -305,7 +297,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       _cctvUrl = cctvUrl;
     });
     _restartRefreshTimer();
+    // Must precede the first evaluation, otherwise every alarm looks new to a
+    // fresh process and gets announced again on top of the background's.
+    await _primeActiveAlerts();
+    if (!mounted) return;
     _evaluateEnergyAlerts();
+    // The background check evaluates the same rules, so it has to be told when
+    // the thresholds change. A threshold raised above the current SOC would
+    // otherwise keep notifying from the background for up to a quarter of an
+    // hour after the user turned it off.
+    unawaited(AlarmNotificationService.sync(api: widget.api));
   }
 
   static double? _readDouble(SharedPreferences preferences, String key) =>
@@ -385,6 +386,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       _connectionHealth.markError(ConnectionTransport.rest, degraded: true);
       if (!mounted) return;
       if (error.toString().contains('Token expired')) {
+        // Same as an explicit logout: the session is over, so the background
+        // check has to stop too.
+        unawaited(AlarmNotificationService.disable());
         await widget.api.logout();
         if (!mounted) return;
         _goToLogin();
@@ -518,68 +522,19 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ── Alerts ───────────────────────────────────────────────────────────────────
   void _evaluateEnergyAlerts() {
-    if (!_energyAlertsEnabled && !_environmentAlertsEnabled) {
-      final hadAlerts = _activeAlertIds.isNotEmpty;
-      _activeAlertIds = {};
-      if (hadAlerts) _alertMessages.value = const [];
-      return;
-    }
-    final alerts = <String, String>{};
-    if (_energyAlertsEnabled) {
-      final soc = _battery?.latestValues['soc'];
-      if (soc != null && soc < _lowSocThreshold) {
-        alerts['low_soc'] = 'SOC baterai rendah: ${soc.toStringAsFixed(0)}%';
-      }
-      final devices = <(String, String, DeviceTelemetry?)>[
-        ('battery', 'Baterai', _battery),
-        ('pzem', 'PZEM', _pzem),
-        ('sensor', 'Sensor lingkungan', _sensor),
-      ];
-      for (final (id, name, telemetry) in devices) {
-        if (telemetry != null &&
-            telemetry.isStale(minutes: _staleTelemetryMinutes)) {
-          alerts['stale_$id'] = 'Data $name belum diperbarui';
-        }
-      }
-    }
-    final sensor = _sensor;
-    if (_environmentAlertsEnabled &&
-        sensor != null &&
-        !sensor.isStale(minutes: _staleTelemetryMinutes)) {
-      _addRangeAlerts(
-        alerts,
-        id: 'ambient_temp',
-        label: 'Suhu lingkungan',
-        unit: '°C',
-        value: sensor.latestValues['temp_dht'],
-        minimum: _environmentTempMin,
-        maximum: _environmentTempMax,
-      );
-      _addRangeAlerts(
-        alerts,
-        id: 'humidity',
-        label: 'Kelembapan',
-        unit: '%',
-        value: sensor.latestValues['humidity_dht'],
-        minimum: _environmentHumidityMin,
-        maximum: _environmentHumidityMax,
-      );
-      _addRangeAlerts(
-        alerts,
-        id: 'tds',
-        label: 'TDS',
-        unit: 'ppm',
-        value: sensor.latestValues['tds_ppm'],
-        minimum: _environmentTdsMin,
-        maximum: _environmentTdsMax,
-      );
-    }
+    final now = DateTime.now();
+    final signals = evaluateAlarmRules(
+      rules: _alarmRules,
+      readings: _alarmReadings,
+      now: now,
+    );
+    final alerts = {for (final signal in signals) signal.id: signal.message};
 
-    final newEntries = alerts.entries
-        .where((entry) => !_activeAlertIds.contains(entry.key))
-        .toList();
-    final newMessages = newEntries.map((entry) => entry.value).toList();
-    final nextMessages = alerts.values.toList();
+    final newSignals = newlyActiveSignals(
+      signals: signals,
+      alreadyActive: _activeAlertIds,
+    );
+    final nextMessages = signals.map((signal) => signal.message).toList();
     final changed =
         alerts.length != _activeAlertIds.length ||
         !alerts.keys.every(_activeAlertIds.contains) ||
@@ -587,68 +542,89 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!changed) return;
     _activeAlertIds = alerts.keys.toSet();
     _alertMessages.value = nextMessages;
+    unawaited(AlarmBridge.instance.setActiveAlerts(_activeAlertIds));
 
-    if (newEntries.isNotEmpty) {
-      final now = DateTime.now();
-      for (final entry in newEntries) {
-        _persistAlarm(entry.key, entry.value, now);
+    // Nothing is announced until the background module's active set has been
+    // read. Before that read completes every alarm looks new, because a fresh
+    // process starts with an empty set, and the first evaluation would report
+    // alarms the background had already reported. The banner still updates, so
+    // the user sees the state immediately either way.
+    if (_activeAlertsPrimed && newSignals.isNotEmpty) {
+      for (final signal in newSignals) {
+        _persistAlarm(signal, now);
       }
     }
-    if (newMessages.isNotEmpty && mounted) {
+    if (nextMessages.isNotEmpty && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(newMessages.join(' · '))));
+          ..showSnackBar(SnackBar(content: Text(nextMessages.join(' · '))));
       });
     }
   }
 
-  void _addRangeAlerts(
-    Map<String, String> alerts, {
-    required String id,
-    required String label,
-    required String unit,
-    required double? value,
-    required double? minimum,
-    required double? maximum,
-  }) {
-    if (value == null) return;
-    if (minimum != null && value < minimum) {
-      alerts['environment_${id}_low'] =
-          '$label rendah: ${value.toStringAsFixed(1)} $unit (batas $minimum $unit)';
-    }
-    if (maximum != null && value > maximum) {
-      alerts['environment_${id}_high'] =
-          '$label tinggi: ${value.toStringAsFixed(1)} $unit (batas $maximum $unit)';
-    }
+  /// The three devices the rules read, in the shape the evaluator expects.
+  List<AlarmReading> get _alarmReadings => [
+    if (_battery != null)
+      AlarmReading(
+        device: AlarmDevice.battery,
+        values: _battery!.latestValues,
+        lastUpdate: _battery!.lastUpdate,
+      ),
+    if (_pzem != null)
+      AlarmReading(
+        device: AlarmDevice.pzem,
+        values: _pzem!.latestValues,
+        lastUpdate: _pzem!.lastUpdate,
+      ),
+    if (_sensor != null)
+      AlarmReading(
+        device: AlarmDevice.sensor,
+        values: _sensor!.latestValues,
+        lastUpdate: _sensor!.lastUpdate,
+      ),
+  ];
+
+  /// Whether the background module's active set has been read yet.
+  bool _activeAlertsPrimed = false;
+
+  /// Reads the set of alarms the background check has already reported.
+  ///
+  /// Awaited during startup, before anything is allowed to announce an alarm.
+  /// Doing it lazily inside the evaluation was the earlier mistake: the read is
+  /// asynchronous, so the first evaluation always saw an empty set and reported
+  /// alarms that the background had already reported, which is exactly the
+  /// duplicate the shared set exists to prevent.
+  Future<void> _primeActiveAlerts() async {
+    if (_activeAlertsPrimed) return;
+    _activeAlertsPrimed = true;
+    final background = await AlarmBridge.instance.activeAlerts();
+    if (!mounted || background.isEmpty) return;
+    _activeAlertIds = {..._activeAlertIds, ...background};
   }
 
-  void _persistAlarm(String id, String message, DateTime now) {
-    final severity = alarmSeverityFromId(id);
+  void _persistAlarm(AlarmSignal signal, DateTime now) {
     unawaited(
       _alarmHistoryService.addAlarm(
         AlarmRecord(
-          id: '${now.millisecondsSinceEpoch}_$id',
+          id: '${now.millisecondsSinceEpoch}_${signal.id}',
           timestamp: now,
-          type: alarmTypeFromId(id),
-          severity: severity,
-          message: message,
-          value: alarmValueFromId(
-            id,
-            batteryValues: _battery?.latestValues,
-            sensorValues: _sensor?.latestValues,
-          ),
+          type: signal.type,
+          severity: signal.severity,
+          message: signal.message,
+          value: signal.value,
         ),
       ),
     );
     unawaited(
       AlarmNotificationService.notifyAlarm(
-        id: id,
-        title:
-            'EnerGrow: ${severity == AlarmSeverity.critical ? 'Critical' : 'Warning'} alarm',
-        message: message,
-        critical: severity == AlarmSeverity.critical,
+        id: signal.id,
+        title: signal.isCritical
+            ? 'EnerGrow: Critical alarm'
+            : 'EnerGrow: Warning alarm',
+        message: signal.message,
+        critical: signal.isCritical,
       ),
     );
   }
@@ -917,6 +893,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _logout() async {
+    // Stop the background check before the session goes away. Otherwise the
+    // native side keeps its own copy of the token and polls with it after the
+    // user has signed out.
+    unawaited(AlarmNotificationService.disable());
     await widget.api.logout();
     if (!mounted) return;
     _goToLogin();

@@ -2,18 +2,42 @@
 
 ### Fixed
 
+- **Fixed background alarms never firing at all.** `android_alarm_manager_plus` requires its `AlarmService` and `AlarmBroadcastReceiver` to be declared in the app manifest, and neither was. The 15-minute alarm was therefore registered but never delivered, which is why `progress.md` recorded "never a real alarm appeared" as untested rather than broken. The dependency is removed entirely and replaced by native Kotlin; see the Added entry below.
+- **Fixed a duplicate notification on every cold start.** The active-alarm set was read from the native module *asynchronously, after* the dashboard had already decided an alarm was new, so opening the app re-announced alarms the background had already reported. The set is now read before the first evaluation, and notifications are held back until it arrives. Covered by `test/alarm_rules_test.dart` via `newlyActiveSignals`.
+- **Fixed the background alarm being dropped by vendor power management.** The repeating alarm fired six times and then silently disappeared from `dumpsys alarm` on MIUI/HyperOS, with `com.miui.powerkeeper` in the same output, so alarms simply stopped arriving with nothing to indicate why. A second `setAndAllowWhileIdle` trigger, re-armed after every run, now backs it up.
+- **Fixed a failed poll being reported as stale telemetry.** A device that produced no reading raised a `stale_*` alarm, so a network outage or a dead token turned into three misleading alarms instead of silence. An unread device now produces nothing, while a device that has stopped reporting still alarms — that is the distinction the alert was meant to draw.
+- **Fixed background alarm credentials never reaching the native side.** The access token was sent inside the config payload while the native code read it as a top-level argument, so every check logged "no credentials stored" and did nothing. The credentials are now sent separately, which also keeps them out of the config file written to disk as plain JSON.
 - Fixed `WeatherForecast.fromJson` parsing One Call API payloads with `WeatherData.fromJson`, which read `main.temp` / `wind.speed` / `coord` — keys that do not exist in that format. Added `WeatherData.fromOneCallJson` to correctly parse One Call entries (scalar `temp` in hourly, `temp.day` object in daily, snake_case `wind_speed`, no per-entry `name` or `coord`).
 - Fixed `_estimateSolarIrradiance` to handle both current-weather (`clouds.all` nested) and One Call (`clouds` scalar) formats.
 - Fixed splash screen logo not being rounded — wrapped `BrandLogo` in `ClipRRect` for consistency with the biometric unlock screen.
 
 ### Added
 
+- **Added native background alarm checking** in `android/app/src/main/kotlin/tech/mbkm/energrow/alarm/`. An `AlarmManager` repeating alarm wakes a `BroadcastReceiver` that does the ThingsBoard reads with `HttpURLConnection` and posts notifications with `NotificationCompat`, so no Flutter engine is started. A background tick costs single-digit MB of RAM instead of the tens of MB a background Flutter isolate holds resident. Devices are polled in parallel and not retried, which fits the roughly ten seconds a manifest receiver is allowed; a full check measures around 0.45 s on the test device, against a worst case of over three minutes for the old sequential, retried Dart poll.
+- **Added a second alarm trigger, `setAndAllowWhileIdle`, re-armed after every run.** A repeating alarm is the first thing vendor power managers remove: on the test device the repeating alarm fired six times and then silently disappeared from `dumpsys alarm`, with `com.miui.powerkeeper` in the same output, leaving alarms that were simply never delivered. The Doze-exempt trigger repairs that.
+- **The check now runs every minute**, down from fifteen, and stands down while the app is in the foreground. A greenhouse alarm is only useful while the condition still is, and a check is now cheap enough to afford it. The stand-down avoids polling ThingsBoard twice over while the dashboard is already evaluating the same rules every ten seconds.
+- Added `AlarmDebugReceiver`, declared only in `src/debug/AndroidManifest.xml` and refusing to act unless the app is debuggable, so one background check can be triggered on demand. Verifying the notification otherwise means waiting for a genuinely new condition, which can take hours.
+- Added `lib/utils/alarm_rules.dart` as the single source of truth for what counts as an alarm. `buildAlarmRules` turns the user's thresholds into a rule list, `evaluateAlarmRules` runs it, and `alarmRulesToJson` ships the same list to the native module. The dashboard banner and the background notification now evaluate one rule list, so a threshold edited in Settings changes both and the wording cannot drift between the two.
+- Added environment limits to the background check. Previously the periodic check only looked at low SOC and stale telemetry, so temperature, humidity and TDS alarms never produced a notification no matter how they were configured.
+- Added `android/app/src/test/resources/alarm_parity_vectors.json`, replayed by `test/alarm_parity_test.dart` and by `AlarmParityTest.kt`, which pins the Dart and Kotlin evaluators to the same messages. The two implementations exist because Dart is not running during a background check; the shared fixture is what keeps them honest. Regenerate with `dart run tool/generate_alarm_parity_fixture.dart`.
+- Added `test/alarm_rules_test.dart` — 20 tests covering rule construction, evaluation, freshness gating, announce-once semantics and JSON round-tripping, including the guard that TDS keeps no upper bound.
+- Added `AlarmBridgeStatus` and the bridge `status` / `checkNow` / `isScheduled` calls, so a background check can be inspected instead of guessed at.
+- Added a second notification channel for critical alarms, letting the user silence warnings while keeping a low-battery alert.
 - Added `WeatherService.dispose()` to release GPS handle and cached coordinates. Dashboard now calls it in its own `dispose()`.
 - Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
 - Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
 
 ### Changed
 
+- **Alarms are reported once per occurrence, not on every check.** The active alarm set is shared between the dashboard and the native module, so an ongoing low-battery condition produces one notification rather than one per interval. The previous implementation de-duplicated with a five-minute timer, which is *longer* than the check interval and so never actually prevented a repeat.
+- Background alarm tokens are stored encrypted under a hardware-backed AndroidKeyStore key instead of being readable only by `flutter_secure_storage`, which cannot be reached without a Flutter engine. Dart keeps the canonical copies and re-pushes on launch; a refresh performed in the background updates only the native copy.
+- The background check renews its own access token on a 401 and stops itself if the refresh token is rejected, so an expired session no longer looks like three unreachable devices.
+- A device that produced no reading no longer counts as stale. A failed poll is missing data, not a condition, and treating it as stale turned a network outage into three misleading alarms.
+- Removed the `android_alarm_manager_plus` dependency and its manifest receiver, and dropped the Android plugin count from 12 to 11.
+- Moved `AlarmType`, `AlarmSeverity` and `AlarmRecord` from `alarm_history_service.dart` to `lib/models/alarm_record.dart`, so the rule engine depends on a model rather than on a service that does I/O.
+- Promoted `alarm_helpers.dart` from `screens/dashboard/utils/` to `utils/`, now that the native module and the dashboard both read it.
+- Added `lib/services/alarm_settings.dart` so the alert defaults are written in one place. They were previously repeated in the settings controller, the dashboard and the background service, which is how the same setting came to default to different values in different readers.
+- Alarm history merges the records the background check wrote with the ones the dashboard wrote, and acknowledging or resolving now applies to both. The two stores stay separate because `shared_preferences` encodes a `List<String>` as a Base64 Java-serialized blob that the native side would have to reproduce byte for byte.
 - Translated all UI text in `alarm_history_screen.dart` to Indonesian (title, dialog, buttons, filters, status badges, menu actions, empty state, month names).
 - Documented battery power sign convention in `energy_forecast_service.dart` — `.abs()` is used because BMS vendors disagree on charge/discharge sign.
 - Translated "Try again" to "Coba lagi" in dashboard banners.
@@ -22,7 +46,11 @@
 
 ### Documentation
 
-- Updated `AGENTS.md` with current test coverage (179 tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
+- Documented the native alarm module in `AGENTS.md`: the one-rule-list contract, why `AlarmManager` is inexact and why there are two triggers, the foreground stand-down, the token handover, the debug trigger, and the parity fixture that keeps the two evaluators in agreement.
+- Rewrote `README.md` around the background alarm capability, with the measured cost of a native check against a Flutter isolate, and corrected the stale "push notification belum tersedia" claims.
+- Corrected `PRD_PLTS_Monitoring_App.md` §4.5, §6 and §7, which still claimed no alert reaches the user while the app is closed.
+- Replaced `progress.md` §10.5, which had recorded the old Dart alarm as merely untested. It was broken, and the reason was a missing manifest declaration.
+- Updated `AGENTS.md` with current test coverage (212 Dart tests, 6 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
 
 # Changelog
 

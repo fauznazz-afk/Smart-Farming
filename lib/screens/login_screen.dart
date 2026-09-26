@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../services/alarm_notification_service.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
 import 'dashboard_screen.dart';
@@ -39,6 +42,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success) {
+        // Arm the background check with the fresh token. Without this the
+        // alarms would only start working after the next app launch, which is
+        // exactly the case a user who just signed in would notice.
+        unawaited(AlarmNotificationService.sync(api: _api));
         Navigator.pushReplacement<void, void>(
           context,
           PageRouteBuilder<void>(

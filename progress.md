@@ -266,6 +266,12 @@ keduanya hanya muncul di build **release**.
 
 #### 5B.1 Ikon notifikasi hilang dari APK release
 
+> **Catatan 27 September 2026**: bagian ini masih berlaku untuk ikon, tapi
+> mechanismenya sudah berbeda. `flutter_local_notifications` masih dipakai untuk
+> alarm yang ditemukan saat aplikasi terbuka, jadi declare `<meta-data>` di
+> `AndroidManifest.xml` tetap wajib. Modul alarm native memakai `NotificationCompat`
+> dengan referensi drawable di Kotlin, yang selalu terlihat shrinker.
+
 **Gejala**: setiap kali app start di release,
 `PlatformException(invalid_icon, The resource @drawable/ic_energrow could not
 be found)`. Tidak terlihat user karena `main.dart` menangkap exception itu
@@ -604,15 +610,70 @@ Sudah ditutup 27 September 2026:
 Masih tipis di:
 
 - `energy_report_service.dart` - test hanya untuk helper, bukan service-nya
-- `alarm_notification_service.dart` - logika background check belum teruji.
-  **Catatan**: `initialize()`-nya dulu gagal total karena ikon hilang (§5B.1),
-  jadi sebelum tes logika, pastikan ikonnya benar-benar ada di APK release.
+- `alarm_notification_service.dart` - test hanya untuk helper, bukan service-nya.
+  Tapi **logika alarm yang menentukan apa yang dihitung sebagai alarm sudah
+  tercover penuh** per 27 September 2026: `lib/utils/alarm_rules.dart` dipisah
+  dari I/O, lalu `test/alarm_rules_test.dart` (17 test) mengujinya dan
+  `test/alarm_parity_test.dart` memutar ulang fixture yang sama dengan
+  `AlarmParityTest.kt` di sisi Kotlin. Yang belum tercover adalah sisanya:
+  pemanggilan method channel dan lifecycle scheduling, yang butuh perangkat.
 
-### 10.5 ~~Push notification belum teruji~~ - MASIH BENAR
+### 10.5 Alarm background: ditemukan rusak, sekarang native, sudah terbukti
 
-`flutter_local_notifications` dan `android_alarm_manager_plus` sudah hooked
-dengan benar sejak §5B.1 diperbaiki, tapi **belum pernah ada alarm sungguhan
-yang muncul di layar**. Itu perlu diuji dengan SOC di bawah ambang.
+**27 September 2026.** Tuduhan lama "hanya belum diuji" ternyata salah: alarm
+tidak pernah jalan sama sekali. `android_alarm_manager_plus` mewajibkan
+`<service> AlarmService` dan `<receiver> AlarmBroadcastReceiver` di manifest,
+dan keduanya tidak pernah ada. Alarm terdaftar tapi tidak pernah dikirim, dan
+tidak menghasilkan log apa pun, jadi dari luar tidak bisa dibedakan dari
+"belum diuji".
+
+Diganti modul native Kotlin (§ AGENTS.md "Background alarms are native
+Kotlin"). **Sudah terverifikasi end-to-end di Xiaomi malachite**, termasuk
+notifikasi sungguhan:
+
+- `configure` menerima aturan dari Dart, `arm=true`, kredensial tersimpan
+- `dumpsys alarm` → dua trigger: `repeatInterval=60000` dan `flags=0x8`
+  (`ALLOW_WHILE_IDLE`)
+- cek berjalan saat app **terlatar belakang** dan selesai dalam ~450 ms:
+  `check finished: 1 active (1 new): environment_humidity_high`
+- notifikasi benar-benar muncul:
+  `EnerGrow: Warning alarm` / `Kelembapan tinggi: 88.9 % (batas 80.0 %)`
+- cek berikutnya `0 new` → **tidak ada spam**, notifikasi tidak diulang
+- saat app di depan, cek `standing down` → ThingsBoard tidak dipoll dua kali
+- APK release memuat `drawable/ic_energrow` dan string channel ✅
+- aturan mengalir: 4 aturan default → 6 setelah ambang environment diisi
+
+### 10.5a Tiga bug yang ketemu saat verifikasi
+
+1. **Alarm lama tidak pernah fires** (di atas). Manifest kurang `<service>` dan
+   `<receiver>`.
+2. **Notifikasi duplikat tiap cold start.** Active-alert set dari sisi native
+   dimuat *asinkron setelah* notifikasi dikirim, jadi tiap pembukaan app
+   mengirim ulang alarm yang sudah dilaporkan background. Diperbaiki dengan
+   priming sebelum evaluasi pertama, dan ada test penjaganya di
+   `test/alarm_rules_test.dart` (`newlyActiveSignals`).
+3. **Alarm dibuang MIUI.** `setInexactRepeating` berbunyi 6× lalu hilang dari
+   `dumpsys alarm`; `com.miui.powerkeeper` terlihat di output yang sama.
+   Diperbaiki dengan trigger kedua `setAndAllowWhileIdle` yang di-rearm tiap
+   kali jalan.
+
+Bug ke-2 dan ke-3 sama-sama tidak akan terlihat dari UI: keduanya muncul
+sebagai "alarm tidak muncul" atau "alarm muncul saat app dibuka".
+
+### 10.5b Catatan operasional
+
+- `adb shell am broadcast` **tidak bisa** memicu `AlarmCheckReceiver` karena
+  `exported="false"`. Itu memang benar secara keamanan. Untuk tes cepat pakai
+  `AlarmDebugReceiver` (khusus build debug):
+  `am broadcast -a tech.mbkm.energrow.action.DEBUG_CHECK_ALARMS -n tech.mbkm.energrow/tech.mbkm.energrow.alarm.AlarmDebugReceiver`
+  dan `...DEBUG_RESET_ALARMS...` untuk memaksa alarm yang sedang menyala
+  diumumkan ulang.
+- APK **debug** tidak bisa dipasang di atas APK **release** (signature beda).
+  `adb uninstall` dulu, dan sesi loginnya hilang → login ulang.
+- Untuk memverifikasi notifikasi tanpa menunggu kondisi baru, set batas yang
+  pasti terlampaui (mis. Humidity Max 80 saat kelembapan 88).
+- MIUI masih bisa lebih agresif dari dua trigger itu. Jika alarm diam di
+  perangkat lain, cek `dumpsys alarm` dulu sebelum conclude apa pun.
 
 ### 10.6 Utang KGP - jika someday dikerjakan
 

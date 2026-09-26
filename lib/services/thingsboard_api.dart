@@ -222,6 +222,14 @@ class ThingsBoardApi {
 
   String? get accessToken => _token;
 
+  /// The refresh token, exposed so the background alarm module can be given a
+  /// way to renew its own access token.
+  ///
+  /// The native check polls independently of the app, so without one its copy
+  /// would expire mid-session and background alarms would stop arriving with no
+  /// way to tell that from a network problem.
+  String? get refreshToken => _refreshToken;
+
   Uri get telemetryWebSocketUri {
     final base = Uri.parse(baseUrl);
     final scheme = base.scheme == 'https' ? 'wss' : 'ws';

@@ -1,6 +1,9 @@
-import '../../../services/alarm_history_service.dart';
+import '../models/alarm_record.dart';
 
 /// Maps an alert ID string to an [AlarmType].
+///
+/// Alert IDs are carried inside persisted alarm records, so this stays the
+/// single mapping used when an id is classified outside the rule engine.
 AlarmType alarmTypeFromId(String id) {
   if (id == 'low_soc') return AlarmType.lowSoc;
   if (id.startsWith('stale_')) return AlarmType.staleTelemetry;
@@ -23,7 +26,8 @@ AlarmSeverity alarmSeverityFromId(String id) {
 }
 
 /// Extracts the triggering numeric value from the alert ID.
-double? alarmValueFromId(String id, {
+double? alarmValueFromId(
+  String id, {
   required Map<String, double>? batteryValues,
   required Map<String, double>? sensorValues,
 }) {
@@ -41,6 +45,11 @@ double? alarmValueFromId(String id, {
 }
 
 /// Returns names of devices with stale telemetry.
+///
+/// This drives the connection banner, which lists devices that stopped
+/// reporting. It deliberately reports nothing for a device that has never been
+/// read, so the banner does not claim three devices are offline before the
+/// first poll has returned.
 List<String> staleDeviceNames({
   required Map<String, double>? batteryValues,
   required DateTime? batteryLastUpdate,

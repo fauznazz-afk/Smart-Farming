@@ -22,7 +22,10 @@ void main() {
 Future<void> _initializeAlarmServices() async {
   try {
     await AlarmNotificationService.initialize();
-    await AlarmNotificationService.initializeBackgroundMonitoring();
+    // Hands the current rules and credentials to the native alarm module, which
+    // is what actually schedules the background check. Doing this after runApp
+    // keeps a slow secure-storage read off the first frame.
+    await AlarmNotificationService.sync();
   } catch (error) {
     debugPrint('Alarm notification initialization failed: $error');
   }

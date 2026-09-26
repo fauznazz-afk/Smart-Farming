@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EnerGrow</string>
+
+    <!--
+      Notification channel names, shown in Android's settings.
+
+      These live in resources rather than in the alarm module because the user
+      sees them in a system screen, and a label only ever available to Kotlin
+      would have to be kept in step by hand. The Dart side references the same
+      channel ids as plain strings, since flutter_local_notifications takes them
+      as arguments and cannot read a resource.
+    -->
+    <string name="alarm_channel_warnings">EnerGrow alarms</string>
+    <string name="alarm_channel_warnings_description">Alerts for stale telemetry and environment limits</string>
+    <string name="alarm_channel_critical">EnerGrow critical alarms</string>
+    <string name="alarm_channel_critical_description">Alerts that need attention soon, such as a low battery charge</string>
+    <string name="alarm_title_critical">EnerGrow: Critical alarm</string>
+    <string name="alarm_title_warning">EnerGrow: Warning alarm</string>
+</resources>
