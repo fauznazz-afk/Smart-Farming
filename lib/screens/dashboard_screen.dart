@@ -1217,11 +1217,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   List<Widget Function()> _overviewPage(bool isDark) {
     return [
       () => GreetingHeader(displayName: _displayName, isDark: isDark),
-      () => const SizedBox(height: 16),
+      () => const SizedBox(height: 8),
       () => _dateStrip(isDark),
-      () => const SizedBox(height: 20),
+      () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, isDark, () => _heroCard(isDark)),
-      () => const SizedBox(height: 12),
+      () => const SizedBox(height: 8),
       () => WeatherCard(
         weather: _currentWeather,
         forecast: _weatherForecast,
@@ -1232,11 +1232,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         isLoading: _weatherLoading,
         error: _weatherError,
       ),
-      () => const SizedBox(height: 12),
+      () => const SizedBox(height: 8),
       () => _bindRevision(_energyRevision, isDark, () => _energySummaryCard(isDark)),
-      () => const SizedBox(height: 12),
+      () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, isDark, () => _dualCards(isDark)),
-      () => const SizedBox(height: 12),
+      () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, isDark, () => _environmentGrid(isDark)),
     ];
   }

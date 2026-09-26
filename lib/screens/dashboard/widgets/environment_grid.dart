@@ -60,29 +60,23 @@ class EnvironmentGrid extends StatelessWidget {
             color: isDark ? Colors.white70 : Colors.black54,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Row(
           children: [
             card(_envSpecs[0]),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             card(_envSpecs[1]),
+            const SizedBox(width: 8),
+            card(_envSpecs[2]),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Row(
           children: [
-            card(_envSpecs[2]),
-            const SizedBox(width: 10),
             card(_envSpecs[3]),
+            const SizedBox(width: 8),
+            card(_envSpecs[4]),
           ],
-        ),
-        const SizedBox(height: 10),
-        _EnvCard(
-          spec: _envSpecs[4],
-          value: values?[_envSpecs[4].key],
-          isDark: isDark,
-          seedColor: seedColor,
-          performanceMode: performanceMode,
         ),
       ],
     );
@@ -110,7 +104,7 @@ class _EnvCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -119,23 +113,23 @@ class _EnvCard extends StatelessWidget {
             children: [
               Icon(
                 spec.icon,
-                size: 16,
+                size: 14,
                 color: metricColor(
                   seedColor: seedColor,
                   index: 3,
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   spec.label,
-                  style: TextStyle(fontSize: 11, color: faint),
+                  style: TextStyle(fontSize: 10, color: faint),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,

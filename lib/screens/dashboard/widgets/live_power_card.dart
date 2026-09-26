@@ -33,19 +33,19 @@ class LivePowerCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel, isDark: isDark, seedColor: seedColor),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _ValueRow(
             pvPower: pvPower,
             soc: soc,
             isDark: isDark,
             seedColor: seedColor,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           IntrinsicHeight(
             child: Row(
               children: [
@@ -236,7 +236,7 @@ class _ValueRow extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text('PV Output', style: TextStyle(fontSize: 12, color: faint)),
             ],
           ),

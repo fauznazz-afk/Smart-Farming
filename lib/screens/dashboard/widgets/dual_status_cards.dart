@@ -150,7 +150,7 @@ class _BatteryCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -160,7 +160,7 @@ class _BatteryCard extends StatelessWidget {
             color: metricColor(seedColor: seedColor, index: 0, isDark: isDark),
             isDark: isDark,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           GlassCircularGauge(
             progress: status.soc / 100,
             centerLabel: '${status.soc.toStringAsFixed(0)}%',
@@ -169,12 +169,12 @@ class _BatteryCard extends StatelessWidget {
                 ? Colors.white.withValues(alpha: 0.10)
                 : Colors.black.withValues(alpha: 0.07),
             progressColor: seedColor,
-            size: 110,
-            strokeWidth: 11,
+            size: 100,
+            strokeWidth: 10,
             semanticLabel:
                 'Battery State of Charge: ${status.soc.toStringAsFixed(0)} percent',
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -223,7 +223,7 @@ class _AcCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -233,24 +233,24 @@ class _AcCard extends StatelessWidget {
             color: metricColor(seedColor: seedColor, index: 2, isDark: isDark),
             isDark: isDark,
             trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: (isStable ? Colors.green : Colors.red).withValues(
                   alpha: 0.18,
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 isStable ? 'Stable' : 'Unstable',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w600,
                   color: isStable ? Colors.green : Colors.red,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           GlassMetricRow(
             label: 'Voltage',
             value: '${status.voltage.toStringAsFixed(1)} V',

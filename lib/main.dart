@@ -203,11 +203,24 @@ class _SplashRouterState extends State<_SplashRouter> {
   @override
   Widget build(BuildContext context) {
     if (_checking) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [BrandLogo(size: 92, showName: true)],
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: const BrandLogo(size: 92),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'EnerGrow',
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       );

@@ -57,7 +57,7 @@ class EnergySummaryCard extends StatelessWidget {
         child: Semantics(
           label: '$title: ${_formatEnergy(value)} kilowatt-hours. $label',
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withValues(alpha: isDark ? 0.12 : 0.08),
               borderRadius: BorderRadius.circular(16),
@@ -66,9 +66,9 @@ class EnergySummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ExcludeSemantics(child: Icon(icon, color: color, size: 18)),
-                const SizedBox(height: 9),
+                const SizedBox(height: 6),
                 Text(title, style: const TextStyle(fontSize: 11)),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   '${_formatEnergy(value)} kWh',
                   maxLines: 1,
@@ -78,7 +78,7 @@ class EnergySummaryCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   label,
                   maxLines: 2,
@@ -108,7 +108,7 @@ class EnergySummaryCard extends StatelessWidget {
     return LiquidGlassCard(
       isDark: isDark,
       performanceMode: performanceMode,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -146,7 +146,7 @@ class EnergySummaryCard extends StatelessWidget {
               color: isDark ? Colors.white54 : Colors.black54,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (loading)
             const SizedBox(
               height: 94,
@@ -186,7 +186,7 @@ class EnergySummaryCard extends StatelessWidget {
                   ],
                 ),
                 if (forecast != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _forecastSummary(context, forecast!),
                 ],
               ],
