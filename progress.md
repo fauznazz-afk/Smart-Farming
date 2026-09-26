@@ -5,9 +5,9 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 26 September 2026 (sesi kedua)
-- **Status**: rilis 1.4.0 terbit. `main` sinkron dengan `origin/main`, **tapi ada
-  perubahan yang belum di-commit** (lihat §0)
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 27 September 2026 (sesi ketiga)
+- **Status**: rilis 1.4.0 terbit. `main` sinkron dengan `origin/main`. Semua
+  perubahan sudah di-commit dan ter-push (commit `749123e`).
 
 ---
 
@@ -76,6 +76,15 @@ Cold launch 911–1176 ms.
 
 Delapan commit refactor, dashboard 3.046 → 1.490 baris, settings 754 → 157,
 CCTV dan energy report dipecah, plus 8 bug diperbaiki (§5C).
+
+### Sesi ketiga (27 Sep) - fix One Call API + 36 test + terjemahan UI
+
+| Commit | Isi |
+|---|---|
+| `749123e` | Fix `WeatherForecast.fromJson` (One Call API), tambah 36 test, terjemahan UI ke Indonesia, dokumentasi battery sign convention, `WeatherService.dispose()` |
+
+**Pencapaian**: Test 143 → 179. `flutter analyze` bersih. Debug APK
+ter-build dan ter-install di device. Semua perubahan ter-push ke `origin/main`.
 
 ---
 
@@ -470,7 +479,7 @@ Langkah 3: sebuah jam dianggap "malam" hanya bila **semua** sampel solar di jam 
 
 ```
 flutter analyze  ->  No issues found
-flutter test     ->  143 tests, All tests passed
+flutter test     ->  179 tests, All tests passed
 ```
 
 | File | Test | Cakupan |
@@ -483,6 +492,8 @@ flutter test     ->  143 tests, All tests passed
 | `chart_bounds_test.dart` | 16 | `niceStep`, `niceTimeStep`, alignment sumbu X, tick multi-hari |
 | `energy_forecast_service_test.dart` | 13 | produksi harian, proyeksi runtime baterai |
 | `settings_screen_test.dart` | 5 | widget test: daftar category, drill-down, navigasi back, penolakan URL |
+| `weather_service_test.dart` | 15 | current weather + One Call API parsing, serialization, computed properties |
+| `thingsboard_realtime_service_test.dart` | 21 | service lifecycle, device config, TelemetryPoint, DeviceTelemetry |
 | `widget_test.dart` | 2 | smoke test |
 
 Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
@@ -759,17 +770,11 @@ Jawabannya ada di `AndroidManifest.xml` (§5B.1).
 
 ## 10. Langkah Berikutnya
 
-### 10.0 Commit perbaikan yang tertunda - PRIORITAS TERTINGGI
+### 10.0 ~~Commit perbaikan yang tertenda~~ - SELESAI 27 September 2026
 
-Dua bug di §5B sudah diperbaiki dan terverifikasi di perangkat, tapi masih
-uncommitted. Suggested messages:
+Semua perubahan sudah di-commit sebagai `749123e` dan ter-push ke `origin/main`.
 
-```
-fix: keep the notification icon in release builds
-fix: survive an unreadable secure storage instead of hanging on the splash
-```
-
-### 10.1 ~~Verifikasi dua hal yang tertunda~~ - SELESAI 26 September 2026
+### 10.1 ~~Verifikasi dua hal yang tertenda~~ - SELESAI 26 September 2026
 
 Kedua item section 8 sudah dicek manual di perangkat dan benar. Tidak ada
 loop terbuka dari sesi refactor.
@@ -794,29 +799,29 @@ File terbesar yang masih belum disentuh:
 
 | File | Baris | Catatan |
 |---|---|---|
-| `widgets/liquid_glass.dart` | 537 | design system, dipakai luas, hati-hati |
-| `services/weather_service.dart` | 439 | service terbesar |
-| `screens/alarm_history_screen.dart` | 382 | belum pernah di-refactor |
-| `screens/dashboard/widgets/weather_card.dart` | 318 | belum pernah di-refactor |
-| `screens/energy_report/widgets/chart_card.dart` | 280 | sudah dipisah, tapi masih satu widget besar |
+| `widgets/liquid_glass.dart` | 583 | design system, dipakai luas, hati-hati |
+| `screens/dashboard_screen.dart` | 1490 | core orchestrator, butuh device testing ekstensif |
+| `screens/alarm_history_screen.dart` | 402 | belum pernah di-refactor |
+| `screens/dashboard/widgets/weather_card.dart` | 331 | belum pernah di-refactor |
+| `screens/energy_report/widgets/chart_card.dart` | 297 | sudah dipisah, tapi masih satu widget besar |
 
 `thingsboard_api.dart` **tidak lagi tanpa test** - ditutup 26 September 2026
-(§6). `services/` masih jadi file terbesar di luar widgets.
+(§6). `weather_service.dart` dan `thingsboard_realtime_service.dart` juga
+sudah ditutup 27 September 2026.
 
 ### 10.4 Menambah cakupan test
 
+Sudah ditutup 27 September 2026:
+
+- ✅ `weather_service.dart` - 15 tests (current weather + One Call API)
+- ✅ `thingsboard_realtime_service.dart` - 21 tests (lifecycle + models)
+
 Masih tipis di:
 
-- `weather_service.dart` - **belum ada test sama sekali**, sekarang gap
-  terbesar
-- `thingsboard_realtime_service.dart` - baru sebagian tertutup; yang diuji
-  guard, bukan parsing frame
 - `energy_report_service.dart` - test hanya untuk helper, bukan service-nya
 - `alarm_notification_service.dart` - logika background check belum teruji.
   **Catatan**: `initialize()`-nya dulu gagal total karena ikon hilang (§5B.1),
   jadi sebelum tes logika, pastikan ikonnya benar-benar ada di APK release.
-
-`thingsboard_api.dart` **sudah ditutup** 26 September 2026, lihat §6.
 
 ### 10.5 ~~Push notification belum teruji~~ - MASIH BENAR
 
@@ -830,6 +835,15 @@ Lihat §9A. Ringkasnya: **tiga paket** (`share_plus` → 13,
 `package_info_plus` → 10, `flutter_secure_storage` → 11), plus `XFile` pindah
 dari `cross_file` ke `file` di `csv_builder.dart`. Dan wajib diuji di perangkat
 karena menyangkut penyimpanan sesi.
+
+**Update 27 September 2026**: Sudah dicoba upgrade `package_info_plus` ke 10.x
+dan `flutter_secure_storage` ke 11.x. Keduanya gagal karena konflik `win32`:
+- `package_info_plus` 10.x butuh `win32 ^6.0.1`
+- `flutter_secure_storage_windows` 3.x masih butuh `win32 ^5.0.0`
+- `flutter_secure_storage` 11.x butuh `flutter_secure_storage_platform_interface` 2.x,
+  yang konflik dengan pin 1.1.2 di dev_dependencies untuk testing
+
+Ini adalah **coordinated upgrade** — tidak bisa dilakukan piecemeal.
 
 ---
 
@@ -998,4 +1012,4 @@ di mesin baru, pre-stage dengan skrip. Detail dan tabel pengukuran di §8A.
 
 ---
 
-*Dokumen ini dibuat di akhir sesi refactor dan perbaikan bug. Diperbarui: 26 September 2026.*
+*Dokumen ini dibuat di akhir sesi refactor dan perbaikan bug. Diperbarui: 27 September 2026.*

@@ -1,6 +1,26 @@
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- Fixed `WeatherForecast.fromJson` parsing One Call API payloads with `WeatherData.fromJson`, which read `main.temp` / `wind.speed` / `coord` — keys that do not exist in that format. Added `WeatherData.fromOneCallJson` to correctly parse One Call entries (scalar `temp` in hourly, `temp.day` object in daily, snake_case `wind_speed`, no per-entry `name` or `coord`).
+- Fixed `_estimateSolarIrradiance` to handle both current-weather (`clouds.all` nested) and One Call (`clouds` scalar) formats.
+
+### Added
+
+- Added `WeatherService.dispose()` to release GPS handle and cached coordinates. Dashboard now calls it in its own `dispose()`.
+- Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
+- Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
+
+### Changed
+
+- Translated all UI text in `alarm_history_screen.dart` to Indonesian (title, dialog, buttons, filters, status badges, menu actions, empty state, month names).
+- Documented battery power sign convention in `energy_forecast_service.dart` — `.abs()` is used because BMS vendors disagree on charge/discharge sign.
+- Translated "Try again" to "Coba lagi" in dashboard banners.
+- Improved stale device label from "stale:" to "data lama:".
+
+### Documentation
+
+- Updated `AGENTS.md` with current test coverage (179 tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
 
 # Changelog
 
