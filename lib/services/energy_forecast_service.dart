@@ -38,6 +38,9 @@ class EnergyForecastResult {
 /// [history] uses telemetry keys such as `power_dc`, `power_ac`, `soc`,
 /// `voltage`, and `remain_capacity_ah`. Values are expected in watts, percent,
 /// volts, and amp-hours respectively.
+///
+/// Battery runtime is projected from the battery's own discharge power, not
+/// from the AC load. See [EnergyForecastService.estimateBatteryDischargeWatts].
 class EnergyForecastService {
   const EnergyForecastService();
 
@@ -73,10 +76,6 @@ class EnergyForecastService {
     final voltage = _latestPoint(history, latest, const [
       'voltage',
       'battery_voltage',
-    ]);
-    final current = _latestPoint(history, latest, const [
-      'current',
-      'battery_current',
     ]);
     final remainingAh = _latestPoint(history, latest, const [
       'remain_capacity_ah',
@@ -120,9 +119,12 @@ class EnergyForecastService {
           (remainingAh != null && voltage != null
               ? remainingAh.value * voltage.value / 1000
               : null);
-      final loadWatts =
-          peak?.value ?? (current?.value ?? 0) * (voltage?.value ?? 0);
-      if (capacity != null && capacity > 0 && loadWatts > 0) {
+      final loadWatts = estimateBatteryDischargeWatts(
+        latest: latest,
+        solar: production,
+        usage: usage,
+      );
+      if (capacity != null && capacity > 0 && loadWatts != null && loadWatts > 0) {
         depletionHours = capacity * (socValue / 100) / (loadWatts / 1000);
       }
     }
@@ -143,6 +145,59 @@ class EnergyForecastService {
       sampleStart: start,
       sampleEnd: end,
     );
+  }
+
+  /// Estimates the power the battery is actually delivering, in watts.
+  ///
+  /// Runtime has to be projected from the battery's own discharge. Using the
+  /// AC peak is wrong twice over: a load peak often lands while PV is covering
+  /// it, when the battery is not discharging at all, and a peak is the worst
+  /// case rather than a typical draw, so it inflates the runtime estimate.
+  ///
+  /// Preference order:
+  ///   1. the battery device's own `power` telemetry
+  ///   2. `voltage` x `current` from the battery
+  ///   3. the average AC load across hours with no PV, which the battery
+  ///      necessarily covered
+  ///   4. the AC peak, as a last resort
+  static double? estimateBatteryDischargeWatts({
+    required Map<String, double> latest,
+    required List<TelemetryPoint> solar,
+    required List<TelemetryPoint> usage,
+  }) {
+    final reported = latest['power'];
+    if (reported != null && reported > 0) return reported;
+
+    final voltageValue = latest['voltage'];
+    final currentValue = latest['current'];
+    if (voltageValue != null && currentValue != null) {
+      final watts = voltageValue * currentValue;
+      if (watts > 0) return watts;
+    }
+
+    // An hour counts as dark only when every solar sample in it was flat zero,
+    // so a momentary dip from a passing cloud does not get mistaken for night.
+    final solarByHour = <int, List<double>>{};
+    for (final point in solar) {
+      (solarByHour[point.timestamp.hour] ??= []).add(point.value);
+    }
+    final darkHours = solarByHour.entries
+        .where((entry) => entry.value.every((value) => value <= 0))
+        .map((entry) => entry.key)
+        .toSet();
+    if (darkHours.isNotEmpty) {
+      final nightLoad = usage
+          .where((point) => darkHours.contains(point.timestamp.hour))
+          .map((point) => point.value)
+          .where((value) => value > 0)
+          .toList(growable: false);
+      if (nightLoad.isNotEmpty) {
+        return nightLoad.reduce((a, b) => a + b) / nightLoad.length;
+      }
+    }
+
+    if (usage.isEmpty) return null;
+    return usage.reduce((a, b) => a.value >= b.value ? a : b).value;
   }
 
   List<TelemetryPoint> _points(
