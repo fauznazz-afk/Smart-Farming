@@ -356,23 +356,132 @@ Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas **
 
 ---
 
-## 8. BELUM Diverifikasi - Perlu Dicek
+## 8. Sudah Diverifikasi - Ditutup 26 September 2026
 
-Dua perbaikan punya test unit yang lulus, tapi **belum dilihat hasilnya di layar**.
+Kedua item yang tadinya tertunda **sudah dicek manual di perangkat** dan benar.
+Bagian ini ditutup; tidak perlu dikerjakan lagi.
 
-### 8.1 Label chart mengikuti tanggal
+### 8.1 Label chart mengikuti tanggal - ✅ VERIFIED
 
-**Cara cek**: buka tab **PV** (atau AC / Battery), lalu ketuk tanggal **kemarin** di date strip.
+Membuka tab **PV** dan memilih tanggal kemarin di date strip memunculkan header
+dengan tanggal (`25/9/2026`), bukan "Last 24 hours". Sumbu X di jam bulat.
+Perbaikan `describeHistoryRange()` di `e897cca` bekerja sesuai rancangannya.
 
-**Harus muncul**: header `PV` dengan `25/9/2026` (bukan "Last 24 hours"), dan sumbu X di jam bulat.
+### 8.2 Field TDS menerima angka 4 digit - ✅ VERIFIED
 
-### 8.2 Field TDS menerima angka 4 digit
+Kolom Min / Max **Water TDS** di Settings → Environment alerts menerima
+`1200` dan `2500` tanpa ditolak. Perbaikan `a5bdcaf` bekerja; batas TDS
+kembali terbuka.
 
-**Cara cek**: Settings, Environment alerts, kolom Min / Max **Water TDS**.
+**Catatan**: dari 8 bug di section 5, sekarang **semua 8** punya hasil yang
+sudah dilihat di layar, bukan hanya test hijau.
 
-**Harus bisa**: menerima `1200` atau `2500` tanpa ditolak "TDS tidak boleh lebih dari 100.0".
+---
 
-Kalau masih muncul error, ada bug yang belum ketahuan. Sampaikan saja.
+## 8A. Sesi Build Linux - 26 September 2026
+
+Project berhasil dibuild dari nol di CachyOS. Ringkasan untuk sesi berikutnya.
+
+### Hasil
+
+| Item | Nilai |
+|---|---|
+| Cold launch | **1110 ms** (target <2 detik ✓) |
+| Warm release build | 3 menit 12 detik |
+| `flutter analyze` | No issues found |
+| `flutter test` | 119/119 lulus, 26,6 detik |
+| Sidik jari signing | `504d13ee...` cocok PRD §3 ✓ |
+| Android SDK total | 732 MB (dari 7,5 GB sebelum optimasi) |
+
+### MASALAH BESAR: `dl.google.com` di-throttle
+
+Ini penyebab build pertama memakan **berjam-jam**. AGP dan Gradle wrapper
+mengunduh dari `dl.google.com` dan `services.gradle.org` di **65-114 KB/s**,
+sedangkan `curl -L` ke URL yang sama mencapai **7-44 MB/s**:
+
+| Artefak | via AGP/Gradle | via `curl -fL` |
+|---|---|---|
+| gradle-9.3.1-bin.zip (131 MB) | 103 KB/s → 22 mnt | 6,5 MB/s → 20 dtk |
+| android-ndk-r28c (690 MB) | 65 KB/s → 2,9 jam | 44 MB/s → 17 dtk |
+| platform-35 (61 MB) | 84 KB/s → 13 mnt | 7 MB/s → 9 dtk |
+| platform-34 (60 MB) | 114 KB/s → 9 mnt | 29 MB/s → 2 dtk |
+
+**Jangan pernah membiarkan AGP mengunduh SDK component di mesin ini.**
+Pre-stage dengan `curl`, verifikasi checksum, baru build.
+
+### Gotcha: `package.xml`
+
+`sdkmanager` menulis `<dir>/package.xml` sebagai catatan paket terpasang, dan
+AGP memakainya untuk memutuskan apa yang sudah ada. **Unzip manual tanpa file
+ini akan membuat AGP mengunduh ulang**, padahal payload-nya sudah utuh di
+disk. Gejalanya build diam-diam macet di unduhan yang tidak perlu.
+
+Kabar baik: AGP kadang mengadopsi folder yang ada dan menulis `package.xml`
+sendiri (terjadi untuk `platforms/android-34` dan `35`), tapi tidak selalu
+(`ndk/28.2.13676358` dan `cmake/3.22.1` tidak). Jangan andalkan ini.
+
+Detail skema dan cara membuatnya ada di `~/dev/setup-energrow.sh`
+(fungsi `write_package_xml`).
+
+### Gotcha: parsing repository XML
+
+`https://dl.google.com/android/repository/repository2-3.xml` adalah sumber
+kebenaran untuk nama arsip, ukuran, dan checksum. **Jangan menebak nama.**
+
+Contoh kesalahan nyata: `android-ndk-r28-linux.zip` berisi **28.0.13004108**,
+sedangkan 28.2.13676358 ada di `android-ndk-r28c-linux.zip`. Huruf `c` di
+akhir wajib ada.
+
+Bentuk XML juga mengalahkan parser naïf: `<size>` muncul **sebelum** `<url>`
+di dalam `<complete>`, dan `<host-os>` berada **di luar** `<complete>`. NDK
+mengirim satu `<archive>` per host OS, jadi entry linux harus dipilih eksplisit.
+
+### NDK tidak bisa dihapus dari sisi project
+
+`FlutterPlugin.kt:230` memanggil `forceNdkDownload` **unconditional** untuk
+setiap project Flutter, dan funcinya **memalsukan** `externalNativeBuild`
+supaya AGP mengira NDK dibutuhkan. Tidak ada flag opt-out.
+
+Diverifikasi: build bersih dengan `ndk/` dan `cmake/` dihapus → AGP tetap
+unduh NDK 28.2.13676358, lalu build menghasilkan **0 file `.o`**, tanpa
+`build.ninja`, tanpa `libdartjni.so`. Jadi 2,3 GB diunduh dan tidak dipakai.
+
+Satu-satunya jalan menghilangkannya adalah patch Flutter SDK, yang hilang
+tiap `flutter upgrade`. **Tidak layak repot** - unduhannya sekali seumur
+hidup mesin, dan `~/dev/setup-energrow.sh` mengubahnya jadi 17 detik.
+
+### Yang berhasil dihilangkan
+
+`path_provider_android` 2.3.0 menulis ulang sisi Kotlin-nya di atas paket
+`jni`, yang mengharuskan NDK + CMake. Rantainya:
+
+```
+share_plus → share_plus_platform_interface → path_provider → path_provider_android → jni → NDK + CMake
+```
+
+`dependency_overrides: path_provider_android: 2.2.23` memutus rantainya.
+Plugin Android 14 → 12, `libdartjni.so` hilang dari APK, tidak ada build
+native, tidak ada CMake. Chain tidak bisa diputus dari sisi app karena
+`share_plus_platform_interface` depend on `path_provider` tanpa syarat di
+semua versi yang pernah rilis.
+
+### Toolchain
+
+```
+Flutter 3.47.5 · Dart 3.13.4 · OpenJDK 21.0.12
+Android SDK 36.0.0 · build-tools 36.0.0 · adb 37.0.1 · Gradle 9.3.1
+```
+
+Semua di `$HOME` (`~/dev/flutter`, `~/Android/Sdk`); hanya JDK perlu sudo.
+`~/dev/setup-energrow.sh` membangun ulang semuanya secara idempotent,
+`--check` untuk audit tanpa mengubah apa pun.
+PATH fish ada di `~/.config/fish/conf.d/energrow-toolchain.fish`.
+
+### Dokumen untuk agent
+
+`AGENTS.md` dibuat di sesi ini, berisi semua hal yang mahal untuk
+ditemukan ulang: arsitektur, konvensi, workaround throttle, gotcha ADB,
+dan batas RAM.
 
 ---
 
@@ -399,18 +508,24 @@ Sudah tercatat di README bagian Known Issues:
 
 ## 10. Langkah Berikutnya
 
-### 10.1 Verifikasi dua hal yang tertunda (section 8)
+### 10.1 ~~Verifikasi dua hal yang tertunda~~ - SELESAI 26 September 2026
 
-Cek manual di perangkat. Cepat, dan menutup dua loop yang masih terbuka.
+Kedua item section 8 sudah dicek manual di perangkat dan benar. Tidak ada
+loop terbuka dari sesi refactor.
 
-### 10.2 Build APK release
+### 10.2 Build APK release - SELESAI 26 September 2026
 
 ```bash
 flutter build apk --release
-# output: build/app/outputs/flutter-apk/app-release.apk
+# output: build/app/outputs/flutter-apk/app-release.apk  (58 MB)
 ```
 
-`android/key.properties` sudah ada (ter-ignore di git). Ada `PRD_GitHub_Release_Process.md` yang menjelaskan langkah signing dan GitHub Release.
+Terbangun, sidik jari signing diverifikasi cocok PRD §3, dan sudah terinstall
+serta dijalankan di perangkat. Lihat section 8A.
+
+`android/key.properties` ada (ter-ignore di git). Ada
+`PRD_GitHub_Release_Process.md` yang menjelaskan langkah signing dan GitHub
+Release.
 
 ### 10.3 Refactor sisa (opsional)
 

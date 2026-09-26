@@ -20,11 +20,39 @@ All notable changes to this project are documented here.
 - Added widget tests for the settings browser (`test/settings_screen_test.dart`) covering category listing, section drill-down, back navigation, and CCTV URL rejection
 - Added unit tests for the extracted dashboard helpers (`test/dashboard_helpers_test.dart`) covering history window resolution, sampling intervals, energy integration, cached telemetry partitioning, and telemetry comparison
 - Added `glassDividerColor` helper so divider tinting stays consistent across glass cards
+Added `AGENTS.md`, a working-notes file for coding agents covering the build
+environment, the `dl.google.com` throttling workaround, and the project conventions
+that are easy to get wrong.
+Added `.gitattributes` forcing LF line endings, plus `core.autocrlf = input` on this
+repository, so the 126 files that were showing as modified purely because they had
+CRLF in the working tree no longer do.
+Added `SettingsKeys` usage notes and the `dependency_overrides` block that keeps
+`path_provider_android` on 2.2.23.
 
 ### Changed
 
 - Changed the Android `applicationId` and `namespace` from `com.example.plts_monitoring` to `tech.mbkm.energrow`, and moved `MainActivity` to the matching package path
 - Changed chart axis intervals to snap to round values, so a 24-hour view now labels ticks on the hour instead of at arbitrary offsets such as 02:10
+Pinned `path_provider_android` to 2.2.23 via `dependency_overrides`. Version 2.3.0
+rewrote its Kotlin side on top of the `jni` package, which forced a CMake and NDK
+toolchain to build a 130 KB shared library. This drops the Android plugin count from
+14 to 12 and removes `libdartjni.so` from the APK. `share_plus_platform_interface`
+depends on `path_provider` unconditionally in every published version, so the chain
+cannot be cut at the app level. Both versions target the same
+`path_provider_platform_interface ^2.1.0`, so the plugin API is unchanged.
+Removed `ndkVersion = "30.0.16248370"` from `android/app/build.gradle.kts`. Nothing in
+the app compiles native code, and the pin only made AGP fetch a second, divergent NDK
+copy. Note this does not stop the download: AGP still installs Flutter's default NDK
+during configuration. Verified with no `ndk/` and no `cmake/` in the SDK: it fetches
+28.2.13676358, then produces zero `.o` files and no `build.ninja`.
+Lowered the Gradle JVM heap in `android/gradle.properties` from `-Xmx8G`
+`-XX:MaxMetaspaceSize=4G` to `-Xmx1536M`, plus a 1 GB Kotlin daemon. The old values
+reserved 12 GB on a machine with 7.1 GB of RAM, so the daemon could never be
+satisfied and was at risk of being OOM-killed.
+Changed the Gradle wrapper distribution from `gradle-9.3.1-all.zip` to `-bin.zip`,
+saving roughly 1.2 GB of download since only the binaries are needed to build.
+Ignored `/.kotlin` in `android/.gitignore`; the Kotlin Gradle plugin writes session
+state and incremental caches there during every build.
 
 ### Fixed
 
@@ -46,6 +74,16 @@ All notable changes to this project are documented here.
 - Updated the README Known Issues: the CCTV stream is now live, so the pending `go2rtc` note was replaced with the actual caveats (WebView battery cost while polling continues, rounded Y axis labels)
 - Documented that changing `applicationId` requires uninstalling the previous build, and that the stored session does not carry over
 - Recorded the features verified on a physical Android 16 device
+Consolidated this changelog. It had accumulated three `[Unreleased]` headings and three
+conflicting `1.3.0` headings from an unclean merge. The three `1.3.0` blocks were all
+part of the tagged `v1.3.0` release and are now merged into one section; the block
+headed `[Unreleased] - 2026-09-25` was verified against git tags and belongs to 1.3.1,
+since the realtime telemetry, connection health, energy forecast, and background alarm
+commits all landed before the `v1.3.1` tag.
+Recorded in `AGENTS.md` that the NDK download cannot be avoided from the project side:
+`FlutterPlugin.kt` calls `forceNdkDownload` unconditionally for every app project, and
+that function fabricates a synthetic `externalNativeBuild` so AGP believes an NDK is
+required. There is no opt-out flag.
 
 ### Refactoring
 
@@ -64,7 +102,6 @@ All notable changes to this project are documented here.
 - Extract `_storeHistory` and `_notifyLive` in the dashboard to remove repeated notify branches
 
 ## [1.3.1] - 2026-09-26
-
 ### Added
 
 - Added Weather monitoring feature with OpenWeatherMap API integration
@@ -92,15 +129,6 @@ All notable changes to this project are documented here.
 - Moved `await loadCctvUrl()` outside `setState` in `_loadPreferences` to fix async context issue
 - Restructured all three screens to use modular widget/utility architecture with clear separation of concerns
 
-### Fixed
-
-- Fixed Dart analyze errors in `weather_service.dart` (parentheses for type casting) and `weather_card.dart` (unnecessary underscores)
-- Fixed async context error in Dashboard `_loadPreferences` by moving `await loadCctvUrl()` outside `setState` callback
-- Resolved merge conflicts in settings_screen.dart and energy_report_screen.dart keeping refactored versions
-- Fixed import paths in all extracted utility/widget files for correct module resolution
-- Fixed weather data not updating on dashboard after saving API key in settings
-- Fixed weather card refresh button and settings button in no-data state
-
 ### Improved
 
 - Reduced total codebase by ~1,000 lines through modular extraction while preserving all functionality
@@ -112,16 +140,6 @@ All notable changes to this project are documented here.
 - Weather service now properly throws exceptions for GPS permission issues instead of silently failing
 - **Weather card compact redesign**: Single card with all metrics (temperature, humidity, wind, cloud cover) in one row; removed solar irradiance section; reduced padding and spacing; uses theme colors (primary, secondary, tertiary, outline) that adapt to accent color from Settings
 - **Fixed humidity text overflow**: Reduced font sizes (value: 14→12, label: 12→9), added ellipsis handling, smaller icons (20→18), optimized padding
-
-## [Unreleased]
-
-### Added
-
-- (No unreleased changes at this time)
-
-## [Unreleased] - 2026-09-25
-
-### Improved
 
 - Added a smooth bottom navigation collapse while scrolling down on dashboard pages.
 - Added live ThingsBoard telemetry over WebSocket with automatic reconnect and REST polling fallback.
@@ -140,6 +158,13 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- Fixed Dart analyze errors in `weather_service.dart` (parentheses for type casting) and `weather_card.dart` (unnecessary underscores)
+- Fixed async context error in Dashboard `_loadPreferences` by moving `await loadCctvUrl()` outside `setState` callback
+- Resolved merge conflicts in settings_screen.dart and energy_report_screen.dart keeping refactored versions
+- Fixed import paths in all extracted utility/widget files for correct module resolution
+- Fixed weather data not updating on dashboard after saving API key in settings
+- Fixed weather card refresh button and settings button in no-data state
+
 - Prevented the bottom navigation animation from changing the Scaffold layout height or causing the dashboard to disappear while scrolling.
 - Replaced abrupt navigation content switching with a crossfade and eased width animation.
 - Fixed the date-range picker failing to open when the current day was selected by normalizing picker dates and validating the initial range.
@@ -152,7 +177,6 @@ All notable changes to this project are documented here.
 - Avoided blocking app startup on alarm notification setup by initializing alarm services asynchronously after `runApp` and guarding failures so they no longer prevent the dashboard from launching.
 
 ## [1.3.0] - 2026-09-25
-
 ### Added
 
 - Added last-known telemetry caching with `SharedPreferences` and an offline dashboard banner showing the cache age.
@@ -160,18 +184,9 @@ All notable changes to this project are documented here.
 - Added persistent alarm history for low SOC, stale telemetry, and environment threshold alerts, with a dedicated history screen and clear action.
 - Added screen-reader semantics for telemetry metrics, charts, gauges, connection status, CCTV controls, and energy reports.
 
-### Improved
-
-- Merged successful telemetry snapshots from the battery, PZEM, and environment devices so offline mode can restore the complete dashboard state.
-- Preserved existing alert SnackBars while recording newly triggered alerts in alarm history.
-
-### Validation
-
-- `flutter analyze --no-pub` passed with no issues.
-- `flutter test --no-pub` passed.
-- Debug APK built, installed, and launched successfully on Android device `24090RA29G`.
-
-## [1.3.0+8] - 2026-09-25
+- Added configurable local alerts for ambient temperature, humidity, and water TDS. Blank thresholds are ignored, and alerts only evaluate fresh sensor telemetry.
+- Added a dashboard status that distinguishes ThingsBoard fetch failures from stale telemetry and shows the last successful fetch time.
+- Added validation for environmental threshold ranges in Settings.
 
 ### Changed
 - Restructured settings page from a single flat scrolling page into a nested category-based navigation pattern (like phone settings)
@@ -183,18 +198,10 @@ All notable changes to this project are documented here.
 - Save button is only visible on the main category list page (hidden in detail pages)
 - All existing logic preserved: SharedPreferences keys, save mechanism, validation, theme controller calls, logout flow
 
-### Fixed
-- System back button (Android gesture/swipe) now correctly returns to the settings category list instead of immediately exiting to the dashboard
-
-## [1.3.0] - Unreleased
-
-### Added
-
-- Added configurable local alerts for ambient temperature, humidity, and water TDS. Blank thresholds are ignored, and alerts only evaluate fresh sensor telemetry.
-- Added a dashboard status that distinguishes ThingsBoard fetch failures from stale telemetry and shows the last successful fetch time.
-- Added validation for environmental threshold ranges in Settings.
-
 ### Improved
+
+- Merged successful telemetry snapshots from the battery, PZEM, and environment devices so offline mode can restore the complete dashboard state.
+- Preserved existing alert SnackBars while recording newly triggered alerts in alarm history.
 
 - Smoothed dashboard page transitions by reducing unnecessary rebuilds, isolating page repaints, and optimizing chart rendering.
 - Improved the ThingsBoard connection banner with a three-second display period and smooth fade/collapse exit animation.
@@ -204,6 +211,15 @@ All notable changes to this project are documented here.
 - Added chart point processing and memoized statistics to reduce rendering work for large telemetry histories.
 - Improved energy report chart interaction and rendering with repaint isolation and a dedicated touch-state notifier.
 - Improved ambient glass rendering with repaint isolation for smoother scrolling and page transitions.
+
+### Fixed
+- System back button (Android gesture/swipe) now correctly returns to the settings category list instead of immediately exiting to the dashboard
+
+### Validation
+
+- `flutter analyze --no-pub` passed with no issues.
+- `flutter test --no-pub` passed.
+- Debug APK built, installed, and launched successfully on Android device `24090RA29G`.
 
 ## [1.2.3] - 2026-09-24
 
@@ -327,14 +343,14 @@ All notable changes to this project are documented here.
 - Logout action from the dashboard menu.
 - Release APK build for Android devices.
 
-### Known limitations
-
-- Push notifications, biometric login, WebSocket telemetry subscriptions, and FNN/XAI prediction remain roadmap items.
-- Historical chart availability depends on ThingsBoard telemetry keys and retention.
-- The application requires access to the ThingsBoard server and does not provide full offline mode.
-
 ### Validation
 
 - `flutter analyze` passed with no issues.
 - `flutter test` passed.
 - Release artifact: `app-release.apk`.
+
+### Known limitations
+
+- Push notifications, biometric login, WebSocket telemetry subscriptions, and FNN/XAI prediction remain roadmap items.
+- Historical chart availability depends on ThingsBoard telemetry keys and retention.
+- The application requires access to the ThingsBoard server and does not provide full offline mode.

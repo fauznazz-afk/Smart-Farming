@@ -6,6 +6,10 @@ gradle-wrapper.jar
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/
+# Kotlin compiler session state and incremental caches. Created by the Gradle
+# Kotlin plugin during any build; its `errors/` subfolder holds crash logs that
+# the root *.log rule already catches, but the `sessions/` files did not.
+/.kotlin
 
 # Remember to never publicly share your keystore.
 # See https://flutter.dev/to/reference-keystore
