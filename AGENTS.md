@@ -75,6 +75,20 @@ against the real surfaces from `main.dart` and `liquid_glass.dart`, not against
 white, and 8-bit quantisation is why the hue tolerances there are 0.5° rather
 than exact.
 
+**Green means a problem is absent, and the user did not choose it.** Status
+colours are for warnings. A healthy reading takes the accent and ordinary text;
+it does not take `statusOk`, and it does not get a green outline. Three green
+elements beside an amber theme is the clearest possible statement that two
+palettes are on screen at once, and the boring case is not information.
+
+**One documented exception, and it is deliberate.** The device chart series are
+fixed red, green and blue, and the chart is the one place where "voltage is red"
+is worth more than theme consistency — three lightness steps of one hue are
+indistinguishable on a phone, and dash patterns to compensate read as broken
+lines. It is also the only place on the dashboard where a quantity is not the
+user's data at all but a trend they are reading, which is a different job from
+showing them a sensor value.
+
 ### Polling and rebuilds
 
 `dashboard_screen.dart` polls every `_refreshSeconds` (default 10). To avoid
@@ -429,7 +443,7 @@ actually bitten:
 
 ```
 flutter analyze     # must stay clean
-flutter test        # 227 tests
+flutter test        # 235 tests
 cd android && ./gradlew :app:testDebugUnitTest   # 11 tests, alarm parity + host allowlist
 ```
 

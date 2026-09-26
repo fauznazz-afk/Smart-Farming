@@ -53,6 +53,23 @@ Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>
     ? Colors.white.withValues(alpha: opacity)
     : Colors.black.withValues(alpha: opacity);
 
+/// The outline around a glass card, tinted with the theme accent.
+///
+/// It was a neutral white or black hairline, so a card's contents followed the
+/// accent the user picked while its edge did not: in an amber theme a card held
+/// amber numbers inside a cold grey frame, which is what made the palette read
+/// as two systems rather than one.
+///
+/// [accent] is the theme's `colorScheme.primary`, not the raw seed. That matters,
+/// because `ColorScheme.fromSeed` maps the seed to a tonal colour chosen to stay
+/// legible on the surface, so the border cannot drift out of contrast the way a
+/// bare seed would at the darker and lighter ends of the palette. It is also why
+/// the card needs no new parameter: the accent is already in the theme, and
+/// threading a `seedColor` through every call site would only let the two
+/// disagree later.
+Color glassBorderColor({required Color accent, required bool isDark}) =>
+    accent.withValues(alpha: isDark ? 0.30 : 0.28);
+
 /// The color for secondary text: units, captions, timestamps.
 ///
 /// The pair this replaces, `Colors.white54` on dark and `Colors.black45` on

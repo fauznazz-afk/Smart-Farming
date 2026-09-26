@@ -149,14 +149,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// readers.
   AlarmThresholds _thresholds = AlarmThresholds.defaults;
 
-  /// Which metric the device charts plot. Shared across pages so the choice
-  /// sticks while moving between PV, AC and Battery.
-  ChartMetric _chartMetric = ChartMetric.power;
-
-  void _selectChartMetric(ChartMetric metric) {
-    if (metric == _chartMetric) return;
-    setState(() => _chartMetric = metric);
-  }
 
   List<AlarmRule> get _alarmRules => buildAlarmRules(_thresholds);
 
@@ -1075,8 +1067,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     // mode showed a green "polling active" line directly above an orange
     // "offline" line, which is two opposite claims about the same connection
     // stacked on top of each other before any content appeared.
+    //
+    // The alarm banner is Overview-only. A threshold breach is a fact about the
+    // greenhouse, not about the page being looked at, so repeating it above the
+    // PV, AC, Battery and CCTV pages pushed four lines the user had already read
+    // above the content they opened a tab to see. It still reaches them where it
+    // matters: a notification, and the alarm count in the status strip, which is
+    // present on every page.
+    //
+    // Connection state is different and stays everywhere, because a page of
+    // numbers that cannot be trusted needs to say so wherever it is displayed.
     final items = <Widget Function()>[
-      () => _statusStripBuilder(isDark),
+      () => _statusStripBuilder(isDark, showAlerts: index == 0),
       ..._pageContentFor(index, isDark),
     ];
     return RepaintBoundary(
@@ -1148,7 +1150,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// beats offline mode, which beats an active alarm, which beats stale devices.
   /// Only the most important thing is ever shown, so the strip cannot contradict
   /// itself and does not push the page content off screen.
-  Widget _statusStripBuilder(bool isDark) {
+  Widget _statusStripBuilder(bool isDark, {required bool showAlerts}) {
     return _bindRevision(
       _connectionChromeListenable,
       isDark,
@@ -1179,7 +1181,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           );
         }
-        if (alerts.isNotEmpty) {
+        if (showAlerts && alerts.isNotEmpty) {
           return _bindRevision(
             _alertMessages,
             isDark,
@@ -1275,6 +1277,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _energySummaryCard(bool isDark) {
     return EnergySummaryCard(
+      seedColor: _seedColor,
       isDark: isDark,
       performanceMode: _performanceMode,
       weekly: _weeklyEnergySummary,
@@ -1489,8 +1492,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       prefix: prefix,
       isDark: isDark,
       seedColor: _seedColor,
-      metric: _chartMetric,
-      onMetricChanged: _selectChartMetric,
       performanceMode: _performanceMode,
       points: _history,
       spots: _chartSpots,

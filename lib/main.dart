@@ -10,6 +10,7 @@ import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
+import 'screens/dashboard/utils/color_helpers.dart';
 import 'widgets/liquid_glass.dart';
 import 'services/alarm_notification_service.dart';
 
@@ -17,6 +18,52 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const PltsMonitoringApp());
   unawaited(_initializeAlarmServices());
+}
+
+/// Styling for every `SegmentedButton` in the app.
+///
+/// Material fills the selected segment with the colour scheme's
+/// `secondaryContainer`, which `ColorScheme.fromSeed` derives by desaturating the
+/// seed until it reads as a neutral. With the default green that is invisible;
+/// with "Solar amber" it produced a muddy olive block on a near-black card,
+/// which is the one place in the app where the chosen accent looked broken.
+///
+/// The accent is applied directly instead, at a low alpha over the card, so the
+/// selected segment reads as the user's colour at a weight that does not compete
+/// with the numbers in the card below it. Three separate call sites use
+/// `SegmentedButton`, so this lives in the theme rather than in each of them.
+///
+/// [seed] is passed in rather than read from the context because a
+/// `ThemeData` is built before there is one to read from. Hard-coding the amber
+/// here instead would have fixed the screenshot and broken the other three
+/// palette entries, which is the mistake the rest of this app keeps making.
+SegmentedButtonThemeData _segmentedTheme(Color seed, Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  final accent = themeColor(
+    seedColor: seed,
+    lightness: isDark ? 0.68 : 0.34,
+  );
+  return SegmentedButtonThemeData(
+    style: ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? accent.withValues(alpha: isDark ? 0.22 : 0.16)
+            : Colors.transparent,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? accent
+            : (isDark ? Colors.white70 : Colors.black54),
+      ),
+      side: WidgetStatePropertyAll(
+        BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.16)
+              : Colors.black.withValues(alpha: 0.10),
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _initializeAlarmServices() async {
@@ -76,6 +123,10 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
           ),
           scaffoldBackgroundColor: const Color(0xFFF6F8F7),
           cardTheme: const CardThemeData(color: Colors.white, elevation: 0),
+          segmentedButtonTheme: _segmentedTheme(
+            _themeController.seedColor,
+            Brightness.light,
+          ),
           inputDecorationTheme: const InputDecorationTheme(
             filled: true,
             fillColor: Color(0xFFEBEFEA),
@@ -93,6 +144,10 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
           cardTheme: const CardThemeData(
             color: Color(0xFF1B211E),
             elevation: 0,
+          ),
+          segmentedButtonTheme: _segmentedTheme(
+            _themeController.seedColor,
+            Brightness.dark,
           ),
           inputDecorationTheme: const InputDecorationTheme(
             filled: true,

@@ -79,6 +79,7 @@ class SystemStatusStrip extends StatelessWidget {
               // its own; whether that is a problem is the user's setting.
               detail: 'min ${lowSocThreshold.toStringAsFixed(0)}%',
               isDark: isDark,
+              seedColor: seedColor,
             ),
             _divider(isDark),
             _Verdict(
@@ -89,6 +90,7 @@ class SystemStatusStrip extends StatelessWidget {
               detail: '${ac.voltage.toStringAsFixed(0)} V · '
                   '${ac.frequency.toStringAsFixed(0)} Hz',
               isDark: isDark,
+              seedColor: seedColor,
             ),
             if (activeAlerts > 0) ...[
               _divider(isDark),
@@ -99,6 +101,7 @@ class SystemStatusStrip extends StatelessWidget {
                 ok: false,
                 detail: 'aktif',
                 isDark: isDark,
+                seedColor: seedColor,
               ),
             ],
           ],
@@ -126,6 +129,7 @@ class _Verdict extends StatelessWidget {
     required this.ok,
     required this.detail,
     required this.isDark,
+    required this.seedColor,
   });
 
   final IconData icon;
@@ -134,10 +138,28 @@ class _Verdict extends StatelessWidget {
   final bool ok;
   final String detail;
   final bool isDark;
+  final Color seedColor;
 
   @override
   Widget build(BuildContext context) {
-    final color = ok ? statusOk(isDark) : statusBad(isDark);
+    // The verdict is a warning, so only a warning is coloured. A healthy
+    // reading is printed in ordinary text and the tick stays green.
+    //
+    // The value used to take the status colour unconditionally, which put three
+    // green elements next to an amber theme's amber everything and read as two
+    // unrelated colour systems. "70%" is not a status; whether 70% is enough is
+    // the user's own threshold, and the icon already says it is fine. A low
+    // battery still turns the number red, which is the case that matters.
+    final color = ok
+        ? (isDark ? Colors.white : Colors.black87)
+        : statusBad(isDark);
+    // Same rule for the icon: the accent when there is nothing to report, a
+    // status colour when there is. A green tick beside an amber theme is the
+    // clearest statement that two palettes are on screen at once, and it says
+    // nothing the icon shape does not already say.
+    final iconColor = ok
+        ? themeColor(seedColor: seedColor, lightness: isDark ? 0.68 : 0.38)
+        : statusBad(isDark);
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,7 +167,7 @@ class _Verdict extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 13, color: color),
+              Icon(icon, size: 13, color: iconColor),
               const SizedBox(width: 5),
               Flexible(
                 child: Text(

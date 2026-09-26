@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/dashboard/utils/color_helpers.dart';
 import '../services/energy_forecast_service.dart';
 import 'liquid_glass.dart';
 
@@ -18,9 +19,11 @@ class EnergySummaryCard extends StatelessWidget {
     required this.previousLoadKwh,
     required this.onRangeChanged,
     required this.onOpenReport,
+    required this.seedColor,
     this.forecast,
   });
 
+  final Color seedColor;
   final bool isDark;
   final bool performanceMode;
   final bool weekly;
@@ -37,12 +40,37 @@ class EnergySummaryCard extends StatelessWidget {
 
   String _formatEnergy(double value) => value.toStringAsFixed(2);
 
+  /// How this period compares with the one before it.
+  ///
+  /// A percentage is only meaningful once the previous period held a real
+  /// amount of energy. It used to be printed whenever `previous > 0`, so a
+  /// period that generated 0.01 kWh followed by one that generated none showed
+  /// "−100% dari periode lalu": arithmetically correct, and it reads as a
+  /// catastrophic loss rather than as "there was nothing then". Below
+  /// [meaningfulPrevious] the absolute figures speak for themselves and a
+  /// percentage would only dramatise rounding.
+  ///
+  /// The threshold is 0.1 kWh, not the 0.01 kWh the value above is displayed
+  /// to. A tenth of a kilowatt-hour is 360 Wh; below that the two periods are
+  /// both rounding noise, and a user reading "−100%" against "0.00 kWh" is being
+  /// told a hundred percent about a number that is displayed as zero.
   String _comparison(double current, double previous) {
     if (previous <= 0) return 'Belum ada pembanding';
+    if (previous < _meaningfulPrevious) {
+      if (current < _meaningfulPrevious) {
+        return current <= 0
+            ? 'Tidak ada produksi'
+            : '(${_formatEnergy(current)} kWh, sebelumnya nihil)';
+      }
+      return 'Belum ada pembanding berarti';
+    }
     final change = ((current - previous) / previous * 100).round();
     if (change == 0) return 'Sama dengan periode lalu';
     return '${change > 0 ? '+' : ''}$change% dari periode lalu';
   }
+
+  /// Below this, two periods are both too small for a ratio to mean anything.
+  static const double _meaningfulPrevious = 0.1;
 
   Widget _metric({
     required String title,
@@ -98,12 +126,24 @@ class EnergySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final solarColor = isDark
-        ? const Color(0xFFFFC857)
-        : const Color(0xFFB77900);
-    final loadColor = isDark
-        ? const Color(0xFF69B7FF)
-        : const Color(0xFF1769AA);
+    // Both tiles follow the accent the user picked, separated only by lightness.
+    //
+    // They were hard-coded amber and blue, which meant a user who selected
+    // "Ocean cyan" got two large saturated tiles in colours that appear nowhere
+    // in Settings. That is the same objection as the hue rotation, in a place
+    // where it is more visible: the Overview page stopped matching the rest of
+    // the app. Two lightness steps of one hue keeps the tiles distinguishable
+    // from each other — which their icons and labels already do — while the page
+    // stays inside the palette the user actually chose.
+    final solarColor = themeColor(
+      seedColor: seedColor,
+      lightness: isDark ? 0.72 : 0.42,
+    );
+    final loadColor = themeColor(
+      seedColor: seedColor,
+      lightness: isDark ? 0.52 : 0.30,
+      saturation: 0.5,
+    );
 
     return LiquidGlassCard(
       isDark: isDark,

@@ -92,7 +92,7 @@ class EnvironmentGrid extends StatelessWidget {
         Row(
           children: [
             Text(
-              'Environment',
+              'Lingkungan',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -265,11 +265,14 @@ class _EnvCard extends StatelessWidget {
       index: 3,
       isDark: isDark,
     );
-    final status = switch (verdict) {
-      true => statusOk(isDark),
-      false => statusBad(isDark),
-      null => null,
-    };
+    // Only a breach is coloured. A reading inside its range keeps the card's own
+    // accent-tinted outline and an ordinary caption, because "fine" is the
+    // boring case and green is not information: it is a second colour system
+    // sitting next to the theme, and in an amber or cyan theme the page filled
+    // up with green text the user had never chosen. The grid's verdict at the
+    // top already counts what is out of range.
+    final breached = verdict == false;
+    final status = breached ? statusBad(isDark) : null;
 
     return LiquidGlassCard(
       isDark: isDark,

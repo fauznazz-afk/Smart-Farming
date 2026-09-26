@@ -2,6 +2,15 @@
 
 ### Fixed
 
+- **The device charts plot voltage, current and power together again.** Splitting them into a metric picker was wrong: seeing all three at once is the reason the chart exists. They are still one series each on a shared axis, so the readability problem is solved by scaling each against its own range and labelling the axis as a percentage — on the AC page power reaches 3500 W while current stays under 16 A, so a raw shared axis flattened two of the three traces onto the X axis. The tooltip and the readout under the chart print real volts, amperes and watts, and `SeriesScale` has tests for the inverse mapping, a flat series (a steady 220 V mains reading divides by zero otherwise) and a negative range (a discharging pack).
+- **The chart series colours are fixed red, green and blue again, and the lines are solid.** Deriving three series from the theme accent as three lightness steps was tried, then distinguishing them with dash patterns, and both were rejected: three obvious colours need no legend decoding, and a dashed trace on a phone reads as broken rather than as styled.
+- **The card outline now follows the theme accent.** It was a neutral white or black hairline, so a card in an amber theme held amber numbers inside a cold grey frame and the palette read as two systems. It is taken from `colorScheme.primary` rather than a new parameter, because the theme already carries the accent and threading a `seedColor` through every call site would only let the two disagree later.
+- **Green no longer appears on a healthy dashboard.** The status strip coloured the value text, the battery icon and the tick green even when nothing was wrong, and every environment card in range got a green border and a green range caption. In an amber or cyan theme that put a second colour system all over the page. Now only a breach is coloured; a healthy reading keeps the card's accent-tinted outline and ordinary text, which is the same rule already applied to the environment grid's verdict.
+- **`SegmentedButton` no longer fills the selected segment with a muddy tone.** Material uses the colour scheme's `secondaryContainer`, which `ColorScheme.fromSeed` desaturates until it reads as neutral — invisible with the default green, an olive block on a near-black card with "Solar amber". All three segmented buttons in the app now take their selected fill and text from the accent through a `SegmentedButtonThemeData`, since the seed is available where the `ThemeData` is built.
+- **`Environment` is now `Lingkungan`**, and the energy comparison no longer prints "−100% dari periode lalu" when the previous period held 0.01 kWh. That figure is arithmetically right and reads as a catastrophe; below 0.1 kWh both periods are rounding noise against a value displayed to two decimals, so the card says what actually happened.
+- **The alarm banner appears on the Overview page only.** A threshold breach is a fact about the greenhouse, not about the tab being looked at, and repeating it above the PV, AC, Battery and CCTV pages pushed four already-read lines above the content the user opened a tab to see. Connection state still shows on every page, because a page of numbers that cannot be trusted needs to say so wherever it appears, and the alarm count is in the status strip on every page.
+
+
 - **Fixed a background check that could be killed mid-write.** The worst case ran about 48 seconds against the ~10 seconds a manifest `BroadcastReceiver` is allowed, and the slow path was the *expected* one whenever the access token had expired. Being killed between writing credentials and saving the active set made the next tick treat the same alarms as new, which is the duplicate notification the design exists to prevent. A wall-clock budget is now enforced, per-request timeouts are capped below it, and the token refresh is skipped rather than started when the budget is already spent.
 - **Fixed three independent check runners with no mutual exclusion.** The scheduled receiver, the "check now" button and the debug trigger each ran on their own thread, so two could read the same active set and both decide an alarm was new. One process-wide guard now covers all three.
 - **Fixed "check now" silently doing nothing.** The manual trigger inherited the foreground stand-down, so pressing the button while looking at the app skipped the check. It now bypasses the stand-down, which is what a user pressing it means.
@@ -38,6 +47,7 @@
 - Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
 - Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
 - Added `test/color_helpers_test.dart` — 8 tests pinning that `metricColor` and `strongMetricColor` never rotate hue away from the accent the user picked, and that every text colour in the file clears AA on the real surfaces.
+- Added `lib/screens/dashboard/charts/series_scale.dart` and `test/series_scale_test.dart` — 8 tests for the per-series normalisation the three-unit chart depends on. Extracted from the widget so the arithmetic is reachable from `flutter test`; the failure it guards against is a chart that still draws and still animates with two of three traces flat on the axis, which reads as "nothing happening" rather than as a broken chart.
 
 ### Changed
 
@@ -86,7 +96,7 @@
 - Corrected `PRD_PLTS_Monitoring_App.md` §4.5, §6 and §7, which still claimed no alert reaches the user while the app is closed.
 - Replaced `progress.md` §10.5, which had recorded the old Dart alarm as merely untested. It was broken, and the reason was a missing manifest declaration.
 - Recorded the security review outcome in `AGENTS.md`, including the two findings that were real defects in brand-new code: the receiver time budget and the missing mutual exclusion between check entry points.
-- Updated `AGENTS.md` with current test coverage (227 Dart tests, 11 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
+- Updated `AGENTS.md` with current test coverage (235 Dart tests, 11 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
 
 # Changelog
 

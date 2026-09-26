@@ -160,16 +160,20 @@ class LiquidGlassCard extends StatelessWidget {
     final surface =
         tintColor ?? (isDark ? const Color(0xFF202020) : Colors.white);
 
-    // A white border on a near-white card is not a border. Light mode uses a
-    // faint black hairline instead, which is what GlassDateChip in this same
-    // file already did.
+    // The hairline follows the theme accent. It used to be a neutral white or
+    // black, which meant a card in an amber theme had amber contents inside a
+    // cold grey frame. `colorScheme.primary` is the tonal colour
+    // `ColorScheme.fromSeed` derived from the user's pick, so it is guaranteed
+    // to be legible on this surface — and reading it from the theme means no
+    // call site has to pass a colour that could disagree with the one in use.
     final border = Border.all(
       width: 1.2,
       color:
           borderColor ??
-          (isDark
-              ? Colors.white.withValues(alpha: 0.13)
-              : Colors.black.withValues(alpha: 0.07)),
+          glassBorderColor(
+            accent: Theme.of(context).colorScheme.primary,
+            isDark: isDark,
+          ),
     );
 
     final shadows = [
