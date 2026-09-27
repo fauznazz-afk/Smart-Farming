@@ -865,7 +865,7 @@ ke pengguna.
 **D. Verifikasi perangkat di lebih dari satu ukuran layar**
 
 Semua verifikasi optimist ini di satu Xiaomi 24090RA29G, 1220×2712, density 520.
-Tiga tempat yang secaraTeoretis bisa pecah di layar kecil: bar tiga item di
+Tiga tempat yang secara teoritis bisa pecah di layar kecil: bar tiga item di
 `_PowerFlow` (Solar / House / Battery), legenda chart tiga seri, dan dua tile
 Energy analytics. `test/` tidak bisa menangkap ini; butuh perangkat atau
 screenshot pada beberapa density.
@@ -881,7 +881,7 @@ dan jangan sebelum A dan B selesai karena keduanya menyentuh penyimpanan sesi.
 - iOS dan web. `AlarmBridge` melihat `MissingPluginException`, latch
   `isUnavailable`, dan jadi no-op — aman, tapi berarti background alarm adalah
   fitur Android tanpa padanan, dan `status` untuk diagnostik mengembalikan null
-  di sana. Kalau aplikasi pernahAlberto wipeFS shipped di platform kedua, ini harus
+  di sana. Kalau aplikasi direncanakan ship di platform kedua, ketidakfungsiannya harus
   disurface di UI lebih dulu.
 - Push notification dari server. Butuh jalur server yang belum ada; lihat PRD §6.
 - Multi-user/role. Hanya kalau kebutuhan operasional bertambah.

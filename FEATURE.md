@@ -16,6 +16,9 @@ berhasil lolos review.
 dibuktikan bekerja. Kalau fitur dihapus, hapus juga barisnya di sini. Jangan buat
 dokumen kedua.
 
+**Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
+AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
+
 **Status verifikasi:** 27 September 2026, `origin/main` = `d9fcf54`. Flutter
 3.47.5 / Dart 3.13.4, target Android (API 36). `flutter analyze` bersih,
 `flutter test` 227 lulus, `./gradlew :app:testDebugUnitTest` 11 lulus.

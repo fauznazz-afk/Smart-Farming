@@ -142,6 +142,17 @@
 
 ### Documentation
 
+- Added `AGENT_PLAYBOOK.md`, a working manual for agents on this repo: the
+  mandatory reading list with the five questions it should answer, when a subagent
+  is worth spawning and when one `grep` is enough, the six rules about subagents
+  that prevent file collisions, the environment numbers that decide whether two
+  builds can run at once, the hard rules, ten harness and domain gotchas that have
+  cost real time, the verification gates including what can only be checked on a
+  device, and the commit protocol. It is written from what actually happened this
+  session, including the harness failures: file content mutating on write,
+  backticks inside a shell-interpreted `python3 -c` silently deleting a filename,
+  line-index edits landing on the wrong line, and a long `write` call truncating
+  mid-document.
 - Added `FEATURE.md`, an inventory of what is actually implemented, verified
   against the source rather than against the other markdown files. Each entry says
   where the feature lives and what proves it works, and §18 lists the gaps: nine
