@@ -138,7 +138,7 @@ class CctvStandbyOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Kamera siap ditampilkan',
+                'Camera ready',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -147,7 +147,7 @@ class CctvStandbyOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Stream tidak berjalan sebelum Anda menekan Play',
+                'The stream does not run until you press Play',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xB3FFFFFF),
@@ -158,7 +158,7 @@ class CctvStandbyOverlay extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Play kamera'),
+                label: const Text('Play camera'),
                 style: FilledButton.styleFrom(
                   backgroundColor: primary,
                   foregroundColor: Colors.white,
@@ -217,7 +217,7 @@ class CctvErrorOverlay extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Kamera tidak dapat dimuat',
+              'Camera could not be loaded',
               style: TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 12),
@@ -227,9 +227,9 @@ class CctvErrorOverlay extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Coba lagi'),
+                  label: const Text('Retry'),
                 ),
-                TextButton(onPressed: onBack, child: const Text('Kembali')),
+                TextButton(onPressed: onBack, child: const Text('Back')),
               ],
             ),
           ],

@@ -1,14 +1,71 @@
 ## [Unreleased]
 
+### Changed
+
+- **The app is now entirely in English.** The interface had been a mix: alarm
+  messages, the energy card, the status strip and the environment grid were
+  Indonesian while the settings screens, the detail pages and the metric labels
+  were English, so the same screen could read two languages. Terms are chosen once
+  and used throughout — "limit" for a configured bound, "stale" for telemetry that
+  has stopped being fresh, "out of range" for a breached threshold, "AC grid" for
+  the mains supply, "Live" for the realtime connection. The alarm message strings
+  changed too, in both `formatAlarmMessage` and `AlarmMessageFormat.kt`, and
+  `alarm_parity_vectors.json` was regenerated so the Dart and Kotlin evaluators are
+  still pinned to identical output.
+
 ### Fixed
 
-- **The device charts plot voltage, current and power together again.** Splitting them into a metric picker was wrong: seeing all three at once is the reason the chart exists. They are still one series each on a shared axis, so the readability problem is solved by scaling each against its own range and labelling the axis as a percentage — on the AC page power reaches 3500 W while current stays under 16 A, so a raw shared axis flattened two of the three traces onto the X axis. The tooltip and the readout under the chart print real volts, amperes and watts, and `SeriesScale` has tests for the inverse mapping, a flat series (a steady 220 V mains reading divides by zero otherwise) and a negative range (a discharging pack).
-- **The chart series colours are fixed red, green and blue again, and the lines are solid.** Deriving three series from the theme accent as three lightness steps was tried, then distinguishing them with dash patterns, and both were rejected: three obvious colours need no legend decoding, and a dashed trace on a phone reads as broken rather than as styled.
+- **The alarm banner now collapses instead of vanishing.** It was rendered by a
+  plain conditional, so an alarm clearing made the entire Overview jump up by the
+  banner's full card height in a single frame with no transition, which reads as a
+  glitch rather than as a condition ending. Every banner now goes through a
+  switcher that fades it, lifts it slightly and shrinks its height continuously.
+  The collapse needs a `SizeTransition` and not just a fade: the switcher stacks
+  the outgoing banner under the incoming one, and a stack takes the largest of its
+  children, so a banner that only faded would hold its full height for the whole
+  exit and then snap to zero on the last frame. The exit is longer than the
+  entrance — an alarm appearing deserves to be noticed quickly, one clearing is
+  information but does not need to interrupt. A change to *which* alarms are active
+  cross-fades the text as well as resizing.
+- **The chart's min and max are no longer truncated.** "↓ 6.98 ↑ 21.43 V" on one
+  line overflowed a third of the card width and ellipsised to "109....", losing the
+  one figure a reader cannot afford to lose. Each figure gets its own line.
+- **The chart Y axis carries real values again.** Normalising each series to 0–100 %
+  of its own range was tried so all three would fill the plot height. It was
+  reverted at the user's request: a reader who sees "0%, 50%, 100%" has to look up
+  three separate scales in the legend to learn anything, and on the PV and battery
+  pages the three quantities are within an order of magnitude anyway, so the raw
+  axis was already readable. Only the AC page has power two orders above current,
+  and a flat trace there is honest rather than broken.
+- **The chart no longer renders an empty plot.** Passing an empty `dashArray` to
+  fl_chart does not mean "solid", it means "draw nothing": the pattern is walked by
+  `pattern[index % pattern.length]`, so a zero-length list produces no output at
+  all. The card came up with correct axes, a correct legend and correct statistics
+  and no lines, which is the worst shape of bug to spot on a device. Leaving the
+  field unset is what draws a solid line.
+- **Overlapping chart traces are both visible.** Current and power are
+  proportional, so their lines usually coincide exactly and the one drawn last hid
+  the other completely. The lines are slightly transparent, so a trace underneath
+  shows through.
+- **The "Live" indicator takes the accent rather than green**, for the same reason
+  as the rest: a green badge for a condition that is normally fine is a second
+  colour system next to the theme.
+- **The device charts plot voltage, current and power together again.** Splitting them behind a metric picker was wrong: seeing all three at once is the reason the chart exists. They are drawn raw against one shared, dynamic Y axis. The series colours are fixed red, green and blue and the lines are solid; deriving three series from the theme accent as lightness steps, and then telling them apart with dash patterns, were both tried and both rejected, because three obvious colours need no legend decoding and a dashed trace on a phone reads as broken.
 - **The card outline now follows the theme accent.** It was a neutral white or black hairline, so a card in an amber theme held amber numbers inside a cold grey frame and the palette read as two systems. It is taken from `colorScheme.primary` rather than a new parameter, because the theme already carries the accent and threading a `seedColor` through every call site would only let the two disagree later.
 - **Green no longer appears on a healthy dashboard.** The status strip coloured the value text, the battery icon and the tick green even when nothing was wrong, and every environment card in range got a green border and a green range caption. In an amber or cyan theme that put a second colour system all over the page. Now only a breach is coloured; a healthy reading keeps the card's accent-tinted outline and ordinary text, which is the same rule already applied to the environment grid's verdict.
 - **`SegmentedButton` no longer fills the selected segment with a muddy tone.** Material uses the colour scheme's `secondaryContainer`, which `ColorScheme.fromSeed` desaturates until it reads as neutral — invisible with the default green, an olive block on a near-black card with "Solar amber". All three segmented buttons in the app now take their selected fill and text from the accent through a `SegmentedButtonThemeData`, since the seed is available where the `ThemeData` is built.
-- **`Environment` is now `Lingkungan`**, and the energy comparison no longer prints "−100% dari periode lalu" when the previous period held 0.01 kWh. That figure is arithmetically right and reads as a catastrophe; below 0.1 kWh both periods are rounding noise against a value displayed to two decimals, so the card says what actually happened.
+- **The energy comparison no longer prints "−100% from the previous period"** when the previous period held 0.01 kWh. That figure is arithmetically right and reads as a catastrophe; below 0.1 kWh both periods are rounding noise against a value displayed to two decimals, so the card says what actually happened instead.
 - **The alarm banner appears on the Overview page only.** A threshold breach is a fact about the greenhouse, not about the tab being looked at, and repeating it above the PV, AC, Battery and CCTV pages pushed four already-read lines above the content the user opened a tab to see. Connection state still shows on every page, because a page of numbers that cannot be trusted needs to say so wherever it appears, and the alarm count is in the status strip on every page.
+- **The date range picker is now localised in English.** Its chrome comes from a `Locale` argument rather than from the strings passed to it, so it was the last Indonesian surface in the app: day headers and month names inside an otherwise English dialog.
+- **The exported CSV is named `energy_report_*.csv`** rather than `laporan_energi_*.csv`. The filename reaches the user through the share sheet, so it is part of the interface.
+- The energy comparison caption is short enough not to wrap. The two tiles sit side by side and wrap independently, so a caption that wraps on one of them leaves the pair with mismatched heights.
+- **The hero card now shows where the power is going** instead of three shortcut capsules. The capsules showed PV output, AC load and battery charge, and all three were already on that same card: the PV figure is the number directly above in the hero, the battery charge is the gauge beside it, and as navigation they duplicated the bottom bar, which already has PV, AC and Battery tabs. Their progress bars were the weakest part of all — PV was divided by a hard-coded 300 W and the load by 2000 W, so a bar could read full while the number beside it was wrong. The strip reads solar, house and battery, draws the house's share of the array's output as a proportion, and states in one line whether the array is covering the load.
+- **The battery figure comes from the BMS's own `power` key**, not multiplied out from voltage and current. The device reports all three. Deriving it gave two separate wrong answers: the product collapses to zero whenever current reads 0.00 A, which this BMS does report while idle, and the two figures drift apart whenever the pack is not at its nominal voltage.
+- **The battery state is a three-way split, not a boolean.** The pack genuinely moves between charging, standby and discharging, and at zero current the sign of the reading is pure noise, so the strip would flip between "Charging" and "Discharging" several times a minute while asserting a direction the data does not establish. Below 1 W it says "Standby" and claims nothing.
+- **The hero card prints the battery figure with the sign the device reports.** Negating it so the card read "Charging 12 W" was tried and reverted: the Battery page, one tab away, says "Power -12.92 W", and making the hero prettier at the cost of two screens disagreeing about the same measurement makes the app less trustworthy. The label carries the direction and the number matches the other page exactly.
+- **"PV Output" no longer appears three times on one card.** It was the card header, the caption directly under the big number, and the first capsule's label. The header now names the card ("Live power") and the duplicate caption is gone; the capsule label is the one that had to stay, because three identical tiles in a row are indistinguishable without it.
+- **The split bar under the power flow actually draws.** `SizedBox(height: 5)` alone leaves `maxWidth` at infinity, so the `Row` beneath it was unbounded and its `Expanded` segments resolved to nothing — the bar rendered as empty space with no exception to notice.
+
 
 
 - **Fixed a background check that could be killed mid-write.** The worst case ran about 48 seconds against the ~10 seconds a manifest `BroadcastReceiver` is allowed, and the slow path was the *expected* one whenever the access token had expired. Being killed between writing credentials and saving the active set made the next tick treat the same alarms as new, which is the duplicate notification the design exists to prevent. A wall-clock budget is now enforced, per-request timeouts are capped below it, and the token refresh is skipped rather than started when the budget is already spent.
@@ -47,7 +104,6 @@
 - Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
 - Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
 - Added `test/color_helpers_test.dart` — 8 tests pinning that `metricColor` and `strongMetricColor` never rotate hue away from the accent the user picked, and that every text colour in the file clears AA on the real surfaces.
-- Added `lib/screens/dashboard/charts/series_scale.dart` and `test/series_scale_test.dart` — 8 tests for the per-series normalisation the three-unit chart depends on. Extracted from the widget so the arithmetic is reachable from `flutter test`; the failure it guards against is a chart that still draws and still animates with two of three traces flat on the axis, which reads as "nothing happening" rather than as a broken chart.
 
 ### Changed
 

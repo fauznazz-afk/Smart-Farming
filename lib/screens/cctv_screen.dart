@@ -163,7 +163,7 @@ class _CctvScreenState extends State<CctvScreen> {
             right: 16,
             child: CctvRoundControl(
               icon: Icons.close_rounded,
-              tooltip: 'Tutup layar penuh',
+              tooltip: 'Exit full screen',
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -217,7 +217,7 @@ class _CctvScreenState extends State<CctvScreen> {
               Padding(
                 padding: const EdgeInsets.only(left: 54, top: 4),
                 child: Text(
-                  'Pantau area secara langsung',
+                  'Watch the area live',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.textTheme.bodySmall?.color?.withValues(
                       alpha: 0.66,
@@ -246,7 +246,7 @@ class _CctvScreenState extends State<CctvScreen> {
                         children: [
                           CctvRoundControl(
                             icon: Icons.fullscreen_rounded,
-                            tooltip: 'Layar penuh',
+                            tooltip: 'Full screen',
                             onPressed: _openFullScreen,
                           ),
                           const SizedBox(width: 8),
@@ -325,14 +325,14 @@ class _InfoBar extends StatelessWidget {
           Expanded(
             child: Text(
               isPlaying
-                  ? 'Stream aktif menggunakan koneksi internet.'
-                  : 'Tekan Play saat Anda siap melihat kamera.',
+                  ? 'The stream is running on an internet connection.'
+                  : 'Press Play when you are ready to watch the camera.',
               style: theme.textTheme.bodySmall,
             ),
           ),
           if (showReload && onReload != null)
             IconButton(
-              tooltip: 'Muat ulang kamera',
+              tooltip: 'Reload camera',
               visualDensity: VisualDensity.compact,
               onPressed: onReload,
               icon: const Icon(Icons.refresh_rounded),

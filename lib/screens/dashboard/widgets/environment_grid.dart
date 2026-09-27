@@ -20,17 +20,18 @@ class _EnvSpec {
   final String? metric;
 }
 
-/// Labels are Indonesian and short. "Ambient Temp" used to ellipsise to
+/// Labels are short. "Ambient Temp" used to ellipsise to
 /// "Ambient T..." in a third-width card, which cost the reader the one thing
 /// they needed most; the labels were shortened before a status icon was added,
 /// and the icon has since been removed, so there is room to grow them back if
 /// the cards ever get wider.
 const _envSpecs = [
-  _EnvSpec('temp_dht', 'Suhu', '°C', Icons.thermostat, metric: 'temp_dht'),
-  _EnvSpec('humidity_dht', 'Kelembapan', '%', Icons.water_drop,
+  _EnvSpec('temp_dht', 'Temperature', '°C', Icons.thermostat,
+      metric: 'temp_dht'),
+  _EnvSpec('humidity_dht', 'Humidity', '%', Icons.water_drop,
       metric: 'humidity_dht'),
-  _EnvSpec('temp_ds18b20', 'Suhu PV', '°C', Icons.device_thermostat),
-  _EnvSpec('lux', 'Cahaya', 'lx', Icons.light_mode),
+  _EnvSpec('temp_ds18b20', 'PV Temp', '°C', Icons.device_thermostat),
+  _EnvSpec('lux', 'Light', 'lx', Icons.light_mode),
   _EnvSpec('tds_ppm', 'TDS', 'ppm', Icons.science, metric: 'tds_ppm'),
 ];
 
@@ -92,7 +93,7 @@ class EnvironmentGrid extends StatelessWidget {
         Row(
           children: [
             Text(
-              'Lingkungan',
+              'Environment',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -107,13 +108,13 @@ class EnvironmentGrid extends StatelessWidget {
             // asserting it permanently put a permanent badge on the screen.
             if (verdicts.isStale)
               _Tag(
-                text: 'Data lama',
+                text: 'Stale data',
                 color: statusWarn(isDark),
                 isDark: isDark,
               )
             else if (breached > 0)
               _Tag(
-                text: '$breached di luar batas',
+                text: '$breached out of range',
                 color: statusBad(isDark),
                 isDark: isDark,
               ),

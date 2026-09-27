@@ -80,7 +80,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: _monthly ? 'Pilih bulan laporan' : 'Pilih tanggal laporan',
+      helpText: _monthly ? 'Select the report month' : 'Select the report date',
     );
     if (selected == null) return;
     final monthChanged =
@@ -114,7 +114,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
         title: const Text('Energi Analytics'),
         actions: [
           IconButton(
-            tooltip: 'Segarkan laporan',
+            tooltip: 'Refresh report',
             onPressed: _requestInFlight ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),

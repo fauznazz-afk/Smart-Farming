@@ -63,7 +63,7 @@ class WeatherCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Cuaca tidak tersedia',
+              'Weather unavailable',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
@@ -81,7 +81,7 @@ class WeatherCard extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh, size: 14),
-              label: const Text('Coba Lagi'),
+              label: const Text('Retry'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: Size.zero,
@@ -156,7 +156,7 @@ class WeatherCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isGoodForSolar ? 'Bagus untuk Solar' : 'Kurang Optimal',
+                  isGoodForSolar ? 'Good for solar' : 'Not ideal',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
@@ -184,7 +184,7 @@ class WeatherCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _WeatherMetric(
-                  label: 'Suhu',
+                  label: 'Temperature',
                   value: '${weather!.temperature.toStringAsFixed(1)}°C',
                   icon: Icons.thermostat,
                   color: colorScheme.tertiary,
@@ -194,7 +194,7 @@ class WeatherCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
-                  label: 'Kelembapan',
+                  label: 'Humidity',
                   value: '${weather!.humidity.toStringAsFixed(0)}%',
                   icon: Icons.water_drop,
                   color: colorScheme.secondary,
@@ -204,7 +204,7 @@ class WeatherCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
-                  label: 'Angin',
+                  label: 'Wind',
                   value: '${weather!.windSpeed.toStringAsFixed(1)} m/s',
                   icon: Icons.air,
                   color: colorScheme.primary,
@@ -214,7 +214,7 @@ class WeatherCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: _WeatherMetric(
-                  label: 'Awan',
+                  label: 'Cloud',
                   value: '${weather!.cloudCover.toStringAsFixed(0)}%',
                   icon: Icons.cloud,
                   color: colorScheme.outline,
@@ -244,7 +244,7 @@ class WeatherCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Data Cuaca',
+            'Weather Data',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: colorScheme.onSurface,
@@ -252,7 +252,7 @@ class WeatherCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Tambahkan API Key OpenWeatherMap di pengaturan',
+            'Add an OpenWeatherMap API key in settings',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -262,7 +262,7 @@ class WeatherCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: onSettings,
             icon: const Icon(Icons.settings, size: 14),
-            label: const Text('Buka Pengaturan'),
+            label: const Text('Open Settings'),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               minimumSize: Size.zero,

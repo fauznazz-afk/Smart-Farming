@@ -15,10 +15,10 @@ class GreetingHeader extends StatelessWidget {
   final bool isDark;
 
   static String greetingFor(DateTime now) {
-    if (now.hour < 12) return 'Selamat Pagi';
-    if (now.hour < 15) return 'Selamat Siang';
-    if (now.hour < 18) return 'Selamat Sore';
-    return 'Selamat Malam';
+    if (now.hour < 12) return 'Good morning';
+    if (now.hour < 15) return 'Good afternoon';
+    if (now.hour < 18) return 'Good evening';
+    return 'Good night';
   }
 
   @override
@@ -42,7 +42,7 @@ class GreetingHeader extends StatelessWidget {
               fit: BoxFit.contain,
               color: primary,
               colorBlendMode: BlendMode.srcIn,
-              semanticLabel: 'Profil pengguna',
+              semanticLabel: 'User profile',
             ),
           ),
         ),

@@ -23,8 +23,8 @@ class PeriodSelector extends StatelessWidget {
         SegmentedButton<bool>(
           showSelectedIcon: false,
           segments: const [
-            ButtonSegment(value: false, label: Text('Harian')),
-            ButtonSegment(value: true, label: Text('Bulanan')),
+            ButtonSegment(value: false, label: Text('Daily')),
+            ButtonSegment(value: true, label: Text('Monthly')),
           ],
           selected: {monthly},
           onSelectionChanged: (value) {

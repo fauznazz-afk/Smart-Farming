@@ -127,8 +127,8 @@ void main() {
     testWidgets('standby offers a play button', (tester) async {
       await tester.pumpWidget(host(CctvStatus.standby));
 
-      expect(find.text('Kamera siap ditampilkan'), findsOneWidget);
-      expect(find.text('Play kamera'), findsOneWidget);
+      expect(find.text('Camera ready'), findsOneWidget);
+      expect(find.text('Play camera'), findsOneWidget);
     });
 
     testWidgets('connecting shows a spinner and no play button',
@@ -150,9 +150,9 @@ void main() {
         ),
       );
 
-      expect(find.text('Kamera tidak dapat dimuat'), findsOneWidget);
-      await tester.tap(find.text('Coba lagi'));
-      await tester.tap(find.text('Kembali'));
+      expect(find.text('Camera could not be loaded'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      await tester.tap(find.text('Back'));
       expect(retried, isTrue);
       expect(stopped, isTrue);
     });
@@ -230,9 +230,9 @@ void main() {
 
       expect(find.text('CCTV Monitoring'), findsOneWidget);
       expect(find.text('STANDBY'), findsOneWidget);
-      expect(find.text('Play kamera'), findsOneWidget);
+      expect(find.text('Play camera'), findsOneWidget);
       expect(
-        find.text('Tekan Play saat Anda siap melihat kamera.'),
+        find.text('Press Play when you are ready to watch the camera.'),
         findsOneWidget,
       );
     });

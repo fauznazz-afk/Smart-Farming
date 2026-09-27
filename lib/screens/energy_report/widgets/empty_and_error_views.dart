@@ -23,12 +23,12 @@ class EmptyPeriodView extends StatelessWidget {
             const Icon(Icons.event_busy_outlined, size: 36),
             const SizedBox(height: 10),
             const Text(
-              'Belum ada data untuk periode ini',
+              'No data for this period',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
-              'Data ThingsBoard mencakup ${formatDateLabel(data.firstSample)} hingga ${formatDateLabel(data.lastSample)}.',
+              'ThingsBoard data covers ${formatDateLabel(data.firstSample)} to ${formatDateLabel(data.lastSample)}.',
               textAlign: TextAlign.center,
               style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
             ),
@@ -66,11 +66,11 @@ class ErrorView extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Coba lagi'),
+              label: const Text('Retry'),
             ),
             const SizedBox(height: 8),
             Text(
-              'Pastikan perangkat PZEM mengirim telemetry dan akun ThingsBoard memiliki akses histori perangkat.',
+              'Check that the PZEM device is sending telemetry and that the ThingsBoard account has access to its history.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,

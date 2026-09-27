@@ -21,17 +21,17 @@ class DataNote extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Sumber & perhitungan',
+              'Source & calculation',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
-              'ThingsBoard · PZEM · ${data.sampleCount} agregat daya per jam',
+              'ThingsBoard · PZEM · ${data.sampleCount} hourly power aggregates',
               style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 5),
             Text(
-              'Energi per jam dihitung dari rata-rata Power DC/AC (W) yang tersimpan di time-series database. Data disegarkan otomatis setiap 5 menit.',
+              'Hourly energy is calculated from the average Power DC/AC (W) stored in the time-series database. Data refreshes automatically every 5 minutes.',
               style: TextStyle(
                 fontSize: 11,
                 color: isDark ? Colors.white60 : Colors.black54,

@@ -48,18 +48,18 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hapus Riwayat Alarm'),
+        title: const Text('Delete Alarm History'),
         content: const Text(
-          'Apakah Anda yakin ingin menghapus semua catatan alarm? Tindakan ini tidak dapat dibatalkan.',
+          'Delete every recorded alarm? This cannot be undone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -95,14 +95,14 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       'Feb',
       'Mar',
       'Apr',
-      'Mei',
+      'May',
       'Jun',
       'Jul',
-      'Agu',
+      'Aug',
       'Sep',
-      'Okt',
+      'Oct',
       'Nov',
-      'Des',
+      'Dec',
     ];
     final day = dt.day.toString().padLeft(2, '0');
     final month = months[dt.month - 1];
@@ -119,12 +119,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Riwayat Alarm'),
+        title: const Text('Alarm History'),
         centerTitle: true,
         actions: [
           if (_alarms.isNotEmpty)
             IconButton(
-              tooltip: 'Hapus semua',
+              tooltip: 'Delete all',
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _clearAll,
             ),
@@ -158,7 +158,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Tidak ada alarm tercatat',
+            'No alarms recorded',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -175,7 +175,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     if (alarms.isEmpty) {
       return Center(
         child: Text(
-          'Tidak ada alarm yang cocok dengan filter ini',
+          'No alarms match this filter',
           style: TextStyle(color: faintColor(isDark)),
         ),
       );
@@ -255,7 +255,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                           if (isExpanded && alarm.value != null) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Nilai: ${alarm.value!.toStringAsFixed(2)}',
+                              'Value: ${alarm.value!.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark ? Colors.white70 : Colors.black54,
@@ -266,7 +266,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                           if (isExpanded) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Tipe: ${alarm.type.label}',
+                              'Type: ${alarm.type.label}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: faintColor(isDark),
@@ -281,23 +281,23 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       children: [
                         _statusBadge(alarm, severityColor),
                         PopupMenuButton<_AlarmAction>(
-                          tooltip: 'Aksi alarm',
+                          tooltip: 'Alarm actions',
                           onSelected: (action) => _applyAction(action, alarm),
                           itemBuilder: (context) => [
                             if (!alarm.acknowledged)
                               const PopupMenuItem(
                                 value: _AlarmAction.acknowledge,
-                                child: Text('Terima'),
+                                child: Text('Acknowledge'),
                               ),
                             if (!alarm.resolved)
                               const PopupMenuItem(
                                 value: _AlarmAction.resolve,
-                                child: Text('Selesaikan'),
+                                child: Text('Resolve'),
                               ),
                             if (alarm.acknowledged || alarm.resolved)
                               const PopupMenuItem(
                                 value: _AlarmAction.reopen,
-                                child: Text('Buka Kembali'),
+                                child: Text('Reopen'),
                               ),
                           ],
                         ),
@@ -339,12 +339,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 
   Widget _statusBadge(AlarmRecord alarm, Color severityColor) {
     final label = alarm.resolved
-        ? 'Selesai'
+        ? 'Resolved'
         : alarm.acknowledged
-        ? 'Diterima'
+        ? 'Acknowledged'
         : alarm.severity == AlarmSeverity.critical
-        ? 'Kritis'
-        : 'Peringatan';
+        ? 'Critical'
+        : 'Warning';
     final color = alarm.resolved
         ? Colors.green
         : alarm.acknowledged
@@ -389,12 +389,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 }
 
 enum _AlarmFilter {
-  all('Semua'),
-  active('Aktif'),
-  acknowledged('Diterima'),
-  resolved('Selesai'),
-  critical('Kritis'),
-  warning('Peringatan');
+  all('All'),
+  active('Active'),
+  acknowledged('Acknowledged'),
+  resolved('Resolved'),
+  critical('Critical'),
+  warning('Warning');
 
   const _AlarmFilter(this.label);
   final String label;

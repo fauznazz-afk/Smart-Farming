@@ -289,19 +289,19 @@ void main() {
 
   group('describeCacheAge', () {
     test('describes recent and older cache times', () {
-      expect(describeCacheAge(null), 'beberapa waktu lalu');
-      expect(describeCacheAge(DateTime.now()), 'baru saja');
+      expect(describeCacheAge(null), 'a while ago');
+      expect(describeCacheAge(DateTime.now()), 'just now');
       expect(
         describeCacheAge(DateTime.now().subtract(const Duration(minutes: 5))),
-        '5 menit lalu',
+        '5 minutes ago',
       );
       expect(
         describeCacheAge(DateTime.now().subtract(const Duration(hours: 3))),
-        '3 jam lalu',
+        '3 hours ago',
       );
       expect(
         describeCacheAge(DateTime.now().subtract(const Duration(days: 2))),
-        '2 hari lalu',
+        '2 days ago',
       );
     });
   });

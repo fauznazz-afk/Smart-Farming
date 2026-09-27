@@ -38,14 +38,14 @@ void main() {
 
   group('validateEnvRange', () {
     test('accepts blank fields (limit simply not monitored)', () {
-      expect(validateEnvRange(range(), errorLabel: 'suhu'), isNull);
+      expect(validateEnvRange(range(), errorLabel: 'Temperature'), isNull);
     });
 
     test('accepts a valid ordered pair', () {
       expect(
         validateEnvRange(
           range(min: '10', max: '30', minAllowed: -40, maxAllowed: 100),
-          errorLabel: 'suhu',
+          errorLabel: 'Temperature',
         ),
         isNull,
       );
@@ -53,12 +53,12 @@ void main() {
 
     test('rejects non-numeric input', () {
       expect(
-        validateEnvRange(range(min: 'abc'), errorLabel: 'suhu'),
-        'suhu harus berupa angka yang valid.',
+        validateEnvRange(range(min: 'abc'), errorLabel: 'Temperature'),
+        'Temperature must be a valid number.',
       );
       expect(
-        validateEnvRange(range(max: '12,5'), errorLabel: 'suhu'),
-        'suhu harus berupa angka yang valid.',
+        validateEnvRange(range(max: '12,5'), errorLabel: 'Temperature'),
+        'Temperature must be a valid number.',
       );
     });
 
@@ -66,27 +66,27 @@ void main() {
       expect(
         validateEnvRange(
           range(min: '-60', minAllowed: -40),
-          errorLabel: 'suhu',
+          errorLabel: 'Temperature',
         ),
-        'suhu tidak boleh kurang dari -40.0.',
+        'Temperature cannot be lower than -40.0.',
       );
       expect(
         validateEnvRange(
           range(max: '120', maxAllowed: 100),
-          errorLabel: 'suhu',
+          errorLabel: 'Temperature',
         ),
-        'suhu tidak boleh lebih dari 100.0.',
+        'Temperature cannot be higher than 100.0.',
       );
     });
 
     test('rejects a minimum that is not below the maximum', () {
       expect(
-        validateEnvRange(range(min: '30', max: '30'), errorLabel: 'suhu'),
-        'Batas minimum suhu harus lebih kecil dari batas maksimum.',
+        validateEnvRange(range(min: '30', max: '30'), errorLabel: 'Temperature'),
+        'The minimum Temperature limit must be lower than the maximum limit.',
       );
       expect(
-        validateEnvRange(range(min: '40', max: '30'), errorLabel: 'suhu'),
-        'Batas minimum suhu harus lebih kecil dari batas maksimum.',
+        validateEnvRange(range(min: '40', max: '30'), errorLabel: 'Temperature'),
+        'The minimum Temperature limit must be lower than the maximum limit.',
       );
     });
 
@@ -94,13 +94,13 @@ void main() {
       expect(
         validateEnvRange(
           range(min: '10', maxAllowed: 5),
-          errorLabel: 'suhu',
+          errorLabel: 'Temperature',
         ),
-        'suhu tidak boleh lebih dari 5.0.',
+        'Temperature cannot be higher than 5.0.',
       );
       expect(
-        validateEnvRange(range(max: '10', minAllowed: 20), errorLabel: 'suhu'),
-        'suhu tidak boleh kurang dari 20.0.',
+        validateEnvRange(range(max: '10', minAllowed: 20), errorLabel: 'Temperature'),
+        'Temperature cannot be lower than 20.0.',
       );
     });
   });
@@ -116,7 +116,7 @@ void main() {
     });
 
     test('rejects zero, negatives, and non-numeric text', () {
-      const message = 'Target produksi harus berupa angka lebih besar dari 0.';
+      const message = 'The production target must be a number greater than 0.';
       expect(validateDailyTargetError('0'), message);
       expect(validateDailyTargetError('-3'), message);
       expect(validateDailyTargetError('sepuluh'), message);
@@ -143,7 +143,7 @@ void main() {
           enabled: true,
           ranges: [blank, blank],
         ),
-        'Isi minimal satu batas sensor untuk mengaktifkan peringatan.',
+        'Set at least one sensor limit to enable alerts.',
       );
     });
 
@@ -269,7 +269,7 @@ void main() {
       tds.min.text = '-5';
       expect(
         validateEnvRange(tds, errorLabel: 'TDS'),
-        'TDS tidak boleh kurang dari 0.0.',
+        'TDS cannot be lower than 0.0.',
       );
     });
   });

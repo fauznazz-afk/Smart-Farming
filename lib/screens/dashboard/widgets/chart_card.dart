@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
-import '../charts/series_scale.dart';
 import '../utils/date_helpers.dart';
 import '../utils/history_range.dart';
 
@@ -27,6 +26,7 @@ class ChartSectionHeader extends StatelessWidget {
     required this.rangeEnd,
     required this.realtimeConnected,
     required this.onPickRange,
+    required this.seedColor,
   });
 
   final String title;
@@ -36,6 +36,9 @@ class ChartSectionHeader extends StatelessWidget {
   final DateTime? rangeEnd;
   final bool realtimeConnected;
   final VoidCallback onPickRange;
+
+  /// The theme accent, so the "Live" indicator is not a status green.
+  final Color seedColor;
 
   @override
   Widget build(BuildContext context) {
@@ -92,11 +95,14 @@ class ChartSectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
+        // A live connection takes the accent, not green. Green here was a status
+        // colour used for a condition that is normally fine, which is the same
+        // thing the dashboard's other "everything is OK" greens were doing.
         Icon(
           realtimeConnected ? Icons.wifi : Icons.wifi_off,
           size: 13,
           color: realtimeConnected
-              ? Colors.green
+              ? themeColor(seedColor: seedColor, lightness: isDark ? 0.68 : 0.38)
               : (faintColor(isDark)),
         ),
         const SizedBox(width: 3),
@@ -105,7 +111,10 @@ class ChartSectionHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             color: realtimeConnected
-                ? Colors.green
+                ? themeColor(
+                    seedColor: seedColor,
+                    lightness: isDark ? 0.68 : 0.38,
+                  )
                 : (faintColor(isDark)),
           ),
         ),
@@ -114,22 +123,23 @@ class ChartSectionHeader extends StatelessWidget {
   }
 }
 
-/// The three quantities a device chart plots together.
+/// The three quantities a device chart plots together, on one dynamic Y axis.
 ///
-/// Voltage, current and power are three different units on three completely
-/// different scales — on the AC page, power runs to 3500 W while current stays
-/// under 16 A and voltage sits near-constant at 220. Drawn on one shared raw
-/// axis only the largest is legible, so the chart scales each series against its
-/// own range and the axis reads as a percentage. That is the only way three
-/// units fit on one plot, and it is why the real numbers are printed under the
-/// chart rather than left to the axis.
+/// The axis carries real values, not a percentage. Rescaling each series against
+/// its own range so all three would fill the plot height was tried, and reverted
+/// at the user's request: a reader who sees "0%, 50%, 100%" has to look up three
+/// different scales in the legend to learn anything, whereas a real axis can be
+/// read directly. It also makes the common case worse. On the PV and battery
+/// pages the three quantities are within an order of magnitude of each other, so
+/// the raw axis is already perfectly readable; only the AC page has power two
+/// orders above current, and a flat trace there is honest rather than broken.
 ///
 /// The colours are fixed red, green and blue rather than derived from the theme
 /// accent. That was tried and reverted: three lightness steps of one hue are too
-/// close to tell apart on a phone, and distinguishing them with dash patterns
-/// was worse still. Three obviously different colours need no legend decoding,
-/// and the chart is the one place in the app where an identity of "voltage is
-/// red" is worth more than consistency with the surrounding theme.
+/// close to tell apart on a phone, and distinguishing them with dash patterns was
+/// worse still. Three obviously different colours need no legend decoding, and
+/// the chart is the one place in the app where an identity of "voltage is red" is
+/// worth more than consistency with the surrounding theme.
 class _MetricSpec {
   const _MetricSpec(this.label, this.unit, this.icon, this.light, this.dark);
 
@@ -148,31 +158,18 @@ class _MetricSpec {
 }
 
 const _metricSpecs = [
-  _MetricSpec('Tegangan', 'V', Icons.bolt_outlined, 0xFFE53935, 0xFFFF5252),
-  _MetricSpec('Arus', 'A', Icons.electrical_services_outlined, 0xFF43A047,
+  _MetricSpec('Voltage', 'V', Icons.bolt_outlined, 0xFFE53935, 0xFFFF5252),
+  _MetricSpec('Current', 'A', Icons.electrical_services_outlined, 0xFF43A047,
       0xFF69F0AE),
-  _MetricSpec('Daya', 'W', Icons.wb_sunny_outlined, 0xFF1E88E5, 0xFF448AFF),
+  _MetricSpec('Power', 'W', Icons.wb_sunny_outlined, 0xFF1E88E5, 0xFF448AFF),
 ];
 
-/// A series plus the scaling that lets it share an axis with two others.
+/// A series paired with the spec that named and coloured it.
 class _Scaled {
-  const _Scaled(this.series, this.spots, this.base, this.span, this.spec);
+  const _Scaled(this.series, this.spec);
 
   final ChartSeries series;
-
-  /// Downsampled spots, rescaled to 0..1.
-  final List<FlSpot> spots;
-
-  /// The real value that a normalised 0 corresponds to.
-  final double base;
-
-  /// The real value range that normalised 0..1 covers.
-  final double span;
-
   final _MetricSpec spec;
-
-  /// Back to real units, for the tooltip and the readout.
-  double unscale(double normalised) => base + normalised * span;
 }
 
 /// Glass card plotting voltage, current and power for one device prefix.
@@ -231,12 +228,12 @@ class TelemetryChartCard extends StatelessWidget {
       // height; reserving it pushed everything below the fold for nothing.
       height: (loading || !hasData) ? 170 : 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel: '$title tegangan, arus dan daya '
+      semanticLabel: '$title voltage, current and power '
           '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
       child: loading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
-          ? const Center(child: Text('Tidak ada data untuk rentang ini'))
+          ? const Center(child: Text('No data for this range'))
           : Column(
               children: [
                 _SeriesLegend(series: scaled, isDark: isDark),
@@ -261,39 +258,30 @@ class TelemetryChartCard extends StatelessWidget {
     );
   }
 
-  /// All three metrics, each rescaled to its own range so one axis serves all.
+  /// All three metrics, plotted raw against one shared Y axis.
   List<_Scaled> _buildSeries() {
     return [
       for (var i = 0; i < _metricSpecs.length; i++)
-        _scaleSeries(_metricSpecs[i], i),
+        _seriesFor(_metricSpecs[i], i),
     ];
   }
 
-  _Scaled _scaleSeries(_MetricSpec spec, int index) {
+  _Scaled _seriesFor(_MetricSpec spec, int index) {
     // The history keys are English, while the labels shown to the user are not.
     // Deriving one from the other is what let them drift apart in the first
     // place, so the suffix is written out and the key is composed here.
     const suffixes = ['voltage', 'current', 'power'];
     final key = '${prefix}_${suffixes[index]}';
     final seriesPoints = points[key] ?? const <TelemetryPoint>[];
-    final series = ChartSeries(
-      spec.label,
-      spec.unit,
-      seriesPoints,
-      spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-      spec.color(isDark),
-      stats[key] ?? SeriesStats.fromPoints(seriesPoints),
-    );
-
-    // Scale from the *downsampled* points rather than the raw series, so the
-    // expensive reduction still happens once and only the mapping is repeated.
-    // See SeriesScale for why the scale is built from the reduced points.
-    final scale = SeriesScale.of(series.spots);
     return _Scaled(
-      series,
-      scale.apply(series.spots),
-      scale.base,
-      scale.span,
+      ChartSeries(
+        spec.label,
+        spec.unit,
+        seriesPoints,
+        spots.putIfAbsent(key, () => processSpots(seriesPoints)),
+        spec.color(isDark),
+        stats[key] ?? SeriesStats.fromPoints(seriesPoints),
+      ),
       spec,
     );
   }
@@ -302,11 +290,8 @@ class TelemetryChartCard extends StatelessWidget {
     return LineChartData(
       minX: bounds.minX,
       maxX: bounds.maxX,
-      // The plot is normalised: 0 is the bottom of a series' own range and 1 its
-      // top. Raw min/max from the bounds are deliberately ignored, because they
-      // are the range of whichever unit happened to be largest.
-      minY: 0,
-      maxY: 1,
+      minY: bounds.minY,
+      maxY: bounds.maxY,
       gridData: _gridData(bounds),
       titlesData: _titlesData(bounds),
       borderData: FlBorderData(show: false),
@@ -328,10 +313,8 @@ class TelemetryChartCard extends StatelessWidget {
             if (touchedSpots.isEmpty) return const [];
             final time = formatAxisTime(touchedSpots.first.x);
             final values = <String>[
-              // Unscale before printing. The y on the spot is a fraction of the
-              // series' range, so showing it raw would print 0.42 W.
               for (final spot in touchedSpots)
-                '${formatAxisNumber(series[spot.barIndex].unscale(spot.y))} '
+                '${formatAxisNumber(spot.y)} '
                     '${series[spot.barIndex].series.unit}',
             ];
             final tooltip = LineTooltipItem(
@@ -353,15 +336,25 @@ class TelemetryChartCard extends StatelessWidget {
       lineBarsData: [
         for (final item in series)
           LineChartBarData(
-            spots: item.spots,
+            spots: item.series.spots,
             isCurved: false,
-            color: item.series.color,
             barWidth: 2.5,
-            // Solid. Dash patterns were tried so three lightness steps of one
-            // hue could be told apart, and they were dropped: three red, green
+            // Slightly transparent so a trace that sits on top of another is
+            // still visible underneath. Current and power are proportional, so
+            // on most devices their lines coincide exactly and the one drawn
+            // last would otherwise hide the other completely.
+            color: item.series.color.withValues(alpha: 0.85),
+            // No dashArray. Dash patterns were tried so three lightness steps of
+            // one hue could be told apart, and they were dropped: three red, green
             // and blue lines need no legend decoding, and a dashed trace on a
             // phone reads as broken rather than as styled.
-            dashArray: const [],
+            //
+            // Leaving the field unset is what draws a solid line. Passing an
+            // empty list does not: fl_chart walks the pattern by
+            // `pattern[index % pattern.length]`, so a zero-length list renders
+            // nothing at all. The chart came up with an empty plot, correct axes,
+            // correct legend and correct statistics, which is the worst kind of
+            // failure to spot on a device.
             dotData: const FlDotData(show: false),
           ),
       ],
@@ -372,9 +365,7 @@ class TelemetryChartCard extends StatelessWidget {
     return FlGridData(
       show: true,
       drawVerticalLine: true,
-      // The vertical axis is normalised, so the interval is a fixed half rather
-      // than whatever `niceStep` worked out for the raw value range.
-      horizontalInterval: 0.5,
+      horizontalInterval: bounds.chartInterval,
       verticalInterval: bounds.timeInterval,
       getDrawingHorizontalLine: (_) => FlLine(
         color: isDark
@@ -406,19 +397,15 @@ class TelemetryChartCard extends StatelessWidget {
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 34,
-          interval: 0.5,
-          // A percentage, not a unit. Each series is scaled to its own range, so
-          // the axis is only meaningful as "how far through its own range", and
-          // the real value in volts, amperes or watts is in the tooltip and in
-          // the readout under the chart.
+          reservedSize: 40,
+          interval: bounds.chartInterval,
+          // Real values, chosen by `niceStep` from the data's own range. The
+          // interval is not a percentage of anything: a reader can take a value
+          // off this axis and use it.
           getTitlesWidget: (value, meta) => SideTitleWidget(
             axisSide: meta.axisSide,
             space: 4,
-            child: Text(
-              '${(value * 100).round()}%',
-              style: labelStyle,
-            ),
+            child: Text(formatAxisNumber(value), style: labelStyle),
           ),
         ),
       ),
@@ -498,14 +485,22 @@ class _SeriesStatistics extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Terakhir ${formatAxisNumber(stats.latest)} ${series.unit}',
+            'Last ${formatAxisNumber(stats.latest)} ${series.unit}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11),
+          ),
+          // One figure per line. "min 6.98 V  maks 21.43 V" on a single line
+          // overflowed a third of the width and ellipsised to "109....", which
+          // is the one number a reader cannot afford to lose.
+          Text(
+            'min ${formatAxisNumber(stats.minimum)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 11),
           ),
           Text(
-            '↓ ${formatAxisNumber(stats.minimum)}  '
-            '↑ ${formatAxisNumber(stats.maximum)} ${series.unit}',
+            'max ${formatAxisNumber(stats.maximum)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 11),

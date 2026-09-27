@@ -24,14 +24,14 @@ bool sameTelemetry(DeviceTelemetry? first, DeviceTelemetry second) {
   return true;
 }
 
-/// Describes how long ago [cacheTime] happened, in Indonesian.
+/// Describes how long ago [cacheTime] happened.
 String describeCacheAge(DateTime? cacheTime) {
-  if (cacheTime == null) return 'beberapa waktu lalu';
+  if (cacheTime == null) return 'a while ago';
   final age = DateTime.now().difference(cacheTime);
-  if (age.inMinutes < 1) return 'baru saja';
-  if (age.inHours < 1) return '${age.inMinutes} menit lalu';
-  if (age.inDays < 1) return '${age.inHours} jam lalu';
-  return '${age.inDays} hari lalu';
+  if (age.inMinutes < 1) return 'just now';
+  if (age.inHours < 1) return '${age.inMinutes} minutes ago';
+  if (age.inDays < 1) return '${age.inHours} hours ago';
+  return '${age.inDays} days ago';
 }
 
 /// Cached telemetry values partitioned per device slot.

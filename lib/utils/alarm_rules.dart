@@ -31,9 +31,9 @@ enum AlarmGroup {
 
 /// Which ThingsBoard device a rule reads from.
 enum AlarmDevice {
-  battery('battery', 'Baterai'),
+  battery('battery', 'Battery'),
   pzem('pzem', 'PZEM'),
-  sensor('sensor', 'Sensor lingkungan');
+  sensor('sensor', 'Environment sensor');
 
   const AlarmDevice(this.wireName, this.label);
 
@@ -75,19 +75,19 @@ enum AlarmComparison {
 
 /// Which wording to render, so the Dart and Kotlin formatters stay in step.
 enum AlarmMessageKind {
-  /// `SOC baterai rendah: 15%`
+  /// `Battery charge low: 15%`
   lowSoc,
 
-  /// `Data Baterai belum diperbarui`
+  /// `No fresh data from Battery`
   stale,
 
-  /// `PZEM berhenti mengirim data`
+  /// `PZEM has stopped reporting`
   offline,
 
-  /// `Suhu lingkungan rendah: 12.4 °C (batas 18.0 °C)`
+  /// `Ambient temperature too low: 12.4 °C (limit 18.0 °C)`
   rangeLow,
 
-  /// `Suhu lingkungan tinggi: 31.2 °C (batas 30.0 °C)`
+  /// `Ambient temperature too high: 31.2 °C (limit 30.0 °C)`
   rangeHigh,
 }
 
@@ -381,7 +381,7 @@ List<AlarmRule> buildAlarmRules(AlarmThresholds thresholds) {
       _EnvironmentLimit(
         metric: 'temp_dht',
         id: 'ambient_temp',
-        label: 'Suhu lingkungan',
+        label: 'Ambient temperature',
         unit: '°C',
         minimum: thresholds.tempMin,
         maximum: thresholds.tempMax,
@@ -389,7 +389,7 @@ List<AlarmRule> buildAlarmRules(AlarmThresholds thresholds) {
       _EnvironmentLimit(
         metric: 'humidity_dht',
         id: 'humidity',
-        label: 'Kelembapan',
+        label: 'Humidity',
         unit: '%',
         minimum: thresholds.humidityMin,
         maximum: thresholds.humidityMax,
@@ -545,15 +545,15 @@ List<AlarmSignal> newlyActiveSignals({
 String formatAlarmMessage(AlarmRule rule, {required double? value}) {
   return switch (rule.message) {
     AlarmMessageKind.lowSoc =>
-      'SOC baterai rendah: ${_fixed(value ?? 0, rule.decimals)}%',
-    AlarmMessageKind.stale => 'Data ${rule.label} belum diperbarui',
-    AlarmMessageKind.offline => '${rule.label} berhenti mengirim data',
+      'Battery charge low: ${_fixed(value ?? 0, rule.decimals)}%',
+    AlarmMessageKind.stale => 'No fresh data from ${rule.label}',
+    AlarmMessageKind.offline => '${rule.label} has stopped reporting',
     AlarmMessageKind.rangeLow =>
-      '${rule.label} rendah: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
-          '(batas ${rule.limit} ${rule.unit})',
+      '${rule.label} too low: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
+          '(limit ${rule.limit} ${rule.unit})',
     AlarmMessageKind.rangeHigh =>
-      '${rule.label} tinggi: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
-          '(batas ${rule.limit} ${rule.unit})',
+      '${rule.label} too high: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
+          '(limit ${rule.limit} ${rule.unit})',
   };
 }
 

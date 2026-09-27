@@ -6,19 +6,19 @@ String formatDateLabel(DateTime date) =>
 String formatHourLabel(DateTime date) =>
     '${date.hour.toString().padLeft(2, '0')}:00';
 
-/// Formats a date as MonthName YYYY (Indonesian).
+/// Formats a date as MonthName YYYY.
 String formatMonthLabel(DateTime date) =>
     '${_monthNames[date.month - 1]} ${date.year}';
 
 const _monthNames = [
-  'Januari',
-  'Februari',
-  'Maret',
+  'January',
+  'February',
+  'March',
   'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
+  'May',
+  'June',
+  'July',
+  'August',
   'September',
   'Oktober',
   'November',
@@ -30,9 +30,9 @@ String escapeCsv(String value) => '"${value.replaceAll('"', '""')}"';
 
 /// Generates a comparison label between current and previous values.
 String comparisonLabel(double current, double? previous) {
-  if (previous == null) return 'Belum ada data pembanding';
-  if (previous <= 0) return 'Periode sebelumnya: 0 kWh';
+  if (previous == null) return 'No comparison data yet';
+  if (previous <= 0) return 'Previous period: 0 kWh';
   final change = ((current - previous) / previous * 100).round();
-  if (change == 0) return 'Sama dengan periode sebelumnya';
-  return '${change > 0 ? '+' : ''}$change% dari periode sebelumnya';
+  if (change == 0) return 'Same as the previous period';
+  return '${change > 0 ? '+' : ''}$change% from the previous period';
 }

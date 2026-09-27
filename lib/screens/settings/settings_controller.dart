@@ -131,8 +131,8 @@ class SettingsController extends ChangeNotifier {
   /// Returns the first validation error, or null when the form is valid.
   String? validate() {
     for (final (range, label) in [
-      (envRanges[0], 'suhu'),
-      (envRanges[1], 'kelembapan'),
+      (envRanges[0], 'Temperature'),
+      (envRanges[1], 'Humidity'),
       (envRanges[2], 'TDS'),
     ]) {
       final error = validateEnvRange(range, errorLabel: label);
@@ -146,7 +146,7 @@ class SettingsController extends ChangeNotifier {
     );
     if (alertsError != null) return alertsError;
     if (parseAllowedCctvUrl(cctvUrl.text) == null) {
-      return 'CCTV URL harus HTTPS dan memakai host resmi';
+      return 'The CCTV URL must be HTTPS and use an approved host';
     }
     return null;
   }

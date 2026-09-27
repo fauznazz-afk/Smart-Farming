@@ -229,7 +229,7 @@ class _SplashRouterState extends State<_SplashRouter> {
     });
     try {
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Autentikasi untuk membuka sesi EnerGrow',
+        localizedReason: 'Authenticate to unlock the EnerGrow session',
         biometricOnly: true,
         persistAcrossBackgrounding: true,
       );
@@ -238,13 +238,13 @@ class _SplashRouterState extends State<_SplashRouter> {
         _unlocked = authenticated;
         _authError = authenticated
             ? null
-            : 'Autentikasi dibatalkan. Gunakan biometrik untuk melanjutkan.';
+            : 'Authentication cancelled. Use biometrics to continue.';
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _authError =
-            'Biometrik tidak tersedia. Masuk menggunakan akun ThingsBoard.';
+            'Biometrics unavailable. Sign in with your ThingsBoard account.';
       });
     } finally {
       _authenticating = false;
@@ -311,7 +311,7 @@ class _SplashRouterState extends State<_SplashRouter> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Gunakan sidik jari atau pengenalan wajah untuk membuka aplikasi.',
+                      'Use your fingerprint or face recognition to unlock the app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: isDark ? Colors.white60 : Colors.black54,
@@ -336,13 +336,15 @@ class _SplashRouterState extends State<_SplashRouter> {
                           : const Icon(Icons.fingerprint),
                       label: Text(
                         _authenticating
-                            ? 'Memverifikasi…'
-                            : 'Buka dengan biometrik',
+                            ? 'Verifying…'
+                            : 'Unlock with biometrics',
                       ),
                     ),
                     TextButton(
                       onPressed: _usePasswordLogin,
-                      child: const Text('Masuk dengan akun ThingsBoard'),
+                      child: const Text(
+                        'Sign in with your ThingsBoard account',
+                      ),
                     ),
                   ],
                 ),

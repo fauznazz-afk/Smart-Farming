@@ -84,18 +84,16 @@ class DeviceTelemetry {
     return DateTime.now().difference(lastUpdate!).inMinutes > minutes;
   }
 
-  /// How long ago telemetry last arrived, in Indonesian.
+  /// How long ago telemetry last arrived.
   ///
-  /// Every other string the user reads is Indonesian, and this one sat in the
-  /// hero card next to the biggest number on the screen, so it was the most
-  /// visible remaining English. Note there is no day bucket: three days old
-  /// reads as "72 jam lalu", which is honest but worth knowing.
+  /// Note there is no day bucket: three days old reads as "72 hours ago",
+  /// which is honest but worth knowing.
   String get ageLabel {
-    if (lastUpdate == null) return 'Belum ada data';
+    if (lastUpdate == null) return 'No data yet';
     final age = DateTime.now().difference(lastUpdate!);
-    if (age.inMinutes < 1) return 'Baru saja';
-    if (age.inHours < 1) return 'Diperbarui ${age.inMinutes} menit lalu';
-    if (age.inDays < 1) return 'Diperbarui ${age.inHours} jam lalu';
-    return 'Diperbarui ${age.inDays} hari lalu';
+    if (age.inMinutes < 1) return 'Just now';
+    if (age.inHours < 1) return 'Updated ${age.inMinutes} minutes ago';
+    if (age.inDays < 1) return 'Updated ${age.inHours} hours ago';
+    return 'Updated ${age.inDays} days ago';
   }
 }

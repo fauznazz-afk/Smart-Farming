@@ -22,40 +22,40 @@ String formatAxisDate(double value) {
 String formatAxisTick(double value, {required bool spansMultipleDays}) =>
     spansMultipleDays ? formatAxisDate(value) : formatAxisTime(value);
 
-/// Returns the short Indonesian day name (Sen, Sel, Rab, etc.).
+/// Returns the short English day name (Mon, Tue, etc.).
 String dayNameShort(int weekday) => const [
-  'Sen',
-  'Sel',
-  'Rab',
-  'Kam',
-  'Jum',
-  'Sab',
-  'Min',
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun',
 ][(weekday - 1) % 7];
 
-/// Returns the full Indonesian day name (Senin, Selasa, etc.).
+/// Returns the full English day name (Monday, Tuesday, etc.).
 String dayNameFull(int weekday) => const [
-  'Senin',
-  'Selasa',
-  'Rabu',
-  'Kamis',
-  'Jumat',
-  'Sabtu',
-  'Minggu',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
 ][(weekday - 1) % 7];
 
-/// Returns the Indonesian month name.
+/// Returns the English month name.
 String monthName(int month) => const [
-  'Januari',
-  'Februari',
-  'Maret',
+  'January',
+  'February',
+  'March',
   'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
+  'May',
+  'June',
+  'July',
+  'August',
   'September',
-  'Oktober',
+  'October',
   'November',
-  'Desember',
+  'December',
 ][month - 1];

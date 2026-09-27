@@ -202,17 +202,17 @@ void main() {
 
   group('comparisonLabel', () {
     test('handles a missing baseline', () {
-      expect(comparisonLabel(5, null), 'Belum ada data pembanding');
+      expect(comparisonLabel(5, null), 'No comparison data yet');
     });
 
     test('handles a zero baseline without dividing by zero', () {
-      expect(comparisonLabel(5, 0), 'Periode sebelumnya: 0 kWh');
+      expect(comparisonLabel(5, 0), 'Previous period: 0 kWh');
     });
 
     test('describes growth, decline, and no change', () {
-      expect(comparisonLabel(12, 10), '+20% dari periode sebelumnya');
-      expect(comparisonLabel(8, 10), '-20% dari periode sebelumnya');
-      expect(comparisonLabel(10, 10), 'Sama dengan periode sebelumnya');
+      expect(comparisonLabel(12, 10), '+20% from the previous period');
+      expect(comparisonLabel(8, 10), '-20% from the previous period');
+      expect(comparisonLabel(10, 10), 'Same as the previous period');
     });
   });
 

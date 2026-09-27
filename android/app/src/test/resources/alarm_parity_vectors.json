@@ -27,7 +27,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -43,7 +43,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -59,7 +59,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -107,7 +107,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -123,7 +123,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -143,7 +143,7 @@
       "expected": [
         {
           "id": "low_soc",
-          "message": "SOC baterai rendah: 15%"
+          "message": "Battery charge low: 15%"
         }
       ]
     },
@@ -174,7 +174,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -190,7 +190,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -206,7 +206,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -254,7 +254,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -270,7 +270,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -316,7 +316,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -332,7 +332,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -348,7 +348,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -396,7 +396,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -412,7 +412,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -432,7 +432,7 @@
       "expected": [
         {
           "id": "low_soc",
-          "message": "SOC baterai rendah: 16%"
+          "message": "Battery charge low: 16%"
         }
       ]
     },
@@ -463,7 +463,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -479,7 +479,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -495,7 +495,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -543,7 +543,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -559,7 +559,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -579,7 +579,7 @@
       "expected": [
         {
           "id": "stale_pzem",
-          "message": "Data PZEM belum diperbarui"
+          "message": "No fresh data from PZEM"
         }
       ]
     },
@@ -610,7 +610,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -626,7 +626,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -642,7 +642,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -690,7 +690,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -706,7 +706,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -722,7 +722,7 @@
           "metric": "temp_dht",
           "comparison": "greaterThan",
           "limit": 30.0,
-          "label": "Suhu lingkungan",
+          "label": "Ambient temperature",
           "unit": "°C",
           "decimals": 1,
           "message": "rangeHigh",
@@ -765,7 +765,7 @@
       "expected": [
         {
           "id": "environment_ambient_temp_high",
-          "message": "Suhu lingkungan tinggi: 31.2 °C (batas 30.0 °C)"
+          "message": "Ambient temperature too high: 31.2 °C (limit 30.0 °C)"
         }
       ]
     },
@@ -796,7 +796,7 @@
           "metric": "temp_dht",
           "comparison": "greaterThan",
           "limit": 30.0,
-          "label": "Suhu lingkungan",
+          "label": "Ambient temperature",
           "unit": "°C",
           "decimals": 1,
           "message": "rangeHigh",
@@ -849,7 +849,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -865,7 +865,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -881,7 +881,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -929,7 +929,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -945,7 +945,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -961,7 +961,7 @@
           "metric": "temp_dht",
           "comparison": "greaterThan",
           "limit": 30.0,
-          "label": "Suhu lingkungan",
+          "label": "Ambient temperature",
           "unit": "°C",
           "decimals": 1,
           "message": "rangeHigh",
@@ -1004,7 +1004,7 @@
       "expected": [
         {
           "id": "stale_sensor",
-          "message": "Data Sensor lingkungan belum diperbarui"
+          "message": "No fresh data from Environment sensor"
         }
       ]
     },
@@ -1035,7 +1035,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -1051,7 +1051,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1067,7 +1067,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1115,7 +1115,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1131,7 +1131,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1147,7 +1147,7 @@
           "metric": "temp_dht",
           "comparison": "greaterThan",
           "limit": 30.0,
-          "label": "Suhu lingkungan",
+          "label": "Ambient temperature",
           "unit": "°C",
           "decimals": 1,
           "message": "rangeHigh",
@@ -1190,7 +1190,7 @@
       "expected": [
         {
           "id": "environment_tds_low",
-          "message": "TDS rendah: 650.0 ppm (batas 800.0 ppm)"
+          "message": "TDS too low: 650.0 ppm (limit 800.0 ppm)"
         }
       ]
     },
@@ -1221,7 +1221,7 @@
           "metric": "humidity_dht",
           "comparison": "greaterThan",
           "limit": 80.0,
-          "label": "Kelembapan",
+          "label": "Humidity",
           "unit": "%",
           "decimals": 1,
           "message": "rangeHigh",
@@ -1241,7 +1241,7 @@
       "expected": [
         {
           "id": "environment_humidity_high",
-          "message": "Kelembapan tinggi: 84.3 % (batas 80.0 %)"
+          "message": "Humidity too high: 84.3 % (limit 80.0 %)"
         }
       ]
     },
@@ -1330,7 +1330,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -1346,7 +1346,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1362,7 +1362,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1410,7 +1410,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1426,7 +1426,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1460,11 +1460,11 @@
       "expected": [
         {
           "id": "offline_sensor",
-          "message": "Sensor lingkungan berhenti mengirim data"
+          "message": "Environment sensor has stopped reporting"
         },
         {
           "id": "stale_sensor",
-          "message": "Data Sensor lingkungan belum diperbarui"
+          "message": "No fresh data from Environment sensor"
         }
       ]
     },
@@ -1495,7 +1495,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -1511,7 +1511,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1527,7 +1527,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1575,7 +1575,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1591,7 +1591,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1625,7 +1625,7 @@
       "expected": [
         {
           "id": "stale_pzem",
-          "message": "Data PZEM belum diperbarui"
+          "message": "No fresh data from PZEM"
         }
       ]
     },
@@ -1656,7 +1656,7 @@
           "metric": "soc",
           "comparison": "lessThan",
           "limit": 20.0,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "%",
           "decimals": 0,
           "message": "lowSoc",
@@ -1672,7 +1672,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1688,7 +1688,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Baterai",
+          "label": "Battery",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1736,7 +1736,7 @@
           "metric": null,
           "comparison": "offline",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "offline",
@@ -1752,7 +1752,7 @@
           "metric": null,
           "comparison": "stale",
           "limit": null,
-          "label": "Sensor lingkungan",
+          "label": "Environment sensor",
           "unit": "",
           "decimals": 0,
           "message": "stale",

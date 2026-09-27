@@ -137,7 +137,7 @@ void main() {
       energy,
       [reading(AlarmDevice.battery, {'soc': 15.4}, fresh)],
       [
-        {'id': 'low_soc', 'message': 'SOC baterai rendah: 15%'},
+        {'id': 'low_soc', 'message': 'Battery charge low: 15%'},
       ],
     ),
     scenario(
@@ -153,7 +153,7 @@ void main() {
       energy,
       [reading(AlarmDevice.battery, {'soc': 15.5}, fresh)],
       [
-        {'id': 'low_soc', 'message': 'SOC baterai rendah: 16%'},
+        {'id': 'low_soc', 'message': 'Battery charge low: 16%'},
       ],
     ),
     scenario(
@@ -164,7 +164,7 @@ void main() {
       [
         {
           'id': 'stale_pzem',
-          'message': 'Data PZEM belum diperbarui',
+          'message': 'No fresh data from PZEM',
         },
       ],
     ),
@@ -179,7 +179,7 @@ void main() {
       [
         {
           'id': 'environment_ambient_temp_high',
-          'message': 'Suhu lingkungan tinggi: 31.2 °C (batas 30.0 °C)',
+          'message': 'Ambient temperature too high: 31.2 °C (limit 30.0 °C)',
         },
       ],
     ),
@@ -206,7 +206,7 @@ void main() {
       [
         {
           'id': 'stale_sensor',
-          'message': 'Data Sensor lingkungan belum diperbarui',
+          'message': 'No fresh data from Environment sensor',
         },
       ],
     ),
@@ -222,7 +222,7 @@ void main() {
       [
         {
           'id': 'environment_tds_low',
-          'message': 'TDS rendah: 650.0 ppm (batas 800.0 ppm)',
+          'message': 'TDS too low: 650.0 ppm (limit 800.0 ppm)',
         },
       ],
     ),
@@ -236,7 +236,7 @@ void main() {
       [
         {
           'id': 'environment_humidity_high',
-          'message': 'Kelembapan tinggi: 84.3 % (batas 80.0 %)',
+          'message': 'Humidity too high: 84.3 % (limit 80.0 %)',
         },
       ],
     ),
@@ -274,11 +274,11 @@ void main() {
       [
         {
           'id': 'offline_sensor',
-          'message': 'Sensor lingkungan berhenti mengirim data',
+          'message': 'Environment sensor has stopped reporting',
         },
         {
           'id': 'stale_sensor',
-          'message': 'Data Sensor lingkungan belum diperbarui',
+          'message': 'No fresh data from Environment sensor',
         },
       ],
     ),
@@ -301,7 +301,7 @@ void main() {
       [
         {
           'id': 'stale_pzem',
-          'message': 'Data PZEM belum diperbarui',
+          'message': 'No fresh data from PZEM',
         },
       ],
     ),

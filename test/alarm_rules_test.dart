@@ -284,14 +284,14 @@ void main() {
           buildAlarmRules(_energy).first,
           value: 15.4,
         ),
-        'SOC baterai rendah: 15%',
+        'Battery charge low: 15%',
       );
       expect(
         formatAlarmMessage(
           buildAlarmRules(_energy).firstWhere((r) => r.id == 'stale_pzem'),
           value: null,
         ),
-        'Data PZEM belum diperbarui',
+        'No fresh data from PZEM',
       );
     });
   });
@@ -406,7 +406,7 @@ void main() {
           values: const {'soc': 50},
           lastUpdate: now.subtract(const Duration(minutes: 30)),
         ),
-        ['Baterai'],
+        ['Battery'],
       );
       // Never read at all: silence before the first poll is not staleness.
       expect(names(values: const {}, lastUpdate: null), isEmpty);

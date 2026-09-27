@@ -18,17 +18,17 @@ object AlarmMessageFormat {
 
     fun format(rule: AlarmRule, value: Double?): String = when (rule.message) {
         AlarmMessageKind.LOW_SOC ->
-            "SOC baterai rendah: ${fixed(value ?: 0.0, rule.decimals)}%"
+            "Battery charge low: ${fixed(value ?: 0.0, rule.decimals)}%"
         AlarmMessageKind.STALE ->
-            "Data ${rule.label} belum diperbarui"
+            "No fresh data from ${rule.label}"
         AlarmMessageKind.OFFLINE ->
-            "${rule.label} berhenti mengirim data"
+            "${rule.label} has stopped reporting"
         AlarmMessageKind.RANGE_LOW ->
-            "${rule.label} rendah: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
-                "(batas ${plain(rule.limit)} ${rule.unit})"
+            "${rule.label} too low: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
+                "(limit ${plain(rule.limit)} ${rule.unit})"
         AlarmMessageKind.RANGE_HIGH ->
-            "${rule.label} tinggi: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
-                "(batas ${plain(rule.limit)} ${rule.unit})"
+            "${rule.label} too high: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
+                "(limit ${plain(rule.limit)} ${rule.unit})"
     }
 
     /**

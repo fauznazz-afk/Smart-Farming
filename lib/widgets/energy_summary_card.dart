@@ -45,7 +45,7 @@ class EnergySummaryCard extends StatelessWidget {
   /// A percentage is only meaningful once the previous period held a real
   /// amount of energy. It used to be printed whenever `previous > 0`, so a
   /// period that generated 0.01 kWh followed by one that generated none showed
-  /// "−100% dari periode lalu": arithmetically correct, and it reads as a
+  /// "-100% from the previous period": arithmetically correct, and it reads as a
   /// catastrophic loss rather than as "there was nothing then". Below
   /// [meaningfulPrevious] the absolute figures speak for themselves and a
   /// percentage would only dramatise rounding.
@@ -55,18 +55,22 @@ class EnergySummaryCard extends StatelessWidget {
   /// both rounding noise, and a user reading "−100%" against "0.00 kWh" is being
   /// told a hundred percent about a number that is displayed as zero.
   String _comparison(double current, double previous) {
-    if (previous <= 0) return 'Belum ada pembanding';
+    if (previous <= 0) return 'Nothing to compare yet';
     if (previous < _meaningfulPrevious) {
       if (current < _meaningfulPrevious) {
         return current <= 0
-            ? 'Tidak ada produksi'
-            : '(${_formatEnergy(current)} kWh, sebelumnya nihil)';
+            ? 'No production'
+            : '${_formatEnergy(current)} kWh, none last period';
       }
-      return 'Belum ada pembanding berarti';
+      return 'Nothing to compare yet';
     }
     final change = ((current - previous) / previous * 100).round();
-    if (change == 0) return 'Sama dengan periode lalu';
-    return '${change > 0 ? '+' : ''}$change% dari periode lalu';
+    if (change == 0) return 'Same as before';
+    // Short on purpose. The two tiles sit side by side and wrap independently,
+    // so a caption long enough to wrap on one of them leaves the pair with
+    // mismatched heights. "from the previous period" was long enough to do that
+    // on a 360dp screen.
+    return '${change > 0 ? '+' : ''}$change% vs previous';
   }
 
   /// Below this, two periods are both too small for a ratio to mean anything.
@@ -163,15 +167,15 @@ class EnergySummaryCard extends StatelessWidget {
               SegmentedButton<bool>(
                 showSelectedIcon: false,
                 segments: const [
-                  ButtonSegment(value: false, label: Text('Hari')),
-                  ButtonSegment(value: true, label: Text('7 hari')),
+                  ButtonSegment(value: false, label: Text('Day')),
+                  ButtonSegment(value: true, label: Text('7 days')),
                 ],
                 selected: {weekly},
                 onSelectionChanged: (selection) =>
                     onRangeChanged(selection.first),
               ),
               IconButton(
-                tooltip: 'Lihat laporan energi',
+                tooltip: 'Open the energy report',
                 visualDensity: VisualDensity.compact,
                 onPressed: onOpenReport,
                 icon: const Icon(Icons.insert_chart_outlined_rounded),
@@ -180,7 +184,7 @@ class EnergySummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            'Estimasi dari daya rata-rata telemetry',
+            'Estimated from average telemetry power',
             style: TextStyle(
               fontSize: 11,
               color: isDark ? Colors.white54 : Colors.black54,
@@ -197,7 +201,7 @@ class EnergySummaryCard extends StatelessWidget {
               height: 94,
               child: Center(
                 child: Text(
-                  errorMessage ?? 'Data daya belum tersedia untuk perhitungan.',
+                  errorMessage ?? 'No power data available to calculate from.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -209,7 +213,7 @@ class EnergySummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _metric(
-                      title: 'Produksi PV',
+                      title: 'PV production',
                       value: solarKwh,
                       previous: previousSolarKwh,
                       color: solarColor,
@@ -217,7 +221,7 @@ class EnergySummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     _metric(
-                      title: 'Pemakaian AC',
+                      title: 'AC usage',
                       value: loadKwh,
                       previous: previousLoadKwh,
                       color: loadColor,
@@ -240,21 +244,21 @@ class EnergySummaryCard extends StatelessWidget {
     final target = result.productionTargetKwh;
     final progress = result.targetProgress;
     final targetLabel = target == null || progress == null
-        ? 'Target produksi belum diatur'
-        : '${(progress * 100).toStringAsFixed(0)}% dari ${target.toStringAsFixed(1)} kWh';
+        ? 'No production target set'
+        : '${(progress * 100).toStringAsFixed(0)}% of ${target.toStringAsFixed(1)} kWh';
     final runway = result.batteryDepletionHours == null
-        ? 'Battery runway tidak tersedia'
-        : '${result.batteryDepletionHours!.toStringAsFixed(1)} jam estimasi baterai';
+        ? 'No battery runway available'
+        : '${result.batteryDepletionHours!.toStringAsFixed(1)} h of estimated battery';
     return Semantics(
       container: true,
       label:
-          'Forecast energi. Estimasi produksi ${result.dailyProductionEstimateKwh.toStringAsFixed(2)} kilowatt-hours. '
+          'Energy forecast. Estimated production ${result.dailyProductionEstimateKwh.toStringAsFixed(2)} kilowatt-hours. '
           '$targetLabel. $runway.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Prediksi',
+            'Forecast',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -267,7 +271,7 @@ class EnergySummaryCard extends StatelessWidget {
               Expanded(
                 child: _forecastMetric(
                   context,
-                  'Estimasi harian',
+                  'Daily estimate',
                   '${result.dailyProductionEstimateKwh.toStringAsFixed(2)} kWh',
                   Icons.auto_graph_rounded,
                 ),
@@ -276,7 +280,7 @@ class EnergySummaryCard extends StatelessWidget {
               Expanded(
                 child: _forecastMetric(
                   context,
-                  'Puncak pakai',
+                  'Peak usage',
                   result.peakUsageWatts == null
                       ? 'Unavailable'
                       : '${result.peakUsageWatts!.toStringAsFixed(0)} W',
@@ -304,7 +308,7 @@ class EnergySummaryCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Aktual hari ini: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
+                'Actual today: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
                 style: TextStyle(
                   fontSize: 10,
                   color: isDark ? Colors.white60 : Colors.black54,

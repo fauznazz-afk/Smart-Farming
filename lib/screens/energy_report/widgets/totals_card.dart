@@ -34,8 +34,8 @@ class TotalsCard extends StatelessWidget {
           children: [
             Text(
               monthly
-                  ? 'Ringkasan ${formatMonthLabel(selectedDate)}'
-                  : 'Ringkasan ${formatDateLabel(selectedDate)}',
+                  ? 'Summary ${formatMonthLabel(selectedDate)}'
+                  : 'Summary ${formatDateLabel(selectedDate)}',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
@@ -43,7 +43,7 @@ class TotalsCard extends StatelessWidget {
               children: [
                 _TotalMetric(
                   isDark: isDark,
-                  label: 'Produksi PV',
+                  label: 'PV production',
                   value: pvKwh,
                   previous: previousTotals?.pvKwh,
                   color: const Color(0xFFFFC857),
@@ -52,7 +52,7 @@ class TotalsCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 _TotalMetric(
                   isDark: isDark,
-                  label: 'Pemakaian AC',
+                  label: 'AC usage',
                   value: acKwh,
                   previous: previousTotals?.acKwh,
                   color: const Color(0xFF69B7FF),
@@ -62,7 +62,7 @@ class TotalsCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '${totalSampleCount(buckets)} sampel • ${buckets.length} ${monthly ? 'hari' : 'jam'} dengan data',
+              '${totalSampleCount(buckets)} samples • ${buckets.length} ${monthly ? 'days' : 'hours'} with data',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white60 : Colors.black54,

@@ -219,7 +219,7 @@ void main() {
         latestValues: {},
         lastUpdate: recent,
       );
-      expect(data.ageLabel, contains('2 menit lalu'));
+      expect(data.ageLabel, contains('2 minutes ago'));
     });
 
     test('ageLabel describes old updates', () {
@@ -228,22 +228,22 @@ void main() {
         latestValues: {},
         lastUpdate: old,
       );
-      expect(data.ageLabel, contains('3 jam lalu'));
+      expect(data.ageLabel, contains('3 hours ago'));
     });
 
     test('ageLabel has a day bucket, not an ever-growing hour count', () {
-      // Three days used to read as "72 jam lalu", which is honest but useless
+      // Three days used to read as "72 hours ago", which is honest but useless
       // to anyone deciding whether the device is alive.
       final data = DeviceTelemetry(
         latestValues: {},
         lastUpdate: DateTime.now().subtract(const Duration(days: 3)),
       );
-      expect(data.ageLabel, contains('3 hari lalu'));
+      expect(data.ageLabel, contains('3 days ago'));
     });
 
     test('ageLabel reports nothing received yet', () {
       final data = DeviceTelemetry(latestValues: {}, lastUpdate: null);
-      expect(data.ageLabel, 'Belum ada data');
+      expect(data.ageLabel, 'No data yet');
     });
 
     test('toJson and fromCacheJson round-trip', () {

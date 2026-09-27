@@ -112,7 +112,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('CCTV URL harus HTTPS dan memakai host resmi'),
+      find.text('The CCTV URL must be HTTPS and use an approved host'),
       findsOneWidget,
     );
     expect(find.text('Settings'), findsOneWidget, reason: 'must stay on screen');

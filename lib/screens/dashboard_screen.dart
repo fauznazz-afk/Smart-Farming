@@ -656,7 +656,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _energyLoading = false;
       _energyError = hasHistory
           ? null
-          : 'ThingsBoard tidak mengirim histori power_dc/power_ac dalam 14 hari terakhir.';
+          : 'ThingsBoard has no power_dc/power_ac history in the last 14 days.';
       _energyUpdatedAt = now;
       _notifyEnergy();
     } catch (error) {
@@ -664,7 +664,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       debugPrint('Energy summary history request failed: $error');
       _energyLoading = false;
       _energyError =
-          'Histori daya gagal dimuat. Tarik layar untuk mencoba lagi.';
+          'Power history could not be loaded. Pull down to retry.';
       _notifyEnergy();
     } finally {
       _energyRequestInFlight = false;
@@ -845,10 +845,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       initialDateRange: DateTimeRange(start: initialStart, end: safeEnd),
       firstDate: firstDate,
       lastDate: today,
-      locale: const Locale('id', 'ID'),
-      helpText: 'Pilih rentang tanggal telemetry',
-      cancelText: 'Batal',
-      confirmText: 'Terapkan',
+      // The picker's own chrome is localised from this, not from the strings
+      // passed in. Leaving it on Indonesian meant the day headers and month
+      // names stayed Indonesian inside an otherwise English dialog, which was
+      // the last Indonesian surface in the app.
+      locale: const Locale('en', 'US'),
+      helpText: 'Select a telemetry date range',
+      cancelText: 'Cancel',
+      confirmText: 'Apply',
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -1009,7 +1013,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         },
       ),
       leading: IconButton(
-        tooltip: 'Muat ulang data',
+        tooltip: 'Reload data',
         icon: const Icon(Icons.refresh_rounded),
         onPressed: _loading ? null : _fetchAll,
       ),
@@ -1028,7 +1032,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           onPressed: _openAlarmHistory,
         ),
         IconButton(
-          tooltip: 'Pengaturan',
+          tooltip: 'Settings',
           icon: const Icon(Icons.settings_outlined),
           onPressed: _openSettings,
         ),
@@ -1160,14 +1164,20 @@ class _DashboardScreenState extends State<DashboardScreen>
         final alerts = _alertMessages.value;
         final stale = _staleDeviceNames();
 
+        // Each branch is wrapped in a BannerSwitcher rather than returned
+        // conditionally, so a banner that goes away collapses instead of
+        // vanishing in one frame. The alert banner is the case that matters
+        // most: a reading returning to range used to drop the whole Overview
+        // down a card-height with no transition, which reads as a glitch.
         if (failed) {
-          return ConnectionStatusBanner(
+          return ConnectionStatusBannerSwitcher(
             failed: true,
             staleNames: stale,
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: _error,
             isDark: isDark,
+            visible: true,
             onRetry: _fetchAll,
           );
         }
@@ -1175,29 +1185,39 @@ class _DashboardScreenState extends State<DashboardScreen>
           return _bindRevision(
             _liveRevision,
             isDark,
-            () => OfflineBanner(
-              cacheTime: _cachedTelemetryTime,
-              onRetry: _fetchAll,
+            () => BannerSwitcher(
+              visible: true,
+              identity: 'offline:${_cachedTelemetryTime ?? ''}',
+              bottomSpacing: 8,
+              builder: () => OfflineBanner(
+                cacheTime: _cachedTelemetryTime,
+                onRetry: _fetchAll,
+              ),
             ),
           );
         }
-        if (showAlerts && alerts.isNotEmpty) {
+        if (showAlerts) {
           return _bindRevision(
             _alertMessages,
             isDark,
-            () => alerts.isEmpty
-                ? const SizedBox.shrink()
-                : EnergyAlertBanner(messages: alerts),
+            () => BannerSwitcher(
+              visible: alerts.isNotEmpty,
+              // The identity is the set of messages, so a *change* of alarm
+              // cross-fades the text rather than only resizing the box.
+              identity: alerts.join('|'),
+              builder: () => EnergyAlertBanner(messages: alerts),
+            ),
           );
         }
         if (stale.isNotEmpty) {
-          return ConnectionStatusBanner(
+          return ConnectionStatusBannerSwitcher(
             failed: false,
             staleNames: stale,
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: null,
             isDark: isDark,
+            visible: true,
             onRetry: _fetchAll,
           );
         }
@@ -1265,13 +1285,26 @@ class _DashboardScreenState extends State<DashboardScreen>
     return LivePowerCard(
       pvPower: _pzem?.latestValues['power_dc'],
       acPower: _pzem?.latestValues['power_ac'] ?? 0.0,
+      // Read from the BMS's own `power` key, not multiplied out from voltage and
+      // current. The device reports all three, and deriving it produced two
+      // separate wrong answers: the product collapses to 0 whenever current reads
+      // 0.00 A, which the BMS does report while idle, and it drifts from the
+      // reported figure whenever the pack is not at its nominal voltage.
+      //
+      // Passed through raw, sign and all. This BMS reports negative power while
+      // charging, which the Battery page shows as "Power -12.92 W". Negating it
+      // here to make the hero read "Charging 12 W" was tried, and it makes two
+      // screens disagree about the same measurement: the reader has to work out
+      // that a minus became a plus. The label carries the direction instead, and
+      // `energy_forecast_service.dart` documents the same vendor disagreement
+      // behind a warning to use `.abs()` where only the magnitude matters.
+      batteryPower: _battery?.latestValues['power'] ?? 0.0,
       soc: _battery?.latestValues['soc'] ?? 0.0,
       pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
       pzemAgeLabel: _pzem?.ageLabel,
       isDark: isDark,
       seedColor: _seedColor,
       performanceMode: _performanceMode,
-      onNavigate: _selectPage,
     );
   }
 
@@ -1483,6 +1516,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
       realtimeConnected: _realtimeConnected,
+      seedColor: _seedColor,
       onPickRange: _pickDateFromCalendar,
     );
   }

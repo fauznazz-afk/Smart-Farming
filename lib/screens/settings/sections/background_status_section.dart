@@ -53,7 +53,9 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     if (!opened) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Buka pengaturan secara manual: Settings > Apps > EnerGrow'),
+          content: Text(
+            'Open the settings manually: Settings > Apps > EnerGrow',
+          ),
         ),
       );
     }

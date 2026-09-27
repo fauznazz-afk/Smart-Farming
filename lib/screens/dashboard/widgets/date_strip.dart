@@ -42,7 +42,7 @@ class DateStrip extends StatelessWidget {
           child: Row(
             children: [
               IconButton(
-                tooltip: 'Pilih rentang tanggal',
+                tooltip: 'Pick a date range',
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints.tightFor(
                   width: 28,
@@ -71,7 +71,7 @@ class DateStrip extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                rangeStart != null ? 'Rentang' : 'Pilih hari',
+                rangeStart != null ? 'Range' : 'Pick a day',
                 style: TextStyle(fontSize: 11, color: faintColor(isDark)),
               ),
             ],
@@ -122,9 +122,9 @@ class DateStrip extends StatelessWidget {
           '${rangeEnd!.day} ${monthName(rangeEnd!.month)} ${rangeEnd!.year}';
     }
     final today = DateTime.now();
-    if (_isSameDay(selectedDate, today)) return 'Hari ini';
+    if (_isSameDay(selectedDate, today)) return 'Today';
     if (_isSameDay(selectedDate, today.subtract(const Duration(days: 1)))) {
-      return 'Kemarin';
+      return 'Yesterday';
     }
     return '${dayNameFull(selectedDate.weekday)}, '
         '${selectedDate.day} ${monthName(selectedDate.month)} ${selectedDate.year}';

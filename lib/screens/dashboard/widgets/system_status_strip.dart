@@ -72,7 +72,7 @@ class SystemStatusStrip extends StatelessWidget {
               icon: batteryOk
                   ? Icons.battery_charging_full
                   : Icons.battery_alert,
-              label: charging ? 'Mengisi' : 'Baterai',
+              label: charging ? 'Charging' : 'Battery',
               value: '${battery.soc.toStringAsFixed(0)}%',
               ok: batteryOk,
               // The threshold is printed because "baterai 18%" means nothing on
@@ -84,8 +84,8 @@ class SystemStatusStrip extends StatelessWidget {
             _divider(isDark),
             _Verdict(
               icon: gridOk ? Icons.check_circle_outline : Icons.error_outline,
-              label: 'Jaringan AC',
-              value: gridOk ? 'Stabil' : 'Turun',
+              label: 'AC grid',
+              value: gridOk ? 'Stable' : 'Unstable',
               ok: gridOk,
               detail: '${ac.voltage.toStringAsFixed(0)} V · '
                   '${ac.frequency.toStringAsFixed(0)} Hz',
@@ -99,7 +99,7 @@ class SystemStatusStrip extends StatelessWidget {
                 label: 'Alarm',
                 value: '$activeAlerts',
                 ok: false,
-                detail: 'aktif',
+                detail: 'active',
                 isDark: isDark,
                 seedColor: seedColor,
               ),

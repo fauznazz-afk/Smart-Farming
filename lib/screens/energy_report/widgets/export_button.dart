@@ -41,7 +41,7 @@ class ExportButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : const Icon(Icons.file_download_outlined),
-      label: Text(sharing ? 'Menyiapkan CSV…' : 'Ekspor laporan CSV'),
+      label: Text(sharing ? 'Preparing CSV…' : 'Export CSV report'),
     );
   }
 }

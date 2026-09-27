@@ -468,7 +468,38 @@ trigger (hydroponic nutrient solution is 800–2000 ppm; seawater is ~35000 ppm)
 That group found a second regression immediately after the first was fixed. Keep
 it.
 
-Regression guards worth knowing about, all added because of a real bug:
+## The battery sign convention, measured on the device
+
+**This BMS reports negative current and negative power while the pack is
+charging.** Confirmed on the test device on 27 September 2026: the Battery page
+read `Current -0.97 A` and `Power -12.92 W` while the state of charge was rising
+at 69 %. The opposite of the convention most people assume.
+
+Three things follow, and all three have already been got wrong once:
+
+- **Read `power` from the device. Do not multiply `voltage * current`.** The BMS
+  publishes `voltage`, `current` and `power` as separate keys. Deriving power
+  from the other two collapses to exactly zero whenever `current` reads `0.00 A`,
+  which this BMS does report while it is idle, and drifts from the reported
+  figure whenever the pack is not sitting at its nominal voltage.
+- **Negate once, at the call site, and say so.** `live_power_card.dart` takes
+  `batteryPower` with "positive means charging" already applied, so no consumer
+  has to remember which way round the raw key is.
+- **Zero current is not a direction.** The pack genuinely sits in standby for
+  stretches, and the sign of a zero reading is pure noise, so any UI that picks
+  one of two labels will flip several times a minute. There are three states —
+  charging, standby, discharging — and standby is the one that gets skipped.
+
+**Do not "fix" the sign at the call site.** The normalisation above was tried and
+reverted, and it is worth explaining because it looks like an improvement. Making
+the card show `Charging 12 W` while the Battery page, one tab away, shows
+`Power -12.92 W` means two screens report different numbers for the same
+measurement, and the reader has to work out that a minus became a plus. Flipping
+the sign makes the hero prettier and makes the app less trustworthy. The hero
+now prints the device's own signed figure and lets the label carry the direction,
+so the two screens agree.
+
+## Regression guards worth knowing about, all added because of a real bug:
 
 - `cctv_test.dart` — `parseAllowedCctvUrl` host allowlist
 - `chart_bounds_test.dart` — `niceStep` / `niceTimeStep` axis rounding

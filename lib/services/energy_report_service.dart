@@ -47,7 +47,7 @@ class EnergyReportService {
     final requestedEnd = DateTime(currentMonth.year, currentMonth.month + 1);
     final end = requestedEnd.isAfter(now) ? now : requestedEnd;
     if (!end.isAfter(start)) {
-      throw Exception('Rentang laporan tidak valid.');
+      throw Exception('The report range is not valid.');
     }
 
     final histories = <String, List<TelemetryPoint>>{
@@ -78,7 +78,7 @@ class EnergyReportService {
     final dc = histories['power_dc'] ?? const <TelemetryPoint>[];
     final ac = histories['power_ac'] ?? const <TelemetryPoint>[];
     if (dc.isEmpty && ac.isEmpty) {
-      throw Exception('ThingsBoard belum memiliki histori daya pada periode ini.');
+      throw Exception('ThingsBoard has no power history for this period.');
     }
 
     final byHour = <DateTime, _MutableEnergyBucket>{};

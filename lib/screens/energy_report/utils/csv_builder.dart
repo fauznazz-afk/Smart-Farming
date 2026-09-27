@@ -14,22 +14,22 @@ String buildEnergyCsv({
   required bool monthly,
 }) {
   final rows = <List<String>>[
-    ['Laporan Energi EnerGrow'],
+    ['EnerGrow Energy Report'],
     [
-      'Periode',
+      'Period',
       monthly ? formatMonthLabel(selectedDate) : formatDateLabel(selectedDate),
     ],
-    ['Sumber', 'ThingsBoard PZEM time-series'],
+    ['Source', 'ThingsBoard PZEM time-series'],
     [
-      'Metode',
-      'Rata-rata daya per jam dikali durasi interval; interval tanpa data tidak diestimasi',
+      'Method',
+      'Hourly average power times the interval duration; intervals without data are not estimated',
     ],
     [],
     [
-      monthly ? 'Tanggal' : 'Jam',
-      'Jumlah sampel',
-      'Produksi PV (kWh)',
-      'Pemakaian AC (kWh)',
+      monthly ? 'Date' : 'Hour',
+      'Sample count',
+      'PV production (kWh)',
+      'AC usage (kWh)',
     ],
     for (final bucket in buckets)
       [
@@ -57,7 +57,9 @@ String generateEnergyCsvFilename({
   required DateTime selectedDate,
   required bool monthly,
 }) {
-  return 'laporan_energi_${selectedDate.year}_${selectedDate.month.toString().padLeft(2, '0')}${monthly ? '' : '_${selectedDate.day.toString().padLeft(2, '0')}'}' 
+  // The filename reaches the user through the share sheet, so it is part of the
+  // interface and gets the same language as everything else.
+  return 'energy_report_${selectedDate.year}_${selectedDate.month.toString().padLeft(2, '0')}${monthly ? '' : '_${selectedDate.day.toString().padLeft(2, '0')}'}'
       '.csv';
 }
 
@@ -83,8 +85,8 @@ Future<void> shareEnergyReport({
     );
     await SharePlus.instance.share(
       ShareParams(
-        title: 'Laporan energi EnerGrow',
-        subject: 'Laporan energi EnerGrow',
+        title: 'EnerGrow energy report',
+        subject: 'EnerGrow energy report',
         files: [
           XFile.fromData(
             Uint8List.fromList(utf8.encode(csv)),
@@ -97,7 +99,7 @@ Future<void> shareEnergyReport({
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Laporan gagal diekspor: $error')),
+        SnackBar(content: Text('Report could not be exported: $error')),
       );
     }
   } finally {

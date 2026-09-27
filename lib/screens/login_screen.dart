@@ -77,10 +77,10 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
-        setState(() => _errorMsg = 'Username atau password salah');
+        setState(() => _errorMsg = 'Wrong username or password');
       }
     } catch (_) {
-      setState(() => _errorMsg = 'Gagal terhubung. Coba lagi nanti.');
+      setState(() => _errorMsg = 'Could not connect. Try again later.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Monitoring Energi PLTS & Smart Farming',
+                          'PLTS & Smart Farming Monitoring',
                           style: TextStyle(
                             fontSize: 13,
                             color: Theme.of(context)
@@ -149,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 22,
                                 color: Theme.of(context).colorScheme.onSurface,
                                 colorBlendMode: BlendMode.srcIn,
-                                semanticLabel: 'Pengguna',
+                                semanticLabel: 'User',
                               ),
                             ),
                             border: OutlineInputBorder(

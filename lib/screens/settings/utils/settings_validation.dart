@@ -71,21 +71,21 @@ String? validateEnvRange(
 
   if ((minText.isNotEmpty && minValue == null) ||
       (maxText.isNotEmpty && maxValue == null)) {
-    return '$errorLabel harus berupa angka yang valid.';
+    return '$errorLabel must be a valid number.';
   }
   for (final value in [minValue, maxValue]) {
     if (value == null) continue;
     final minAllowed = setting.minAllowed;
     final maxAllowed = setting.maxAllowed;
     if (minAllowed != null && value < minAllowed) {
-      return '$errorLabel tidak boleh kurang dari $minAllowed.';
+      return '$errorLabel cannot be lower than $minAllowed.';
     }
     if (maxAllowed != null && value > maxAllowed) {
-      return '$errorLabel tidak boleh lebih dari $maxAllowed.';
+      return '$errorLabel cannot be higher than $maxAllowed.';
     }
   }
   if (minValue != null && maxValue != null && minValue >= maxValue) {
-    return 'Batas minimum $errorLabel harus lebih kecil dari batas maksimum.';
+    return 'The minimum $errorLabel limit must be lower than the maximum limit.';
   }
   return null;
 }
@@ -98,7 +98,7 @@ String? validateDailyTargetError(String raw) {
   if (text.isEmpty) return null;
   final value = double.tryParse(text);
   if (value == null || value <= 0) {
-    return 'Target produksi harus berupa angka lebih besar dari 0.';
+    return 'The production target must be a number greater than 0.';
   }
   return null;
 }
@@ -110,7 +110,7 @@ String? validateEnvironmentAlertsEnabled({
 }) {
   if (!enabled) return null;
   if (ranges.every((setting) => setting.isEmpty)) {
-    return 'Isi minimal satu batas sensor untuk mengaktifkan peringatan.';
+    return 'Set at least one sensor limit to enable alerts.';
   }
   return null;
 }

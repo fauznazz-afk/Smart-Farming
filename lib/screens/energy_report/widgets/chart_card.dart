@@ -34,7 +34,7 @@ class ChartCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Energi per interval',
+                'Energy per interval',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
@@ -211,7 +211,7 @@ class _BucketStepper extends StatelessWidget {
         return Row(
           children: [
             IconButton(
-              tooltip: 'Interval sebelumnya',
+              tooltip: 'Previous interval',
               onPressed: selectedIndex == 0
                   ? null
                   : () => touchedBucketNotifier.value = selectedIndex - 1,
@@ -229,7 +229,7 @@ class _BucketStepper extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Interval berikutnya',
+              tooltip: 'Next interval',
               onPressed: selectedIndex >= buckets.length - 1
                   ? null
                   : () => touchedBucketNotifier.value = selectedIndex + 1,

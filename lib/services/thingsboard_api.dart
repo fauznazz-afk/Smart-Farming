@@ -258,8 +258,8 @@ class ThingsBoardApi {
     final refreshResult = await _refreshAccessToken();
     if (refreshResult == _TokenRefreshResult.unavailable) {
       throw Exception(
-        'Sesi tersimpan, tetapi server tidak dapat memperbaruinya. '
-        'Periksa koneksi lalu coba lagi.',
+        'The saved session could not be refreshed by the server. '
+        'Check the connection and try again.',
       );
     }
     if (refreshResult == _TokenRefreshResult.rejected) return response;
@@ -390,18 +390,18 @@ class ThingsBoardApi {
           return DeviceTelemetry.fromJson(json);
         } else if (response.statusCode == 401) {
           throw const _NonRetryableTelemetryException(
-            'Token expired, silakan login ulang',
+            'Token expired, please sign in again',
           );
         } else if (response.statusCode >= 500) {
           // Retry on 5xx
           lastError = Exception(
-            'Gagal fetch telemetry: ${response.statusCode}',
+            'Telemetry fetch failed: ${response.statusCode}',
           );
           continue;
         } else {
           // Non-retryable HTTP error (e.g. 403, 404)
           throw _NonRetryableTelemetryException(
-            'Gagal fetch telemetry: ${response.statusCode}',
+            'Telemetry fetch failed: ${response.statusCode}',
           );
         }
       } on Exception catch (e) {
@@ -414,7 +414,7 @@ class ThingsBoardApi {
       }
     }
 
-    throw lastError ?? Exception('Gagal fetch telemetry setelah retry');
+    throw lastError ?? Exception('Telemetry fetch failed after retrying');
   }
 
   /// Save telemetry snapshot to SharedPreferences for offline fallback.
@@ -543,10 +543,10 @@ class ThingsBoardApi {
               .toList(),
       };
     } else if (response.statusCode == 401) {
-      throw Exception('Token expired, silakan login ulang');
+      throw Exception('Token expired, please sign in again');
     } else {
       throw Exception(
-        'Gagal fetch history: ${response.statusCode}',
+        'History fetch failed: ${response.statusCode}',
       );
     }
   }
