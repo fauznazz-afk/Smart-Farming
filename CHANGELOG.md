@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-27
+
 ### Changed
 
 - **The app is now entirely in English.** The interface had been a mix: alarm
