@@ -3,9 +3,12 @@
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
 **Versi aplikasi saat ini:** 1.4.0 (build 10; sudah diterbitkan, tag `v1.4.0`)
-**Versi dokumen:** 1.3
+**Versi dokumen:** 1.4
 **Status:** Rilis 1.4.0 terbit 26 September 2026. Build pertamanya dari Linux,
-tanpa NDK dan CMake.
+tanpa NDK dan CMake. Sesi 27 September 2026 thereafter: modul alarm background
+ditulis ulang menjadi Kotlin native, antarmuka diratakan ke bahasa Inggris
+sepenuhnya, dan UI dashboard disederhanakan. Detail di `progress.md` §10.5 dan
+§10.7.
 
 ---
 
@@ -61,8 +64,20 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 - Data Battery, PZEM (PV/AC), dan sensor lingkungan diminta dari ThingsBoard REST API.
 - Polling otomatis aktif secara default setiap 10 detik. Pengguna dapat mengubah interval atau mematikannya di Settings.
 - Pull-to-refresh memperbarui telemetry dan histori halaman aktif.
-- Dashboard menghindari rebuild saat hasil telemetry tidak berubah.
+- Dashboard menghindari rebuild saat hasil telemetry tidak berubah. Perubahan
+  telemetri diumumkan lewat penghitung revisi, bukan `setState`, agar pohon
+  widget tidak dibangun ulang.
 - Tampilan mendukung tema gelap dan terang serta pilihan warna aksen.
+- **Overview merangkum sebagai strip verdict, bukan sebagai barisan angka.** Strip
+  itu mencetak satu verdict untuk baterai, satu untuk jaringan AC, dan jumlah
+  alarm aktif, jadi pertanyaannya "apakah aman" dijawab tanpa membaca angka.
+- **Hero card menampilkan arah daya**, bukan hanya besarannya: solar, beban
+  rumah, dan baterai, beserta proporsi beban terhadap produksi solar. Tiga
+  capsule shortcut (PV output, beban AC, isi baterai) dihapus karena ketiganya
+  sudah ada di kartu yang sama, dan sebagai navigasi hanya mengulang bottom bar.
+- **Alarm banner hanya muncul di halaman Overview.** Pelanggaran ambang adalah
+  fakta tentang kebun, bukan tentang tab yang sedang dibuka.
+- Antarmuka sepenuhnya berbahasa Inggris.
 
 **Perbedaan dari konsep awal:** PRD versi 1.0 mengusulkan tiga card grouped-list di satu dashboard. Implementasi saat ini memakai Overview dan halaman/tab detail terpisah. Bentuk navigasi tab ini menjadi baseline produk.
 
@@ -74,6 +89,15 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 - Data dibaca melalui endpoint time-series ThingsBoard dengan agregasi AVG.
 - Tampilan grafik mengikuti tanggal yang dipilih; tersedia pemilih tanggal untuk meninjau hari lain.
 - Rentang dan resolusi mengikuti implementasi query aplikasi. Ketersediaan titik data bergantung pada telemetry dan retensi ThingsBoard.
+- **Tiga seri digambar bersama: tegangan, arus, dan daya, dengan warna merah, hijau,
+  dan biru, garis solid, dan sumbu Y yang dinamis.** Sumbu Y berisi nilai
+  sebenarnya. Menormalkan tiap seri ke 0-100% rentangnya sendiri supaya ketiganya
+  sama-sama terlihat pernah dicoba dan ditolak: pembaca yang melihat
+  "0%, 50%, 100%" harus mencari tiga skala berbeda di legenda, sementara sumbu
+  mentah bisa langsung dibaca. Pada halaman AC dayanya dua orde di atas arus, dan
+  trace yang rata di sana itu jujur, bukan rusak.
+- Di bawah plot, tiap seri menampilkan latest, average, min, dan max, masing-masing
+  satu baris agar tidak terpotong.
 
 ### 4.4 Ringkasan dan laporan energi
 
@@ -92,14 +116,17 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 - Pengguna dapat mengaktifkan/menonaktifkan peringatan dan mengatur ambang SOC serta usia telemetry di Settings.
 - Kartu telemetry menampilkan usia update saat stale.
 - Pengguna dapat menentukan batas minimum dan/atau maksimum suhu lingkungan, kelembapan, dan TDS air. Batas kosong diabaikan; alert lingkungan hanya mengevaluasi data sensor yang masih segar.
-- Dashboard membedakan kegagalan fetch ThingsBoard dari perangkat yang telemetry-nya stale dan menunjukkan waktu fetch sukses terakhir.
-- Pengecekan juga berjalan saat aplikasi ditutup (Android). Pengecekan dijadwalkan setiap 15 menit oleh modul native dan mengirim notifikasi lokal, sehingga alarm tidak perlu membuka aplikasi. Cakupannya sama dengan alert dalam aplikasi: SOC rendah, telemetry stale, serta batas suhu, kelembapan, dan TDS.
-- Satu notifikasi dikirim per kemunculan alarm, bukan setiap pengecekan, dan hanya untuk alarm yang baru aktif.
-- Push notification dari server belum tersedia. Yang ada adalah pengecekan lokal terjadwal, yang hanya bisa melaporkan kondisi yang sudah tercatat di ThingsBoard.
+- Pengecekan juga berjalan saat aplikasi ditutup (Android). Modul Kotlin native dibaca lewat `AlarmManager`, sehingga tidak ada Flutter engine yang dibangun di latar belakang; satu pengecekan hanya handful MB RAM dan sekitar 0,45 detik, bukan puluhan MB dan beberapa detik seperti isolate Flutter. Pengecekan dijadwalkan **setiap satu menit** dan mengirim notifikasi lokal, sehingga alarm tidak perlu membuka aplikasi. Cakupannya sama dengan alert dalam aplikasi: SOC rendah, telemetry stale, batas suhu, kelembapan, dan TDS.
+- Pengecekan **berhenti berdiri** (stand down) selama aplikasi terbuka di depan, karena dashboard sudah mengevaluasi aturan yang sama setiap 10 detik; melanjutkan polling ThingsBoard dua kali hanya pekerjaan ganda dan berisiko kedua sisi berbeda pendapat tentang alarm aktif.
+- Tombol "Check now" di Settings menjalankan satu pengecekan tanpa hormat pada foreground stand-down, karena itulah yang dimaksud pengguna saat menekan.
+- Bagian "Background checks" di Settings menampilkan apakah pengecekan terpasang, apakah kredensial tersimpan, kapan terakhir berjalan, dan apa hasilnya, plus pintasan ke layar optimasi baterai. Bagian ini ada karena kegagalan ini mustahil terlihat: alarm yang hilang terlihat persis seperti "tidak ada yang perlu dilaporkan".
+- **Push notification dari server belum tersedia.** Yang ada adalah pengecekan lokal terjadwal, yang hanya bisa melaporkan kondisi yang sudah tercatat di ThingsBoard.
 
 Ambang stale yang disimpan pengguna dipakai untuk evaluasi peringatan, label pada kartu telemetry, dan ringkasan Overview. Aturan yang sama dipakai oleh aplikasi dan oleh pengecekan latar belakang, sehingga mengubah ambang di Settings langsung mengubah keduanya.
 
 Catatan: karena pengecekan terjadwal memakai `setInexactRepeating`, Android dapat menundanya, kadang lama, saat perangkat dalam mode hemat baterai. Keterlambatan ini disengaja. Alarm persis memerlukan izin `SCHEDULE_EXACT_ALARM` yang harus diberikan pengguna lewat pengaturan sistem, dan `USE_EXACT_ALARM` hanya untuk aplikasi jam dan kalender.
+
+Karena itu ada **dua** trigger, bukan satu: satu `setInexactRepeating` untuk ritme, dan satu `setAndAllowWhileIdle` satu kali yang di-arm ulang setiap kali dijalankan. Alarm berulang adalah hal pertama yang dibuang vendor power manager — di perangkat uji MIUI/HyperOS, alarm berulang berjalan enam kali lalu hilang diam-diam dari `dumpsys alarm`, dengan `com.miui.powerkeeper` terlihat di output yang sama. Yang kedua bebas dari Doze, jadi keduanya bertahan terhadap sebagian besar perilaku perangkat nyata. Konsekuensinya, pengecekan membaca **umur telemetry**, bukan mengasumsikan satu tick sudah terjadi.
 
 ### 4.6 CCTV
 
@@ -115,6 +142,8 @@ Catatan: karena pengecekan terjadwal memakai `setInexactRepeating`, Android dapa
 **Status: Diimplementasikan.**
 
 - Preferensi tema (System/Light/Dark), warna aksen, polling, peringatan energi/lingkungan, ambang stale/SOC, batas sensor, dan URL CCTV disimpan lokal.
+- Batas lingkungan punya default yang bekerja: suhu 15-35 °C, kelembapan 40-85 %,
+  TDS >= 800 ppm, dan alert lingkungan aktif secara default.
 - Pengguna dapat melihat versi aplikasi yang dibaca dari metadata paket, serta melakukan logout.
 - Pengaturan mengoptimalkan efek visual untuk performa.
 
@@ -125,7 +154,7 @@ Catatan: karena pengecekan terjadwal memakai `setInexactRepeating`, Android dapa
 | Keamanan transport | HTTPS untuk ThingsBoard dan URL CCTV yang diizinkan. Token sesi disimpan dengan secure storage. |
 | Kinerja | Polling tidak boleh menumpuk request; UI menghindari rebuild ketika data tidak berubah. Satu cold launch APK 1.2.3 pada perangkat uji tercatat 930 ms; perlu pengukuran berulang dan perangkat lain untuk memastikan konsistensi target <2 detik. |
 | Responsif | Pada satu perangkat Android 1220×2712, halaman Overview dapat digulir dan konten terlihat. Ukuran layar lain belum diuji. |
-| Ketahanan data | Jika fetch gagal, tampilkan status/error; MVP tidak menjanjikan cache offline lengkap. |
+| Beban latar belakang | Satu pengecekan alarm native sekitar 0,45 detik dan handful MB RAM, tanpa membangun Flutter engine. Pengecekan berhenti berdiri selama aplikasi terbuka, jadi tidak ada polling ganda. |
 | Ketersediaan | Tidak ada SLA formal; bergantung pada Orange Pi, ThingsBoard, tunnel, jaringan, dan perangkat IoT. |
 | Akurasi | Nilai dan estimasi hanya seakurat telemetry yang dikirim perangkat dan histori yang tersedia. |
 
@@ -142,14 +171,63 @@ Catatan: karena pengecekan terjadwal memakai `setInexactRepeating`, Android dapa
 
 ## 7. Saran pengembangan
 
-Urutan berikut disarankan berdasarkan risiko dan kesesuaian terhadap implementasi sekarang:
+Diurutkan menurut apa yang paling mungkin menyesatkan kalau ditunda, bukan
+menurut apa yang paling menarik untuk dikerjakan. Catatan teknis yang lebih
+panjang ada di `progress.md` §10.8.
 
-1. **Kurangi waktu cold start.** Profilkan startup pada build release dan optimalkan bagian yang terbukti lambat; ukur ulang sampai target <2 detik tercapai.
-2. **Verifikasi CCTV end-to-end.** Uji URL produksi, kontrol fullscreen, dan rotasi pada perangkat Android.
-3. **Ukur layout pada beberapa ukuran perangkat Android** dan simpan hasil verifikasi APK/perangkat di catatan rilis.
-4. **Perjelas status fetch dan usia data.** Tampilkan waktu pembaruan yang mudah ditemukan dan bedakan kegagalan koneksi dari telemetry yang stale.
-5. **Pertimbangkan WebSocket setelah polling stabil.** Evaluasi dampaknya terhadap baterai, koneksi ThingsBoard, serta kompleksitas reconnect sebelum mengganti polling.
-6. **Tambahkan push notification hanya dengan jalur server.** Tentukan sumber aturan/threshold dan layanan pengiriman terlebih dahulu; alert lokal yang ada hanya aktif saat aplikasi berjalan.
+### 7.1 Yang paling murah dan paling mencegah kerusakan berulang
+
+1. **Tutup celah test yang masih ada.** `energy_report_service.dart` dan
+   `alarm_notification_service.dart` baru punya test untuk helper-nya; yang belum
+   tercover adalah pemanggilan method channel dan lifecycle scheduling.
+   `weather_card.dart` (331 baris) dan `energy_report/widgets/chart_card.dart`
+   (297 baris) belum pernah di-refactor dan belum punya test widget.
+   **Prioritas khusus: widget test untuk `LivePowerCard` dan `EnvironmentGrid`.**
+   Pada sesi 27 September 2026, tiga regresi label ditemukan **hanya dengan melihat
+   layar** — `PV Output` yang muncul tiga kali di satu kartu, satuan yang
+   terpotong jadi `109....`, dan label yang ellipsised hanya saat verdict muncul.
+   Semuanya lolos `flutter analyze`, lolos build, dan lolos test yang ada.
+2. **Kunci konvensi tanda baterai dengan test, bukan dengan catatan.** BMS ini
+   dilaporkan minus saat charging, terukur di satu perangkat. Belum diketahui
+   apakah device yang sama memakai konvensi yang sama, dan apakah
+   `energy_forecast_service.dart` yang memakai `.abs()` sudah benar untuk semua
+   kasus. Ganti BMS tanpa test ini akan membalik semua tampilan tanpa satu pun
+   indikator yang merah.
+
+### 7.2 Verifikasi yang belum pernah dilakukan
+
+3. **Backfill `offline_*` di riwayat alarm.** `AlarmRule.kt` punya
+   `AlarmComparison.offline` dan Dart punya tipe untuknya, tapi belum jelas apakah
+   record itu pernah benar-benar tertulis di store native atau hanya muncul di
+   banner. Kalau belum, alarm "perangkat berhenti" — yang justru paling perlu
+   dibuktikan ke pengguna — tidak pernah muncul di riwayat.
+4. **Ukur layout di lebih dari satu ukuran layar.** Semua verifikasi optimist ini
+   di satu Xiaomi 24090RA29G, 1220x2712, density 520. Tiga tempat yang paling
+   mungkin pecah di layar kecil: bar tiga item power flow di hero card, legenda
+   chart tiga seri, dan dua tile Energy analytics. `flutter test` tidak bisa
+   menangkap ini.
+
+### 7.3 Yang perlu keputusan, bukan sekadar pengerjaan
+
+5. **`package_info_plus` / `share_plus` / `flutter_secure_storage`.** Coordinated
+   upgrade, sudah dicoba dan gagal karena konflik `win32` (lihat `progress.md`
+   §10.6b). Jangan dicoba piecemeal, dan jangan sebelum butir 1 dan 2 selesai
+   karena keduanya menyentuh penyimpanan sesi.
+6. **Cold start.** Target `<2 detik` belum diukur ulang sejak 1.2.3, dan
+   pengukuran itu tunggal di satu perangkat.
+
+### 7.4 Yang perlu ada jalurnya lebih dulu
+
+7. **Push notification dari server** belum punya jalur. Alert lokal yang ada hanya
+   bisa melaporkan kondisi yang sudah tercatat di ThingsBoard, dan hanya dengan
+   aplikasi yang sudah pernah dibuka setidaknya sekali. Sumber aturan dan layanan
+   pengiriman harus ditentukan dulu.
+8. **Platform kedua.** `AlarmBridge` melihat `MissingPluginException`, latch
+   `isUnavailable`, dan jadi no-op di iOS, desktop, dan web. Aman, tapi berarti
+   background alarm adalah fitur Android tanpa padanan, dan `status` untuk
+   diagnostik mengembalikan null di sana. Kalau aplikasi direncanakan ship di
+   platform kedua, ketidakfungsiannya harus disurface di UI lebih dulu, bukan
+   diam-diam tidak berfungsi.
 
 ## 8. Kriteria penerimaan baseline
 
@@ -166,20 +244,101 @@ Urutan berikut disarankan berdasarkan risiko dan kesesuaian terhadap implementas
 - Halaman CCTV memvalidasi URL, menyediakan kontrol playback dan fullscreen, serta menampilkan kegagalan stream dengan jelas.
 - APK release tersedia sebagai artefak build. Instalasi dan uji pada perangkat fisik harus dicatat terpisah; keberadaan file APK saja bukan bukti uji perangkat.
 
+**Ditambahkan 27 September 2026, setelah sesi alarm native dan perapian UI:**
+
+- Satu notifikasi alarm muncul saat aplikasi ditutup, dengan teks yang persis sama
+  dengan yang dihitung oleh evaluator di dalam aplikasi.
+- Alarm yang masih berlaku tidak mengulang notifikasi pada pengecekan berikutnya.
+  Controleksinya bukan "notifikasi kedua tidak muncul dalam 24 jam", melainkan set
+  id alarm aktif yang dibagi.
+- Teks pesan alarm identik antara `formatAlarmMessage` (Dart) dan
+  `AlarmMessageFormat.kt`, dipin oleh fixture yang sama untuk kedua sisi.
+- Ambang yang diubah di Settings mengubah perilaku notifikasi latar belakang pada
+  tick berikutnya, bukan hanya tampilan di dalam aplikasi.
+- `dumpsys alarm` menunjukkan **dua** trigger, bukan satu.
+- Seluruh antarmuka berbahasa Inggris, termasuk chrome date range picker dan
+  nama file CSV yang muncul di share sheet.
+- Nilai baterai ditampilkan dengan tanda yang sama seperti yang dilaporkan device,
+  sehingga halaman Battery dan hero card tidak mengukur besaran yang sama dengan
+  angka berbeda.
+- Banner alarm menyusut dengan animasi, bukan hilang dalam satu frame.
+
 ## 9. Roadmap
 
-- **Prioritas perbaikan:** verifikasi CCTV dan APK pada perangkat; kurangi waktu cold start.
-- **Peningkatan monitoring:** pertimbangkan WebSocket, cache ringan untuk tampilan terakhir, dan push notification berbasis server.
+- **Prioritas perbaikan:** widget test untuk `LivePowerCard` dan `EnvironmentGrid`,
+  kunci konvensi tanda baterai dengan test, backfill `offline_*` di riwayat, dan
+  ukur layout di lebih dari satu ukuran layar. Semuanya murah, dan ketiganya
+  berasal dari kegagalan yang lolos `flutter analyze`, build, dan test yang ada.
+- **Peningkatan monitoring:** pertimbangkan WebSocket, cache ringan untuk tampilan
+  terakhir, dan push notification berbasis server.
 - **Riset produk:** integrasi hasil FNN-XAI setelah model dan format output stabil.
-- **Skala pengguna:** evaluasi role/multi-user dan backend perantara hanya jika kebutuhan operasional bertambah.
+- **Skala pengguna:** evaluasi role/multi-user dan backend perantara hanya jika
+  kebutuhan operasional bertambah.
 
-## 10. Hasil verifikasi versi 1.2.3
+## 10. Hasil verifikasi
+
+### 10.1 Rilis 1.2.3 (historis)
 
 - `flutter analyze`: lulus tanpa temuan.
 - `flutter test`: lulus (2 test).
 - APK release 1.2.3 build 7 berhasil dibuat.
-- APK release 1.2.3 build 7 berhasil dipasang dan dibuka pada perangkat Android 24090RA29G dengan resolusi 1220×2712. Package Manager melaporkan versionName 1.2.3 dan versionCode 7.
-- Layar Login tampil normal setelah instalasi baru. Sesi dan preferensi lokal lama terhapus saat paket sebelumnya di-uninstall; login ThingsBoard belum dilakukan.
-- Cold launch awal APK 1.2.3 tercatat 930 ms (`adb am start -W`), memenuhi target <2 detik pada pengukuran tunggal ini.
-- Pengukuran sebelum penggantian APK pada 1.2.2 sempat mencatat 2417–3339 ms; hasil lama itu tidak mewakili build 1.2.3 dan menunjukkan hasil startup perlu diuji berulang.
-- Halaman monitoring setelah login, stream CCTV, dan tata letak pada ukuran perangkat lain belum diverifikasi langsung.
+- APK release 1.2.3 build 7 berhasil dipasang dan dibuka pada perangkat Android
+  24090RA29G dengan resolusi 1220x2712. Package Manager melaporkan versionName
+  1.2.3 dan versionCode 7.
+- Layar Login tampil normal setelah instalasi baru. Sesi dan preferensi lokal lama
+  terhapus saat paket sebelumnya di-uninstall; login ThingsBoard belum dilakukan.
+- Cold launch awal APK 1.2.3 tercatat 930 ms (`adb am start -W`), memenuhi target
+  <2 detik pada pengukuran tunggal ini.
+- Pengukuran sebelum penggantian APK pada 1.2.2 sempat mencatat 2417-3339 ms; hasil
+  lama itu tidak mewakili build 1.2.3 dan menunjukkan hasil startup perlu diuji
+  berulang.
+
+### 10.2 1.4.0 dan sesi 27 September 2026
+
+**Otomatis:**
+
+- `flutter analyze`: lulus tanpa temuan.
+- `flutter test`: lulus, 227 test.
+- `./gradlew :app:testDebugUnitTest`: lulus, 11 unit test (parity alarm dan host
+  allowlist).
+
+**Di perangkat — Xiaomi 24090RA29G, Android 16, 1220x2712, density 520:**
+
+- Login ThingsBoard berhasil, sesi bertahan setelah aplikasi ditutup dan dibuka
+  kembali.
+- Modul alarm native terbukti berjalan: satu checks lithiumional berjalan dengan
+  aplikasi ditutup, dan notifikasi muncul di lock screen dengan teks
+  `Kelembapan tinggi: 91.0 % (batas 85.0 %)` pada build pertama, sebelum antarmuka
+  diratakan ke bahasa Inggris.
+- Pengecekan berulang pada menit berikutnya melaporkan `0 new`, jadi set alarm aktif
+  mencegah notifikasi berulang seperti yang dimaksud.
+- `dumpsys alarm` menunjukkan kedua trigger: `repeatInterval=60000` untuk ritme dan
+  `flags=0x8` (`ALLOW_WHILE_IDLE`) untuk cadangan.
+- 13 aturan ter-push ke modul native, dan ambang yang diubah di Settings terlihat
+  dipakai oleh kedua sisi.
+- APK release terpasang dan dibangun ulang beberapa kali dalam sesi ini; setiap
+  perubahan UI diverifikasi lewat screenshot.
+
+**Yang diverifikasi lewat screenshot, bukan lewat log:** seluruh perapian UI sesi
+ini. Empat dari temuan tersebut adalah kegagalan senyap — tidak ada exception,
+`flutter analyze` bersih, build sukses, test lulus — dan tidak satu pun bisa
+dilihat tanpa menjalankan aplikasi. Dua di antaranya bahkan tidak terlihat
+dengan mata pada ukuran screenshot penuh; bar split power flow baru
+ketahuan setelah brightness tiap baris piksel diukur.
+
+**Yang belum diverifikasi:**
+
+- Tampilan tanda minus pada hero card. Saat verifikasi terakhir baterai sedang
+  standby pada 0 W, jadi hanya label `Standby` yang terlihat. Kodenya mencetak
+  nilai mentah dari device, dan ini akan terlihat begitu pack masuk charging.
+- Layout pada ukuran layar selain 1220x2712.
+- Stream CCTV end-to-end di URL produksi.
+- Cold start pada build terkini; pengukuran terakhir masih dari 1.2.3.
+
+### 10.3 Konvensi tanda baterai, terukur
+
+BMS pada perangkat uji melaporkan **arus dan daya negatif saat charging**: halaman
+Battery menampilkan `Current -0.97 A` dan `Power -12.92 W` sementara state of
+charge naik di 69%. Ini berlawanan dengan asumsi yang paling umum, dan sudah
+menyebabkan dua kesalahan terpisah yang keduanya terlihat seperti perbaikan.
+Rinciannya di `progress.md` §10.7 butir 7, aturannya di `AGENTS.md`.

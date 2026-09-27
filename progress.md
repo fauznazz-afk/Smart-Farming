@@ -741,7 +741,152 @@ dan toggle "Smooth Glass" yang menyalakan blur saat dimatikan.
 satuan dengan satu metrik terpilih lewat segmented button. Keduanya bagus, tapi
 menyentuh layout substantially.
 
-### 10.6 Utang KGP - jika someday dikerjakan
+### 10.7 Sesi kedua: bahasa, animasi, dan konvensi tanda baterai
+
+**27 September 2026, lanjutan.** Sesi ini berawal dari satu kalimat — "kenapa
+accent warnanya berubah, jadi lebih jelek" — dan berakhir di satu pengukuran
+tanda baterai di perangkat._some Rekap, karena hampir semua keputusan di sini
+ditolak setelah dicoba, dan yang perlu bertahan justru alasan penolakannya.
+
+**1. Warna tidak pernah boleh berubah otomatis.** Rotasi hue 40° per index
+ditambahkan supaya halaman PV/AC/Battery bisa dibedakan lewat warna, dan
+dibatalkan. `metricColor` menerima `index` lalu **sengaja mengabaikannya**,
+dan `test/color_helpers_test.dart` gagal kalau itu berubah. Alasan yang bertahan:
+warna yang tidak dipilih user adalah warna yang tidak bisa diprediksi. Halaman
+sudah dibedakan oleh judul dan ikon. `kAccentPalette` juga dikembalikan —
+menggeser `Ocean cyan` untuk memisahkannya dari `Forest teal` akan diam-diam
+mengubah arti setting yang sudah ada.
+
+**2. Hijau bukan untuk kondisi yang baik.** Strip status, kartu environment, dan
+indikator `Live` semuanya memakai hijau saat semuanya normal. Di tema amber itu
+membuat **dua sistem warna** di satu layar. Aturannya sekarang: hanya pelanggaran
+yang diberi warna. Ditulis di `AGENTS.md` sebagai "never signal the same state
+three ways" dan "say nothing when nothing is wrong".
+
+**3. Outline card mengikuti accent.** Semula hairline putih/hitam netral, jadi
+kartu berangka abu-abu dingin di dalam tema amber. Diambil dari
+`colorScheme.primary`, bukan parameter baru, karena accent sudah ada di theme dan
+menyelipkan `seedColor` ke semua call site hanya memberi kesempatan keduanya
+berbeda.
+
+**4. Chart: tiga seri kembali, RGB, solid, sumbu dinamis.** Metric picker
+dibatalkan — melihat ketiganya sekaligus justru tujuan chart itu. Skalakan
+per-seri ke 0–100% juga dibatalkan: pembaca yang lihat "0%, 50%, 100%" harus
+mencari tiga skala berbeda di legenda, sedangkan sumbu mentah bisa langsung
+dibaca. Only the AC page punya power dua orde di atas arus, dan trace rata di
+sana itu jujur, bukan rusak.
+
+**5. `dashArray: []` berarti "gambar apa pun", bukan "solid".** fl_chart menelusuri
+pola dengan `pattern[index % pattern.length]`, jadi list kosong menghasilkan nol
+output. Chart naik dengan sumbu benar, legenda benar, statistik benar, dan
+**tanpa garis** — bentuk kegagalan terburuk untuk ditemukan di perangkat. Yang
+solid adalah **tidak mengisi field itu sama sekali**.
+
+**6. `SizedBox(height: 5)` membuat `maxWidth` jadi infinity.** Jadi `Row` di
+bawahnya unbounded dan `Expanded` resolve ke nol: bar split power flow tampil
+sebagai ruang kosong, tanpa exception. Baru ketahuan setelah mengukur brightness
+setiap baris piksel di screenshot, bukan dengan melihatnya. Perbaikan:
+`width: double.infinity` eksplisit.
+
+**7. BMS ini melaporkan MINUS saat charging.** Terukur di perangkat 27 September
+2026: halaman Battery menunjukkan `Current -0.97 A` dan `Power -12.92 W` saat
+SOC naik di 69%. Tiga aturan yang lahir dari itu:
+
+- **Baca key `power`. Jangan kali-kalikan `voltage * current`.** BMS mengirim
+  ketiganya terpisah. Menghitung ulang menghasilkan nol persis saat `current`
+  = `0.00 A` (yang memang dikirim saat standby) dan melenceng saat baterai tidak
+  di tegangan nominal.
+- **Jangan balik tanda di call site.** Negasi supaya hero bisa menulis
+  "Charging 12 W" **dibatalkan**: halaman Battery, satu tab saja, menulis
+  `Power -12.92 W`. Dua layar mengukur besaran yang sama dengan angka berbeda,
+  dan pembaca harus Tempat tahu bahwa minus jadi plus.
+- **Nol bukan arah.** Pak benar-benar punya tiga status — charging, standby,
+  discharging — dan tanda bacaan nol adalah noise, jadi label dua-pilihan akan
+  berkedip beberapa kali semenit sambil mengklaim sesuatu. Di bawah 1 W: "Standby".
+
+Ketiga aturan ini ditulis di `AGENTS.md` sebagai bagian "The battery sign
+convention, measured on the device", karena ketiganya sudah dilanggar sekali dan
+semuanya terlihat seperti perbaikan.
+
+**8. Animasi banner butuh `SizeTransition`, bukan hanya fade.** Banner dulu
+dirender conditional biasa, jadi alarm selesai membuat seluruh Overview melompat
+naik setinggi kartu dalam satu frame — terbaca sebagai glitch. `AnimatedSwitcher`
+menumpuk banner yang keluar di bawah yang masuk, dan **stack mengambil child
+terbesar**, jadi banner yang hanya fade akan **mempertahankan tinggi penuh
+selama seluruh animasi lalu melompat ke nol di frame terakhir** — lebih buruk
+daripada tidak beranimasi sama sekali.
+
+**9. `_Shortcut` ada di tiga tempat, dua privat, satu publik tanpa consumer.**
+Digabung jadi `DashboardShortcut`.
+
+**10. Aplikasi sekarang full English.** Yang diterjemahkan: alarm message
+(Dart **dan** Kotlin), energy card, status strip, environment grid, dan date-range picker —
+yang chrome-nya dilokalkan dari argumen `Locale`, bukan dari string yang
+diberikan, jadi itu surface Indonesia terakhir. CSV export juga
+`energy_report_*.csv` karena filename-nya muncul di share sheet.
+
+**11. Alarm banner hanya di halaman Overview.** Pelanggaran ambang adalah fakta
+tentang kebun, bukan tentang tab yang sedang dibuka, dan mengulangnya di empat
+halaman mendorong empat baris yang sudah dibaca di atas konten yang ingin dilihat
+user. State koneksi tetap muncul di semua halaman, dan jumlah alarm ada di strip
+di semua halaman.
+
+### 10.8 Rekomendasi pengembangan berikutnya
+
+Diurutkan berdasarkan yang paling mungkin menyesatkan kalau ditunda. Rincian
+produk ada di `PRD_PLTS_Monitoring_App.md` §7.
+
+**A. Tutup celah test yang masih ada** (paling murah, paling bisa dikerjakan sendiri)
+
+- `energy_report_service.dart` dan `alarm_notification_service.dart` masih hanya
+  punya test untuk helper-nya. Yang belum tercover: pemanggilan method channel dan
+  lifecycle scheduling — butuh perangkat, atau fake untuk `MethodChannel`.
+- `weather_card.dart` (331 baris) dan `energy_report/widgets/chart_card.dart`
+  (297 baris) belum pernah di-refactor dan belum punya test widget.
+- Widget test untuk `LivePowerCard` dan `EnvironmentGrid` akan menangkap
+  regresi label yang di sesi ini ditemukan tiga kali hanya dengan melihat layar.
+
+**B. Rekonsiliasi tanda dan satuan di seluruh aplikasi**
+
+Konvensi tanda BMS baru terukur di satu perangkat (§10.7). Yang **belum
+diverifikasi**: apakah device yang sama mengGpoliciesConvention yang sama,
+dan apakah `energy_forecast_service.dart` yang memakai `.abs()` sudah benar
+untuk semua kasus. Buat satu test yang mengunci konvensi ini per device id, supaya
+ganti BMS tidak diam-diam membalik semua tampilan.
+
+**C. Backfill `offline_*` di riwayat alarm**
+
+`AlarmRule.kt` punya `AlarmComparison.offline` dan Dart punya `AlarmHistory`
+untuknya, tapi belum jelas apakah record `offline_*` pernah benar-benar tertulis
+di store native atau hanya di banner. Kalau belum, alarm "perangkat berhenti"
+tidak pernah muncul di riwayat — dan itu persis alarm yang paling perlu dibuktikan
+ke pengguna.
+
+**D. Verifikasi perangkat di lebih dari satu ukuran layar**
+
+Semua verifikasi optimist ini di satu Xiaomi 24090RA29G, 1220×2712, density 520.
+Tiga tempat yang secaraTeoretis bisa pecah di layar kecil: bar tiga item di
+`_PowerFlow` (Solar / House / Battery), legenda chart tiga seri, dan dua tile
+Energy analytics. `test/` tidak bisa menangkap ini; butuh perangkat atau
+screenshot pada beberapa density.
+
+**E. `package_info_plus` / `share_plus` / `flutter_secure_storage` (§10.6)**
+
+Coordinated upgrade, sudah dicoba dan gagal karena konflik `win32`. Butuh
+release Flutter yang sudah memperbaiki KFGPengum Floures — jangan dicoba piecemeal,
+dan jangan sebelum A dan B selesai karena keduanya menyentuh penyimpanan sesi.
+
+**F. Yang sengaja belum dikerjakan**
+
+- iOS dan web. `AlarmBridge` melihat `MissingPluginException`, latch
+  `isUnavailable`, dan jadi no-op — aman, tapi berarti background alarm adalah
+  fitur Android tanpa padanan, dan `status` untuk diagnostik mengembalikan null
+  di sana. Kalau aplikasi pernahAlberto wipeFS shipped di platform kedua, ini harus
+  disurface di UI lebih dulu.
+- Push notification dari server. Butuh jalur server yang belum ada; lihat PRD §6.
+- Multi-user/role. Hanya kalau kebutuhan operasional bertambah.
+
+### 10.6b Utang KGP - jika someday dikerjakan
 
 Lihat §9A. Ringkasnya: **tiga paket** (`share_plus` → 13,
 `package_info_plus` → 10, `flutter_secure_storage` → 11), plus `XFile` pindah
@@ -762,6 +907,84 @@ Ini adalah **coordinated upgrade** — tidak bisa dilakukan piecemeal.
 ## 11. Gotcha untuk Agent Berikutnya
 
 Hal-hal ini memakan waktu dan tidak terlihat di kode.
+
+### 11.0 Widget bisa tampil benar dan tetap tidak menggambar apa pun
+
+Tiga dari empat bug UI di sesi 27 September 2026 adalahsilent layout bugs. Tidak
+ada exception, tidak ada analyze error, tidak ada test yang gagal, dan `flutter
+build` sukses. Semuanya ketahuan hanya dengan melihat layar perangkat atau
+mengukur piksel screenshot.
+
+- **`dashArray: []` bukan "solid".** fl_chart menelusuri pola dengan
+  `pattern[index % pattern.length]`, jadi list kosong menghasilkan nol output.
+  Chart naik dengan sumbu, legenda, dan statistik yang benar lalu **tidak
+  menggambar garis sama sekali**. Yang solid adalah tidak mengisi field itu.
+- **`SizedBox(height: 5)` membuat `maxWidth` jadi infinity.** `BoxConstraints
+  .tightFor(height: 5)` hanya mengisi sumbu tinggi, sehingga `Row` di bawahnya
+  unbounded dan anak-anaknya `Expanded` resolve ke nol. Bar split power flow
+  tampil sebagai ruang kosong. Perbaikan: `width: double.infinity` eksplisit.
+- **`AnimatedSwitcher` + `SizeTransition`, bukan hanya fade.** Switcher menumpuk
+  child yang keluar di bawah yang masuk, dan `Stack` mengambil child **terbesar**.
+  Banner yang hanya fade mempertahankan tinggi penuh selama seluruh animasi
+  lalu melompat ke nol di frame terakhir.
+- **Nilai yang terlalu kecil tidak punya arah.** "Discharging 0 W" adalah klaim
+  yang tidak didukung data; tanda bacaan nol adalah noise, dan label dua-pilihan
+  akan berkedip beberapa kali semenit.
+
+CaraSequelize memeriksa tanpa dispositivo: crop screenshot lalu ukur brightness
+setiap baris piksel. Bar yang seharusnya terlihat tetapi max brightness-nya sama
+dengan background berarti tidak menggambar — bukan "sukar dilihat", tidak ada.
+
+### 11.0b Tanda ini bukan tanda keamanan, ini tanda sensor
+
+BMS ini **melaporkan minus saat charging** (`Current -0.97 A`,
+`Power -12.92 W` saat SOC 69% naik). Kontrak ini sudah ditulis di
+`AGENTS.md` §"The battery sign convention". Tiga aturan yang lahir darinya, dan
+ketiganya sudah dilanggar sekali:
+
+1. Baca key `power` dari device. **Jangan** mengalikan `voltage * current` —
+   BMS mengirim ketiganya terpisah, dan hasil perkalian nol persis saat
+   `current` = 0.00 A.
+2. **Jangan balik tanda di call site** supaya lebih prettify. Dua layar
+  Dua layar yang menampilkan angka berbeda untuk besaran yang sama lebih buruk
+   daripada minus yang aneh kelihatan.
+3. **Nol bukan arah.** Ada tiga status: charging, standby, discharging.
+
+Konvensi ini terukur di **satu** device. Jangan diasumsikan berlaku untuk BMS
+lain tanpa diukur ulang.
+
+### 11.0c Warna yang tidak dipilih user bukan warna
+
+Semua makeover warna di sesi ini ditolak, dan tiga yang cancelled semuanya terlihat
+seperti perbaikan:
+
+- rotasi hue 40° per index → satu accent satu hue
+- tiga lightness step dari satu hue + dash pattern → RGB solid, dan chart adalah
+  satu-satunya pengecualian yang didokumentasikan
+- hijau untuk "kondisi baik" → hanya pelanggaran yang diberi warna
+
+Semuanya satu alasan: **warna yang tidak dipilih user adalah warna yang tidak
+bisa diprediksi**, dan aplikasi yang kehilangan tema jauh lebih buruk daripada
+aplikasi yang terlihat sedikit monoton.
+
+### 11.0d Isi file bisa berubah di balik layar saat agent menulis
+
+Terjadi di sesi ini pada `date_helpers.dart` dan `weather_card.dart`: penulisan
+text-mode menyisipkan CRLF, dan beberapa kata Indonesia berganti bentuk saat
+dibaca ulang. Verifikasi dengan hex dump atau `unicode_escape`, bukan dengan
+membaca teks yang ditampilkan. Setelah setiap perubahan yang besar, jalankan:
+
+```bash
+for f in $(git status --porcelain | awk '{print $NF}'); do
+  [ -f "$f" ] && grep -qU $'\r' "$f" 2>/dev/null && echo "CRLF: $f"
+done
+git diff -U0 | grep "^+" | grep -oP "[^\x00-\x7F]" | sort -u | tr -d '\n'; echo
+```
+
+Hasil kedua perintah harus hanya berisi karakter yang memang dimaksud (derajat,
+tanda hubung, panah). Kalau ada CJK atau Hangul di dokumen Indonesia, itu
+bukan dari Anda.
+
 
 ### 11.1 named record typedef tidak bisa dipakai
 

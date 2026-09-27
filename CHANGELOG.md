@@ -104,9 +104,6 @@
 - Added `test/weather_service_test.dart` — 15 tests covering both current-weather and One Call API parsing, serialization round-trips, and computed properties.
 - Added `test/thingsboard_realtime_service_test.dart` — 21 tests covering service lifecycle, device configuration, `TelemetryPoint`, and `DeviceTelemetry`.
 - Added `test/color_helpers_test.dart` — 8 tests pinning that `metricColor` and `strongMetricColor` never rotate hue away from the accent the user picked, and that every text colour in the file clears AA on the real surfaces.
-
-### Changed
-
 - **Environment cards now show whether each reading is inside its limit**, with the configured range printed under the value and a single verdict for the whole grid. Five numbers with nothing to read them against is what the feature looked like before; a reading of 38 °C was visually identical to a healthy one until an alert banner appeared elsewhere on the screen. A stale sensor now says so instead of claiming everything is fine.
 - **One status strip replaces three stacked banners.** Offline mode used to show a green "polling active" line directly above an orange "offline" line — two opposite claims about the same connection, stacked before any content. Precedence is now failure > offline > alert > stale, and the strip no longer auto-hides after three seconds, because a 3-second flash was the only connection indicator there was.
 - **The dashboard's date strip now states the selected day** rather than the span of the seven chips. Tapping a chip left the label describing a range that no longer matched the selection, while the detail pages showed the correct single day, so two screens disagreed about the same state.
@@ -121,7 +118,7 @@
 - The glass toggle is now named for what it does. "Smooth Glass Mode" turned the blur *off* when switched on, the opposite of what the name promised.
 - An empty or loading chart no longer reserves a full plot's height, and chart axis labels moved from 8dp to 10dp.
 - The full battery capacity was already being fetched and displayed nowhere, so "Remaining Capacity 50.0 Ah" appeared with nothing to compare it to. It now sits next to the pack size.
-- Health messages reach the UI translated, instead of the whole interface being half English.
+- Health messages and transport state reach the UI in the interface language rather than as raw model strings.
 - The environment range keys are named from `SettingsKeys` by the settings controller rather than re-derived from a sensor id, so the two can no longer drift apart uncaught.
 
 - **Alarms are reported once per occurrence, not on every check.** The active alarm set is shared between the dashboard and the native module, so an ongoing low-battery condition produces one notification rather than one per interval. The previous implementation de-duplicated with a five-minute timer, which is *longer* than the check interval and so never actually prevented a repeat.
@@ -133,10 +130,8 @@
 - Promoted `alarm_helpers.dart` from `screens/dashboard/utils/` to `utils/`, now that the native module and the dashboard both read it.
 - Added `lib/services/alarm_settings.dart` so the alert defaults are written in one place. They were previously repeated in the settings controller, the dashboard and the background service, which is how the same setting came to default to different values in different readers.
 - Alarm history merges the records the background check wrote with the ones the dashboard wrote, and acknowledging or resolving now applies to both. The two stores stay separate because `shared_preferences` encodes a `List<String>` as a Base64 Java-serialized blob that the native side would have to reproduce byte for byte.
-- Translated all UI text in `alarm_history_screen.dart` to Indonesian (title, dialog, buttons, filters, status badges, menu actions, empty state, month names).
+- All user-facing text in `alarm_history_screen.dart` is now English (title, dialog, buttons, filters, status badges, menu actions, empty state, month names).
 - Documented battery power sign convention in `energy_forecast_service.dart` — `.abs()` is used because BMS vendors disagree on charge/discharge sign.
-- Translated "Try again" to "Coba lagi" in dashboard banners.
-- Improved stale device label from "stale:" to "data lama:".
 - Made dashboard overview page more compact: reduced card spacing from 12–20px to 8px, reduced internal padding across all dashboard cards (LivePowerCard 18→14, DualStatusCards 14→10, EnergySummaryCard 14→10, WeatherCard 12→10), changed EnvironmentGrid layout from 2+2+1 to 3+2 for better space efficiency.
 
 ### Removed
@@ -152,7 +147,7 @@
 - Corrected `PRD_PLTS_Monitoring_App.md` §4.5, §6 and §7, which still claimed no alert reaches the user while the app is closed.
 - Replaced `progress.md` §10.5, which had recorded the old Dart alarm as merely untested. It was broken, and the reason was a missing manifest declaration.
 - Recorded the security review outcome in `AGENTS.md`, including the two findings that were real defects in brand-new code: the receiver time budget and the missing mutual exclusion between check entry points.
-- Updated `AGENTS.md` with current test coverage (235 Dart tests, 11 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
+- Updated `AGENTS.md` with current test coverage (227 Dart tests, 11 Kotlin unit tests), coordinated upgrade blocker for `package_info_plus` / `share_plus`, and `WeatherService.dispose()` note.
 
 # Changelog
 
