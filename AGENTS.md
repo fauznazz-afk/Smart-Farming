@@ -24,6 +24,15 @@ the UI.
 
 ## Architecture rule
 
+**Read FEATURE.md first.** It is the inventory of what is actually implemented,
+verified against the source rather than against the other markdown files, and its
+§18 lists the known gaps — nine functional ones, twenty-odd dead or unreachable
+symbols, five test gaps, and six things nobody has yet seen on a device. Several
+things that look absent are already there and unused; several that look present are
+not reachable. Its header explains why it exists: three label regressions in one
+session passed `flutter analyze`, the release build and every existing test, and
+were only found by looking at the screen.
+
 Three layers, consistently applied:
 
 1. **Pure logic goes in `utils/`** — no widgets, no I/O. This is what makes it

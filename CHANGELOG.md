@@ -142,6 +142,15 @@
 
 ### Documentation
 
+- Added `FEATURE.md`, an inventory of what is actually implemented, verified
+  against the source rather than against the other markdown files. Each entry says
+  where the feature lives and what proves it works, and §18 lists the gaps: nine
+  functional ones, twenty-odd dead or unreachable symbols, seven behaviours that
+  are counter-intuitive rather than wrong, five test gaps, and six things that no
+  one has yet seen on a device. The reason it exists is in its own header: three
+  label regressions in one session passed `flutter analyze`, the release build and
+  every existing test, and were only found by looking at the screen.
+
 - Documented the native alarm module in `AGENTS.md`: the one-rule-list contract, why `AlarmManager` is inexact and why there are two triggers, the foreground stand-down, the token handover, the debug trigger, and the parity fixture that keeps the two evaluators in agreement.
 - Rewrote `README.md` around the background alarm capability, with the measured cost of a native check against a Flutter isolate, and corrected the stale "push notification belum tersedia" claims.
 - Corrected `PRD_PLTS_Monitoring_App.md` §4.5, §6 and §7, which still claimed no alert reaches the user while the app is closed.

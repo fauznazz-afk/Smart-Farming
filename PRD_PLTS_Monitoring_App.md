@@ -171,6 +171,9 @@ Karena itu ada **dua** trigger, bukan satu: satu `setInexactRepeating` untuk rit
 
 ## 7. Saran pengembangan
 
+> Inventaris fitur yang benar-benar ada, beserta celah yang diketahui, ada di
+> FEATURE.md. Dokumen ini hanya membahas arah produk, bukan inventaris.
+
 Diurutkan menurut apa yang paling mungkin menyesatkan kalau ditunda, bukan
 menurut apa yang paling menarik untuk dikerjakan. Catatan teknis yang lebih
 panjang ada di `progress.md` §10.8.
