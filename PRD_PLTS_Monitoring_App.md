@@ -2,13 +2,13 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
-**Versi aplikasi saat ini:** 1.4.0 (build 10; sudah diterbitkan, tag `v1.4.0`)
-**Versi dokumen:** 1.4
-**Status:** Rilis 1.4.0 terbit 26 September 2026. Build pertamanya dari Linux,
-tanpa NDK dan CMake. Sesi 27 September 2026 thereafter: modul alarm background
-ditulis ulang menjadi Kotlin native, antarmuka diratakan ke bahasa Inggris
-sepenuhnya, dan UI dashboard disederhanakan. Detail di `progress.md` §10.5 dan
-§10.7.
+**Versi aplikasi saat ini:** 1.5.0 (build 11; sudah diterbitkan, tag `v1.5.0`)
+**Versi dokumen:** 1.5
+**Status:** Rilis 1.5.0 terbit 27 September 2026. Build pertamanya dari Linux,
+tanpa NDK dan CMake. Rilis 1.4.0 sudah membawa modul alarm background yang ditulis
+ulang menjadi Kotlin native; 1.5.0 meratakan antarmuka ke bahasa Inggris
+sepenuhnya, menyederhanakan UI dashboard, dan menambahkan inventaris fitur serta
+playbook agent. Detail di `progress.md` §10.5, §10.7 dan §10.8, dan `FEATURE.md`.
 
 ---
 
