@@ -4,10 +4,13 @@
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
 **Dokumen:** 1.2
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.5.0 (build 11), tag `v1.5.0` — every procedure in this document
-was exercised successfully for that release, including the `apksigner` fingerprint
-check in §3, the `adb install -r` upgrade test in §5, and a post-publication
-download whose SHA-256 was compared against the locally built APK.
+**Rilis acuan:** 1.6.0 (build 12), tag `v1.6.0` — setiap prosedur di dokumen ini
+dijalankan untuk rilis itu kecuali uji upgrade `adb install -r` di §5, yang
+dilewati dengan sadar pada 28 September 2026 karena perangkat uji memakai build
+debug (jalur terakhir yang berhasil menjalankan langkah itu adalah 1.5.0, dari
+1.4.0). Pemeriksaan fingerprint `apksigner` di §3 dan unduhan pasca-publikasi
+dengan pembandingan SHA-256 terhadap build lokal keduanya berjalan untuk 1.6.0 —
+`828d9afdcf89cb4da4a65e4fcafd8a43ca1d201700e44aff3984074ef0c85777`, identik.
 
 ---
 
