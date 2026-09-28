@@ -24,34 +24,45 @@ AlarmThresholds readAlarmThresholds(SharedPreferences preferences) {
         AlarmThresholds.defaultStaleMinutes,
     offlineMinutes: preferences.getInt(SettingsKeys.offlineTelemetryMinutes) ??
         AlarmThresholds.defaultOfflineMinutes,
-    tempMin: _readLimit(
-      preferences,
-      SettingsKeys.environmentTempMin,
-      AlarmThresholds.defaultTempMin,
-    ),
-    tempMax: _readLimit(
-      preferences,
-      SettingsKeys.environmentTempMax,
-      AlarmThresholds.defaultTempMax,
-    ),
+    // All environment limits are nullable: a blank field means "no limit on
+    // this side", not the default. The settings screen subtitle says "Blank
+    // limits are not monitored" — this makes that true.
+    tempMin: _readLimit(preferences, SettingsKeys.environmentTempMin, null),
+    tempMax: _readLimit(preferences, SettingsKeys.environmentTempMax, null),
     humidityMin: _readLimit(
       preferences,
       SettingsKeys.environmentHumidityMin,
-      AlarmThresholds.defaultHumidityMin,
+      null,
     ),
     humidityMax: _readLimit(
       preferences,
       SettingsKeys.environmentHumidityMax,
-      AlarmThresholds.defaultHumidityMax,
+      null,
     ),
-    tdsMin: _readLimit(
-      preferences,
-      SettingsKeys.environmentTdsMin,
-      AlarmThresholds.defaultTdsMin,
-    ),
-    // Never defaulted, and never given an upper bound. See
-    // AlarmThresholds.defaultTdsMin for why.
+    tdsMin: _readLimit(preferences, SettingsKeys.environmentTdsMin, null),
+    // Never given an upper bound. See AlarmThresholds.defaultTdsMin for why.
     tdsMax: _readLimit(preferences, SettingsKeys.environmentTdsMax, null),
+    // Fish limits are nullable for the same reason the environment limits are.
+    // They used to fall back to `AlarmThresholds.defaultFish*`, which meant a
+    // pH field the user cleared was removed from preferences by Settings and
+    // then re-armed at 6.5 on the next load — the fish section's own subtitle
+    // promises "Blank limits are not monitored", so the alarm fired for a limit
+    // the user had deliberately taken away. A missing key and a cleared field
+    // are the same value in storage (Settings removes the key rather than
+    // writing an empty string), so both have to mean "not monitored". The
+    // defaults still live in `AlarmThresholds.defaults` and in the prefilled
+    // Settings fields; they arm on the first save, exactly like the
+    // environment limits do.
+    fishAlerts: preferences.getBool(SettingsKeys.fishAlertsEnabled) ?? true,
+    fishPhMin: _readLimit(preferences, SettingsKeys.fishPhMin, null),
+    fishPhMax: _readLimit(preferences, SettingsKeys.fishPhMax, null),
+    fishTempMin: _readLimit(preferences, SettingsKeys.fishTempMin, null),
+    fishTempMax: _readLimit(preferences, SettingsKeys.fishTempMax, null),
+    fishTurbidityMax: _readLimit(
+      preferences,
+      SettingsKeys.fishTurbidityMax,
+      null,
+    ),
   );
 }
 

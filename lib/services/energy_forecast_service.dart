@@ -12,7 +12,6 @@ class EnergyForecastResult {
     required this.peakUsageWatts,
     required this.peakUsageAt,
     required this.batteryDepletionHours,
-    required this.batteryStateOfCharge,
     required this.sampleStart,
     required this.sampleEnd,
   });
@@ -24,13 +23,10 @@ class EnergyForecastResult {
   final double? peakUsageWatts;
   final DateTime? peakUsageAt;
   final double? batteryDepletionHours;
-  final double? batteryStateOfCharge;
   final DateTime? sampleStart;
   final DateTime? sampleEnd;
 
   bool get hasProduction => observedProductionKwh > 0;
-  bool get hasPeakUsage => peakUsageWatts != null;
-  bool get hasBatteryEstimate => batteryDepletionHours != null;
 }
 
 /// Performs local forecast calculations from ThingsBoard history.
@@ -48,7 +44,6 @@ class EnergyForecastService {
     required Map<String, List<TelemetryPoint>> history,
     Map<String, double> latest = const {},
     double? dailyProductionTargetKwh,
-    double? batteryCapacityKwh,
     DateTime? referenceDate,
   }) {
     final day = referenceDate ?? DateTime.now();
@@ -115,10 +110,9 @@ class EnergyForecastService {
     final socValue = soc?.value;
     if (socValue != null && socValue > 0) {
       final capacity =
-          batteryCapacityKwh ??
-          (remainingAh != null && voltage != null
+          remainingAh != null && voltage != null
               ? remainingAh.value * voltage.value / 1000
-              : null);
+              : null;
       final loadWatts = estimateBatteryDischargeWatts(
         latest: latest,
         solar: production,
@@ -141,7 +135,6 @@ class EnergyForecastService {
       peakUsageWatts: peak?.value,
       peakUsageAt: peak?.timestamp,
       batteryDepletionHours: depletionHours,
-      batteryStateOfCharge: socValue,
       sampleStart: start,
       sampleEnd: end,
     );

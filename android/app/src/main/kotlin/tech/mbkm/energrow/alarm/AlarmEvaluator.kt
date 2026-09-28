@@ -55,8 +55,8 @@ object AlarmEvaluator {
             val value = reading.values[metric] ?: continue
 
             if (rule.requireFreshSensor) {
-                val sensor = readings[AlarmDevice.SENSOR]
-                if (sensor == null || isStale(sensor, rule.staleMinutes, nowMs)) continue
+                val device = readings[rule.device]
+                if (device == null || isStale(device, rule.staleMinutes, nowMs)) continue
             }
 
             val limit = rule.limit ?: continue

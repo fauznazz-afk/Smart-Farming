@@ -194,6 +194,7 @@ class AlarmParityTest {
         AlarmDevice.BATTERY -> "soc"
         AlarmDevice.PZEM -> "voltage_ac"
         AlarmDevice.SENSOR -> "temp_dht"
+        AlarmDevice.FISH -> "ph"
     }
 
     private fun readingsFor(raw: JSONArray): Map<AlarmDevice, AlarmReading> {

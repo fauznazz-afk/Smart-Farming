@@ -13,15 +13,17 @@ void main() {
   group('buildAlarmRules', () {
     test('arms low SOC and one stale rule per device for energy alerts', () {
       final rules = buildAlarmRules(_energy);
-      expect(rules.map((rule) => rule.id), [
+      // Driven from the enum rather than written out, because a new AlarmDevice
+      // silently changes this list and a hard-coded expectation would then fail
+      // for a reason that has nothing to do with the rule engine.
+      final expected = <String>[
         'low_soc',
-        'offline_battery',
-        'stale_battery',
-        'offline_pzem',
-        'stale_pzem',
-        'offline_sensor',
-        'stale_sensor',
-      ]);
+        for (final device in AlarmDevice.values) ...[
+          'offline_${device.wireName}',
+          'stale_${device.wireName}',
+        ],
+      ];
+      expect(rules.map((rule) => rule.id), expected);
       final lowSoc = rules.first;
       expect(lowSoc.type, AlarmType.lowSoc);
       expect(lowSoc.severity, AlarmSeverity.critical);

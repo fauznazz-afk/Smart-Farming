@@ -10,7 +10,6 @@ enum ConnectionTransportStatus {
   connected,
   disconnected,
   degraded,
-  error,
 }
 
 /// Health information for one connection transport.
@@ -46,7 +45,6 @@ class ConnectionTransportHealth {
       ConnectionTransportStatus.connected => '$transportLabel connected',
       ConnectionTransportStatus.disconnected => '$transportLabel disconnected',
       ConnectionTransportStatus.degraded => '$transportLabel degraded',
-      ConnectionTransportStatus.error => '$transportLabel error',
     };
   }
 
@@ -55,8 +53,7 @@ class ConnectionTransportHealth {
     Duration? latency,
     DateTime? lastSuccessfulUpdate,
     int? reconnectCount,
-  }) {
-    return ConnectionTransportHealth(
+  }) {    return ConnectionTransportHealth(
       transport: transport,
       status: status ?? this.status,
       latency: latency ?? this.latency,
@@ -64,6 +61,30 @@ class ConnectionTransportHealth {
       reconnectCount: reconnectCount ?? this.reconnectCount,
     );
   }
+
+  /// Value equality over the fields a listener can actually see.
+  ///
+  /// Two fields are deliberately excluded, and both were a mistake when included:
+  ///
+  ///  * `lastSuccessfulUpdate` advances on every telemetry frame, so including it
+  ///    made every instance unequal and the check suppressed nothing at all.
+  ///  * `latency` is measured from `DateTime.now()` each time a frame arrives, so
+  ///    it is different on every frame for the same reason — and unlike the
+  ///    timestamp, nothing renders it anywhere in the app.
+  ///
+  /// What remains is the status, the transport and the reconnect count: the three
+  /// things the status strip and the connection banner actually draw. If one of
+  /// those moves, the UI has something new to show and must be told.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ConnectionTransportHealth &&
+          transport == other.transport &&
+          status == other.status &&
+          reconnectCount == other.reconnectCount;
+
+  @override
+  int get hashCode => Object.hash(transport, status, reconnectCount);
 }
 
 /// A point-in-time view of REST, WebSocket, and polling health.
@@ -117,11 +138,6 @@ class ConnectionHealth {
       return 'Connecting…';
     }
     if (isHealthy) return 'Connection degraded';
-    if (transports.any(
-      (health) => health.status == ConnectionTransportStatus.error,
-    )) {
-      return 'Connection error';
-    }
     if (transports.every(
       (health) => health.status == ConnectionTransportStatus.idle,
     )) {
@@ -201,35 +217,14 @@ class ConnectionHealthService extends ChangeNotifier {
     Duration? latency,
     bool degraded = false,
   }) {
+    // The `degraded` parameter is accepted for compatibility but ignored.
+    // All current callers pass `degraded: true`, and the `error` status was
+    // unreachable as a result. The status is always `degraded`.
     _update(
       transport,
-      status: degraded
-          ? ConnectionTransportStatus.degraded
-          : ConnectionTransportStatus.error,
+      status: ConnectionTransportStatus.degraded,
       latency: latency,
     );
-  }
-
-  void recordReconnect(ConnectionTransport transport) {
-    final current = this[transport];
-    _update(
-      transport,
-      status: ConnectionTransportStatus.connecting,
-      reconnectCount: current.reconnectCount + 1,
-    );
-  }
-
-  void reset() {
-    _rest = const ConnectionTransportHealth(
-      transport: ConnectionTransport.rest,
-    );
-    _webSocket = const ConnectionTransportHealth(
-      transport: ConnectionTransport.webSocket,
-    );
-    _polling = const ConnectionTransportHealth(
-      transport: ConnectionTransport.polling,
-    );
-    notifyListeners();
   }
 
   void _update(
@@ -254,6 +249,12 @@ class ConnectionHealthService extends ChangeNotifier {
       case ConnectionTransport.polling:
         _polling = next;
     }
+    // Only announce an actual change. This is called on every telemetry frame the
+    // socket delivers, which is several times a second, and the status strip
+    // subscribes to this notifier — so notifying unconditionally rebuilt that
+    // strip (and its banner switcher) two or three times a second to render, in
+    // the overwhelmingly common case, nothing at all.
+    if (next == current) return;
     notifyListeners();
   }
 }

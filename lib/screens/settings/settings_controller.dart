@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/settings_keys.dart';
 import '../../services/alarm_settings.dart';
 import '../../services/cctv_url.dart';
-import '../../services/weather_service.dart';
 import '../../theme/app_theme_controller.dart';
 import '../../utils/alarm_rules.dart';
 import 'utils/settings_validation.dart';
@@ -22,9 +21,8 @@ class SettingsController extends ChangeNotifier {
 
   // ── Text-backed values ──────────────────────────────────────────────────────
   final cctvUrl = TextEditingController(text: defaultAllowedCctvUrl);
+  final fishCctvUrl = TextEditingController(text: defaultAllowedFishCctvUrl);
   final dailyTarget = TextEditingController();
-  final weatherApiKey = TextEditingController();
-  final weatherCity = TextEditingController();
 
   /// Environment alert limits, in display order.
   final List<EnvRangeSetting> envRanges = [
@@ -64,11 +62,49 @@ class SettingsController extends ChangeNotifier {
     ),
   ];
 
+  /// Fish tank alert limits, in display order.
+  final List<EnvRangeSetting> fishRanges = [
+    EnvRangeSetting(
+      id: 'ph',
+      label: 'pH',
+      unit: '',
+      minKey: SettingsKeys.fishPhMin,
+      maxKey: SettingsKeys.fishPhMax,
+      minAllowed: 0,
+      maxAllowed: 14,
+      defaultMin: AlarmThresholds.defaultFishPhMin,
+      defaultMax: AlarmThresholds.defaultFishPhMax,
+    ),
+    EnvRangeSetting(
+      id: 'water_temp',
+      label: 'Water temperature',
+      unit: '°C',
+      minKey: SettingsKeys.fishTempMin,
+      maxKey: SettingsKeys.fishTempMax,
+      minAllowed: 0,
+      maxAllowed: 50,
+      defaultMin: AlarmThresholds.defaultFishTempMin,
+      defaultMax: AlarmThresholds.defaultFishTempMax,
+    ),
+    // Upper bound only: turbidity has no meaningful lower limit.
+    EnvRangeSetting(
+      id: 'turbidity',
+      label: 'Turbidity',
+      unit: 'NTU',
+      minKey: null,
+      maxKey: SettingsKeys.fishTurbidityMax,
+      minAllowed: 0,
+      maxAllowed: 1000,
+      defaultMax: AlarmThresholds.defaultFishTurbidityMax,
+    ),
+  ];
+
   // ── Plain values ────────────────────────────────────────────────────────────
   bool autoRefresh = true;
   int refreshSeconds = 10;
   bool energyAlerts = true;
   bool envAlerts = true;
+  bool fishAlerts = true;
   int lowSoc = AlarmThresholds.defaultLowSoc;
   int staleMinutes = AlarmThresholds.defaultStaleMinutes;
   int offlineMinutes = AlarmThresholds.defaultOfflineMinutes;
@@ -76,11 +112,6 @@ class SettingsController extends ChangeNotifier {
 
   // ── Transient status ────────────────────────────────────────────────────────
   bool saving = false;
-  String? weatherError;
-  String? weatherLocationName;
-  double? weatherLatitude;
-  double? weatherLongitude;
-  bool weatherLoading = false;
   String? appVersion;
 
   // ── Loading ─────────────────────────────────────────────────────────────────
@@ -94,6 +125,7 @@ class SettingsController extends ChangeNotifier {
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     final savedCctvUrl = await loadCctvUrl();
+    final savedFishCctvUrl = await loadFishCctvUrl();
     autoRefresh = p.getBool(SettingsKeys.autoRefresh) ?? true;
     refreshSeconds = p.getInt(SettingsKeys.refreshSeconds) ?? 10;
     // One reader for the alert defaults. This used to repeat the same five
@@ -103,19 +135,31 @@ class SettingsController extends ChangeNotifier {
     final thresholds = readAlarmThresholds(p);
     energyAlerts = thresholds.energyAlerts;
     envAlerts = thresholds.environmentAlerts;
+    fishAlerts = thresholds.fishAlerts;
     lowSoc = thresholds.lowSoc.round();
     staleMinutes = thresholds.staleMinutes;
     offlineMinutes = thresholds.offlineMinutes;
     dailyTarget.text = p.getString(SettingsKeys.dailyProductionTargetKwh) ?? '';
-    weatherApiKey.text = p.getString(SettingsKeys.weatherApiKey) ?? '';
-    weatherLocationName = p.getString(SettingsKeys.weatherLocationName);
-    weatherCity.text = weatherLocationName ?? '';
-    weatherLatitude = p.getDouble(SettingsKeys.weatherLocationLat);
-    weatherLongitude = p.getDouble(SettingsKeys.weatherLocationLon);
     cctvUrl.text = savedCctvUrl;
+    fishCctvUrl.text = savedFishCctvUrl;
+    // Every environment range has both keys today, but the fish list proved
+    // that a one-sided range is a real shape: an unguarded `minKey!` there
+    // threw, so the same guard is kept on both loops.
     for (final range in envRanges) {
-      range.min.text = p.getString(range.minKey!) ?? range.min.text;
-      range.max.text = p.getString(range.maxKey!) ?? range.max.text;
+      if (range.minKey != null) {
+        range.min.text = p.getString(range.minKey!) ?? range.min.text;
+      }
+      if (range.maxKey != null) {
+        range.max.text = p.getString(range.maxKey!) ?? range.max.text;
+      }
+    }
+    for (final range in fishRanges) {
+      if (range.minKey != null) {
+        range.min.text = p.getString(range.minKey!) ?? range.min.text;
+      }
+      if (range.maxKey != null) {
+        range.max.text = p.getString(range.maxKey!) ?? range.max.text;
+      }
     }
     selectedSeed = themeController.seedColor;
     notifyListeners();
@@ -138,6 +182,14 @@ class SettingsController extends ChangeNotifier {
       final error = validateEnvRange(range, errorLabel: label);
       if (error != null) return error;
     }
+    for (final (range, label) in [
+      (fishRanges[0], 'pH'),
+      (fishRanges[1], 'Water temperature'),
+      (fishRanges[2], 'Turbidity'),
+    ]) {
+      final error = validateEnvRange(range, errorLabel: label);
+      if (error != null) return error;
+    }
     final targetError = validateDailyTargetError(dailyTarget.text);
     if (targetError != null) return targetError;
     final alertsError = validateEnvironmentAlertsEnabled(
@@ -145,15 +197,30 @@ class SettingsController extends ChangeNotifier {
       ranges: envRanges,
     );
     if (alertsError != null) return alertsError;
+    final fishAlertsError = validateEnvironmentAlertsEnabled(
+      enabled: fishAlerts,
+      ranges: fishRanges,
+    );
+    if (fishAlertsError != null) return fishAlertsError;
     if (parseAllowedCctvUrl(cctvUrl.text) == null) {
       return 'The CCTV URL must be HTTPS and use an approved host';
+    }
+    if (parseAllowedCctvUrl(fishCctvUrl.text) == null) {
+      return 'The fish camera URL must be HTTPS and use an approved host';
     }
     return null;
   }
 
   // ── Saving ──────────────────────────────────────────────────────────────────
-  /// Persists every setting. Returns an error message on failure, or null when
-  /// the settings were written successfully.
+  /// Persists every setting. Returns an error message when [validate] rejects
+  /// the current values, or null when they were written successfully.
+  ///
+  /// Validation failures are returned because they are meant to be read: the
+  /// caller shows the message and the user fixes the field. Unexpected I/O
+  /// failures still throw, and the caller is responsible for surfacing them —
+  /// `SettingsScreen._save` catches and shows a SnackBar, because an exception
+  /// escaping here used to become an unhandled async error and the Save button
+  /// simply did nothing.
   Future<String?> save() async {
     if (saving) return null;
     final error = validate();
@@ -167,21 +234,34 @@ class SettingsController extends ChangeNotifier {
       await p.setInt(SettingsKeys.refreshSeconds, refreshSeconds);
       await p.setBool(SettingsKeys.energyAlertsEnabled, energyAlerts);
       await p.setBool(SettingsKeys.environmentAlertsEnabled, envAlerts);
+      await p.setBool(SettingsKeys.fishAlertsEnabled, fishAlerts);
       await p.setInt(SettingsKeys.lowSocThreshold, lowSoc);
       await p.setInt(SettingsKeys.staleTelemetryMinutes, staleMinutes);
-    await p.setInt(SettingsKeys.offlineTelemetryMinutes, offlineMinutes);
-      await p.setString(SettingsKeys.weatherApiKey, weatherApiKey.text.trim());
-      await p.setString(
-        SettingsKeys.weatherLocationName,
-        weatherCity.text.trim(),
-      );
+      await p.setInt(SettingsKeys.offlineTelemetryMinutes, offlineMinutes);
       await _saveDailyTarget(p);
+      // A range may be missing a key on one side (turbidity is upper bound
+      // only), so that side is skipped. `range.minKey!` used to throw right
+      // here: after the environment values were written, before the CCTV URLs,
+      // and with nothing on screen to say the save had failed.
       for (final range in envRanges) {
-        await _saveIfNotEmpty(p, range.minKey!, range.min.text);
-        await _saveIfNotEmpty(p, range.maxKey!, range.max.text);
+        if (range.minKey != null) {
+          await _saveIfNotEmpty(p, range.minKey!, range.min.text);
+        }
+        if (range.maxKey != null) {
+          await _saveIfNotEmpty(p, range.maxKey!, range.max.text);
+        }
       }
-      // The dashboard reads the stream URL from secure storage, not prefs.
+      for (final range in fishRanges) {
+        if (range.minKey != null) {
+          await _saveIfNotEmpty(p, range.minKey!, range.min.text);
+        }
+        if (range.maxKey != null) {
+          await _saveIfNotEmpty(p, range.maxKey!, range.max.text);
+        }
+      }
+      // The dashboard reads the stream URLs from secure storage, not prefs.
       await saveCctvUrl(cctvUrl.text.trim());
+      await saveFishCctvUrl(fishCctvUrl.text.trim());
       return null;
     } finally {
       saving = false;
@@ -211,51 +291,15 @@ class SettingsController extends ChangeNotifier {
     }
   }
 
-  // ── Weather ─────────────────────────────────────────────────────────────────
-  /// Fetches weather once to verify the API key and location, then caches the
-  /// resolved coordinates so the dashboard can reuse them.
-  Future<void> testWeatherConnection() async {
-    weatherLoading = true;
-    weatherError = null;
-    notifyListeners();
-
-    final service = WeatherService();
-    await service.initialize();
-    await service.setApiKey(weatherApiKey.text.trim());
-    final city = weatherCity.text.trim();
-
-    try {
-      final weather = city.isEmpty
-          ? await service.getCurrentWeather()
-          : await service.getWeatherByCity(city);
-      if (weather == null) {
-        weatherError =
-            'Failed to fetch weather data. Check your API key and location.';
-      } else {
-        weatherLocationName = weather.locationName;
-        weatherLatitude = weather.latitude;
-        weatherLongitude = weather.longitude;
-        weatherCity.text = weather.locationName;
-      }
-    } catch (error) {
-      weatherError = _cleanError(error.toString());
-    } finally {
-      weatherLoading = false;
-      notifyListeners();
-    }
-  }
-
-  static String _cleanError(String message) => message.startsWith('Exception: ')
-      ? message.substring('Exception: '.length)
-      : message;
-
   @override
   void dispose() {
     cctvUrl.dispose();
+    fishCctvUrl.dispose();
     dailyTarget.dispose();
-    weatherApiKey.dispose();
-    weatherCity.dispose();
     for (final range in envRanges) {
+      range.dispose();
+    }
+    for (final range in fishRanges) {
       range.dispose();
     }
     super.dispose();

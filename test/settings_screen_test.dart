@@ -48,7 +48,6 @@ void main() {
       'Monitoring',
       'Energy alerts',
       'Environment alerts',
-      'Weather',
       'CCTV source',
       'Performance',
       'About',
@@ -102,7 +101,7 @@ void main() {
     await tester.tap(find.text('CCTV source'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Stream URL'),
+      find.widgetWithText(TextField, 'Hydroponics camera URL'),
       'http://evil.example.com/stream.html',
     );
     await tester.tap(find.byIcon(Icons.arrow_back));
@@ -113,6 +112,32 @@ void main() {
 
     expect(
       find.text('The CCTV URL must be HTTPS and use an approved host'),
+      findsOneWidget,
+    );
+    expect(find.text('Settings'), findsOneWidget, reason: 'must stay on screen');
+  });
+
+  testWidgets('rejects an invalid fish camera url instead of saving', (
+    tester,
+  ) async {
+    await _pumpSettings(tester);
+
+    await tester.tap(find.text('CCTV source'));
+    await tester.pumpAndSettle();
+    // The hydroponics URL is left valid, so the failure can only come from the
+    // fish one. Validating only the first field would pass this test silently.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Fish camera URL'),
+      'https://cctv.mbkm20262027.tech.evil.example/stream.html?src=cam2',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save settings'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('The fish camera URL must be HTTPS and use an approved host'),
       findsOneWidget,
     );
     expect(find.text('Settings'), findsOneWidget, reason: 'must stay on screen');

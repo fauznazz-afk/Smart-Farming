@@ -156,7 +156,11 @@ class _MetricRow extends StatelessWidget {
               : '${value!.toStringAsFixed(decimals)} $unit');
     return MergeSemantics(
       child: Semantics(
-        label: '$metric: $displayValue',
+        // `metric.label`, not `$metric`. MetricDef has no toString(), so
+        // interpolating the object announced "Instance of 'MetricDef': 45 %" to a
+        // screen reader instead of "State of Charge: 45 %". It compiles and passes
+        // every lint, which is why it survived.
+        label: '${metric.label}: $displayValue',
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 13),
           child: Row(
@@ -202,91 +206,4 @@ class GlassDivider extends StatelessWidget {
   }
 }
 
-/// Compact label/value pair used inside summary cards.
-class GlassMetricRow extends StatelessWidget {
-  const GlassMetricRow({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
 
-  final String label;
-  final String value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return MergeSemantics(
-      child: Semantics(
-        label: '$label: $value',
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: faintColor(isDark),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Large value over a caption, used under circular gauges.
-class MiniMetric extends StatelessWidget {
-  const MiniMetric({
-    super.key,
-    required this.value,
-    required this.label,
-    required this.isDark,
-  });
-
-  final String value;
-  final String label;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return MergeSemantics(
-      child: Semantics(
-        label: '$label: $value',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: faintColor(isDark),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

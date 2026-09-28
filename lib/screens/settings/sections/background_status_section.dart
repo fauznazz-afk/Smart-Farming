@@ -137,7 +137,16 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
               ),
             ),
           const SizedBox(height: 10),
-          Row(
+          // A Wrap, not a Row. "Check now" and "Battery settings" side by side with
+          // their icons are wider than the card on a narrow phone, and the second
+          // button only appears when the app is NOT exempt — so the overflow only
+          // shows up for exactly the user who has something to fix. A Row with
+          // neither child flexible overflows by a few pixels and Flutter draws the
+          // striped error box over the buttons. Wrapping lets the second button drop
+          // to its own line instead, which also reads better next to the hint text.
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: _checking ? null : _checkNow,
@@ -149,7 +158,6 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
                     : const Icon(Icons.refresh, size: 18),
                 label: Text(_checking ? 'Checking…' : 'Check now'),
               ),
-              const SizedBox(width: 10),
               if (!_exempt)
                 OutlinedButton.icon(
                   onPressed: _requestExemption,
@@ -185,10 +193,20 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 150, plus a fixed 10 px gap before the value. "Battery optimisation"
+          // is a couple of pixels wider than 150, so the label ran straight into
+          // its value and the row read "Battery optimisationActive". Widening the
+          // column alone would not have fixed it: the next label to exceed the
+          // width would collide the same way. The gap is unconditional, so a
+          // label that exactly fills its column still cannot touch the value.
+          //
+          // A label too long for the column wraps to a second line rather than
+          // being clipped, which is why crossAxisAlignment is start.
           SizedBox(
             width: 150,
             child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               value,

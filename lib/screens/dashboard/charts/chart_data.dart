@@ -23,13 +23,11 @@ class MetricDef {
 /// Statistics for a series of telemetry points.
 class SeriesStats {
   final double latest;
-  final double average;
   final double minimum;
   final double maximum;
 
   const SeriesStats({
     required this.latest,
-    required this.average,
     required this.minimum,
     required this.maximum,
   });
@@ -37,18 +35,15 @@ class SeriesStats {
   static SeriesStats? fromPoints(List<TelemetryPoint> points) {
     if (points.isEmpty) return null;
     var latest = points.first;
-    var sum = 0.0;
     var minimum = points.first.value;
     var maximum = points.first.value;
     for (final point in points) {
-      sum += point.value;
       if (point.value < minimum) minimum = point.value;
       if (point.value > maximum) maximum = point.value;
       if (point.timestamp.isAfter(latest.timestamp)) latest = point;
     }
     return SeriesStats(
       latest: latest.value,
-      average: sum / points.length,
       minimum: minimum,
       maximum: maximum,
     );

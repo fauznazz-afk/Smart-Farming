@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../../../utils/battery_sign.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 import 'shortcut.dart';
 
 /// Snapshot values shown for the battery.
-typedef BatteryStatus = ({double soc, double voltage, double current});
+///
+/// Carries `power` and not just `current` because the charge direction has to be
+/// read from the same key the hero card reads. This used to derive it from
+/// `current < 0`, which was a second, independent interpretation of the BMS sign
+/// using a different telemetry key: the hero card said one thing and this strip
+/// said the opposite, on the same screen, from the same pack. Two readings of one
+/// measurement is worse than either being alone.
+typedef BatteryStatus = ({
+  double soc,
+  double voltage,
+  double current,
+  double power,
+});
 
 /// Snapshot values shown for the AC side.
 typedef AcStatus = ({
@@ -33,7 +46,7 @@ class SystemStatusStrip extends StatelessWidget {
     required this.isDark,
     required this.seedColor,
     required this.performanceMode,
-    required this.onNavigate,
+    required this.onOpenBattery,
     required this.lowSocThreshold,
     required this.activeAlerts,
   });
@@ -43,7 +56,14 @@ class SystemStatusStrip extends StatelessWidget {
   final bool isDark;
   final Color seedColor;
   final bool performanceMode;
-  final ValueChanged<int> onNavigate;
+  /// Takes the user to the battery readings.
+  ///
+  /// A bare callback rather than a page index, because Battery is no longer a
+  /// destination of its own: it is a view inside the Power tab, so getting there
+  /// takes two steps and only the screen knows what they are. Hard-coding an index
+  /// here is how this widget ended up pointing at the wrong tab the moment the
+  /// navigation changed.
+  final VoidCallback onOpenBattery;
 
   /// The user's low-SOC limit, so the verdict says what it is judged against.
   final double lowSocThreshold;
@@ -57,11 +77,15 @@ class SystemStatusStrip extends StatelessWidget {
         ac.voltage > 200 &&
         ac.voltage < 240;
     final batteryOk = battery.soc >= lowSocThreshold;
-    final charging = battery.current < 0;
+    // One interpretation, shared with the hero card. The three states rather than
+    // the old `current < 0` binary, because this BMS reports 0.00 A for stretches
+    // while idling and a bare comparison flips the label several times a minute
+    // while asserting a direction the data does not establish.
+    final chargeState = batteryChargeState(battery.power);
+    final charging = chargeState == BatteryChargeState.charging;
 
     return DashboardShortcut(
-      pageIndex: 3,
-      onSelect: onNavigate,
+      onTap: onOpenBattery,
       child: LiquidGlassCard(
         isDark: isDark,
         performanceMode: performanceMode,
@@ -69,9 +93,21 @@ class SystemStatusStrip extends StatelessWidget {
         child: Row(
           children: [
             _Verdict(
-              icon: batteryOk
-                  ? Icons.battery_charging_full
-                  : Icons.battery_alert,
+              // Low charge is the actionable state, so the alert glyph wins over
+              // the direction glyph. Previously the icon was a full charging
+              // battery whenever the SOC was healthy, which drew a battery
+              // charging on a pack that was discharging — a third signal, and the
+              // one most likely to be read before the label.
+              icon: !batteryOk
+                  ? Icons.battery_alert
+                  : switch (chargeState) {
+                      BatteryChargeState.charging => Icons.battery_charging_full,
+                      BatteryChargeState.discharging => Icons.battery_5_bar_rounded,
+                      BatteryChargeState.standby => Icons.battery_std_rounded,
+                    },
+              // Only charging is worth naming here. Standby and discharging both
+              // read as "Battery", which says less than the hero card but never
+              // contradicts it.
               label: charging ? 'Charging' : 'Battery',
               value: '${battery.soc.toStringAsFixed(0)}%',
               ok: batteryOk,

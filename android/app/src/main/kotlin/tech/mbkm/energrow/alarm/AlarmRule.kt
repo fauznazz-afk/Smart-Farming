@@ -16,11 +16,20 @@ import java.net.URISyntaxException
  * [AlarmEvaluatorTest] exercise it on the JVM.
  */
 
-/** Which ThingsBoard device a rule reads from. */
+/**
+ * Which ThingsBoard device a rule reads from.
+ *
+ * The wire names are a contract with lib/utils/alarm_rules.dart and with the
+ * config JSON Dart hands over. They are NOT free to change: an older native
+ * build receiving an unknown name rejects the whole config in
+ * [parseAlarmConfig], which is the safe direction — no rules rather than rules
+ * it cannot evaluate.
+ */
 enum class AlarmDevice(val wireName: String) {
     BATTERY("battery"),
     PZEM("pzem"),
-    SENSOR("sensor");
+    SENSOR("sensor"),
+    FISH("fish");
 
     companion object {
         fun fromWireName(value: String): AlarmDevice? =

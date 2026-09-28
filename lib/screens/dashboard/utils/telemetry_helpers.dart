@@ -39,25 +39,34 @@ typedef CachedTelemetrySplit = ({
   Map<String, double> battery,
   Map<String, double> pzem,
   Map<String, double> sensor,
+  Map<String, double> fish,
 });
 
-/// Splits a flat cached telemetry map into the three device buckets.
+/// Splits a flat cached telemetry map into the device buckets.
 CachedTelemetrySplit splitCachedTelemetry(Map<String, double> values) {
   final battery = <String, double>{};
   final pzem = <String, double>{};
   final sensor = <String, double>{};
+  final fish = <String, double>{};
   values.forEach((key, value) {
-    // The three key lists live on ThingsBoardApi and nowhere else. They used to
+    // The key lists live on ThingsBoardApi and nowhere else. They used to
     // be written out here a second time, which is precisely the duplication the
     // comment on those constants exists to prevent: adding a key to one side
     // would silently drop it from the offline cache with no error anywhere.
+    //
+    // A key in none of the lists is dropped silently, by design. That is exactly
+    // what happened to the fish device's keys when only ThingsBoardApi knew about
+    // them: the REST poll looked healthy, the card showed live numbers, and the
+    // offline fallback came up empty for that page alone.
     if (ThingsBoardApi.batteryKeys.contains(key)) {
       battery[key] = value;
     } else if (ThingsBoardApi.pzemKeys.contains(key)) {
       pzem[key] = value;
     } else if (ThingsBoardApi.sensorKeys.contains(key)) {
       sensor[key] = value;
+    } else if (ThingsBoardApi.fishKeys.contains(key)) {
+      fish[key] = value;
     }
   });
-  return (battery: battery, pzem: pzem, sensor: sensor);
+  return (battery: battery, pzem: pzem, sensor: sensor, fish: fish);
 }

@@ -104,15 +104,16 @@ class AlarmHistoryService {
       alarms[index] = record;
       await _save(prefs, alarms);
     }
-    // An acknowledgement has to reach the native store too, or the badge comes
-    // back the next time the screen reloads from the merged list.
-    if (record.acknowledged) {
-      if (record.resolved) {
-        await AlarmBridge.instance.resolve(record.id);
-      } else {
-        await AlarmBridge.instance.acknowledge(record.id);
-      }
+    // Always sync to the native store so the merged list reflects the change.
+    // Without this, an acknowledgement or resolution is lost the next time the
+    // screen reloads from the merged list.
+    if (record.resolved) {
+      await AlarmBridge.instance.resolve(record.id);
+    } else if (record.acknowledged) {
+      await AlarmBridge.instance.acknowledge(record.id);
     }
+    // Reopen (acknowledged=false, resolved=false) has no native equivalent,
+    // but the Dart store update above is the source of truth for the UI.
   }
 
   List<AlarmRecord> _decode(List<String>? raw) {

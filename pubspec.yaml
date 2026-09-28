@@ -45,7 +45,6 @@ dependencies:
   web_socket_channel: ^3.0.3
   flutter_local_notifications: ^19.4.1
   path_provider: ^2.1.1
-  geolocator: ^10.1.0
 
 # path_provider_android 2.3.0 rewrote its Kotlin side on top of the `jni` package,
 # which makes Gradle pull in a full NDK and CMake toolchain to build a 130 KB

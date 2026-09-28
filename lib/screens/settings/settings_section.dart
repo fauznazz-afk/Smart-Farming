@@ -5,7 +5,6 @@ import 'sections/alerts_section.dart';
 import 'sections/background_status_section.dart';
 import 'sections/appearance_section.dart';
 import 'sections/monitoring_section.dart';
-import 'sections/weather_section.dart';
 import 'settings_controller.dart';
 
 /// One entry in the settings list, and the widget shown when it is opened.
@@ -56,10 +55,10 @@ List<SettingsSection> buildSettingsSections({
         builder: (_, settings) => EnvironmentAlertsSection(settings: settings),
       ),
       SettingsSection(
-        title: 'Weather',
-        subtitle: 'Configure OpenWeatherMap API and location.',
-        icon: Icons.cloud_outlined,
-        builder: (_, settings) => WeatherSection(settings: settings),
+        title: 'Fish tank alerts',
+        subtitle: 'Set fish tank limits. Blank limits are not monitored.',
+        icon: Icons.water_drop_outlined,
+        builder: (_, settings) => FishAlertsSection(settings: settings),
       ),
       SettingsSection(
         title: 'CCTV source',

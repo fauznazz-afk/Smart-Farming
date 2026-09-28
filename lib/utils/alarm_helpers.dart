@@ -18,6 +18,9 @@ AlarmType alarmTypeFromId(String id) {
     return AlarmType.environmentHumidity;
   }
   if (id.startsWith('environment_tds')) return AlarmType.environmentTds;
+  if (id.startsWith('fish_ph')) return AlarmType.fishPh;
+  if (id.startsWith('fish_water_temp')) return AlarmType.fishTemp;
+  if (id.startsWith('fish_turbidity')) return AlarmType.fishTurbidity;
   return AlarmType.deviceOffline;
 }
 

@@ -91,5 +91,10 @@ AlarmThresholds _thresholdsOf(Map<String, dynamic> json) => AlarmThresholds(
   humidityMax: (json['humidityMax'] as num?)?.toDouble(),
   tdsMin: (json['tdsMin'] as num?)?.toDouble(),
   tdsMax: (json['tdsMax'] as num?)?.toDouble(),
-
+  fishAlerts: json['fishAlerts'] as bool? ?? false,
+  fishPhMin: (json['fishPhMin'] as num?)?.toDouble(),
+  fishPhMax: (json['fishPhMax'] as num?)?.toDouble(),
+  fishTempMin: (json['fishTempMin'] as num?)?.toDouble(),
+  fishTempMax: (json['fishTempMax'] as num?)?.toDouble(),
+  fishTurbidityMax: (json['fishTurbidityMax'] as num?)?.toDouble(),
 );

@@ -44,7 +44,12 @@ class MonitoringSection extends StatelessWidget {
   }
 }
 
-/// Editable HTTPS stream page for the CCTV tab.
+/// Editable HTTPS stream pages for the two cameras.
+///
+/// Both are validated by the same host allowlist, and both default to a
+/// different `src` on the same go2rtc host. They are two settings rather than
+/// one plus a derived second value so a user with a different rig can point each
+/// page at their own camera.
 class CctvSection extends StatelessWidget {
   const CctvSection({super.key, required this.settings});
 
@@ -52,13 +57,27 @@ class CctvSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: settings.cctvUrl,
-      keyboardType: TextInputType.url,
-      decoration: const InputDecoration(
-        labelText: 'Stream URL',
-        prefixIcon: Icon(Icons.link),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: settings.cctvUrl,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'Hydroponics camera URL',
+            prefixIcon: Icon(Icons.link),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: settings.fishCctvUrl,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'Fish camera URL',
+            prefixIcon: Icon(Icons.videocam_outlined),
+          ),
+        ),
+      ],
     );
   }
 }

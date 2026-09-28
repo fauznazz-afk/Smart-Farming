@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../utils/battery_sign.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 
@@ -41,18 +42,12 @@ class LivePowerCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel, isDark: isDark, seedColor: seedColor),
-          const SizedBox(height: 8),
-          _ValueRow(
-            pvPower: pvPower,
-            soc: soc,
-            isDark: isDark,
-            seedColor: seedColor,
-          ),
           const SizedBox(height: 14),
           _PowerFlow(
             pvPower: pvPower,
             acPower: acPower,
             batteryPower: batteryPower,
+            soc: soc,
             isDark: isDark,
             seedColor: seedColor,
           ),
@@ -88,6 +83,7 @@ class _PowerFlow extends StatelessWidget {
     required this.pvPower,
     required this.acPower,
     required this.batteryPower,
+    required this.soc,
     required this.isDark,
     required this.seedColor,
   });
@@ -95,6 +91,7 @@ class _PowerFlow extends StatelessWidget {
   final double? pvPower;
   final double acPower;
   final double batteryPower;
+  final double soc;
   final bool isDark;
   final Color seedColor;
 
@@ -124,18 +121,18 @@ class _PowerFlow extends StatelessWidget {
     // wrong reading is worse than showing one.
     final solarForBar = solar.clamp(0.0, double.infinity);
     final loadForBar = acPower.clamp(0.0, double.infinity);
-    // Three states, not two. The pack genuinely sits in standby for stretches, and
-    // at zero current the sign of the reading is pure noise, so picking one of two
-    // labels would flip the card between "Charging" and "Discharging" several times
-    // a minute while asserting a direction the data does not establish. Standby is
-    // the state that gets skipped, and it is the one this BMS reports most often.
+    // Three states, not two, and the mapping lives in utils/battery_sign.dart so
+    // it can be pinned by a test. It used to be two comparisons here with a
+    // comment asserting a convention that a BMS swap had since invalidated, and
+    // the comment outlived the hardware it described.
     //
-    // The sign is the BMS's own: negative while charging, which is the opposite of
-    // what most people assume and is confirmed on the Battery page. Nothing here
-    // flips it, so the figure printed below matches the figure one tab away.
-    const standbyWatts = 1.0;
-    final charging = batteryPower < -standbyWatts;
-    final discharging = batteryPower > standbyWatts;
+    // The sign is the BMS's own and nothing here flips it, so the figure printed
+    // below matches the figure one tab away on the Battery page. Negating to make
+    // the number "look right" was tried and reverted: two screens reporting
+    // different numbers for one measurement is worse than an odd-looking minus.
+    final chargeState = batteryChargeState(batteryPower);
+    final charging = chargeState == BatteryChargeState.charging;
+    final discharging = chargeState == BatteryChargeState.discharging;
     final coversLoad = solarForBar >= loadForBar;
     final loadShare =
         solarForBar <= 0 ? 0.0 : (loadForBar / solarForBar).clamp(0.0, 1.0);
@@ -153,50 +150,70 @@ class _PowerFlow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // The flow IS the hero now. It used to sit under a 48 px PV number that
+        // said the same thing again as the first term, so the largest element on
+        // the card was the least informative number on it — one reading, printed
+        // twice, with the relationship between three readings shrunk underneath.
+        //
+        // Expanded on all three so the slots are equal. `mainAxisSize.min` let the
+        // widest term set the width for all three, which is why "Discharging"
+        // used to squeeze its neighbours and why a longer label would have pushed
+        // the row past the card rather than reflowing it.
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Term(
-              icon: Icons.wb_sunny_rounded,
-              label: 'Solar',
-              watts: solarForBar,
-              color: accent,
-              isDark: isDark,
+            Expanded(
+              child: _Term(
+                icon: Icons.wb_sunny_rounded,
+                label: 'Solar',
+                watts: solarForBar,
+                color: accent,
+                isDark: isDark,
+              ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(7, 0, 7, 13),
+              padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
               child: Icon(Icons.arrow_right_alt_rounded, size: 15, color: faint),
             ),
-            _Term(
-              icon: Icons.home_rounded,
-              label: 'House',
-              watts: acPower,
-              color: loadColor,
-              isDark: isDark,
+            Expanded(
+              child: _Term(
+                icon: Icons.home_rounded,
+                label: 'House',
+                watts: acPower,
+                color: loadColor,
+                isDark: isDark,
+              ),
             ),
-            const SizedBox(width: 14),
-            _Term(
-              icon: charging
-                  ? Icons.battery_charging_full
-                  : discharging
-                  ? Icons.battery_5_bar_rounded
-                  : Icons.battery_std_rounded,
-              label: charging
-                  ? 'Charging'
-                  : discharging
-                  ? 'Discharging'
-                  : 'Standby',
-              // Not `.abs()`. The Battery page prints the same figure with the
-              // same sign, and two screens reporting different numbers for one
-              // measurement is worse than an odd-looking minus. No explicit "+"
-              // either, because the Battery page does not print one.
-              watts: batteryPower,
-              color: accent,
-              isDark: isDark,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
+              child: Icon(
+                charging
+                    ? Icons.arrow_back_rounded
+                    : Icons.arrow_forward_rounded,
+                size: 15,
+                color: faint,
+              ),
+            ),
+            Expanded(
+              child: _Term(
+                icon: charging
+                    ? Icons.battery_charging_full
+                    : discharging
+                    ? Icons.battery_5_bar_rounded
+                    : Icons.battery_std_rounded,
+                label: chargeState.label,
+                // Not `.abs()`. The Battery page prints the same figure with the
+                // same sign, and two screens reporting different numbers for one
+                // measurement is worse than an odd-looking minus. No explicit "+"
+                // either, because the Battery page does not print one.
+                watts: batteryPower,
+                color: accent,
+                isDark: isDark,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 12),
         // The house's share of the array's output. A proportion of something on
         // screen, not a claim about where the power physically went.
         //
@@ -209,9 +226,12 @@ class _PowerFlow extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(5),
             child: SizedBox(
-              height: 5,
+              // 8, not 5. At 5 px the bar was a hairline that read as a divider
+              // rather than as a proportion, so the one thing the card was
+              // actually saying about the array had no visual weight.
+              height: 8,
               child: solarForBar > 0
                   ? Row(
                       children: [
@@ -230,7 +250,20 @@ class _PowerFlow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 10),
+        // State of charge, on its own line under the flow rather than as a dial
+        // beside the hero number. Two reasons. It groups with the other battery
+        // facts instead of floating away from them — charge and direction are one
+        // fact about one device, and a gauge opposite the flow read as a separate
+        // instrument. And the dial repeated "SOC" in words under a percentage that
+        // already carried a unit, which is the same "say it twice" problem the PV
+        // number had.
+        //
+        // Not tinted by level. Green would be a second colour system beside the
+        // theme for a condition that is boring when true, and the user did not
+        // choose it; the fill uses the same accent as the rest of the card.
+        _SocLine(soc: soc, isDark: isDark, seedColor: seedColor),
+        const SizedBox(height: 8),
         Text(
           !coversLoad
               ? 'The array is not covering the house load right now'
@@ -241,6 +274,73 @@ class _PowerFlow extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             color: !coversLoad ? statusWarn(isDark) : faint,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The state of charge, as a label, a track and a percentage.
+///
+/// The gauge this replaced was a `GlassCircularGauge` with "SOC" printed inside it
+/// under a number that already had a unit, sitting to the right of a hero figure
+/// it had nothing to do with. Three elements for one reading.
+class _SocLine extends StatelessWidget {
+  const _SocLine({
+    required this.soc,
+    required this.isDark,
+    required this.seedColor,
+  });
+
+  final double soc;
+  final bool isDark;
+  final Color seedColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final faint = faintColor(isDark);
+    final clamped = soc.clamp(0.0, 100.0);
+    final accent = themeColor(
+      seedColor: seedColor,
+      lightness: isDark ? 0.68 : 0.38,
+    );
+    return Row(
+      children: [
+        Text(
+          'Charge',
+          style: TextStyle(fontSize: 11, color: faint),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: SizedBox(
+              height: 6,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(color: faint.withValues(alpha: isDark ? 0.16 : 0.12)),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: clamped / 100,
+                    child: ColoredBox(color: accent),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Semantics(
+          label: 'State of charge: ${clamped.toStringAsFixed(0)} percent',
+          child: Text(
+            '${clamped.toStringAsFixed(0)}%',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
         ),
       ],
@@ -271,31 +371,38 @@ class _Term extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: faint),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(fontSize: 11, color: faint)),
-          ],
+        // The label sits above the number, not beside it. "Discharging" is eleven
+        // characters and the slot is a third of the card, so beside-the-number it
+        // forced the row wide enough to overflow; above it, the label gets the
+        // full slot and ellipsises on its own if a future one is longer still.
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: faint),
         ),
-        const SizedBox(height: 1),
+        const SizedBox(height: 2),
         Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
+            // Baseline-aligned with the figure rather than centred in the Row, so
+            // a 13 px icon sits on the number's baseline instead of floating
+            // halfway up a 24 px glyph.
+            Icon(icon, size: 13, color: faint),
+            const SizedBox(width: 4),
             Text(
               watts.toStringAsFixed(0),
               style: TextStyle(
-                fontSize: 19,
+                fontSize: 24,
                 fontWeight: FontWeight.w800,
                 height: 1.0,
                 color: color,
               ),
             ),
             const SizedBox(width: 2),
-            Text('W', style: TextStyle(fontSize: 10, color: faint)),
+            Text('W', style: TextStyle(fontSize: 11, color: faint)),
           ],
         ),
       ],
@@ -363,74 +470,6 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-      ],
-    );
-  }
-}
-
-class _ValueRow extends StatelessWidget {
-  const _ValueRow({
-    required this.pvPower,
-    required this.soc,
-    required this.isDark,
-    required this.seedColor,
-  });
-
-  final double? pvPower;
-  final double soc;
-  final bool isDark;
-  final Color seedColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final faint = faintColor(isDark);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Semantics(
-                    label: pvPower == null
-                        ? 'PV output power unavailable'
-                        : 'PV output: ${pvPower!.toStringAsFixed(0)} watts',
-                    child: Text(
-                      pvPower == null ? '--' : pvPower!.toStringAsFixed(0),
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  ExcludeSemantics(
-                    child: Text('W', style: TextStyle(fontSize: 20, color: faint)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        GlassCircularGauge(
-          progress: soc / 100,
-          centerLabel: '${soc.toStringAsFixed(0)}%',
-          centerSubLabel: 'SOC',
-          trackColor: isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.black.withValues(alpha: 0.08),
-          progressColor: seedColor,
-          size: 90,
-          strokeWidth: 9,
-          semanticLabel:
-              'Battery State of Charge: ${soc.toStringAsFixed(0)} percent',
-        ),
       ],
     );
   }

@@ -15,7 +15,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -124,6 +130,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -162,7 +200,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -271,6 +315,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -304,7 +380,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -413,6 +495,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -451,7 +565,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -560,6 +680,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -598,7 +750,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": 800.0,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -707,6 +865,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -784,7 +974,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -837,7 +1033,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": 800.0,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -946,6 +1148,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1023,7 +1257,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": 800.0,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -1132,6 +1372,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1209,7 +1481,13 @@
         "humidityMin": null,
         "humidityMax": 80.0,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -1260,7 +1538,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [],
       "readings": [
@@ -1289,7 +1573,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [],
       "readings": [
@@ -1318,7 +1608,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -1427,6 +1723,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 30,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1483,7 +1811,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -1592,6 +1926,38 @@
           "comparison": "stale",
           "limit": null,
           "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
           "unit": "",
           "decimals": 0,
           "message": "stale",
@@ -1644,7 +2010,13 @@
         "humidityMin": null,
         "humidityMax": null,
         "tdsMin": null,
-        "tdsMax": null
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
       },
       "rules": [
         {
@@ -1758,10 +2130,2372 @@
           "message": "stale",
           "staleMinutes": 10,
           "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
         }
       ],
       "readings": [],
       "expected": []
+    },
+    {
+      "name": "stale_fish_names_the_tank",
+      "description": "The fish device going quiet is a warning, and the message has to name the tank rather than a device id. This is the only place the fish label is pinned across both languages.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 6.24
+          },
+          "lastUpdate": "2026-09-27T09:35:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "stale_fish",
+          "message": "No fresh data from Fish tank"
+        }
+      ]
+    },
+    {
+      "name": "fish_silent_past_the_offline_window_is_critical",
+      "description": "An hour of silence is a stopped sensor rather than a hiccup, so the offline rule joins the stale one instead of replacing it. Both stay armed, which means one long outage produces two notifications — a warning at ten minutes and a critical at sixty. That is the existing behaviour for every device, not something the fish device adds.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 6.24
+          },
+          "lastUpdate": "2026-09-27T07:00:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "offline_fish",
+          "message": "Fish tank has stopped reporting"
+        },
+        {
+          "id": "stale_fish",
+          "message": "No fresh data from Fish tank"
+        }
+      ]
+    },
+    {
+      "name": "fish_normal_reading_is_not_an_alarm",
+      "description": "A fish tank reading within every configured limit stays silent, so the thresholds do not fire on healthy values.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 7.2,
+            "suhu": 25.0,
+            "turbidity_ntu": 12.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "fish_ph_high_breaches_the_upper_limit",
+      "description": "A pH above the configured maximum raises a warning naming the value and the limit.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 9.1
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "fish_ph_high",
+          "message": "pH too high: 9.10  (limit 8.5 )"
+        }
+      ]
+    },
+    {
+      "name": "fish_ph_low_breaches_the_lower_limit",
+      "description": "A pH below the configured minimum raises a warning.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 5.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "fish_ph_low",
+          "message": "pH too low: 5.80  (limit 6.5 )"
+        }
+      ]
+    },
+    {
+      "name": "fish_water_temp_high_breaches_the_upper_limit",
+      "description": "A water temperature above the configured maximum raises a warning.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "suhu": 32.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "fish_water_temp_high",
+          "message": "Water temperature too high: 32.5 °C (limit 30.0 °C)"
+        }
+      ]
+    },
+    {
+      "name": "fish_turbidity_high_breaches_the_upper_limit",
+      "description": "Turbidity above the configured maximum raises a warning.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "turbidity_ntu": 150.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "fish_turbidity_high",
+          "message": "Turbidity too high: 150.0 NTU (limit 100.0 NTU)"
+        }
+      ]
+    },
+    {
+      "name": "fish_alerts_disabled_produces_no_value_alarms",
+      "description": "With fish alerts switched off, even a wildly out-of-range reading stays silent. Stale and offline rules are energy alerts and still fire.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": false,
+        "fishPhMin": null,
+        "fishPhMax": null,
+        "fishTempMin": null,
+        "fishTempMax": null,
+        "fishTurbidityMax": null
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 14.2
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "fish_value_alarm_silenced_while_fish_is_stale",
+      "description": "A stale fish reading that crosses a limit describes a condition that has already ended, so the value rule waits for fresh data. The stale rule still fires.",
+      "now": "2026-09-27T10:00:00.000Z",
+      "thresholds": {
+        "energyAlerts": true,
+        "environmentAlerts": false,
+        "lowSoc": 20.0,
+        "staleMinutes": 10,
+        "offlineMinutes": 60,
+        "tempMin": null,
+        "tempMax": null,
+        "humidityMin": null,
+        "humidityMax": null,
+        "tdsMin": null,
+        "tdsMax": null,
+        "fishAlerts": true,
+        "fishPhMin": 6.5,
+        "fishPhMax": 8.5,
+        "fishTempMin": 20.0,
+        "fishTempMax": 30.0,
+        "fishTurbidityMax": 100.0
+      },
+      "rules": [
+        {
+          "id": "low_soc",
+          "type": "lowSoc",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": "soc",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Battery",
+          "unit": "%",
+          "decimals": 0,
+          "message": "lowSoc",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_battery",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_battery",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "battery",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Battery",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_pzem",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_pzem",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "pzem",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "PZEM",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_sensor",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_sensor",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "sensor",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Environment sensor",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "offline_fish",
+          "type": "deviceOffline",
+          "severity": "critical",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "offline",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "offline",
+          "staleMinutes": 60,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "stale_fish",
+          "type": "staleTelemetry",
+          "severity": "warning",
+          "group": "energy",
+          "device": "fish",
+          "metric": null,
+          "comparison": "stale",
+          "limit": null,
+          "label": "Fish tank",
+          "unit": "",
+          "decimals": 0,
+          "message": "stale",
+          "staleMinutes": 10,
+          "requireFreshSensor": false
+        },
+        {
+          "id": "fish_ph_low",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "lessThan",
+          "limit": 6.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_ph_high",
+          "type": "fishPh",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "ph",
+          "comparison": "greaterThan",
+          "limit": 8.5,
+          "label": "pH",
+          "unit": "",
+          "decimals": 2,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_low",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "lessThan",
+          "limit": 20.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeLow",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_water_temp_high",
+          "type": "fishTemp",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "suhu",
+          "comparison": "greaterThan",
+          "limit": 30.0,
+          "label": "Water temperature",
+          "unit": "°C",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        },
+        {
+          "id": "fish_turbidity_high",
+          "type": "fishTurbidity",
+          "severity": "warning",
+          "group": "fish",
+          "device": "fish",
+          "metric": "turbidity_ntu",
+          "comparison": "greaterThan",
+          "limit": 100.0,
+          "label": "Turbidity",
+          "unit": "NTU",
+          "decimals": 1,
+          "message": "rangeHigh",
+          "staleMinutes": 10,
+          "requireFreshSensor": true
+        }
+      ],
+      "readings": [
+        {
+          "device": "fish",
+          "values": {
+            "ph": 14.2
+          },
+          "lastUpdate": "2026-09-27T09:35:00.000Z"
+        },
+        {
+          "device": "battery",
+          "values": {
+            "soc": 77.0
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "pzem",
+          "values": {
+            "power_ac": 15.8
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        },
+        {
+          "device": "sensor",
+          "values": {
+            "temp_dht": 26.5
+          },
+          "lastUpdate": "2026-09-27T09:59:00.000Z"
+        }
+      ],
+      "expected": [
+        {
+          "id": "stale_fish",
+          "message": "No fresh data from Fish tank"
+        }
+      ]
     }
   ]
 }

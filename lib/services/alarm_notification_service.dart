@@ -175,6 +175,10 @@ class AlarmNotificationService {
       (AlarmDevice.battery, ThingsBoardApi.deviceBattery),
       (AlarmDevice.pzem, ThingsBoardApi.devicePzem),
       (AlarmDevice.sensor, ThingsBoardApi.deviceSensor),
+      // Without this entry buildAlarmRules still emits stale_fish/offline_fish,
+      // and parseAlarmConfig then rejects the entire config, so the background
+      // check stops notifying altogether while Settings still reports "ok".
+      (AlarmDevice.fish, ThingsBoardApi.deviceFish),
     ].where((entry) => byDevice.containsKey(entry.$1)).map((entry) {
       return {
         'device': entry.$1.wireName,
@@ -189,5 +193,6 @@ class AlarmNotificationService {
     AlarmDevice.battery => ThingsBoardApi.batteryKeys.first,
     AlarmDevice.pzem => ThingsBoardApi.pzemKeys.first,
     AlarmDevice.sensor => ThingsBoardApi.sensorKeys.first,
+    AlarmDevice.fish => ThingsBoardApi.fishKeys.first,
   };
 }

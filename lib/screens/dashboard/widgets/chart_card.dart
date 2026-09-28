@@ -27,6 +27,7 @@ class ChartSectionHeader extends StatelessWidget {
     required this.realtimeConnected,
     required this.onPickRange,
     required this.seedColor,
+    this.refreshing = false,
   });
 
   final String title;
@@ -39,6 +40,9 @@ class ChartSectionHeader extends StatelessWidget {
 
   /// The theme accent, so the "Live" indicator is not a status green.
   final Color seedColor;
+
+  /// True while a request for this view's data is in flight.
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +99,38 @@ class ChartSectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
+        // Says "Updating" only while a request for this view is actually in
+        // flight, and nothing at all otherwise.
+        //
+        // It is here because of what its absence looked like. Switching between
+        // PV, AC and Battery refetches, and the chart deliberately keeps showing
+        // the previous numbers rather than blanking — which is right, and was
+        // completely silent. On a slow ThingsBoard that is a second or two of a
+        // card that looks frozen, and "frozen" reads as broken in a way that
+        // "updating" does not. Silence is only good news when nothing is wrong;
+        // here something was happening and the screen was saying otherwise.
+        if (refreshing) ...[
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.6,
+              color: themeColor(
+                seedColor: seedColor,
+                lightness: isDark ? 0.68 : 0.38,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Updating',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: faintColor(isDark),
+            ),
+          ),
+        ],
         // A live connection takes the accent, not green. Green here was a status
         // colour used for a condition that is normally fine, which is the same
         // thing the dashboard's other "everything is OK" greens were doing.

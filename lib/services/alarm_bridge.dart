@@ -129,9 +129,6 @@ class AlarmBridge {
   /// background thread because it does network I/O.
   Future<void> checkNow() => _invoke<void>('checkNow');
 
-  Future<bool> isScheduled() async =>
-      await _invoke<bool>('isScheduled') ?? false;
-
   /// Diagnostics for the background check, for the settings screen.
   Future<AlarmBridgeStatus?> status() async {
     final raw = await _invoke<Map<dynamic, dynamic>>('status');
@@ -139,9 +136,6 @@ class AlarmBridge {
     return AlarmBridgeStatus(
       scheduled: raw['scheduled'] == true,
       intervalMinutes: (raw['intervalMinutes'] as num?)?.toInt() ?? 0,
-      configSavedAt: DateTime.fromMillisecondsSinceEpoch(
-        (raw['configSavedAt'] as num?)?.toInt() ?? 0,
-      ),
       hasCredentials: raw['hasCredentials'] == true,
       lastCheckAt: DateTime.fromMillisecondsSinceEpoch(
         (raw['lastCheckAt'] as num?)?.toInt() ?? 0,
@@ -169,15 +163,23 @@ class AlarmBridge {
   Future<bool> requestIgnoreBatteryOptimizations() async =>
       await _invoke<bool>('requestIgnoreBatteryOptimizations') ?? false;
 
-  /// The alarm the app was opened for, when a notification was tapped.
-  Future<String?> launchAlarmId() => _invoke<String>('launchAlarmId');
-
   /// Creates the notification channels.
   ///
   /// The native module does this on every notification, but the dashboard can
   /// raise one before any background check has run, and a notification with no
   /// channel is dropped without an error on Android 8 and newer.
   Future<void> ensureChannels() => _invoke<void>('ensureChannels');
+
+  /// Returns the alarm ID from a notification tap, or null if the app was
+  /// launched normally.
+  ///
+  /// The native side receives `EXTRA_ALARM_ID` via `onNewIntent` when the user
+  /// taps an alarm notification. This method reads that ID so the dashboard can
+  /// navigate to the alarm history screen.
+  Future<String?> launchAlarmId() async {
+    final id = await _invoke<String>('launchAlarmId');
+    return id?.isEmpty == true ? null : id;
+  }
 
   Future<T?> _invoke<T>(String method, [Map<String, dynamic>? arguments]) async {
     if (_unavailable) return null;
@@ -207,7 +209,6 @@ class AlarmBridgeStatus {
   const AlarmBridgeStatus({
     required this.scheduled,
     required this.intervalMinutes,
-    required this.configSavedAt,
     required this.hasCredentials,
     required this.lastCheckAt,
     required this.lastOutcome,
@@ -215,7 +216,6 @@ class AlarmBridgeStatus {
 
   final bool scheduled;
   final int intervalMinutes;
-  final DateTime configSavedAt;
   final bool hasCredentials;
   final DateTime lastCheckAt;
   final String lastOutcome;

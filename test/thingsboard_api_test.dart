@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/telemetry_helpers.dart';
 import 'package:plts_monitoring/services/thingsboard_api.dart';
 import 'package:plts_monitoring/services/thingsboard_realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -286,28 +287,59 @@ void main() {
     });
 
     test('no key is requested twice', () {
-      for (final keys in [
-        ThingsBoardApi.batteryKeys,
-        ThingsBoardApi.pzemKeys,
-        ThingsBoardApi.sensorKeys,
-      ]) {
+      for (final keys in ThingsBoardApi.deviceKeysById.values) {
         expect(keys.toSet().length, keys.length, reason: 'duplicate in $keys');
       }
     });
 
-    test('the three devices do not share a key', () {
+    test('no two devices share a key', () {
       // Sharing would mean a value arriving on the wrong device is merged into
-      // the wrong slot, which the dashboard cannot detect.
-      final all = <String>{
-        ...ThingsBoardApi.batteryKeys,
-        ...ThingsBoardApi.pzemKeys,
-        ...ThingsBoardApi.sensorKeys,
-      };
-      final total =
-          ThingsBoardApi.batteryKeys.length +
-          ThingsBoardApi.pzemKeys.length +
-          ThingsBoardApi.sensorKeys.length;
+      // the wrong slot, which the dashboard cannot detect. Driven by
+      // deviceKeysById so a newly added device is covered without editing here.
+      final all = ThingsBoardApi.deviceKeysById.values.expand((k) => k).toSet();
+      final total = ThingsBoardApi.deviceKeysById.values
+          .fold<int>(0, (sum, keys) => sum + keys.length);
       expect(all.length, total);
+    });
+
+    test('deviceKeysById covers every device the app reads', () {
+      // The map is the canonical list, so a device present in one place and
+      // missing from the other would make it look like a device that does not
+      // exist.
+      expect(
+        ThingsBoardApi.deviceKeysById.keys.toSet(),
+        {
+          ThingsBoardApi.deviceBattery,
+          ThingsBoardApi.devicePzem,
+          ThingsBoardApi.deviceSensor,
+          ThingsBoardApi.deviceFish,
+        },
+      );
+    });
+
+    test('every key reaches the offline cache under its own device', () {
+      // The regression guard for the silent drop: splitCachedTelemetry routes by
+      // membership in these lists, and a key in none of them is discarded with no
+      // error. Adding a device's keys here without adding the device to the
+      // split left the page working live and empty offline.
+      final allKeys = ThingsBoardApi.deviceKeysById.values.expand((k) => k);
+      final routed = splitCachedTelemetry({for (final k in allKeys) k: 1.0});
+      final buckets = <String, Map<String, double>>{
+        ThingsBoardApi.deviceBattery: routed.battery,
+        ThingsBoardApi.devicePzem: routed.pzem,
+        ThingsBoardApi.deviceSensor: routed.sensor,
+        ThingsBoardApi.deviceFish: routed.fish,
+      };
+      for (final entry in ThingsBoardApi.deviceKeysById.entries) {
+        final target = buckets[entry.key]!;
+        for (final key in entry.value) {
+          expect(
+            target.containsKey(key),
+            isTrue,
+            reason: '$key for $entry.key is dropped from the offline cache',
+          );
+        }
+      }
     });
 
     test('key sets are unmodifiable so a caller cannot mutate them', () {
@@ -351,8 +383,9 @@ void main() {
         ThingsBoardApi.deviceBattery,
         ThingsBoardApi.devicePzem,
         ThingsBoardApi.deviceSensor,
+        ThingsBoardApi.deviceFish,
       };
-      expect(ids.length, 3);
+      expect(ids.length, 4);
       for (final id in ids) {
         expect(
           RegExp(

@@ -232,11 +232,23 @@ void main() {
         'voltage': 48.1,
         'power_ac': 210,
         'temp_dht': 27.5,
+        'ph': 6.24,
         'unknown_key': 1,
       });
       expect(split.battery, {'soc': 80, 'voltage': 48.1});
       expect(split.pzem, {'power_ac': 210});
       expect(split.sensor, {'temp_dht': 27.5});
+      expect(split.fish, {'ph': 6.24});
+    });
+
+    test('a key in no device list is dropped, not guessed at', () {
+      // Deliberate: the flat cache has thrown away which device each value came
+      // from, so membership in the key lists is the only routing signal there is.
+      final split = splitCachedTelemetry({'unknown_key': 1});
+      expect(split.battery, isEmpty);
+      expect(split.pzem, isEmpty);
+      expect(split.sensor, isEmpty);
+      expect(split.fish, isEmpty);
     });
   });
 

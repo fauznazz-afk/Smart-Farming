@@ -168,13 +168,11 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                       DataNote(isDark: isDark, data: data!),
                       const SizedBox(height: 12),
                       ExportButton(
-                        isDark: isDark,
                         sharing: _sharing.value,
                         buckets: buckets,
                         selectedDate: _selectedDate,
                         monthly: _monthly,
                         sharingNotifier: _sharing,
-                        onShare: () {},
                       ),
                     ],
                   ],

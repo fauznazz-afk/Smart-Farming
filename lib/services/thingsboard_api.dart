@@ -27,6 +27,7 @@ class ThingsBoardApi {
   static const String deviceBattery = '9465cf90-b264-11f1-9294-d92385142e6d';
   static const String deviceSensor = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
   static const String devicePzem = 'af9531a0-ac44-11f1-841c-f5914d050259';
+  static const String deviceFish = '1c433980-ba25-11f1-b893-9dd5b4b6bde1';
 
   // Kunci telemetry per device. Sengaja declared di sini dan dipakai bersama oleh
   // polling REST (fetchBatteryData dan friends) dan langganan WebSocket di
@@ -64,6 +65,52 @@ class ThingsBoardApi {
     'temp_dht',
     'temp_ds18b20',
   ];
+
+  // Device ikan publishes a sixth key, `turbidity_keruh`, which is a BOOLEAN
+  // ("true" when the water is turbid), not a number. It is deliberately absent
+  // here. TelemetryPoint.fromJson parses with
+  // `double.tryParse(value.toString()) ?? 0.0`, so requesting it would not
+  // throw — it would store 0.0, and the card would show a confident `0` that is
+  // indistinguishable from a real zero reading while meaning the opposite. The
+  // numeric `turbidity_ntu` carries the same fact with a scale, so the boolean
+  // adds a wrong value rather than information. Supporting it properly means
+  // widening Map<String, double> to Map<String, dynamic> across the cache, the
+  // offline split, the chart and the Kotlin alarm parser.
+  //
+  // `turbidity_voltage` is also absent: it is the sensor's own supply rail
+  // (3.3 V), useful for bench diagnosis and noise on a water-quality page.
+  static const List<String> fishKeys = [
+    // Listed first on purpose: AlarmNotificationService._freshnessKeyFor takes
+    // `fishKeys.first` as the key that proves the device is still reporting, so
+    // it has to be a key the device always publishes.
+    'ph',
+    // The one Indonesian key name in the app, because that is what the device
+    // publishes. The label shown to the user is still English. Do not
+    // "correct" it to `suhu_air` or similar.
+    'suhu',
+    'turbidity_ntu',
+    'water_level_percent',
+  ];
+
+  /// Every device the app reads, paired with the keys it publishes.
+  ///
+  /// This is the canonical list, and it exists because three places used to be
+  /// hand-written lists that had to be extended in step: the REST shortcuts, the
+  /// WebSocket subscriptions, and the offline cache split. Adding a device to
+  /// the constants above but forgetting the split produced the worst kind of
+  /// bug — the page polled live, showed correct numbers, and then came up empty
+  /// from the offline fallback with nothing in any log. Tests derive from this
+  /// map so a fifth device cannot silently drop out of coverage either.
+  ///
+  /// Note it is keyed by device id, so a duplicated UUID would silently collapse
+  /// two devices into one entry here. `thingsboard_api_test.dart` pins the
+  /// distinctness separately for that reason.
+  static const Map<String, List<String>> deviceKeysById = {
+    deviceBattery: batteryKeys,
+    devicePzem: pzemKeys,
+    deviceSensor: sensorKeys,
+    deviceFish: fishKeys,
+  };
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
@@ -249,10 +296,11 @@ class ThingsBoardApi {
     'X-Authorization': 'Bearer $_token',
   };
 
-  Future<http.Response> _getWithTokenRefresh(Uri url) async {
+  Future<http.Response> _getWithTokenRefresh(Uri url, {DateTime? deadline}) async {
+    final timeout = _timeoutFor(deadline);
     final response = await http
         .get(url, headers: _authHeaders)
-        .timeout(_requestTimeout);
+        .timeout(timeout);
     if (response.statusCode != 401) return response;
 
     final refreshResult = await _refreshAccessToken();
@@ -264,7 +312,20 @@ class ThingsBoardApi {
     }
     if (refreshResult == _TokenRefreshResult.rejected) return response;
 
-    return http.get(url, headers: _authHeaders).timeout(_requestTimeout);
+    return http.get(url, headers: _authHeaders).timeout(_timeoutFor(deadline));
+  }
+
+  /// Compute the timeout for a request, capped by the remaining budget.
+  ///
+  /// When [deadline] is null, the default [_requestTimeout] is used. When a
+  /// deadline is provided, the timeout is the remaining time until that deadline,
+  /// but never more than [_requestTimeout]. If the deadline has already passed,
+  /// a minimal timeout is returned so the request fails fast rather than hanging.
+  Duration _timeoutFor(DateTime? deadline) {
+    if (deadline == null) return _requestTimeout;
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining <= Duration.zero) return const Duration(milliseconds: 1);
+    return remaining < _requestTimeout ? remaining : _requestTimeout;
   }
 
   Future<_TokenRefreshResult> _refreshAccessToken() async {
@@ -339,23 +400,63 @@ class ThingsBoardApi {
   /// Fetch nilai telemetry terkini (latest value) untuk satu device.
   ///
   /// Retries with exponential backoff (1s, 2s, 4s) on network/5xx errors.
-  /// Does NOT retry on 401 (auth errors). After a successful fetch, the
-  /// result is cached to SharedPreferences for offline fallback.
+  /// Does NOT retry on 401 (auth errors).
+  ///
+  /// This no longer writes the offline cache. It used to, per device, and four
+  /// devices fetching inside one `Future.wait` meant four concurrent
+  /// read-modify-write cycles against the same `cached_telemetry` key: each read
+  /// the same snapshot and each wrote only its own device, so the last writer won
+  /// and the other three buckets were lost. Measured at 32-77 ms each on the test
+  /// device, all of it inside the poll's critical path. The cache is now written
+  /// once per tick by [cacheTelemetrySnapshot] with the merged result.
   Future<DeviceTelemetry> fetchLatestTelemetry(
     String deviceId,
-    List<String> keys,
-  ) async {
+    List<String> keys, {
+    DateTime? deadline,
+  }) async {
     final keysParam = keys.join(',');
     final url = Uri.parse(
       '$baseUrl/api/plugins/telemetry/DEVICE/$deviceId/values/timeseries?keys=$keysParam',
     );
 
-    final telemetry = await _fetchWithRetry(url);
+    return _fetchWithRetry(url, deadline: deadline);
+  }
 
-    // Cache the successful result for offline mode.
-    await _cacheTelemetry(deviceId, telemetry);
-
-    return telemetry;
+  /// Merge one snapshot per device and write the offline cache exactly once.
+  ///
+  /// Takes the whole tick's readings rather than a single device's, which is the
+  /// point: one read, one merge, one write, no interleaving. The caller owns the
+  /// loop, so a device that failed simply contributes nothing instead of
+  /// overwriting the others with its own stale view.
+  Future<void> cacheTelemetrySnapshot(
+    Map<String, DeviceTelemetry> byDevice,
+  ) async {
+    final mergedValues = <String, double>{};
+    DateTime? latest;
+    for (final telemetry in byDevice.values) {
+      mergedValues.addAll(telemetry.latestValues);
+      final at = telemetry.lastUpdate;
+      if (at != null && (latest == null || at.isAfter(latest))) latest = at;
+    }
+    if (mergedValues.isEmpty) return;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        'cached_telemetry',
+        jsonEncode(
+          DeviceTelemetry(
+            latestValues: mergedValues,
+            lastUpdate: latest,
+          ).toJson(),
+        ),
+      );
+      await preferences.setString(
+        'cached_telemetry_time',
+        DateTime.now().toIso8601String(),
+      );
+    } catch (_) {
+      // Best-effort: a failed cache must never fail a successful fetch.
+    }
   }
 
   /// Wraps an HTTP GET with exponential-backoff retry.
@@ -368,7 +469,7 @@ class ThingsBoardApi {
   /// Retries only on network errors and 5xx responses. 401 is NOT retried
   /// (it's an auth error — caller handles it). After all attempts fail,
   /// the last error is rethrown.
-  Future<DeviceTelemetry> _fetchWithRetry(Uri url) async {
+  Future<DeviceTelemetry> _fetchWithRetry(Uri url, {DateTime? deadline}) async {
     const maxRetries = 3; // 4 total attempts (initial + 3 retries)
     const delays = [
       Duration(seconds: 1),
@@ -383,7 +484,7 @@ class ThingsBoardApi {
         await Future.delayed(delays[attempt - 1]);
       }
       try {
-        final response = await _getWithTokenRefresh(url);
+        final response = await _getWithTokenRefresh(url, deadline: deadline);
 
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -417,39 +518,6 @@ class ThingsBoardApi {
     throw lastError ?? Exception('Telemetry fetch failed after retrying');
   }
 
-  /// Save telemetry snapshot to SharedPreferences for offline fallback.
-  Future<void> _cacheTelemetry(
-    String deviceId,
-    DeviceTelemetry telemetry,
-  ) async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      final existingJson = preferences.getString('cached_telemetry');
-      final existing = existingJson == null || existingJson.isEmpty
-          ? null
-          : DeviceTelemetry.fromCacheJson(
-              jsonDecode(existingJson) as Map<String, dynamic>,
-            );
-      final mergedValues = <String, double>{
-        ...?existing?.latestValues,
-        ...telemetry.latestValues,
-      };
-      final merged = DeviceTelemetry(
-        latestValues: mergedValues,
-        lastUpdate: telemetry.lastUpdate ?? existing?.lastUpdate,
-      );
-      await preferences.setString(
-        'cached_telemetry',
-        jsonEncode(merged.toJson()),
-      );
-      await preferences.setString(
-        'cached_telemetry_time',
-        DateTime.now().toIso8601String(),
-      );
-    } catch (_) {
-      // Caching is best-effort — don't fail the fetch if storage fails.
-    }
-  }
 
   /// Load the last cached telemetry snapshot from SharedPreferences.
   /// Returns `null` if no cache exists.
@@ -486,24 +554,6 @@ class ThingsBoardApi {
     } catch (_) {
       // Best-effort cleanup.
     }
-  }
-
-  /// Fetch histori telemetry (buat chart) dalam rentang waktu tertentu
-  Future<List<TelemetryPoint>> fetchHistory(
-    String deviceId,
-    String key, {
-    required DateTime start,
-    required DateTime end,
-    int intervalMs = 300000, // 5 menit
-  }) async {
-    final histories = await fetchHistoryForKeys(
-      deviceId,
-      [key],
-      start: start,
-      end: end,
-      intervalMs: intervalMs,
-    );
-    return histories[key] ?? <TelemetryPoint>[];
   }
 
   /// Fetch several telemetry series in one request (useful for chart screens).
@@ -563,5 +613,9 @@ class ThingsBoardApi {
 
   Future<DeviceTelemetry> fetchSensorData() {
     return fetchLatestTelemetry(deviceSensor, sensorKeys);
+  }
+
+  Future<DeviceTelemetry> fetchFishData() {
+    return fetchLatestTelemetry(deviceFish, fishKeys);
   }
 }

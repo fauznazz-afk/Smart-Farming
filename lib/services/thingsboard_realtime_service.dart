@@ -31,6 +31,7 @@ class ThingsBoardRealtimeService {
   int _reconnectAttempt = 0;
   int _nextCommandId = 1;
   final Map<int, String> _subscriptionDevices = {};
+  final Map<String, DeviceTelemetry> _telemetryByDevice = {};
 
   bool get isConnected => _connected;
 
@@ -48,6 +49,7 @@ class ThingsBoardRealtimeService {
     _subscription = null;
     await _channel?.sink.close();
     _channel = null;
+    _telemetryByDevice.clear();
     _setConnected(false);
   }
 
@@ -85,6 +87,7 @@ class ThingsBoardRealtimeService {
       _subscriptionCommand(ThingsBoardApi.deviceBattery, ThingsBoardApi.batteryKeys),
       _subscriptionCommand(ThingsBoardApi.devicePzem, ThingsBoardApi.pzemKeys),
       _subscriptionCommand(ThingsBoardApi.deviceSensor, ThingsBoardApi.sensorKeys),
+      _subscriptionCommand(ThingsBoardApi.deviceFish, ThingsBoardApi.fishKeys),
     ];
     channel.sink.add(
       jsonEncode({
@@ -143,10 +146,30 @@ class ThingsBoardRealtimeService {
           );
         }
       });
-      if (values.isNotEmpty) onTelemetry(deviceId, values);
+      if (values.isNotEmpty) {
+        onTelemetry(deviceId, values);
+        _cacheTelemetry(deviceId, values);
+      }
     } catch (_) {
       // Ignore malformed frames and keep the live stream alive.
     }
+  }
+
+  /// Write the latest WebSocket telemetry to the offline cache.
+  ///
+  /// The REST polling path writes the cache once per tick with the merged
+  /// result. The WebSocket path receives telemetry per device, so it
+  /// accumulates the latest reading from each device and writes the full
+  /// snapshot whenever any device reports. This ensures the offline fallback
+  /// has data even when the app is using WebSocket and the network goes down.
+  void _cacheTelemetry(String deviceId, Map<String, TelemetryPoint> values) {
+    _telemetryByDevice[deviceId] = DeviceTelemetry(
+      latestValues: {
+        for (final entry in values.entries) entry.key: entry.value.value,
+      },
+      lastUpdate: DateTime.now(),
+    );
+    unawaited(api.cacheTelemetrySnapshot(_telemetryByDevice));
   }
 
   String? _deviceForSubscription(Object? subscriptionId) {

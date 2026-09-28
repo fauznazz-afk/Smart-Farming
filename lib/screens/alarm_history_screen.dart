@@ -79,6 +79,9 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     AlarmType.environmentTemp => Icons.thermostat_outlined,
     AlarmType.environmentHumidity => Icons.water_drop_outlined,
     AlarmType.environmentTds => Icons.science_outlined,
+    AlarmType.fishPh => Icons.water_drop_outlined,
+    AlarmType.fishTemp => Icons.thermostat_outlined,
+    AlarmType.fishTurbidity => Icons.blur_on_outlined,
     AlarmType.deviceOffline => Icons.cloud_off_outlined,
   };
 

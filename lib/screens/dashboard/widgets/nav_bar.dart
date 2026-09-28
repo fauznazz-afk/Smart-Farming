@@ -11,17 +11,30 @@ class NavDestination {
   const NavDestination(this.icon, this.selectedIcon, this.label);
 }
 
-/// The five dashboard tabs, in navigation order.
+/// The dashboard tabs, in navigation order.
+///
+/// Four, not six. Material 2 documents 80 dp as the minimum width of a
+/// bottom-navigation destination in portrait; this phone is 380 dp, so six tabs
+/// needed 480 dp and "Hydroponics" measured 62 dp in a 60 dp slot even at
+/// `label-small`, the smallest style the Material type scale has. Material 3
+/// states the limit and the symptom together: "the elements may collide and there
+/// likely won't be enough space for translated text." Four tabs need 320 dp and
+/// leave a slot spare for a seventh destination.
+///
+/// PV, AC and Battery are one tab with a selector inside it, because they are
+/// three views of one electrical system. See `power_sub_tabs.dart`.
+///
+/// Labels are 11 sp and must stay at or above it. Both Material versions forbid
+/// the two ways of making a long label fit: "Don't shrink text to fit on a single
+/// line" and "Don't reduce the type size to fit more characters into a
+/// destination label." Neither do they forbid the other escape route — "Don't
+/// use multiple or low-contrast colors in a bottom navigation bar" — which is why
+/// every tab here renders the same accent and is told apart by label and icon.
 const List<NavDestination> kNavDestinations = [
   NavDestination(Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
-  NavDestination(Icons.wb_sunny_outlined, Icons.wb_sunny, 'PV'),
-  NavDestination(Icons.power_outlined, Icons.power, 'AC'),
-  NavDestination(
-    Icons.battery_5_bar_outlined,
-    Icons.battery_full,
-    'Battery',
-  ),
-  NavDestination(Icons.videocam_outlined, Icons.videocam, 'CCTV'),
+  NavDestination(Icons.bolt_outlined, Icons.bolt, 'Power'),
+  NavDestination(Icons.eco_outlined, Icons.eco, 'Hydroponics'),
+  NavDestination(Icons.set_meal_outlined, Icons.set_meal, 'Fish'),
 ];
 
 /// Floating glass navigation bar that collapses to a single button when the
@@ -57,7 +70,11 @@ class GlassNavBar extends StatelessWidget {
         );
         return SafeArea(
           top: false,
-          minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          // 10, not 16. Six tabs split the width with Expanded, so every point of
+          // margin is a point taken from an already narrow slot. The bar used to
+          // have five tabs and 16 dp of air; both had to give when the Hydroponics
+          // and Fish tabs arrived.
+          minimum: const EdgeInsets.fromLTRB(10, 0, 10, 10),
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
@@ -258,8 +275,26 @@ class _NavItem extends StatelessWidget {
                           Text(
                             destination.label,
                             maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 9,
+                              // 11, not 8. Shrinking this to 8 was my suggestion
+                              // and it was wrong: 11sp is `label-small`, the
+                              // smallest style in the entire Material type scale,
+                              // so 8px was off the scale entirely. Material 2 says
+                              // "Don't shrink text to fit on a single line" and
+                              // Material 3 says "Don't reduce the type size to fit
+                              // more characters into a destination label".
+                              //
+                              // At 11sp "Hydroponics" measures 62dp and the slot is
+                              // 60dp, so it still does not fit — which is the actual
+                              // finding, and it is a tab-count problem rather than a
+                              // font problem. Six slots at Material 2's documented
+                              // 80dp portrait minimum need 480dp; this phone is
+                              // 380dp. Fixing that means fewer tabs, not smaller
+                              // text.
+                              fontSize: 11,
                               color: tint,
                               fontWeight: FontWeight.w600,
                             ),

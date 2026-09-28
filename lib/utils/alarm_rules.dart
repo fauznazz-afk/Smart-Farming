@@ -27,13 +27,32 @@ enum AlarmGroup {
   /// Governed by `SettingsKeys.environmentAlertsEnabled`: temperature, humidity
   /// and TDS limits.
   environment,
+
+  /// Governed by `SettingsKeys.fishAlertsEnabled`: fish tank pH, water
+  /// temperature and turbidity limits.
+  fish,
 }
 
 /// Which ThingsBoard device a rule reads from.
+///
+/// Adding a value here has consequences well past this enum:
+///
+///  * `buildAlarmRules` loops `AlarmDevice.values`, so a new entry
+///    immediately produces a `stale_<wireName>` and an `offline_<wireName>`
+///    rule, and every one of them requires the device to be polled.
+///  * `AlarmNotificationService._devicesFor` is a hand-written list, and
+///    `AlarmRule.parseAlarmConfig` refuses any rule naming a device that is not
+///    in it. Omit the device there and the stored config is rejected whole, so
+///    every background tick ends at "no alarm config stored" and nothing is ever
+///    notified again. No exception, no crash.
+///  * `AlarmRule.kt` needs the same wire name, and both `_freshnessKeyFor`
+///    (Dart) and `AlarmParityTest.freshnessKeyFor` (Kotlin) are exhaustive
+///    `switch`es, so a missing branch is a compile error rather than a silence.
 enum AlarmDevice {
   battery('battery', 'Battery'),
   pzem('pzem', 'PZEM'),
-  sensor('sensor', 'Environment sensor');
+  sensor('sensor', 'Environment sensor'),
+  fish('fish', 'Fish tank');
 
   const AlarmDevice(this.wireName, this.label);
 
@@ -211,6 +230,12 @@ class AlarmThresholds {
     this.humidityMax,
     this.tdsMin,
     this.tdsMax,
+    this.fishAlerts = true,
+    this.fishPhMin,
+    this.fishPhMax,
+    this.fishTempMin,
+    this.fishTempMax,
+    this.fishTurbidityMax,
   });
 
   final bool energyAlerts;
@@ -235,6 +260,42 @@ class AlarmThresholds {
   /// TDS, and a low one makes the alert unreachable.
   final double? tdsMax;
 
+  final bool fishAlerts;
+  final double? fishPhMin;
+  final double? fishPhMax;
+  final double? fishTempMin;
+  final double? fishTempMax;
+  final double? fishTurbidityMax;
+
+  /// The configured lower bound for a telemetry key, or null when that key is not
+  /// one this app puts a limit on.
+  ///
+  /// This mapping used to be written out twice inside the environment grid — once
+  /// to colour a card and once to caption it — and both switches ended in
+  /// `_ => (null, null)`. That is a safe default for the two keys that had a case,
+  /// and a silent one for anything added later: a new monitored sensor would have
+  /// shown no verdict and no range with nothing to indicate the omission. It lives
+  /// here instead because these are this class's own numbers.
+  double? minFor(String metric) => switch (metric) {
+    'temp_dht' => tempMin,
+    'humidity_dht' => humidityMin,
+    'tds_ppm' => tdsMin,
+    'ph' => fishPhMin,
+    'suhu' => fishTempMin,
+    _ => null,
+  };
+
+  /// The configured upper bound for a telemetry key, or null. See [minFor].
+  double? maxFor(String metric) => switch (metric) {
+    'temp_dht' => tempMax,
+    'humidity_dht' => humidityMax,
+    'tds_ppm' => tdsMax,
+    'ph' => fishPhMax,
+    'suhu' => fishTempMax,
+    'turbidity_ntu' => fishTurbidityMax,
+    _ => null,
+  };
+
   // Default environment limits, chosen for a tropical greenhouse and stated here
   // so the settings screen, the dashboard and the background check cannot
   // disagree about them.
@@ -257,6 +318,17 @@ class AlarmThresholds {
   /// catch, so it is recorded here too.
   static const double defaultTdsMin = 800;
 
+  // Fish tank defaults, chosen for a tropical ornamental fish tank.
+  //
+  // pH 6.5-8.5 covers most tropical fish. Water temperature 20-30 C covers
+  // the common range for tropical species. Turbidity above 100 NTU is visibly
+  // cloudy and indicates a filtration problem.
+  static const double defaultFishPhMin = 6.5;
+  static const double defaultFishPhMax = 8.5;
+  static const double defaultFishTempMin = 20;
+  static const double defaultFishTempMax = 30;
+  static const double defaultFishTurbidityMax = 100;
+
   static const int defaultLowSoc = 20;
   static const int defaultStaleMinutes = 10;
   static const int defaultOfflineMinutes = 60;
@@ -265,6 +337,7 @@ class AlarmThresholds {
   static const AlarmThresholds defaults = AlarmThresholds(
     energyAlerts: true,
     environmentAlerts: true,
+    fishAlerts: true,
     lowSoc: 20,
     staleMinutes: defaultStaleMinutes,
     offlineMinutes: defaultOfflineMinutes,
@@ -273,10 +346,21 @@ class AlarmThresholds {
     humidityMin: defaultHumidityMin,
     humidityMax: defaultHumidityMax,
     tdsMin: defaultTdsMin,
+    fishPhMin: defaultFishPhMin,
+    fishPhMax: defaultFishPhMax,
+    fishTempMin: defaultFishTempMin,
+    fishTempMax: defaultFishTempMax,
+    fishTurbidityMax: defaultFishTurbidityMax,
   );
 }
 
-/// One user-adjustable limit for an environment sensor.
+/// One user-adjustable limit for a monitored sensor.
+///
+/// Shared between environment and fish sensors: the structure is identical, and
+/// a second copy for the fish tank would drift from the first the moment a
+/// field was added to one and not the other. The `decimals` field is per-sensor
+/// because pH is reported to two decimals while temperatures and turbidity are
+/// not.
 class _EnvironmentLimit {
   const _EnvironmentLimit({
     required this.metric,
@@ -285,6 +369,7 @@ class _EnvironmentLimit {
     required this.unit,
     required this.minimum,
     required this.maximum,
+    this.decimals = 1,
   });
 
   final String metric;
@@ -293,6 +378,7 @@ class _EnvironmentLimit {
   final String unit;
   final double? minimum;
   final double? maximum;
+  final int decimals;
 }
 
 /// One side of an [\_EnvironmentLimit], as a rule.
@@ -434,7 +520,74 @@ List<AlarmRule> buildAlarmRules(AlarmThresholds thresholds) {
             limit: bound.limit,
             label: sensor.label,
             unit: sensor.unit,
-            decimals: 1,
+            decimals: sensor.decimals,
+            message: bound.messageKind,
+            staleMinutes: staleMinutes,
+            requireFreshSensor: true,
+          ),
+        );
+      }
+    }
+  }
+
+  if (thresholds.fishAlerts) {
+    final sensors = <_EnvironmentLimit>[
+      _EnvironmentLimit(
+        metric: 'ph',
+        id: 'ph',
+        label: 'pH',
+        unit: '',
+        minimum: thresholds.fishPhMin,
+        maximum: thresholds.fishPhMax,
+        decimals: 2,
+      ),
+      _EnvironmentLimit(
+        metric: 'suhu',
+        id: 'water_temp',
+        label: 'Water temperature',
+        unit: '°C',
+        minimum: thresholds.fishTempMin,
+        maximum: thresholds.fishTempMax,
+      ),
+      _EnvironmentLimit(
+        metric: 'turbidity_ntu',
+        id: 'turbidity',
+        label: 'Turbidity',
+        unit: 'NTU',
+        minimum: null,
+        maximum: thresholds.fishTurbidityMax,
+      ),
+    ];
+    for (final sensor in sensors) {
+      final bounds = <_EnvironmentBound>[
+        _EnvironmentBound(
+          suffix: 'low',
+          comparison: AlarmComparison.lessThan,
+          limit: sensor.minimum,
+          messageKind: AlarmMessageKind.rangeLow,
+        ),
+        _EnvironmentBound(
+          suffix: 'high',
+          comparison: AlarmComparison.greaterThan,
+          limit: sensor.maximum,
+          messageKind: AlarmMessageKind.rangeHigh,
+        ),
+      ];
+      for (final bound in bounds) {
+        if (bound.limit == null) continue;
+        rules.add(
+          AlarmRule(
+            id: 'fish_${sensor.id}_${bound.suffix}',
+            type: _fishType(sensor.id),
+            severity: AlarmSeverity.warning,
+            group: AlarmGroup.fish,
+            device: AlarmDevice.fish,
+            metric: sensor.metric,
+            comparison: bound.comparison,
+            limit: bound.limit,
+            label: sensor.label,
+            unit: sensor.unit,
+            decimals: sensor.decimals,
             message: bound.messageKind,
             staleMinutes: staleMinutes,
             requireFreshSensor: true,
@@ -451,6 +604,12 @@ AlarmType _environmentType(String id) => switch (id) {
   'ambient_temp' => AlarmType.environmentTemp,
   'humidity' => AlarmType.environmentHumidity,
   _ => AlarmType.environmentTds,
+};
+
+AlarmType _fishType(String id) => switch (id) {
+  'ph' => AlarmType.fishPh,
+  'water_temp' => AlarmType.fishTemp,
+  _ => AlarmType.fishTurbidity,
 };
 
 /// Evaluates [rules] against [readings] and returns the active ones.
@@ -492,8 +651,8 @@ List<AlarmSignal> evaluateAlarmRules({
     if (value == null) continue;
 
     if (rule.requireFreshSensor) {
-      final sensor = byDevice[AlarmDevice.sensor];
-      if (sensor == null || sensor.isStale(rule.staleMinutes, now)) continue;
+      final device = byDevice[rule.device];
+      if (device == null || device.isStale(rule.staleMinutes, now)) continue;
     }
 
     final limit = rule.limit;

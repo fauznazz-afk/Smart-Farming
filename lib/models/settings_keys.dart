@@ -24,9 +24,11 @@ abstract final class SettingsKeys {
   static const environmentTdsMin = 'environment_tds_min';
   static const environmentTdsMax = 'environment_tds_max';
 
-  // Weather
-  static const weatherApiKey = 'weather_api_key';
-  static const weatherLocationName = 'weather_location_name';
-  static const weatherLocationLat = 'weather_location_lat';
-  static const weatherLocationLon = 'weather_location_lon';
+  // Fish tank alert limits
+  static const fishAlertsEnabled = 'fish_alerts_enabled';
+  static const fishPhMin = 'fish_ph_min';
+  static const fishPhMax = 'fish_ph_max';
+  static const fishTempMin = 'fish_temp_min';
+  static const fishTempMax = 'fish_temp_max';
+  static const fishTurbidityMax = 'fish_turbidity_max';
 }

@@ -96,37 +96,39 @@ void main() {
 
   group('ThingsBoardApi device configuration', () {
     test('device IDs are distinct UUIDs', () {
-      expect(ThingsBoardApi.deviceBattery, isNot(equals(ThingsBoardApi.devicePzem)));
-      expect(ThingsBoardApi.deviceBattery, isNot(equals(ThingsBoardApi.deviceSensor)));
-      expect(ThingsBoardApi.devicePzem, isNot(equals(ThingsBoardApi.deviceSensor)));
+      final ids = ThingsBoardApi.deviceKeysById.keys.toSet();
+      // Distinctness is checked pairwise through the canonical map, so a fifth
+      // device is covered without editing this test.
+      expect(ids.length, ThingsBoardApi.deviceKeysById.length);
     });
 
-    test('battery keys are non-empty and unique', () {
-      expect(ThingsBoardApi.batteryKeys, isNotEmpty);
-      expect(ThingsBoardApi.batteryKeys.length,
-          equals(ThingsBoardApi.batteryKeys.toSet().length));
+    test('every key list is non-empty and unique', () {
+      for (final entry in ThingsBoardApi.deviceKeysById.entries) {
+        expect(
+          entry.value,
+          isNotEmpty,
+          reason: '${entry.key} declares no keys, so nothing can be polled',
+        );
+        expect(
+          entry.value.length,
+          equals(entry.value.toSet().length),
+          reason: 'duplicate key in ${entry.key}',
+        );
+      }
     });
 
-    test('pzem keys are non-empty and unique', () {
-      expect(ThingsBoardApi.pzemKeys, isNotEmpty);
-      expect(ThingsBoardApi.pzemKeys.length,
-          equals(ThingsBoardApi.pzemKeys.toSet().length));
-    });
-
-    test('sensor keys are non-empty and unique', () {
-      expect(ThingsBoardApi.sensorKeys, isNotEmpty);
-      expect(ThingsBoardApi.sensorKeys.length,
-          equals(ThingsBoardApi.sensorKeys.toSet().length));
-    });
-
-    test('no key overlap between devices', () {
-      final batterySet = ThingsBoardApi.batteryKeys.toSet();
-      final pzemSet = ThingsBoardApi.pzemKeys.toSet();
-      final sensorSet = ThingsBoardApi.sensorKeys.toSet();
-
-      expect(batterySet.intersection(pzemSet), isEmpty);
-      expect(batterySet.intersection(sensorSet), isEmpty);
-      expect(pzemSet.intersection(sensorSet), isEmpty);
+    test('no key overlap between any two devices', () {
+      final entries = ThingsBoardApi.deviceKeysById.entries.toList();
+      for (var i = 0; i < entries.length; i++) {
+        for (var j = i + 1; j < entries.length; j++) {
+          expect(
+            entries[i].value.toSet().intersection(entries[j].value.toSet()),
+            isEmpty,
+            reason:
+                '${entries[i].key} and ${entries[j].key} share a telemetry key',
+          );
+        }
+      }
     });
   });
 

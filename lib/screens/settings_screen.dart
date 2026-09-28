@@ -44,9 +44,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _save() async {
-    final error = await _settings.save();
+    String? error;
+    try {
+      error = await _settings.save();
+    } catch (exception) {
+      // A thrown exception used to escape here as an unhandled async error, so
+      // the save failed with no SnackBar and no pop and the button looked
+      // dead. Say so instead, and leave the details in the log.
+      debugPrint('Saving settings failed: $exception');
+      error = 'Saving the settings failed. Please try again.';
+    }
     if (error != null) {
-      _showError(error);
+      if (mounted) _showError(error);
       return;
     }
     if (mounted) Navigator.pop(context, true);

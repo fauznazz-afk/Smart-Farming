@@ -116,3 +116,31 @@ class EnvironmentAlertsSection extends StatelessWidget {
     );
   }
 }
+
+/// Toggle plus per-sensor min/max limits for the fish tank alerts.
+class FishAlertsSection extends StatelessWidget {
+  const FishAlertsSection({super.key, required this.settings});
+
+  final SettingsController settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Enable fish tank alerts'),
+          subtitle: const Text(
+            'Monitors pH, water temperature and turbidity. Only fresh readings '
+            'are judged, so an alert always describes the current state.',
+          ),
+          value: settings.fishAlerts,
+          onChanged: (value) =>
+              settings.update(() => settings.fishAlerts = value),
+        ),
+        for (final range in settings.fishRanges) EnvRangeField(setting: range),
+      ],
+    );
+  }
+}

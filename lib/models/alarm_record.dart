@@ -14,6 +14,9 @@ enum AlarmType {
   environmentTemp,
   environmentHumidity,
   environmentTds,
+  fishPh,
+  fishTemp,
+  fishTurbidity,
   deviceOffline;
 
   String get label => switch (this) {
@@ -22,6 +25,9 @@ enum AlarmType {
     environmentTemp => 'Environment Temp',
     environmentHumidity => 'Environment Humidity',
     environmentTds => 'Environment TDS',
+    fishPh => 'Fish pH',
+    fishTemp => 'Fish Water Temp',
+    fishTurbidity => 'Fish Turbidity',
     deviceOffline => 'Device Offline',
   };
 }

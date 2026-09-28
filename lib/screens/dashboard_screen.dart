@@ -16,7 +16,6 @@ import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
-import '../services/weather_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
@@ -26,6 +25,7 @@ import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
 import 'dashboard/utils/bound.dart';
+import 'dashboard/utils/chart_gesture_lock.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/energy_helpers.dart';
 import 'dashboard/utils/history_range.dart';
@@ -33,13 +33,14 @@ import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/date_strip.dart';
+import 'dashboard/widgets/power_sub_tabs.dart';
 import 'dashboard/widgets/system_status_strip.dart';
-import 'dashboard/widgets/environment_grid.dart';
+import 'dashboard/widgets/metric_grid.dart';
+import 'dashboard/widgets/metric_specs.dart';
 import 'dashboard/widgets/greeting_header.dart';
 import 'dashboard/widgets/live_power_card.dart';
 import 'dashboard/widgets/nav_bar.dart';
 import 'dashboard/widgets/telemetry_card.dart';
-import 'dashboard/widgets/weather_card.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -69,10 +70,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _downScrollDistance = 0;
   int _selectedIndex = 0;
 
+  /// Which of PV / AC / Battery the Power tab is showing.
+  ///
+  /// A notifier rather than plain state so that selecting a sub-view rebuilds only
+  /// the Power page. See `_powerPage` for the measurement that motivated it.
+  final ValueNotifier<int> _powerSubNotifier = ValueNotifier(0);
+
   // ── Telemetry ────────────────────────────────────────────────────────────────
   DeviceTelemetry? _battery;
   DeviceTelemetry? _pzem;
   DeviceTelemetry? _sensor;
+  DeviceTelemetry? _fish;
   bool _loading = true;
   bool _telemetryRequestInFlight = false;
   String? _error;
@@ -94,6 +102,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   final Map<String, ChartBounds> _chartBounds = {};
   bool _chartLoading = true;
   final _historyRequestInFlight = <String>{};
+
+  /// Bumped when a history request starts or finishes, so the chart header can
+  /// show that it is updating. The set itself changing is not observable.
+  final ValueNotifier<int> _historyBusyNotifier = ValueNotifier(0);
   final _historyRequestDate = <String, String>{};
   final _historyPendingRefresh = <String>{};
   final _historyLoaded = <String>{};
@@ -122,11 +134,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _refreshSeconds = 10;
   Timer? _refreshTimer;
   final _connectionHealth = ConnectionHealthService();
-  final ValueNotifier<bool> _connectionStatusVisible = ValueNotifier(false);
-  Timer? _connectionStatusTimer;
   late final Listenable _connectionChromeListenable = Listenable.merge([
     _liveRevision,
-    _connectionStatusVisible,
     _connectionHealth,
   ]);
 
@@ -149,26 +158,33 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// readers.
   AlarmThresholds _thresholds = AlarmThresholds.defaults;
 
+  /// The rule list, rebuilt only when the thresholds change.
+  ///
+  /// This was a getter, so every read rebuilt the whole list from scratch —
+  /// roughly fifteen `AlarmRule` objects plus nine short-lived helper instances.
+  /// `_evaluateEnergyAlerts` reads it on every telemetry frame the socket
+  /// delivers, and does so *before* its own `if (!changed) return` bail-out, so
+  /// the common case of nothing having changed still paid for a fresh rule list.
+  /// The thresholds only move in `_setThresholds`, which is the only writer.
+  late List<AlarmRule> _alarmRules = buildAlarmRules(_thresholds);
 
-  List<AlarmRule> get _alarmRules => buildAlarmRules(_thresholds);
+  void _setThresholds(AlarmThresholds value) {
+    if (identical(value, _thresholds)) return;
+    _thresholds = value;
+    _alarmRules = buildAlarmRules(value);
+  }
 
   int get _staleTelemetryMinutes => _thresholds.staleMinutes;
 
   // ── Misc ─────────────────────────────────────────────────────────────────────
   String _displayName = '';
   String _cctvUrl = defaultAllowedCctvUrl;
+  String _cctvUrlFish = defaultAllowedFishCctvUrl;
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
   final ValueNotifier<int> _liveRevision = ValueNotifier(0);
   final ValueNotifier<int> _energyRevision = ValueNotifier(0);
   final ValueNotifier<int> _chartRevision = ValueNotifier(0);
   final ValueNotifier<bool> _chartPointerActiveNotifier = ValueNotifier(false);
-
-  // ── Weather ──────────────────────────────────────────────────────────────────
-  final _weatherService = WeatherService();
-  WeatherData? _currentWeather;
-  WeatherForecast? _weatherForecast;
-  bool _weatherLoading = false;
-  String? _weatherError;
 
   bool get _performanceMode => widget.themeController.performanceMode;
 
@@ -185,11 +201,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     _fetchEnergyHistory();
     _loadPreferences();
     _loadDisplayName();
-    _initializeWeatherService();
     // The screen is already on screen at this point, so the background check
     // has to stand down before its next tick rather than at the first resume
     // callback, which may not arrive for a while.
     unawaited(AlarmBridge.instance.setForeground(true));
+    // If the app was launched by tapping an alarm notification, navigate to the
+    // alarm history screen so the user can see what fired.
+    unawaited(_checkLaunchAlarm());
+  }
+
+  Future<void> _checkLaunchAlarm() async {
+    final alarmId = await AlarmBridge.instance.launchAlarmId();
+    if (alarmId != null && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()),
+      );
+    }
   }
 
   @override
@@ -198,22 +225,21 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _selectedPage.dispose();
+    _powerSubNotifier.dispose();
+    _historyBusyNotifier.dispose();
     _navCollapsed.dispose();
     _appBarBlurProgress.dispose();
     _chartPointerActiveNotifier.dispose();
     _liveRevision.dispose();
     _energyRevision.dispose();
     _chartRevision.dispose();
-    _connectionStatusVisible.dispose();
     _alertMessages.dispose();
     _cctvKeepAlive.dispose();
     _refreshTimer?.cancel();
-    _connectionStatusTimer?.cancel();
     // Nothing is evaluating alarms once this screen is gone, so the background
     // check has to be allowed to run again.
     unawaited(AlarmBridge.instance.setForeground(false));
     unawaited(_realtimeService.stop());
-    _weatherService.dispose();
     super.dispose();
   }
 
@@ -284,17 +310,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!mounted) return;
     final cctvUrl = await loadCctvUrl();
     if (!mounted) return;
+    final fishCctvUrl = await loadFishCctvUrl();
+    if (!mounted) return;
     final thresholds = readAlarmThresholds(preferences);
     setState(() {
       _autoRefresh = preferences.getBool(SettingsKeys.autoRefresh) ?? true;
       _refreshSeconds =
           preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
-      _thresholds = thresholds;
+      _setThresholds(thresholds);
       _dailyProductionTargetKwh = _readDouble(
         preferences,
         SettingsKeys.dailyProductionTargetKwh,
       );
       _cctvUrl = cctvUrl;
+      _cctvUrlFish = fishCctvUrl;
     });
     _restartRefreshTimer();
     // Must precede the first evaluation, otherwise every alarm looks new to a
@@ -347,6 +376,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         widget.api.fetchBatteryData(),
         widget.api.fetchPzemData(),
         widget.api.fetchSensorData(),
+        widget.api.fetchFishData(),
       ]);
       if (!mounted) return;
       final now = DateTime.now();
@@ -356,13 +386,34 @@ class _DashboardScreenState extends State<DashboardScreen>
           _error != null ||
           !sameTelemetry(_battery, results[0]) ||
           !sameTelemetry(_pzem, results[1]) ||
-          !sameTelemetry(_sensor, results[2]);
+          !sameTelemetry(_sensor, results[2]) ||
+          !sameTelemetry(_fish, results[3]);
       final timestampChanged =
           _lastSuccessfulTelemetryAt == null ||
           now.difference(_lastSuccessfulTelemetryAt!).inMinutes >= 1;
       _battery = results[0];
       _pzem = results[1];
       _sensor = results[2];
+      _fish = results[3];
+      // One merged cache write for the whole tick, and not awaited.
+      //
+      // This used to happen per device inside each fetch, so one poll meant four
+      // concurrent read-modify-write cycles against the same key: each read the
+      // same snapshot and each wrote only its own device, so three of the four
+      // buckets were discarded by whichever write landed last. Measured on the
+      // test device at 32-77 ms per write, all of it on the poll's critical path
+      // because `Future.wait` could not complete until the slowest write finished.
+      //
+      // Fire-and-forget because it is a best-effort offline fallback: the values
+      // are already in memory and on screen, and nothing should wait on storage.
+      unawaited(
+        widget.api.cacheTelemetrySnapshot({
+          ThingsBoardApi.deviceBattery: results[0],
+          ThingsBoardApi.devicePzem: results[1],
+          ThingsBoardApi.deviceSensor: results[2],
+          ThingsBoardApi.deviceFish: results[3],
+        }),
+      );
       _lastSuccessfulTelemetryAt = now;
       _loading = false;
       _error = null;
@@ -438,6 +489,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       latestValues: split.sensor,
       lastUpdate: cached.lastUpdate,
     );
+    _fish = DeviceTelemetry(
+      latestValues: split.fish,
+      lastUpdate: cached.lastUpdate,
+    );
   }
 
   void _handleRealtimeConnection(bool connected) {
@@ -459,6 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ThingsBoardApi.deviceBattery => _battery,
       ThingsBoardApi.devicePzem => _pzem,
       ThingsBoardApi.deviceSensor => _sensor,
+      ThingsBoardApi.deviceFish => _fish,
       _ => null,
     };
     if (slot == null && !_isKnownDevice(deviceId)) return;
@@ -484,9 +540,25 @@ class _DashboardScreenState extends State<DashboardScreen>
         _pzem = updated;
       case ThingsBoardApi.deviceSensor:
         _sensor = updated;
+      case ThingsBoardApi.deviceFish:
+        _fish = updated;
     }
 
     final wasLoading = _loading;
+    // Gate the rebuild on the values actually differing, exactly as the poll path
+    // does. This used to pass `changed: true` unconditionally, which meant every
+    // telemetry frame the socket delivered announced itself as a change: the PZEM
+    // and the BMS publish around 1 Hz each, so the revision counter went up two or
+    // three times a second, roughly thirty times more often than the ten-second
+    // poll it was designed around, and every Bound in the tree rebuilt with it.
+    //
+    // The socket can also deliver a frame whose values are identical to what is
+    // already on screen, which is the common case for a device that reports on a
+    // slow cycle. Those frames used to be indistinguishable from real changes.
+    final changed =
+        wasLoading ||
+        _error != null ||
+        !sameTelemetry(slot, updated);
     _connectionHealth.markSuccess(
       ConnectionTransport.webSocket,
       latency: DateTime.now().difference(values.values.first.timestamp),
@@ -496,14 +568,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     _lastSuccessfulTelemetryAt = DateTime.now();
     _error = null;
     _loading = false;
-    _notifyLive(wasLoading: wasLoading, changed: true);
+    _notifyLive(wasLoading: wasLoading, changed: changed);
     _evaluateEnergyAlerts();
   }
 
   static bool _isKnownDevice(String deviceId) =>
       deviceId == ThingsBoardApi.deviceBattery ||
       deviceId == ThingsBoardApi.devicePzem ||
-      deviceId == ThingsBoardApi.deviceSensor;
+      deviceId == ThingsBoardApi.deviceSensor ||
+      deviceId == ThingsBoardApi.deviceFish;
 
   Future<void> _refreshCurrentPage() async {
     await _fetchAll();
@@ -521,8 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       rules: _alarmRules,
       readings: _alarmReadings,
       now: now,
-    );
-    final alerts = {for (final signal in signals) signal.id: signal.message};
+    );    final alerts = {for (final signal in signals) signal.id: signal.message};
 
     final newSignals = newlyActiveSignals(
       signals: signals,
@@ -559,7 +631,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     // is the right shape for a condition that is still true.
   }
 
-  /// The three devices the rules read, in the shape the evaluator expects.
+  /// The devices the rules read, in the shape the evaluator expects.
+  ///
+  /// A device missing from this list cannot raise anything at all: the evaluator
+  /// skips any rule whose device has no reading, because a device that was never
+  /// read is not the same as a device that stopped reporting. The fish device is
+  /// here so that `stale_fish` and `offline_fish` can actually fire.
   List<AlarmReading> get _alarmReadings => [
     if (_battery != null)
       AlarmReading(
@@ -578,6 +655,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         device: AlarmDevice.sensor,
         values: _sensor!.latestValues,
         lastUpdate: _sensor!.lastUpdate,
+      ),
+    if (_fish != null)
+      AlarmReading(
+        device: AlarmDevice.fish,
+        values: _fish!.latestValues,
+        lastUpdate: _fish!.lastUpdate,
       ),
   ];
 
@@ -711,6 +794,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       rangeStart: rangeStart,
       rangeEnd: _selectedRangeEnd,
     );
+    // Always refetch, even when this view's data is already in hand.
+    //
+    // This used to return early on a cache hit, on the reasoning that a switch
+    // should be instant. It is, but the numbers it showed were whatever was there
+    // when that view was last opened, which for "Last 24 hours" on a live system
+    // is not what anyone means by looking at it again.
+    //
+    // Refreshing unconditionally does not make the switch feel slower, because
+    // nothing waits: `_chartLoading` is only raised when this prefix has no data at
+    // all, so the already-loaded chart stays on screen and the fresh series
+    // replaces it when the request lands. Stale-while-revalidate, not a spinner.
     if (_historyRequestInFlight.contains(prefix)) {
       if (_historyRequestDate[prefix] != selectionKey) {
         _historyPendingRefresh.add(prefix);
@@ -719,6 +813,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     _historyRequestInFlight.add(prefix);
     _historyRequestDate[prefix] = selectionKey;
+    _historyBusyNotifier.value++;
     if (mounted && !_historyLoaded.contains(prefix)) {
       _chartLoading = true;
       _notifyCharts();
@@ -755,6 +850,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     _historyRequestInFlight.remove(prefix);
     _historyRequestDate.remove(prefix);
+    _historyBusyNotifier.value++;
     if (_historyPendingRefresh.remove(prefix) &&
         _prefixForPage(_selectedIndex) == prefix) {
       unawaited(_fetchHistoryFor(prefix));
@@ -781,12 +877,63 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Navigation ───────────────────────────────────────────────────────────────
-  String? _prefixForPage(int index) => switch (index) {
-    1 => 'pv',
-    2 => 'ac',
-    3 => 'battery',
-    _ => null,
-  };
+  // PV, AC and Battery share one tab, selected by a segmented control inside the
+  // page rather than by three tabs of their own.
+  //
+  // The reason is arithmetic, and it is not close. Material 2 documents 80 dp as
+  // the minimum width of a bottom-navigation destination in portrait, and this
+  // phone is 380 dp wide, so a six-tab bar needed 480 dp — a hundred dp short of
+  // fitting, and "Hydroponics" measured 62 dp in a 60 dp slot at the smallest
+  // type size Material has. Material 3 states the limit and the symptom together:
+  // "the elements may collide and there likely won't be enough space for
+  // translated text."
+  //
+  // Four tabs need 320 dp, which fits with 60 dp to spare, and leaves one slot
+  // free for a seventh destination later. The grouping is also the honest one:
+  // PV, AC and Battery are three views of a single electrical system, all of it
+  // from the PZEM and BMS devices, whereas Hydroponics and Fish are separate
+  // subsystems that fail differently. Material asks for destinations "of equal
+  // importance", and six peers was never the right description of what this app
+  // has — it is a cluster of three plus an overview plus two singletons.
+  //
+  // Hydroponics and Fish deliberately have no prefix: they have no history chart.
+  // TelemetryChartCard plots voltage/current/power under the names
+  // `${prefix}_voltage`, `${prefix}_current` and `${prefix}_power`, so pH and
+  // turbidity cannot be charted without generalising that widget. A null prefix
+  // also means no history request is fired for those pages.
+  //
+  // Only the Power page has a prefix, and which one depends on the sub-tab the
+  // user has selected inside it, so this cannot be a plain lookup any more. Four
+  // callers depend on it agreeing with what is actually on screen: the history
+  // fetch, pull-to-refresh, the date-change reload and the pending-refresh check.
+  String? _prefixForPage(int index) =>
+      index == 1 ? kPowerSubTabs[_powerSubNotifier.value].prefix : null;
+
+  /// The status strip's battery cell is a shortcut to the battery readings, which
+  /// are now a view inside the Power tab rather than a tab. Both halves have to
+  /// happen, and the order matters: selecting the sub-view first means the page
+  /// builds with the right content already in place instead of flashing PV.
+  void _openBatteryFromStrip() {
+    final batteryIndex = kPowerSubTabs.indexWhere(
+      (tab) => tab.prefix == 'battery',
+    );
+    if (batteryIndex != _powerSubNotifier.value) {
+      _powerSubNotifier.value = batteryIndex;
+    }
+    if (_selectedIndex != 1) {
+      _pageController.animateToPage(
+        1,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+    // Fetched by prefix rather than through _reloadHistoryForCurrentPage, which
+    // reads _selectedIndex — and that is only updated by onPageChanged once the
+    // animation above has finished. Relying on it here would fetch whatever page
+    // the user was on, not the one they were sent to.
+    _historyLoaded.remove('battery');
+    unawaited(_fetchHistoryFor('battery'));
+  }
 
   void _selectPage(int index) {
     if (_selectedPage.value == index) return;
@@ -886,6 +1033,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     // user has signed out.
     unawaited(AlarmNotificationService.disable());
     await widget.api.logout();
+    // Clear the CCTV URL so the next user on this device does not inherit
+    // the previous user's stream URL.
+    await clearCctvUrl();
     if (!mounted) return;
     _goToLogin();
   }
@@ -902,12 +1052,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     if (changed == true) {
       _loadPreferences();
-      // The dashboard holds one long-lived weather service, so it has to be
-      // told to pick up an API key or city that was just saved in Settings.
-      await _weatherService.reloadStoredConfig();
-      if (_weatherService.hasApiKey) {
-        await _fetchWeather();
-      }
     }
   }
 
@@ -923,38 +1067,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       context,
       MaterialPageRoute(builder: (_) => EnergyReportScreen(api: widget.api)),
     );
-  }
-
-  // ── Weather ──────────────────────────────────────────────────────────────────
-  Future<void> _initializeWeatherService() async {
-    await _weatherService.initialize();
-    if (_weatherService.hasApiKey) {
-      await _fetchWeather();
-    }
-  }
-
-  Future<void> _fetchWeather() async {
-    if (!_weatherService.hasApiKey) return;
-    setState(() {
-      _weatherLoading = true;
-      _weatherError = null;
-    });
-    try {
-      final weather = await _weatherService.getCurrentWeather();
-      final forecast = await _weatherService.getForecast();
-      if (!mounted) return;
-      setState(() {
-        _currentWeather = weather;
-        _weatherForecast = forecast;
-        _weatherLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _weatherLoading = false;
-        _weatherError = e.toString();
-      });
-    }
   }
 
   // ── Build ────────────────────────────────────────────────────────────────────
@@ -1045,17 +1157,19 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_error != null && _battery == null) {
       return TelemetryErrorView(message: _error!, onRetry: _fetchAll);
     }
-    return ValueListenableBuilder<bool>(
-      valueListenable: _chartPointerActiveNotifier,
-      builder: (context, chartPointerActive, _) => PageView.builder(
-        controller: _pageController,
-        physics: chartPointerActive
-            ? const NeverScrollableScrollPhysics()
-            : const PageScrollPhysics(),
-        itemCount: 5,
-        onPageChanged: _onPageChanged,
-        itemBuilder: (context, index) => _buildPage(index, isDark),
+    // No ValueListenableBuilder here any more. The physics reads the pointer flag
+    // at gesture time, so touching a chart no longer rebuilds the PageView — and
+    // because the chart fills most of the PV, AC and Battery pages, that rebuild
+    // used to fire twice for nearly every scroll on those pages.
+    return PageView.builder(
+      controller: _pageController,
+      physics: ChartGestureLockPhysics(
+        basePhysics: const PageScrollPhysics(),
+        isLocked: () => _chartPointerActiveNotifier.value,
       ),
+      itemCount: 4,
+      onPageChanged: _onPageChanged,
+      itemBuilder: (context, index) => _buildPage(index, isDark),
     );
   }
 
@@ -1064,6 +1178,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     _selectedPage.value = index;
     final prefix = _prefixForPage(index);
     if (prefix != null) unawaited(_fetchHistoryFor(prefix));
+    // Entering the Power tab warms all three of its sub-views.
+    //
+    // The symptom this fixes: switching between PV, AC and Battery left the
+    // incoming card showing the previous fetch's numbers for as long as the
+    // request took, which on a slow ThingsBoard is a second or two. It read as the
+    // card being stuck rather than as a refresh, because nothing on screen said
+    // anything was happening. There are only three views, so fetching all of them
+    // on entry costs three requests once and makes every later switch land on data
+    // that is already there. Each switch still refreshes in the background, so this
+    // changes when the data arrives, not whether it is current.
+    if (index == 1) _warmPowerSubViews();
+  }
+
+  void _warmPowerSubViews() {
+    for (final tab in kPowerSubTabs) {
+      unawaited(_fetchHistoryFor(tab.prefix));
+    }
   }
 
   Widget _buildPage(int index, bool isDark) {
@@ -1074,10 +1205,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     //
     // The alarm banner is Overview-only. A threshold breach is a fact about the
     // greenhouse, not about the page being looked at, so repeating it above the
-    // PV, AC, Battery and CCTV pages pushed four lines the user had already read
-    // above the content they opened a tab to see. It still reaches them where it
-    // matters: a notification, and the alarm count in the status strip, which is
-    // present on every page.
+    // PV, AC, Battery, Hydroponics and Fish pages pushed lines the user had
+    // already read above the content they opened a tab to see. It still reaches
+    // them where it matters: a notification, and the alarm count in the status
+    // strip, which is present on every page.
     //
     // Connection state is different and stays everywhere, because a page of
     // numbers that cannot be trusted needs to say so wherever it is displayed.
@@ -1113,17 +1244,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   List<Widget Function()> _pageContentFor(int index, bool isDark) {
+    // The `_ =>` arm renders Overview, so a page index added to the PageView
+    // without an arm here shows the Overview page twice with no error anywhere.
     return switch (index) {
-      1 => _pvPage(isDark),
-      2 => _acPage(isDark),
-      3 => _batteryPage(isDark),
-      4 => [
-        () => Bound(
-          listenable: _cctvKeepAlive,
-          token: _cctvUrl,
-          builder: () => CctvScreen(streamUrl: _cctvUrl),
-        ),
-      ],
+      1 => _powerPage(isDark),
+      2 => _hydroponicsPage(isDark),
+      3 => _fishPage(isDark),
       _ => _overviewPage(isDark),
     };
   }
@@ -1134,6 +1260,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     _performanceMode,
     _selectedDate,
     _displayName,
+    // The thresholds belong here. Bound only rebuilds when the listenable fires or
+    // this token changes, and _loadPreferences changes the thresholds with a plain
+    // setState — so without this, saving a new limit left the environment grid
+    // captioning its old range and the status strip judging against the old
+    // low-SOC threshold, until the next telemetry change happened to rescue it.
+    _thresholds,
+    // Which power sub-view is selected. PV, AC and Battery are three closure
+    // lists spliced into the same Column, so their Bound widgets sit at the same
+    // tree position and reuse each other's State. Bound keeps its cached child
+    // when the token is unchanged, so without this the symptom was: tapping AC
+    // then PV left the AC card and the AC chart on screen under the "PV Status"
+    // header until the next revision bump — up to ten seconds for the telemetry
+    // card, because that is the poll interval. The header is a plain widget and
+    // updated immediately, which made the stale card below it read as the wrong
+    // page rather than as a slow refresh.
+    _powerSubNotifier.value,
   );
 
   Widget _bindRevision(
@@ -1244,22 +1386,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, isDark, () => _heroCard(isDark)),
       () => const SizedBox(height: 8),
-      () => WeatherCard(
-        weather: _currentWeather,
-        forecast: _weatherForecast,
-        isDark: isDark,
-        performanceMode: _performanceMode,
-        onRefresh: _fetchWeather,
-        onSettings: _openSettings,
-        isLoading: _weatherLoading,
-        error: _weatherError,
-      ),
-      () => const SizedBox(height: 8),
       () => _bindRevision(_energyRevision, isDark, () => _energySummaryCard(isDark)),
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, isDark, () => _dualCards(isDark)),
-      () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, isDark, () => _environmentGrid(isDark)),
+      // The environment grid used to sit here. It moved to the Hydroponics page,
+      // where it belongs with the camera looking at the same greenhouse, and
+      // Overview is now only what the power system is doing. The readings did not
+      // change and the limits did not change, so the alarms are unaffected.
     ];
   }
 
@@ -1291,13 +1424,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       // 0.00 A, which the BMS does report while idle, and it drifts from the
       // reported figure whenever the pack is not at its nominal voltage.
       //
-      // Passed through raw, sign and all. This BMS reports negative power while
-      // charging, which the Battery page shows as "Power -12.92 W". Negating it
-      // here to make the hero read "Charging 12 W" was tried, and it makes two
-      // screens disagree about the same measurement: the reader has to work out
-      // that a minus became a plus. The label carries the direction instead, and
-      // `energy_forecast_service.dart` documents the same vendor disagreement
-      // behind a warning to use `.abs()` where only the magnitude matters.
+      // Passed through raw, sign and all, so the figure matches the Battery page
+      // one tab away. Negating it here to make the hero read "Charging 12 W" was
+      // tried and reverted: two screens reporting different numbers for one
+      // measurement is worse than an odd-looking minus, because the reader has to
+      // work out that a minus became a plus.
+      //
+      // Which sign means which direction is decided by the observed state-of-charge
+      // trend, not by this comment, and it has been opposite twice on two BMSes.
+      // `batteryChargeState` owns it and is pinned by a test; see
+      // `lib/utils/battery_sign.dart`. `energy_forecast_service.dart` documents the
+      // same vendor disagreement behind a warning to use `.abs()` where only the
+      // magnitude matters.
       batteryPower: _battery?.latestValues['power'] ?? 0.0,
       soc: _battery?.latestValues['soc'] ?? 0.0,
       pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
@@ -1342,6 +1480,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         soc: _battery?.latestValues['soc'] ?? 0.0,
         voltage: _battery?.latestValues['voltage'] ?? 0.0,
         current: _battery?.latestValues['current'] ?? 0.0,
+        // The same key the hero card reads, so the two cannot disagree about
+        // which way the pack is moving.
+        power: _battery?.latestValues['power'] ?? 0.0,
       ),
       ac: (
         voltage: _pzem?.latestValues['voltage_ac'] ?? 0.0,
@@ -1352,12 +1493,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       isDark: isDark,
       seedColor: _seedColor,
       performanceMode: _performanceMode,
-      onNavigate: _selectPage,
+      onOpenBattery: _openBatteryFromStrip,
     );
   }
 
   Widget _environmentGrid(bool isDark) {
-    return EnvironmentGrid(
+    return MetricGrid(
+      title: 'Environment',
+      specs: kEnvironmentSpecs,
       values: _sensor?.latestValues,
       isDark: isDark,
       seedColor: _seedColor,
@@ -1365,12 +1508,110 @@ class _DashboardScreenState extends State<DashboardScreen>
       // The grid grades each reading against the same thresholds the alarms use,
       // so a number on screen always has something to be read against.
       thresholds: _thresholds,
+      limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
       staleMinutes: _staleTelemetryMinutes,
       lastUpdate: _sensor?.lastUpdate,
+      // The alerts toggle governs the grid's warning colours too, not just the
+      // background rules — a limit the user switched off must stop colouring the
+      // page, or Settings and the dashboard contradict each other.
+      showGridColors: _thresholds.environmentAlerts,
+    );
+  }
+
+  Widget _fishGrid(bool isDark) {
+    return MetricGrid(
+      title: 'Water Quality',
+      specs: kFishSpecs,
+      values: _fish?.latestValues,
+      isDark: isDark,
+      seedColor: _seedColor,
+      performanceMode: _performanceMode,
+      // Fish thresholds now exist (pH, water temperature, turbidity), so the
+      // grid grades these readings against them exactly as the environment grid
+      // does — the background alarm and the page the reading lives on must not
+      // disagree about what the limit is.
+      thresholds: _thresholds,
+      limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
+      showGridColors: _thresholds.fishAlerts,
+      // The readings still get the stale tag, so a dead sensor cannot present a
+      // page of plausible numbers as current.
+      staleMinutes: _staleTelemetryMinutes,
+      lastUpdate: _fish?.lastUpdate,
+      // Two columns, so four readings land as 2 + 2. Three would leave the fourth
+      // stranded beside a gap.
+      columns: 2,
     );
   }
 
   // ── Detail pages ─────────────────────────────────────────────────────────────
+  // ── Power page ───────────────────────────────────────────────────────────────
+  /// PV, AC and Battery behind one tab, chosen with a segmented control.
+  ///
+  /// The selector is a `ValueListenableBuilder` over [_powerSubNotifier] rather
+  /// than screen `setState`, and that is the whole reason the switch feels
+  /// immediate. Measured on the device: a screen-level `setState` here cost
+  /// 14-20 ms to the next frame against an 8.33 ms budget at 120 Hz, because
+  /// rebuilding the screen repaints `AmbientBackground` and the blurred app bar
+  /// and re-runs every cached page's closure list — none of which have anything to
+  /// do with which sub-view is selected. Same pattern the nav bar already uses for
+  /// [_selectedPage].
+  List<Widget Function()> _powerPage(bool isDark) {
+    return [
+      () => ValueListenableBuilder<int>(
+        valueListenable: _powerSubNotifier,
+        builder: (context, sub, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _powerSelector(isDark, sub),
+            const SizedBox(height: 12),
+            // The page builders hand back lazily-invoked closures so the outer
+            // ListView only realises visible items. Inside this one Column they
+            // are invoked instead, which costs nothing measurable: the expensive
+            // child is the chart, and that is a `Bound` whose child is cached and
+            // only rebuilt when the chart revision actually bumps.
+            ...switch (sub) {
+              0 => _pvPage(isDark),
+              1 => _acPage(isDark),
+              _ => _batteryPage(isDark),
+            }.map((make) => make()),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _powerSelector(bool isDark, int selected) {
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<int>(
+        segments: [
+          for (final tab in kPowerSubTabs)
+            ButtonSegment<int>(
+              value: kPowerSubTabs.indexOf(tab),
+              icon: Icon(tab.icon, size: 16),
+              label: Text(tab.label),
+            ),
+        ],
+        selected: {selected},
+        showSelectedIcon: false,
+        onSelectionChanged: (selection) => _selectPowerSub(selection.first),
+      ),
+    );
+  }
+
+  void _selectPowerSub(int index) {
+    if (index == _powerSubNotifier.value) return;
+    _powerSubNotifier.value = index;
+    // No cache invalidation. An earlier version removed the incoming prefix from
+    // `_historyLoaded` to force a refetch, which had the opposite of the intended
+    // effect: every tap re-requested the history and blanked the chart while it was
+    // in flight. `_fetchHistoryFor` returns early when it already holds this
+    // selection's data, and a date change still clears everything.
+    final prefix = _prefixForPage(_selectedIndex);
+    if (prefix == null) return;
+    unawaited(_fetchHistoryFor(prefix));
+  }
+
   List<Widget Function()> _pvPage(bool isDark) => [
     () => GlassPageHeader(
       title: 'PV Status',
@@ -1398,7 +1639,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('PV', isDark),
+    () => _chartSectionHeader('PV', 'pv', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -1436,7 +1677,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('AC', isDark),
+    () => _chartSectionHeader('AC', 'ac', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -1479,12 +1720,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           // The full capacity was already being fetched and displayed nowhere.
           // A remaining charge with no reference to the original size is just a
           // number, so the pack size goes next to it.
-          MetricDef('full_capacity_ah', 'Full Capacity', 'Ah', Icons.battery_full),
+          MetricDef('full_capacity_ah', 'Full Capacity', 'Ah', Icons.battery_full, decimals: 0),
         ],
       ),
     ),
     () => const SizedBox(height: 16),
-    () => _chartSectionHeader('Battery', isDark),
+    () => _chartSectionHeader('Battery', 'battery', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
@@ -1492,6 +1733,66 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => _chartCard('battery', isDark),
     ),
   ];
+
+  // ── Hydroponics page ──────────────────────────────────────────────────────────
+  /// The greenhouse sensors plus the camera that was previously a tab of its own.
+  ///
+  /// No chart: `_prefixForPage` returns null for this page, so no history request
+  /// is made and the chart section is absent entirely rather than empty. Adding
+  /// one later means generalising TelemetryChartCard off its fixed
+  /// voltage/current/power series, not just adding a case here.
+  List<Widget Function()> _hydroponicsPage(bool isDark) {
+    return [
+      () => GlassPageHeader(
+        title: 'Hydroponics',
+        icon: Icons.eco,
+        accent: strongMetricColor(
+          seedColor: _seedColor,
+          index: 0,
+          isDark: isDark,
+        ),
+        isDark: isDark,
+      ),
+      () => const SizedBox(height: 10),
+      () => _bindRevision(_liveRevision, isDark, () => _environmentGrid(isDark)),
+      () => const SizedBox(height: 8),
+      () => Bound(
+        listenable: _cctvKeepAlive,
+        token: _cctvUrl,
+        builder: () => CctvScreen(streamUrl: _cctvUrl),
+      ),
+    ];
+  }
+
+  // ── Fish page ─────────────────────────────────────────────────────────────────
+  /// Water quality for the fish tank, plus the second camera.
+  ///
+  /// The metric list mirrors ThingsBoardApi.fishKeys exactly. `turbidity_keruh`
+  /// and `turbidity_voltage` are intentionally not here: the first is a boolean
+  /// the numeric parser would flatten to a confident 0, the second is the
+  /// sensor's own supply rail.
+  List<Widget Function()> _fishPage(bool isDark) {
+    return [
+      () => GlassPageHeader(
+        title: 'Fish Tank',
+        icon: Icons.set_meal,
+        accent: strongMetricColor(
+          seedColor: _seedColor,
+          index: 0,
+          isDark: isDark,
+        ),
+        isDark: isDark,
+      ),
+      () => const SizedBox(height: 10),
+      () => _bindRevision(_liveRevision, isDark, () => _fishGrid(isDark)),
+      () => const SizedBox(height: 8),
+      () => Bound(
+        listenable: _cctvKeepAlive,
+        token: _cctvUrlFish,
+        builder: () => CctvScreen(streamUrl: _cctvUrlFish),
+      ),
+    ];
+  }
 
   Widget _telemetryCard(
     DeviceTelemetry? data,
@@ -1508,16 +1809,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _chartSectionHeader(String title, bool isDark) {
-    return ChartSectionHeader(
-      title: title,
-      isDark: isDark,
-      selectedDate: _selectedDate,
-      rangeStart: _selectedRangeStart,
-      rangeEnd: _selectedRangeEnd,
-      realtimeConnected: _realtimeConnected,
-      seedColor: _seedColor,
-      onPickRange: _pickDateFromCalendar,
+  Widget _chartSectionHeader(String title, String prefix, bool isDark) {
+    // A notifier rather than reading the set directly: adding or removing a prefix
+    // from `_historyRequestInFlight` mutates a plain Set, which rebuilds nothing.
+    return ValueListenableBuilder<int>(
+      valueListenable: _historyBusyNotifier,
+      builder: (context, _, _) => ChartSectionHeader(
+        title: title,
+        isDark: isDark,
+        selectedDate: _selectedDate,
+        rangeStart: _selectedRangeStart,
+        rangeEnd: _selectedRangeEnd,
+        realtimeConnected: _realtimeConnected,
+        seedColor: _seedColor,
+        onPickRange: _pickDateFromCalendar,
+        refreshing: _historyRequestInFlight.contains(prefix),
+      ),
     );
   }
 
