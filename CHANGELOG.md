@@ -1,5 +1,281 @@
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-28
+
+### Added
+
+- **Hydroponics and Fish pages, driven by a fourth ThingsBoard device.** The
+  standalone CCTV tab is gone; its greenhouse sensors and its camera now share a
+  **Hydroponics** tab, and a new **Fish** tab shows water quality from device
+  `1c433980-ba25-11f1-b893-9dd5b4b6bde1` next to a second camera
+  (`?src=cam2`, same allowlisted go2rtc host, separate setting and separate
+  secure-storage key). The Fish page reads pH, temperature, turbidity and water
+  level.
+
+  The fish device is a first-class `AlarmDevice`, so `buildAlarmRules` arms
+  `stale_fish` and `offline_fish` for it exactly as it does for the other three.
+  That gives background notifications for the new device — "no fresh data" at ten
+  minutes, "stopped reporting" at sixty — with no thresholds configured, which is
+  what a monitor-only device cannot do. Three scenarios were added to
+  `alarm_parity_vectors.json` and it was regenerated, so the Dart and Kotlin
+  evaluators are still pinned to identical wording for the new device's messages.
+
+  Threshold rules arrived in the same release. Settings gains a **Fish tank
+  alerts** section (pH 6–8.5, water temperature 20–30 °C, turbidity ≤ 100
+  NTU, each limit individually blank-able, and a blank limit is not
+  monitored), and `buildAlarmRules` arms matching fish rules in both the
+  Dart and Kotlin evaluators. The parity fixture grew to 23 scenarios
+  pinning the shared wording, and the Fish grid on the dashboard now grades
+  against the same `AlarmThresholds` the alarms use — so the page and the
+  notification can never disagree about what the limit is.
+
+- **The test suite grew from 223 to 273 — and two files that had never run now
+  do.** `widget_test_environment_grid.dart` and `widget_test_live_power_card.dart`
+  did not match the `*_test.dart` pattern `flutter test` collects, so every gate
+  reported green without executing either. Renamed to `metric_grid_test.dart`
+  and `live_power_card_test.dart`, they immediately failed five assertions: three
+  looked for value and unit joined as one string ("25.0 °C") when the card
+  renders them as two separate `Text` widgets, and two asserted the *previous*
+  BMS's sign convention — negative power labelled "Charging" — which the
+  replaced pack had already invalidated. All five now assert what the screen
+  actually shows. New files pin what this release could have silently broken:
+  `settings_save_regression_test` (the full write set and blank-means-null),
+  `alarm_path_thresholds_to_rules_test` (thresholds → rules → native JSON for
+  both alert groups), `battery_sign_convention_test` and
+  `energy_report_service_test`; `metric_grid_test` also carries the
+  `showGridColors` gate added in this release.
+
+### Fixed
+
+- **Touching a chart rebuilt the entire page view, twice per gesture.** The
+  `PageView`'s `physics` was being driven by a `ValueListenableBuilder` wrapped
+  around the whole `PageView`, so a chart's `onPointerDown` / `onPointerUp` — and
+  the chart covers most of the PV, AC and Battery pages — rebuilt every cached
+  page twice for nearly every scroll. The lock now lives in a
+  `ChartGestureLockPhysics` that reads the flag when a drag *begins*, so nothing
+  rebuilds. The base physics is delegated to rather than replaced, so page snapping
+  survives; swapping in `NeverScrollableScrollPhysics` would have silently dropped
+  it.
+
+- **The offline cache was a read-modify-write race.** Each device's fetch wrote
+  `cached_telemetry` on its own, so four devices fetching inside one `Future.wait`
+  read the same snapshot and the last writer discarded the other three buckets.
+  Measured at 32-77 ms per write on the test device, all of it on the poll's
+  critical path. `fetchLatestTelemetry` no longer caches; `_fetchAll` merges the
+  tick's readings and writes once, unawaited.
+
+- **The WebSocket announced every frame as a change.** `_handleRealtimeTelemetry`
+  passed `changed: true` unconditionally, so the revision counter rose two or three
+  times a second — about thirty times more often than the ten-second poll the
+  counter was designed around — and every bound widget in the tree rebuilt with
+  it. It now compares the merged values the same way the poll path does.
+
+- **`ConnectionHealthService` notified on every telemetry frame.** It had no value
+  equality, and `lastSuccessfulUpdate` plus `latency` both change on every frame
+  anyway. Equality now covers only the three fields the UI actually draws: status,
+  transport and reconnect count.
+
+- **`_alarmRules` was a getter**, so `buildAlarmRules` allocated roughly fifteen
+  `AlarmRule` objects plus nine helper instances on every telemetry frame, before
+  `_evaluateEnergyAlerts` could reject the update as unchanged. It is now rebuilt
+  only when the thresholds change.
+
+- **The bound-widget token omitted `_thresholds`**, so saving a new limit in
+  Settings left the environment grid captioning its old range and the status strip
+  judging against the old low-SOC threshold until the next telemetry change
+  happened to rescue it.
+
+- **A metric row announced itself to a screen reader as `Instance of 'MetricDef':
+  45 %`.** `Semantics.label` interpolated the object, which has no `toString()`. It
+  compiles and passes every lint.
+
+- **`turbidity_keruh` is deliberately not requested.** The fish device publishes
+  it as a boolean. `TelemetryPoint.fromJson` parses with
+  `double.tryParse(value.toString()) ?? 0.0`, so requesting it would not throw —
+  it would store `0.0`, and the card would show a confident `0` meaning the
+  opposite of the truth, indistinguishable from a real zero reading. The numeric
+  `turbidity_ntu` carries the same fact with a scale. `turbidity_voltage` (the
+  sensor's own 3.3 V rail) is also not requested.
+
+- **Nine source files had CRLF in the working tree where git stores LF**, which
+  would have shown as a whole-file rewrite on commit. Normalised.
+
+- **The battery sign convention is now the opposite of what it was, and it is
+  pinned by a test.** The hero card labelled a discharging pack "Charging" at
+  −22 W. The cause was not a rendering bug: the previous pack was measured on
+  27 September 2026 reporting `−12.92 W` while its state of charge was *rising*,
+  and the current pack reports `−28 W` while the state of charge is *falling*.
+  `AGENTS.md` had recorded the risk in advance — the convention was measured on
+  one device, and replacing the BMS would invert every battery display without a
+  single red indicator. The mapping now lives in `lib/utils/battery_sign.dart`
+  with the measurement in the reason string, so the next swap fails a test that
+  says what to re-measure instead of quietly inverting the app.
+
+- **The status strip was reading the battery sign a second time, differently.**
+  It derived "Charging" from `current < 0` while the hero card read `power`, so
+  the two contradicted each other on the same screen from the same pack, and the
+  bare comparison had no deadband to sit in when the BMS idled at 0.00 A. It also
+  picked a full-charging-battery icon from the SOC rather than from the direction,
+  so the icon drew a charging pack while it was discharging. Both now go through
+  `batteryChargeState` on the same key.
+
+- **Saving Settings failed silently whenever any limit field was blank.**
+  `save()` threw on `range.minKey!` for turbidity — its minimum is deliberately
+  unbounded, so `minKey` is null — the exception escaped `_save()` before the
+  SnackBar could be shown, and the screen neither popped nor reported anything:
+  from the user's side the Save button simply did nothing. The same crash also
+  swallowed the `true` that drives the dashboard to re-ship alarm rules, so an
+  edited threshold did not reach the background evaluator until the next app
+  restart. Both save and load loops are null-guarded, `_save()` catches and
+  surfaces unexpected errors instead of dying quietly, and
+  `settings_save_regression_test.dart` reproduces the symptom — reverting the
+  guard fails it four times over. Verified on the device: Save pops to the
+  dashboard and `run-as` shows the new fish and environment limits in
+  `shared_prefs`.
+
+- **Switching between the PV, AC and Battery sub-tabs showed the outgoing
+  page's numbers.** All three sit at the same tree position, so `Bound` reused
+  the cached child across the switch and kept rendering the old view until the
+  next ten-second revision bump happened to change the token. `_visualToken`
+  now includes `_powerSubNotifier.value`. Verified on the device: one second
+  after an AC → PV switch the screen showed DC metrics only.
+
+- **The CSV export button never showed "Preparing CSV…".** `sharingNotifier`
+  was written but never listened to, so the button could not rebuild; it now
+  listens, which also makes the double-tap guard visible instead of merely
+  effective.
+
+- **Tapping an alarm notification opened nothing.** The native side already
+  stashed `EXTRA_ALARM_ID` and `AlarmBridge.launchAlarmId()` could read it, but
+  no Dart code ever consumed it; `DashboardScreen` now drains it on init and
+  routes to the alarm history. Not yet reproduced on the device — a genuine
+  notification is needed to exercise it.
+
+- **The environment alerts toggle now removes the grid's warning colours too.**
+  It previously disabled only the background rules, so Settings could say
+  alerts were off while the Hydroponics grid kept painting out-of-range
+  readings red. `MetricGrid` now takes `showGridColors` from the same
+  threshold the alarms read, and the "out of range" tag follows it; the
+  "Stale data" tag deliberately does not, because a dead sensor is a fact
+  about the data, not a configured limit.
+
+- **The Fish dashboard page never showed the limits an alarm could be firing
+  on.** It passed no thresholds to `MetricGrid`, so a pH of 14 rendered as an
+  ordinary reading while the evaluator judged it against a limit the page never
+  printed. It now grades and captions against the same `AlarmThresholds` as the
+  alarms; a blank limit still shows no range.
+
+- **A fish device that never saved its limits still armed the defaults.**
+  `alarm_settings.dart` fell back to `defaultFish*` whenever a key was absent,
+  turning "never configured" into "configured at the defaults" — a device the
+  user had never set up would start alarming at numbers nobody chose. Absent
+  now means null, matching the environment group, so the first Save is what
+  arms the defaults.
+
+### Changed
+
+- **The Power tab is selected by a `ValueNotifier`, not screen `setState`.** A
+  screen-level `setState` for the PV/AC/Battery selector cost 14-20 ms to the next
+  frame against an 8.33 ms budget at 120 Hz, because it repainted the ambient
+  background, the blurred app bar and every cached page to change one selector.
+  Median is now 6 ms, measured on the device.
+
+- **Entering the Power tab prefetches all three sub-views.** Switching used to
+  leave the incoming card showing the previous fetch's numbers for as long as the
+  request took, which read as the card being stuck. Three requests once on entry
+  means every later switch lands on data that is already there; each switch still
+  refreshes in the background.
+
+- **The chart header says "Updating" while a request is in flight**, and nothing at
+  all otherwise. The silence was the problem: a deliberate stale-while-revalidate
+  is correct, but with no indication at all it is indistinguishable from a frozen
+  card.
+
+- **The OpenWeatherMap integration is gone, along with the location permission
+  it needed.** The Overview card is removed, along with `WeatherService`, its
+  fifteen tests, the `geolocator` dependency, the Settings section that asked for
+  an API key nothing consumed, and `ACCESS_FINE_LOCATION` /
+  `ACCESS_COARSE_LOCATION` from the manifest. Light (`lux`) already lives on the
+  Hydroponics page and PV output already lives in Energy analytics, so the card
+  showed numbers the user could see twice. What is lost is outdoor temperature,
+  wind, cloud and any forward-looking forecast; `power_dc` and `lux` are
+  measurements, not predictions. The one credential this app stored outside secure
+  storage was that API key.
+
+- **Bottom navigation is four tabs, not six.** PV, AC and Battery became one
+  "Power" tab with a segmented selector, because they are three views of a single
+  electrical system. Material 2 documents 80 dp as the minimum width of a
+  bottom-navigation destination in portrait and this phone is 380 dp, so six tabs
+  needed 480 dp; "Hydroponics" measured 62 dp in a 60 dp slot and was visibly
+  truncated. Material 3 names the limit and the symptom together: "the elements
+  may collide and there likely won't be enough space for translated text." Both
+  versions forbid the alternatives — "Don't shrink text to fit on a single line",
+  "Don't truncate text", "Don't reduce the type size to fit more characters into a
+  destination label" — and both independently forbid the per-tab colour that this
+  project had already reverted. Four tabs need 320 dp and leave a slot spare.
+
+- **`EnvironmentGrid` is now `MetricGrid`, and takes its readings as a
+  parameter.** It was one widget hardcoded to five greenhouse sensors, laid out by
+  hand as a 3 + 2 shape with `_envSpecs[0]` through `_envSpecs[4]` written out
+  individually, so a sixth sensor meant rewriting the layout and a forgotten index
+  renders nothing at all. The fish page uses it with two columns, and `decimals`
+  is per spec rather than a fixed 1 — which mattered immediately: pH is
+  logarithmic and wants two places, and an NTU turbidity sensor printing
+  "2395.5" implies precision it does not have.
+
+- **The two hardcoded switches mapping a telemetry key to its configured limit now
+  live on `AlarmThresholds` as `minFor` / `maxFor`.** They were duplicated inside
+  the grid, once to colour a card and once to caption it, and both ended in
+  `_ => (null, null)` — safe for the three keys that had a case, and silent for
+  anything added later.
+
+- **A `RenderFlex` overflowed by 12 pixels in Settings → Background checks.** Two
+  `OutlinedButton.icon`s sat in a `Row` with neither child flexible, and the
+  second one only appears when the app is *not* exempt from battery optimisation,
+  so it overflowed for exactly the user who had something to fix. Now a `Wrap`.
+
+- **"Battery optimisation" ran into its own value.** The label column was a fixed
+  150 px and that label is a couple of pixels wider, so the row read
+  "Battery optimisationActive". A fixed gap now sits between them, which also
+  stops the next label to exceed the column from colliding the same way.
+
+- **`ThingsBoardApi.deviceKeysById` is the canonical device list.** The REST
+  shortcuts, the WebSocket subscriptions, the offline cache split and the key-set
+  tests were four hand-written lists that had to be extended in step. A device
+  added to the constants but missed in `splitCachedTelemetry` polled live and
+  correctly, then came up empty from the offline fallback — no error, no log. The
+  tests now derive from the map, and a new test asserts every key of every device
+  reaches its own cache bucket, so a fifth device cannot silently drop out of
+  coverage either.
+
+- **The environment grid moved from Overview to the Hydroponics tab.** The
+  readings and their limits are unchanged, so no alarm behaviour changed; Overview
+  is now only what the power system is doing.
+
+- **Settings → CCTV source has two URL fields**, labelled "Hydroponics camera URL"
+  and "Fish camera URL". Both go through the same host allowlist and both are
+  validated on save.
+
+- **The dead-code inventory in `FEATURE.md` §18.2 was worked down.** Roughly
+  two dozen symbols with no callers were deleted rather than left to rot —
+  `SeriesStats.average`, `batteryCapacityKwh`, `ExportButton.onShare`,
+  `AlarmBridge.isScheduled`, `AlarmTokenStore.updateAccessToken`,
+  `AlarmBridgeStatus.configSavedAt`, the never-written connection-status timer
+  fields, `solarProductionFactor`, and the unreachable `ConnectionHealth`
+  status `error` among them. Two entries on that list turned out to be
+  call-site problems rather than dead code: `clearCctvUrl` now runs on logout
+  and `launchAlarmId` now has its consumer.
+
+### Known issues still open
+
+- **The dashboard still feels sluggish on the test device.** See `progress.md` for
+  every measurement taken, every tool that turned out not to work, and the three
+  candidates that remain. This is unresolved and is the first thing to pick up.
+
+- **The Offline fallback only ever ran on a cold start.** Not touched this
+  session, but the race above is the same failure family: the page polls live,
+  shows correct numbers, and the offline path comes up empty with nothing logged.
+
 ## [1.5.0] - 2026-09-27
 
 ### Changed

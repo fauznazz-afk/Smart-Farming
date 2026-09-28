@@ -2,13 +2,15 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
-**Versi aplikasi saat ini:** 1.5.0 (build 11; sudah diterbitkan, tag `v1.5.0`)
-**Versi dokumen:** 1.5
-**Status:** Rilis 1.5.0 terbit 27 September 2026. Build pertamanya dari Linux,
-tanpa NDK dan CMake. Rilis 1.4.0 sudah membawa modul alarm background yang ditulis
-ulang menjadi Kotlin native; 1.5.0 meratakan antarmuka ke bahasa Inggris
-sepenuhnya, menyederhanakan UI dashboard, dan menambahkan inventaris fitur serta
-playbook agent. Detail di `progress.md` §10.5, §10.7 dan §10.8, dan `FEATURE.md`.
+**Versi aplikasi saat ini:** 1.6.0 (build 12; sudah diterbitkan, tag `v1.6.0`)
+**Versi dokumen:** 1.6
+**Status:** Rilis 1.6.0 terbit 28 September 2026: halaman Hydroponics dan Fish
+dari device ThingsBoard keempat, navigasi bawah 4 tab dengan tab Power
+terpadu, OpenWeatherMap dihapus beserta izin lokasinya, serta perbaikan
+performa (race cache offline, rebuild per frame) dan fix crash Save Settings.
+Sebelumnya 1.5.0 (27 September 2026) meratakan antarmuka ke bahasa Inggris dan
+1.4.0 membawa modul alarm background Kotlin native. Detail di `CHANGELOG.md`
+§1.6.0, `progress.md` §0A, dan `FEATURE.md`.
 
 ---
 
@@ -176,7 +178,7 @@ Karena itu ada **dua** trigger, bukan satu: satu `setInexactRepeating` untuk rit
 
 Diurutkan menurut apa yang paling mungkin menyesatkan kalau ditunda, bukan
 menurut apa yang paling menarik untuk dikerjakan. Catatan teknis yang lebih
-panjang ada di `progress.md` §10.8.
+panjang ada di `FEATURE.md` §18 (celah yang diketahui).
 
 ### 7.1 Yang paling murah dan paling mencegah kerusakan berulang
 
@@ -340,8 +342,13 @@ ketahuan setelah brightness tiap baris piksel diukur.
 
 ### 10.3 Konvensi tanda baterai, terukur
 
-BMS pada perangkat uji melaporkan **arus dan daya negatif saat charging**: halaman
-Battery menampilkan `Current -0.97 A` dan `Power -12.92 W` sementara state of
-charge naik di 69%. Ini berlawanan dengan asumsi yang paling umum, dan sudah
-menyebabkan dua kesalahan terpisah yang keduanya terlihat seperti perbaikan.
-Rinciannya di `progress.md` §10.7 butir 7, aturannya di `AGENTS.md`.
+Konvensi tanda BMS **terukur di perangkat, dan berubah saat hardware diganti**.
+Pada 27 September 2026 dua pengukuran berlawanan tercatat di hari yang sama:
+BMS sebelumnya melaporkan `Power -12.92 W` sementara state of charge *naik* di
+69 % (negatif = charging), sedangkan BMS penggantinya melaporkan `Power -22 W`
+sementara state of charge *turun* (negatif = discharging). Tanda itu sendiri
+tidak bisa memutuskan arah; hanya tren SOC yang bisa. Pemetaan terpusat di
+`lib/utils/battery_sign.dart`, dipin oleh
+`battery_sign_convention_test.dart` — karena klaim versi lama tertulis di
+dokumen dan bertahan setelah hardware-nya berubah. Aturannya di `AGENTS.md`
+§"The battery sign convention".
