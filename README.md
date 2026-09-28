@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-217%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-273%20Dart%20%2B%2011%20Kotlin-4CAF50">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
@@ -74,7 +74,8 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 
 **Monitoring**
 
-- Dashboard real-time dengan navigasi **Overview**, **PV**, **AC**, **Battery**, dan **CCTV**
+- Dashboard real-time dengan navigasi **Overview**, **Power** (PV / AC / Battery
+  dalam satu tab bersegmen), **Hydroponics**, dan **Fish**
 - Chart histori 24 jam untuk Voltage, Current, dan Power tiap sumber energi
 - Update real-time lewat **WebSocket ThingsBoard**, dengan polling REST sebagai cadangan
 - Auto-refresh tiap 10 detik + pull-to-refresh, intervalnya bisa diatur
@@ -92,7 +93,7 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 
 - **Pengecekan latar belakang tiap menit** (lihat di atas) — native, hemat RAM
 - Ambang yang bisa diatur: SOC baterai, usia telemetry, serta batas minimum/maksimum
-  suhu, kelembapan, dan TDS
+  suhu, kelembapan, dan TDS — plus batas tank ikan (pH, suhu air, turbidity)
 - **Deteksi perangkat mati** — telemetry yang diam 10 menit memberi peringatan,
   dan diam lebih lama (default 60 menit) memberi alarm kritis tersendiri, karena
   "telat" dan "mati" butuh tindakan yang berbeda
@@ -107,7 +108,9 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 
 - Login **Customer User** ThingsBoard dengan token yang disimpan di keystore terenkripsi
 - **Biometric gate** (sidik jari / pengenalan wajah) untuk membuka sesi
-- CCTV layar penuh, dengan status koneksi yang jujur (standby / connecting / live / offline)
+- Dua stream CCTV (go2rtc) — greenhouse di Hydroponics dan `?src=cam2` di Fish —
+  dengan allowlist host, dan status koneksi yang jujur
+  (standby / connecting / live / offline)
 - Dark & light mode, empat pilihan aksen, mode glass yang bisa dipecah untuk scrolling
   lebih halus
 - Konfigurasi ThingsBoard tersimpan di secure storage, bukan di teks biasa
@@ -157,7 +160,6 @@ lib/
 │   ├── alarm_notification_service.dart  # Push aturan + token ke native
 │   ├── alarm_history_service.dart   # Riwayat (gabung store Dart & native)
 │   ├── alarm_settings.dart          # Ambang dari SharedPreferences
-│   ├── weather_service.dart
 │   ├── energy_forecast_service.dart
 │   ├── energy_report_service.dart
 │   └── connection_health_service.dart
@@ -282,11 +284,14 @@ Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
 - [x] go2rtc CCTV live, video decode berjalan
 - [x] **Alarm background**: notifikasi muncul saat app tertutup, 450 ms, tanpa duplikat
 - [x] Alarm dijalankan ulang setelah reboot (`BOOT_COMPLETED`)
-- [ ] OpenWeatherMap — **fitur ada dan terpasang, belum diisi API key** di perangkat uji
+- [ ] Halaman Hydroponics dan Fish — lolos test, **belum pernah dibuka di perangkat**
 
-Release build 1.4.0 dibangun di Linux: cold launch 1038 ms, fingerprint signing
-terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3, dan berkas APK di GitHub
-Release dibandingkan byte-per-byte dengan hasil build lokal.
+OpenWeatherMap dihapus dari aplikasi pada 1.6.0 (termasuk izin lokasi dan API
+key-nya); baris verifikasinya ikut ditarik.
+
+Release build 1.6.0 (build 12) terbit 28 September 2026; fingerprint signing
+terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3. Cold launch terakhir
+diukur pada 1.4.0: 1038 ms.
 
 ---
 

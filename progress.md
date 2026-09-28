@@ -5,15 +5,17 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 27 September 2026 (sesi keempat)
-- **Status**: rilis 1.4.0 terbit. `main` sinkron dengan `origin/main`. Semua
-  perubahan sudah di-commit dan ter-push (commit `71bb751`).
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 28 September 2026 (sesi keenam)
+- **Status**: rilis **1.6.0 (build 12)** diterbitkan 28 September 2026. Semua
+  perubahan di-commit; `main` dan tag `v1.6.0` ter-push ke `origin/main`. Rilis
+  sebelumnya: 1.5.0 (27 September 2026, commit `24189a0`).
 
 ---
 
 ## 0. ✅ MULAI DI SINI - Status Terkini
 
-**Semua perubahan sudah di-commit dan ter-push.** Commit terakhir: `71bb751`.
+**Rilis 1.6.0 (build 12) terbit.** Isinya ada di `CHANGELOG.md` §1.6.0; catatan
+perangkat di §7 dokumen ini.
 
 ### Langkah pertama sesi baru
 
@@ -23,19 +25,28 @@ export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
 export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
 flutter analyze          # harus: No issues found
-flutter test             # harus: 179/179
+flutter test             # harus: 273/273 (19 file)
+cd android && ./gradlew :app:testDebugUnitTest   # harus: 11
 git log --oneline -5     # lihat commit terakhir
 ```
 
-### Yang sudah selesai
+### Yang sudah selesai (batch 1.6.0)
 
-- ✅ Dua bug post-1.4.0 (ikon notifikasi + splash hang) — sudah di-commit
-- ✅ Fix `WeatherForecast.fromJson` — sudah di-commit
-- ✅ 36 test baru (weather_service + realtime_service) — sudah di-commit
-- ✅ Terjemahan UI ke Bahasa Indonesia — sudah di-commit
-- ✅ Compact dashboard layout — sudah di-commit
-- ✅ Rounded splash logo — sudah di-commit
-- ✅ Build APK debug + install ke device — sudah diverifikasi
+- ✅ Halaman **Hydroponics** dan **Fish** dari device ThingsBoard keempat;
+  navigasi bawah 6 → 4 tab (PV/AC/Battery jadi satu tab Power)
+- ✅ **Weather dihapus** — kartu, `WeatherService` + 15 test, `geolocator`,
+  izin lokasi, dan API key yang satu-satunya tersimpan di luar secure storage
+- ✅ Performa: race cache offline, frame WebSocket membangun seluruh tree,
+  `_alarmRules` dihitung ulang per frame, selector Power 14–20 ms → median 6 ms
+- ✅ Save Settings crash saat field limit kosong — diverifikasi di perangkat
+  (Save pop + `run-as` membaca nilai baru dari `shared_prefs`)
+- ✅ Konvensi tanda BMS (BMS diganti, arah berbalik) terpusat di
+  `battery_sign.dart` dan dipin test
+- ✅ `EnvironmentGrid` → `MetricGrid` generik; grid environment pindah ke
+  Hydroponics; `AlarmThresholds.minFor`/`maxFor` jadi satu sumber limit
+- ✅ Dua file test yang tidak pernah ikut gate (`*_test.dart`) di-rename, 5
+  asersi basi diperbaiki — lihat sesi keenam di §0A
+- ✅ Test 223 → **273**; `flutter analyze` bersih; Gradle 11 lulus
 
 ---
 
@@ -82,6 +93,55 @@ ter-build dan ter-install di device. Semua perubahan ter-push ke `origin/main`.
 **Pencapaian**: Dashboard lebih compact, lebih banyak informasi terlihat
 tanpa scroll. Splash screen logo sekarang rounded. 179 tests lolos,
 `flutter analyze` bersih, debug APK ter-build dan ter-install di device.
+
+### Sesi kelima (27–28 Sep) - batch 1.6.0: Fish/Hydroponics, 4 tab, weather dihapus
+
+Rincian lengkap di `CHANGELOG.md` §1.6.0. Ringkas:
+
+- Halaman **Hydroponics** dan **Fish** dari device ThingsBoard keempat
+  (`1c433980-…`), CCTV jadi bagian Hydroponics, kamera kedua `?src=cam2` punya
+  setting dan secure-storage key sendiri. Fish device jadi `AlarmDevice`
+  penuh (stale/offline), lalu threshold `Fish tank alerts` (pH 6–8,5, suhu
+  20–30 °C, turbidity ≤100 NTU) menyusul di sesi keenam.
+- Navigasi bawah **6 → 4 tab**: PV/AC/Battery jadi satu tab Power dengan
+  segmented selector (`ValueNotifier`, median frame 6 ms, semula 14–20 ms),
+  plus prefetch ketiga sub-view saat masuk tab.
+- **Weather dihapus**: kartu Overview, `WeatherService` + 15 test,
+  `geolocator`, izin `ACCESS_*_LOCATION`, section Settings API key.
+- Performa dan konsistensi: race `cached_telemetry` (read-modify-write per
+  device), WebSocket `changed: true` per frame, `ConnectionHealthService`
+  notify per frame, `_alarmRules` getter per frame, token `Bound` tak memuat
+  `_thresholds`.
+- `EnvironmentGrid` → **`MetricGrid`** generik (`MetricSpec`, `decimals` per
+  sensor, dua kolom untuk Fish); `minFor`/`maxFor` pindah ke `AlarmThresholds`.
+- Konvensi tanda BMS **berbalik karena BMS diganti** → `battery_sign.dart`
+  (`negative = discharging`), dipin `battery_sign_convention_test.dart`.
+- **Save Settings crash** saat ada field limit kosong (`minKey!` pada
+  turbidity) — exception lolos sebelum SnackBar, layar tidak pop, dan `true`
+  untuk re-ship rules hilang. Kini di-null-guard dan punya regression test.
+- Dead-code sweep ±24 simbol; offline cache & bound-token dirapikan.
+- Test 179 → 223 di akhir sesi ini.
+
+### Sesi keenam (28 Sep) - nama test, wiring grid, rilis 1.6.0
+
+- **Dua file test tidak pernah dijalankan gate.**
+  `widget_test_environment_grid.dart` dan `widget_test_live_power_card.dart`
+  tidak match pola `*_test.dart` yang dikumpulkan `flutter test`. Di-rename ke
+  `metric_grid_test.dart` dan `live_power_card_test.dart`, keduanya langsung
+  gagal 5 asersi: 3 memakai teks gabungan `"25.0 °C"` padahal widget merender
+  value dan unit sebagai dua `Text`, dan 2 memakai konvensi tanda BMS lama
+  (negatif = Charging). Semua asersi kini mengklaim apa yang benar-benar
+  dirender layar.
+- **`kFishSpecs` diberi `metric`** (`ph`, `suhu`, `turbidity_ntu`) — tanpa ini
+  wiring fish grid ke `AlarmThresholds` adalah no-op: verdict dan caption tidak
+  akan pernah terhitung. Komentar basi "no threshold rules yet" diganti.
+- **`showGridColors` di-wire**: `_environmentGrid` → `_thresholds.environmentAlerts`,
+  `_fishGrid` → `_thresholds.fishAlerts` (+ `limitLabelFor`, jadi limit Fish
+  tampil). Tag breach mengikuti toggle; tag `Stale data` sengaja tidak — sensor
+  mati adalah fakta data, bukan limit yang di setel.
+- Tiga gate terakhir: `flutter analyze` bersih, **273 test** lulus, Gradle 11.
+- Dokumentasi rilis: `CHANGELOG.md` §1.6.0, FEATURE §18/§19, AGENTS.md
+  (versi, jumlah test, konvensi baterai), progress.md, PRD version header.
 
 ---
 
@@ -245,7 +305,7 @@ lib/                                    62 file, 11.445 baris
     alarm_history_screen.dart           402 baris, belum di-refactor
     login_screen.dart
   widgets/                              design system (liquid_glass, energy cards)
-  test/                                 11 file, 179 test, ~1.800 baris
+  test/                                 19 file, 273 test, ~4.500 baris
 ```
 
 ### Konvensi yang perlu dijaga
@@ -354,22 +414,35 @@ lulus.
 
 ```
 flutter analyze  ->  No issues found
-flutter test     ->  179 tests, All tests passed
+flutter test     ->  273 tests, All tests passed (19 file)
+cd android && ./gradlew :app:testDebugUnitTest -> BUILD SUCCESSFUL (11 tests)
 ```
+
+`alarm_parity_test.dart` menghitung 1 test statis + 23 skenario vektor dari
+`alarm_parity_vectors.json` (dinamis), jadi jumlah statis per file (250) +
+vektor (23) = 273.
 
 | File | Test | Cakupan |
 |---|---|---|
+| `thingsboard_api_test.dart` | 26 | state sesi, token/refresh, URI WebSocket, key set per device, cache offline |
+| `dashboard_helpers_test.dart` | 23 | history window, interval, integrasi energi, cache split, `describeHistoryRange` |
 | `cctv_test.dart` | 22 | status model, overlay, host allowlist `parseAllowedCctvUrl` |
-| `dashboard_helpers_test.dart` | 22 | history window, interval, integrasi energi, cache split, `describeHistoryRange` |
+| `thingsboard_realtime_service_test.dart` | 21 | service lifecycle, device config, TelemetryPoint, DeviceTelemetry |
+| `settings_validation_test.dart` | 21 | validasi range, target harian, batas per sensor (termasuk TDS tanpa plafon) |
 | `energy_report_helpers_test.dart` | 21 | bucketing harian dan bulanan, lintas batas bulan dan tahun, skala chart |
-| `thingsboard_api_test.dart` | 24 | URI WebSocket, state sesi, migrasi token, cache offline, key set |
-| `settings_validation_test.dart` | 18 | validasi range, target harian, batas sensor |
+| `alarm_rules_test.dart` | 20 | `buildAlarmRules` per kelompok, device tanpa pembacaan bukan stale, staleness per rule |
 | `chart_bounds_test.dart` | 16 | `niceStep`, `niceTimeStep`, alignment sumbu X, tick multi-hari |
 | `energy_forecast_service_test.dart` | 13 | produksi harian, proyeksi runtime baterai |
-| `settings_screen_test.dart` | 5 | widget test: daftar category, drill-down, navigasi back, penolakan URL |
-| `weather_service_test.dart` | 15 | current weather + One Call API parsing, serialization, computed properties |
-| `thingsboard_realtime_service_test.dart` | 21 | service lifecycle, device config, TelemetryPoint, DeviceTelemetry |
-| `widget_test.dart` | 2 | smoke test |
+| `metric_grid_test.dart` | 10 | widget: verdict/caption/limit label, tag breach, `showGridColors`, stale tag, dark mode |
+| `live_power_card_test.dart` | 10 | widget: unavailable, konvensi tanda (negatif = discharging), standby, arus tidak tertutupi beban |
+| `energy_report_service_test.dart` | 9 | bucketing jam, data parsial DC/AC, clamp negatif, error kosong |
+| `alarm_path_thresholds_to_rules_test.dart` | 9 | Settings → rules → JSON native, kedua kelompok alert, limit yang di-clear tidak hidup lagi |
+| `color_helpers_test.dart` | 8 | satu accent satu hue (index diabaikan), warna terukur AA di permukaan nyata |
+| `settings_screen_test.dart` | 6 | widget: daftar kategori, versi app, field limit, back, tolak URL CCTV & Fish |
+| `settings_save_regression_test.dart` | 6 | save menulis semua key, satu sisi limit, `minKey` null tidak crash, pop & error terlihat |
+| `battery_sign_convention_test.dart` | 6 | negatif = discharging (BMS kini), positif = charging, deadband ±1 W, konvensi BMS lama |
+| `widget_test.dart` | 2 | smoke test: app boot, logo |
+| `alarm_parity_test.dart` | 2 (+23 vektor) | fixture ada; evaluator Dart == evaluator Kotlin per skenario |
 
 Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
 **hanya ketahuan** karena test penjaga.
@@ -395,6 +468,12 @@ Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
 | Release build 1.4.0 | cold launch **1038 ms**, fingerprint cocok PRD §3, APK di GitHub identik byte-per-byte dengan build lokal |
 | Compact dashboard | spacing 8px antar card, padding dikurangi, lebih banyak info terlihat |
 | Rounded splash logo | logo di splash screen sekarang rounded dengan `ClipRRect` |
+| Save Settings setelah fix kosong (28 Sep) | Save pop ke dashboard; `run-as` membaca `fish_ph_min=6`, `fish_ph_max=8.5`, `fish_temp_min=20`, `fish_temp_max=30`, `fish_turbidity_max=100` dan limit environment dari `shared_prefs` |
+| Sub-tab AC → PV (28 Sep) | satu detik setelah pindah, layar sudah menampilkan metrik DC saja — angka sub-tab sebelumnya tidak lagi tertinggal |
+| Selector Power (28 Sep) | median frame **6 ms** di perangkat (semula 14–20 ms, diukur dengan tool perf) |
+
+> Baris "Weather (OpenWeatherMap)" di atas adalah catatan historis: integrasi
+> itu dihapus dari aplikasi pada 1.6.0, termasuk izin lokasi dan API key-nya.
 
 ---
 
@@ -741,152 +820,7 @@ dan toggle "Smooth Glass" yang menyalakan blur saat dimatikan.
 satuan dengan satu metrik terpilih lewat segmented button. Keduanya bagus, tapi
 menyentuh layout substantially.
 
-### 10.7 Sesi kedua: bahasa, animasi, dan konvensi tanda baterai
-
-**27 September 2026, lanjutan.** Sesi ini berawal dari satu kalimat — "kenapa
-accent warnanya berubah, jadi lebih jelek" — dan berakhir di satu pengukuran
-tanda baterai di perangkat._some Rekap, karena hampir semua keputusan di sini
-ditolak setelah dicoba, dan yang perlu bertahan justru alasan penolakannya.
-
-**1. Warna tidak pernah boleh berubah otomatis.** Rotasi hue 40° per index
-ditambahkan supaya halaman PV/AC/Battery bisa dibedakan lewat warna, dan
-dibatalkan. `metricColor` menerima `index` lalu **sengaja mengabaikannya**,
-dan `test/color_helpers_test.dart` gagal kalau itu berubah. Alasan yang bertahan:
-warna yang tidak dipilih user adalah warna yang tidak bisa diprediksi. Halaman
-sudah dibedakan oleh judul dan ikon. `kAccentPalette` juga dikembalikan —
-menggeser `Ocean cyan` untuk memisahkannya dari `Forest teal` akan diam-diam
-mengubah arti setting yang sudah ada.
-
-**2. Hijau bukan untuk kondisi yang baik.** Strip status, kartu environment, dan
-indikator `Live` semuanya memakai hijau saat semuanya normal. Di tema amber itu
-membuat **dua sistem warna** di satu layar. Aturannya sekarang: hanya pelanggaran
-yang diberi warna. Ditulis di `AGENTS.md` sebagai "never signal the same state
-three ways" dan "say nothing when nothing is wrong".
-
-**3. Outline card mengikuti accent.** Semula hairline putih/hitam netral, jadi
-kartu berangka abu-abu dingin di dalam tema amber. Diambil dari
-`colorScheme.primary`, bukan parameter baru, karena accent sudah ada di theme dan
-menyelipkan `seedColor` ke semua call site hanya memberi kesempatan keduanya
-berbeda.
-
-**4. Chart: tiga seri kembali, RGB, solid, sumbu dinamis.** Metric picker
-dibatalkan — melihat ketiganya sekaligus justru tujuan chart itu. Skalakan
-per-seri ke 0–100% juga dibatalkan: pembaca yang lihat "0%, 50%, 100%" harus
-mencari tiga skala berbeda di legenda, sedangkan sumbu mentah bisa langsung
-dibaca. Only the AC page punya power dua orde di atas arus, dan trace rata di
-sana itu jujur, bukan rusak.
-
-**5. `dashArray: []` berarti "gambar apa pun", bukan "solid".** fl_chart menelusuri
-pola dengan `pattern[index % pattern.length]`, jadi list kosong menghasilkan nol
-output. Chart naik dengan sumbu benar, legenda benar, statistik benar, dan
-**tanpa garis** — bentuk kegagalan terburuk untuk ditemukan di perangkat. Yang
-solid adalah **tidak mengisi field itu sama sekali**.
-
-**6. `SizedBox(height: 5)` membuat `maxWidth` jadi infinity.** Jadi `Row` di
-bawahnya unbounded dan `Expanded` resolve ke nol: bar split power flow tampil
-sebagai ruang kosong, tanpa exception. Baru ketahuan setelah mengukur brightness
-setiap baris piksel di screenshot, bukan dengan melihatnya. Perbaikan:
-`width: double.infinity` eksplisit.
-
-**7. BMS ini melaporkan MINUS saat charging.** Terukur di perangkat 27 September
-2026: halaman Battery menunjukkan `Current -0.97 A` dan `Power -12.92 W` saat
-SOC naik di 69%. Tiga aturan yang lahir dari itu:
-
-- **Baca key `power`. Jangan kali-kalikan `voltage * current`.** BMS mengirim
-  ketiganya terpisah. Menghitung ulang menghasilkan nol persis saat `current`
-  = `0.00 A` (yang memang dikirim saat standby) dan melenceng saat baterai tidak
-  di tegangan nominal.
-- **Jangan balik tanda di call site.** Negasi supaya hero bisa menulis
-  "Charging 12 W" **dibatalkan**: halaman Battery, satu tab saja, menulis
-  `Power -12.92 W`. Dua layar mengukur besaran yang sama dengan angka berbeda,
-  dan pembaca harus Tempat tahu bahwa minus jadi plus.
-- **Nol bukan arah.** Pak benar-benar punya tiga status — charging, standby,
-  discharging — dan tanda bacaan nol adalah noise, jadi label dua-pilihan akan
-  berkedip beberapa kali semenit sambil mengklaim sesuatu. Di bawah 1 W: "Standby".
-
-Ketiga aturan ini ditulis di `AGENTS.md` sebagai bagian "The battery sign
-convention, measured on the device", karena ketiganya sudah dilanggar sekali dan
-semuanya terlihat seperti perbaikan.
-
-**8. Animasi banner butuh `SizeTransition`, bukan hanya fade.** Banner dulu
-dirender conditional biasa, jadi alarm selesai membuat seluruh Overview melompat
-naik setinggi kartu dalam satu frame — terbaca sebagai glitch. `AnimatedSwitcher`
-menumpuk banner yang keluar di bawah yang masuk, dan **stack mengambil child
-terbesar**, jadi banner yang hanya fade akan **mempertahankan tinggi penuh
-selama seluruh animasi lalu melompat ke nol di frame terakhir** — lebih buruk
-daripada tidak beranimasi sama sekali.
-
-**9. `_Shortcut` ada di tiga tempat, dua privat, satu publik tanpa consumer.**
-Digabung jadi `DashboardShortcut`.
-
-**10. Aplikasi sekarang full English.** Yang diterjemahkan: alarm message
-(Dart **dan** Kotlin), energy card, status strip, environment grid, dan date-range picker —
-yang chrome-nya dilokalkan dari argumen `Locale`, bukan dari string yang
-diberikan, jadi itu surface Indonesia terakhir. CSV export juga
-`energy_report_*.csv` karena filename-nya muncul di share sheet.
-
-**11. Alarm banner hanya di halaman Overview.** Pelanggaran ambang adalah fakta
-tentang kebun, bukan tentang tab yang sedang dibuka, dan mengulangnya di empat
-halaman mendorong empat baris yang sudah dibaca di atas konten yang ingin dilihat
-user. State koneksi tetap muncul di semua halaman, dan jumlah alarm ada di strip
-di semua halaman.
-
-### 10.8 Rekomendasi pengembangan berikutnya
-
-Diurutkan berdasarkan yang paling mungkin menyesatkan kalau ditunda. Rincian
-produk ada di `PRD_PLTS_Monitoring_App.md` §7.
-
-**A. Tutup celah test yang masih ada** (paling murah, paling bisa dikerjakan sendiri)
-
-- `energy_report_service.dart` dan `alarm_notification_service.dart` masih hanya
-  punya test untuk helper-nya. Yang belum tercover: pemanggilan method channel dan
-  lifecycle scheduling — butuh perangkat, atau fake untuk `MethodChannel`.
-- `weather_card.dart` (331 baris) dan `energy_report/widgets/chart_card.dart`
-  (297 baris) belum pernah di-refactor dan belum punya test widget.
-- Widget test untuk `LivePowerCard` dan `EnvironmentGrid` akan menangkap
-  regresi label yang di sesi ini ditemukan tiga kali hanya dengan melihat layar.
-
-**B. Rekonsiliasi tanda dan satuan di seluruh aplikasi**
-
-Konvensi tanda BMS baru terukur di satu perangkat (§10.7). Yang **belum
-diverifikasi**: apakah device yang sama mengGpoliciesConvention yang sama,
-dan apakah `energy_forecast_service.dart` yang memakai `.abs()` sudah benar
-untuk semua kasus. Buat satu test yang mengunci konvensi ini per device id, supaya
-ganti BMS tidak diam-diam membalik semua tampilan.
-
-**C. Backfill `offline_*` di riwayat alarm**
-
-`AlarmRule.kt` punya `AlarmComparison.offline` dan Dart punya `AlarmHistory`
-untuknya, tapi belum jelas apakah record `offline_*` pernah benar-benar tertulis
-di store native atau hanya di banner. Kalau belum, alarm "perangkat berhenti"
-tidak pernah muncul di riwayat — dan itu persis alarm yang paling perlu dibuktikan
-ke pengguna.
-
-**D. Verifikasi perangkat di lebih dari satu ukuran layar**
-
-Semua verifikasi optimist ini di satu Xiaomi 24090RA29G, 1220×2712, density 520.
-Tiga tempat yang secara teoritis bisa pecah di layar kecil: bar tiga item di
-`_PowerFlow` (Solar / House / Battery), legenda chart tiga seri, dan dua tile
-Energy analytics. `test/` tidak bisa menangkap ini; butuh perangkat atau
-screenshot pada beberapa density.
-
-**E. `package_info_plus` / `share_plus` / `flutter_secure_storage` (§10.6)**
-
-Coordinated upgrade, sudah dicoba dan gagal karena konflik `win32`. Butuh
-release Flutter yang sudah memperbaiki KFGPengum Floures — jangan dicoba piecemeal,
-dan jangan sebelum A dan B selesai karena keduanya menyentuh penyimpanan sesi.
-
-**F. Yang sengaja belum dikerjakan**
-
-- iOS dan web. `AlarmBridge` melihat `MissingPluginException`, latch
-  `isUnavailable`, dan jadi no-op — aman, tapi berarti background alarm adalah
-  fitur Android tanpa padanan, dan `status` untuk diagnostik mengembalikan null
-  di sana. Kalau aplikasi direncanakan ship di platform kedua, ketidakfungsiannya harus
-  disurface di UI lebih dulu.
-- Push notification dari server. Butuh jalur server yang belum ada; lihat PRD §6.
-- Multi-user/role. Hanya kalau kebutuhan operasional bertambah.
-
-### 10.6b Utang KGP - jika someday dikerjakan
+### 10.6 Utang KGP - jika someday dikerjakan
 
 Lihat §9A. Ringkasnya: **tiga paket** (`share_plus` → 13,
 `package_info_plus` → 10, `flutter_secure_storage` → 11), plus `XFile` pindah
@@ -907,84 +841,6 @@ Ini adalah **coordinated upgrade** — tidak bisa dilakukan piecemeal.
 ## 11. Gotcha untuk Agent Berikutnya
 
 Hal-hal ini memakan waktu dan tidak terlihat di kode.
-
-### 11.0 Widget bisa tampil benar dan tetap tidak menggambar apa pun
-
-Tiga dari empat bug UI di sesi 27 September 2026 adalahsilent layout bugs. Tidak
-ada exception, tidak ada analyze error, tidak ada test yang gagal, dan `flutter
-build` sukses. Semuanya ketahuan hanya dengan melihat layar perangkat atau
-mengukur piksel screenshot.
-
-- **`dashArray: []` bukan "solid".** fl_chart menelusuri pola dengan
-  `pattern[index % pattern.length]`, jadi list kosong menghasilkan nol output.
-  Chart naik dengan sumbu, legenda, dan statistik yang benar lalu **tidak
-  menggambar garis sama sekali**. Yang solid adalah tidak mengisi field itu.
-- **`SizedBox(height: 5)` membuat `maxWidth` jadi infinity.** `BoxConstraints
-  .tightFor(height: 5)` hanya mengisi sumbu tinggi, sehingga `Row` di bawahnya
-  unbounded dan anak-anaknya `Expanded` resolve ke nol. Bar split power flow
-  tampil sebagai ruang kosong. Perbaikan: `width: double.infinity` eksplisit.
-- **`AnimatedSwitcher` + `SizeTransition`, bukan hanya fade.** Switcher menumpuk
-  child yang keluar di bawah yang masuk, dan `Stack` mengambil child **terbesar**.
-  Banner yang hanya fade mempertahankan tinggi penuh selama seluruh animasi
-  lalu melompat ke nol di frame terakhir.
-- **Nilai yang terlalu kecil tidak punya arah.** "Discharging 0 W" adalah klaim
-  yang tidak didukung data; tanda bacaan nol adalah noise, dan label dua-pilihan
-  akan berkedip beberapa kali semenit.
-
-CaraSequelize memeriksa tanpa dispositivo: crop screenshot lalu ukur brightness
-setiap baris piksel. Bar yang seharusnya terlihat tetapi max brightness-nya sama
-dengan background berarti tidak menggambar — bukan "sukar dilihat", tidak ada.
-
-### 11.0b Tanda ini bukan tanda keamanan, ini tanda sensor
-
-BMS ini **melaporkan minus saat charging** (`Current -0.97 A`,
-`Power -12.92 W` saat SOC 69% naik). Kontrak ini sudah ditulis di
-`AGENTS.md` §"The battery sign convention". Tiga aturan yang lahir darinya, dan
-ketiganya sudah dilanggar sekali:
-
-1. Baca key `power` dari device. **Jangan** mengalikan `voltage * current` —
-   BMS mengirim ketiganya terpisah, dan hasil perkalian nol persis saat
-   `current` = 0.00 A.
-2. **Jangan balik tanda di call site** supaya lebih prettify. Dua layar
-  Dua layar yang menampilkan angka berbeda untuk besaran yang sama lebih buruk
-   daripada minus yang aneh kelihatan.
-3. **Nol bukan arah.** Ada tiga status: charging, standby, discharging.
-
-Konvensi ini terukur di **satu** device. Jangan diasumsikan berlaku untuk BMS
-lain tanpa diukur ulang.
-
-### 11.0c Warna yang tidak dipilih user bukan warna
-
-Semua makeover warna di sesi ini ditolak, dan tiga yang cancelled semuanya terlihat
-seperti perbaikan:
-
-- rotasi hue 40° per index → satu accent satu hue
-- tiga lightness step dari satu hue + dash pattern → RGB solid, dan chart adalah
-  satu-satunya pengecualian yang didokumentasikan
-- hijau untuk "kondisi baik" → hanya pelanggaran yang diberi warna
-
-Semuanya satu alasan: **warna yang tidak dipilih user adalah warna yang tidak
-bisa diprediksi**, dan aplikasi yang kehilangan tema jauh lebih buruk daripada
-aplikasi yang terlihat sedikit monoton.
-
-### 11.0d Isi file bisa berubah di balik layar saat agent menulis
-
-Terjadi di sesi ini pada `date_helpers.dart` dan `weather_card.dart`: penulisan
-text-mode menyisipkan CRLF, dan beberapa kata Indonesia berganti bentuk saat
-dibaca ulang. Verifikasi dengan hex dump atau `unicode_escape`, bukan dengan
-membaca teks yang ditampilkan. Setelah setiap perubahan yang besar, jalankan:
-
-```bash
-for f in $(git status --porcelain | awk '{print $NF}'); do
-  [ -f "$f" ] && grep -qU $'\r' "$f" 2>/dev/null && echo "CRLF: $f"
-done
-git diff -U0 | grep "^+" | grep -oP "[^\x00-\x7F]" | sort -u | tr -d '\n'; echo
-```
-
-Hasil kedua perintah harus hanya berisi karakter yang memang dimaksud (derajat,
-tanda hubung, panah). Kalau ada CJK atau Hangul di dokumen Indonesia, itu
-bukan dari Anda.
-
 
 ### 11.1 named record typedef tidak bisa dipakai
 
@@ -1093,7 +949,7 @@ adalah **fish**, bukan bash.
 
 ```bash
 flutter analyze                    # harus: No issues found
-flutter test                       # harus: 179/179
+flutter test                       # harus: 273/273
 flutter build apk --release        # warm ~2-3 menit
 
 # Perangkat (HP Xiaomi 24090RA29G, Android 16)

@@ -18,7 +18,7 @@ ESP32 sensor → ESP-NOW → ESP32 gateway → MQTT → ThingsBoard CE (Orange P
 Battery telemetry does **not** go through the ESP32. It is read from a Bluetooth
 BMS and publishes to its own ThingsBoard device.
 
-Version lives in `pubspec.yaml` (`1.4.0+10` as of 26 September 2026).
+Version lives in `pubspec.yaml` (`1.6.0+12` as of 28 September 2026).
 `package_info_plus` reads it at runtime, so never hardcode a version string in
 the UI.
 
@@ -34,8 +34,8 @@ and both are short.
   protocol.
 - **FEATURE.md** — *what* is already implemented, verified against the source
   rather than against the other markdown files. Its §18 lists the known gaps:
-  nine functional ones, twenty-odd dead or unreachable symbols, five test gaps,
-  and six things nobody has yet seen on a device. Several things that look absent
+  four functional ones, three dead or unreachable symbols, five test gaps,
+  and eight things nobody has yet seen on a device. Several things that look absent
   are already there and unused; several that look present are not reachable. Its
   header explains why it exists: three label regressions in one session passed
   `flutter analyze`, the release build and every existing test, and were only
@@ -460,7 +460,7 @@ actually bitten:
 
 ```
 flutter analyze     # must stay clean
-flutter test        # 235 tests
+flutter test        # 273 tests
 cd android && ./gradlew :app:testDebugUnitTest   # 11 tests, alarm parity + host allowlist
 ```
 
@@ -487,10 +487,15 @@ it.
 
 ## The battery sign convention, measured on the device
 
-**This BMS reports negative current and negative power while the pack is
-charging.** Confirmed on the test device on 27 September 2026: the Battery page
-read `Current -0.97 A` and `Power -12.92 W` while the state of charge was rising
-at 69 %. The opposite of the convention most people assume.
+**The current BMS reports negative current and negative power while the pack is
+discharging.** Confirmed on the test device on 27 September 2026 after a BMS
+swap: `Power -22 W` while the state of charge was *falling*. The **previous**
+BMS reported the opposite — `Current -0.97 A`, `Power -12.92 W` while the charge
+was *rising* at 69 % — and the swap inverted every battery display in the app
+without a single red indicator, exactly as this section warned it would. The
+mapping lives in `batteryChargeState` (`lib/utils/battery_sign.dart`), pinned by
+`battery_sign_convention_test.dart`, so the next swap fails a test that says what
+to re-measure instead of quietly inverting the app.
 
 Three things follow, and all three have already been got wrong once:
 
@@ -499,22 +504,22 @@ Three things follow, and all three have already been got wrong once:
   from the other two collapses to exactly zero whenever `current` reads `0.00 A`,
   which this BMS does report while it is idle, and drifts from the reported
   figure whenever the pack is not sitting at its nominal voltage.
-- **Negate once, at the call site, and say so.** `live_power_card.dart` takes
-  `batteryPower` with "positive means charging" already applied, so no consumer
-  has to remember which way round the raw key is.
+- **Do not flip the sign at the call site.** The hero card receives
+  `latestValues['power']` raw, sign and all, so its figure matches the Battery
+  page one tab away. Negating it to make the hero read "Charging 12 W" was tried
+  and reverted: two screens reporting different numbers for one measurement is
+  worse than an odd-looking minus, because the reader has to work out that a
+  minus became a plus. The label carries the direction, not the number.
 - **Zero current is not a direction.** The pack genuinely sits in standby for
   stretches, and the sign of a zero reading is pure noise, so any UI that picks
   one of two labels will flip several times a minute. There are three states —
   charging, standby, discharging — and standby is the one that gets skipped.
 
-**Do not "fix" the sign at the call site.** The normalisation above was tried and
-reverted, and it is worth explaining because it looks like an improvement. Making
-the card show `Charging 12 W` while the Battery page, one tab away, shows
-`Power -12.92 W` means two screens report different numbers for the same
-measurement, and the reader has to work out that a minus became a plus. Flipping
-the sign makes the hero prettier and makes the app less trustworthy. The hero
-now prints the device's own signed figure and lets the label carry the direction,
-so the two screens agree.
+**Do not "fix" the sign at the call site, and do not edit
+`batteryChargeState` from a screenshot.** Only the state-of-charge trend settles
+which sign means which direction. If the BMS is ever replaced, watch the SOC for a
+minute while the sign is fixed, note which way it moves, and update
+`battery_sign_convention_test.dart` with the measurement in the reason string.
 
 ## Regression guards worth knowing about, all added because of a real bug:
 
@@ -523,6 +528,9 @@ so the two screens agree.
 - `dashboard_helpers_test.dart` — `describeHistoryRange` must agree with
   `historyTimeWindow`
 - `energy_forecast_service_test.dart` — battery discharge sign convention
+- `battery_sign_convention_test.dart` — which sign means which direction, with
+  the SOC-trend measurement in the reason string (the BMS swap of 27 Sep 2026
+  inverted the old convention)
 - `alarm_rules_test.dart` — a device that produced no reading is not stale, and
   TDS keeps no upper bound
 - `alarm_parity_test.dart` + `AlarmParityTest.kt` — the Dart and Kotlin alarm

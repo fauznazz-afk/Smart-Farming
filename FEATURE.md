@@ -19,13 +19,17 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 27 September 2026, `origin/main` = `d9fcf54`. Flutter
-3.47.5 / Dart 3.13.4, target Android (API 36). `flutter analyze` bersih,
-`flutter test` 227 lulus, `./gradlew :app:testDebugUnitTest` 11 lulus.
+**Status verifikasi:** 28 September 2026, batch menuju rilis 1.6.0 di atas
+`origin/main` = `422a699`. Flutter 3.47.5 / Dart 3.13.4, target Android (API 36).
+`flutter analyze` bersih, `flutter test` 273 lulus,
+`./gradlew :app:testDebugUnitTest` 11 lulus.
 
-**Konvensi tanda sensor.** BMS ini melaporkan **minus saat charging** — terukur di
-perangkat: `Current -0.97 A`, `Power -12.92 W` sementara SOC naik di 69%. Tiga
-aturan yang lahir dari itu ada di §18.6.
+**Konvensi tanda sensor.** BMS saat ini melaporkan **minus saat discharging** —
+terukur 27 September 2026 setelah BMS diganti: `Power -22 W` sementara SOC turun.
+BMS sebelumnya melaporkan kebalikannya (`Power -12.92 W` saat SOC naik di 69 %),
+dan pertukaran itu membalik semua tampilan baterai tanpa satu pun indikator merah.
+Pemetaan terpusat di `lib/utils/battery_sign.dart` dan dipin oleh test. Tiga
+aturan yang lahir dari riwayat itu ada di §18.6.
 
 ---
 
@@ -82,7 +86,7 @@ aturan yang lahir dari itu ada di §18.6.
 
 | Fitur | Detail |
 |---|---|
-| 5 tab | Overview · PV · AC · Battery · CCTV |
+| 4 tab | Overview · Power (PV/AC/Battery) · Hydroponics · Fish |
 | Bottom nav GlassNavBar | tombol melebar saat dipilih, menyusut jadi tombol bulat 64 px saat scroll turun ≥ 12 px, 380 ms |
 | App bar transparan dengan blur progress | `DecoratedBox` berbasis progress scroll, di-quantize agar tidak rebuild tiap frame |
 | Pull-to-refresh | semua halaman; di Overview juga refresh histori energi |
@@ -278,29 +282,28 @@ bucket, baris `TOTAL`.
 
 ---
 
-## 8. Weather
+## 8. Weather - dihapus
 
-Kartu di Overview. OpenWeatherMap, HTTPS, `lang=id`, `units=metric`.
+**Tidak ada lagi.** Integrasi OpenWeatherMap dicabut bersama kartunya.
 
-| State | Konten |
-|---|---|
-| Loading | spinner |
-| Error | `Weather unavailable` + pesan + `Retry` |
-| Tanpa API key | `Weather Data` + `Add an OpenWeatherMap API key in settings` + `Open Settings` |
-| Terisi | lokasi, kondisi, deskripsi, ikon, `Good for solar` / `Not ideal`, lalu 4 tile: Temperature · Humidity · Wind · Cloud |
+Yang dihapus: `WeatherCard` di Overview, `WeatherService`,
+`test/weather_service_test.dart`, section Weather di Settings, dependency
+`geolocator`, dan permission `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION`
+dari manifest.
 
-`Good for solar` bila `cloudCover < 30 && solarIrradiance > 500`.
+**Alasannya.** `lux` sudah tampil di halaman Hydroponics dan `power_dc` sudah
+tampil di Energy analytics, jadi kartu itu hanya mengulang angka yang sudah ada
+di tab lain. Selain itu `weather_api_key` adalah satu-satunya kredensial yang
+disimpan di SharedPreferences bukan secure storage, dan `/onecall` dipanggil di
+setiap fetch lalu 48 + 48 entri dibuang karena `WeatherCard.forecast` tidak pernah
+dirender. Field City sudah tidak berfungsi sejak lama: `getWeatherByCity` hanya
+dipakai tombol Test Connection, sedangkan dashboard selalu me-resolve dari GPS.
 
-| Aspek | Detail |
-|---|---|
-| Endpoint | `/weather` (current), `/onecall` (forecast), `/weather?q=` (by city) |
-| Lokasi | **GPS saja** — permission dicek dan diminta runtime |
-| Cache | 30 menit di SharedPreferences, key terpisah untuk current & forecast |
-| API key | SharedPreferences (bukan secure storage) |
-| `dispose()` | ada, dipanggil dari dashboard |
-
-**Forecast, `solarIrradiance` sebagai nilai tampil, `solarProductionFactor`, dan
-field City di Settings tidak dipakai UI apa pun** — lihat §18.
+**Yang hilang, dan itu harus dicatat jujur:** suhu dan kelembapan **luar**,
+angin, tutupan awan, dan seluruh prakiraan ke depan. `power_dc` dan `lux` adalah
+**pengukuran, bukan prediksi** - keduanya tahu apa yang terjadi sekarang, tidak
+tahu apa yang terjadi besok. Kalau prakiraan dibutuhkan lagi, jalurnya adalah
+backend push atau prediksi FNN-XAI (PRD §7.4), bukan API cuaca.
 
 ---
 
@@ -371,7 +374,7 @@ rangeHigh : {label} too high: {value} {unit} (limit {limit} {unit})
 **Pesan ini diduplikasi di dua bahasa** — Dart (`formatAlarmMessage`) dan Kotlin
 (`AlarmMessageFormat.kt`) — karena notifikasi dibangun saat Dart tidak berjalan.
 Keduanya dipin oleh `android/app/src/test/resources/alarm_parity_vectors.json`
-(14 skenario), yang diputar ulang oleh `test/alarm_parity_test.dart` **dan**
+(17 skenario), yang diputar ulang oleh `test/alarm_parity_test.dart` **dan**
 `AlarmParityTest.kt`. Regenerate dengan
 `dart run tool/generate_alarm_parity_fixture.dart`.
 
@@ -610,21 +613,25 @@ kalau Settings mengembalikan `changed == true`.
 | | Warn when telemetry is older than | `stale_telemetry_minutes` | int | 10 mnt | ✅ |
 | | Report a device as stopped after | `offline_telemetry_minutes` | int | 60 mnt | ✅ |
 | | Daily production target | `daily_production_target_kwh` | **String** | — | ✅ |
-| **Environment alerts** | Enable environment alerts | `environment_alerts_enabled` | bool | on | ✅ untuk alarm, ❌ untuk warna grid |
+| **Environment alerts** | Enable environment alerts | `environment_alerts_enabled` | bool | on | ✅ untuk alarm dan warna grid |
 | | Temperature min / max | `environment_temp_min` / `_max` | String | 15 / 35 | ✅ |
 | | Humidity min / max | `environment_humidity_min` / `_max` | String | 40 / 85 | ✅ |
 | | Water TDS min / max | `environment_tds_min` / `_max` | String | 800 / — | ✅ |
-| **Weather** | OpenWeatherMap API key | `weather_api_key` | String | — | ✅ |
-| | City name | `weather_location_name` | String | — | **❌ tidak ada efek** |
-| | Test Connection | — | tombol | — | ✅ |
-| **CCTV source** | Stream URL | `cctv_url` (**secure storage**) | String | URL camera | ✅ |
+| **Fish tank alerts** | Enable fish tank alerts | `fish_alerts_enabled` | bool | on | ✅ untuk alarm dan warna grid |
+| | pH min / max | `fish_ph_min` / `_max` | String | 6 / 8.5 | ✅ |
+| | Water temperature min / max | `fish_temp_min` / `_max` | String | 20 / 30 | ✅ |
+| | Turbidity max (tanpa batas bawah) | `fish_turbidity_max` | String | 100 | ✅ |
+| ~~Weather~~ | ~~OpenWeatherMap API key~~ | ~~`weather_api_key`~~ | — | — | **⛔ dihapus** |
+| **CCTV source** | Hydroponics / Fish stream URL | `cctv_url` / `cctv_url_fish` (**secure storage**) | String | URL camera | ✅ |
 | **Performance** | Liquid glass blur | `performance_mode` | bool | on | ✅ (on = blur **mati**) |
 | **Background checks** | 5 baris status + Check now + Battery settings | — | read-only | — | ✅ |
-| **About** | App version | — | read-only | `v1.4.0+10` | ✅ |
+| **About** | App version | — | read-only | `v1.6.0+12` | ✅ |
 | **Account** | Logout | — | tombol | — | ✅ |
 
 Default limit lingkungan: suhu 15–35 °C · kelembapan 40–85 % · TDS ≥ 800 ppm ·
 stale 10 mnt · offline 60 mnt · SOC 20 %.
+Default limit ikan: pH 6–8.5 · suhu air 20–30 °C · turbidity ≤ 100 NTU (tanpa
+batas bawah, karena air keruh tidak punya "terlalu jernih").
 
 ### Validasi
 
@@ -741,13 +748,13 @@ satu sisi tidak bisa diam-diam hilang dari sisi lain.
 | `provider` | **tidak pernah di-import** |
 | `fl_chart` | chart telemetry + bar chart laporan |
 | `webview_flutter` | CCTV |
-| `geolocator` | koordinat weather |
+| ~~`geolocator`~~ | **⛔ dihapus** bersama integrasi OpenWeatherMap; `ACCESS_FINE_LOCATION` dan `ACCESS_COARSE_LOCATION` juga dicabut dari manifest |
 | `local_auth` | login biometrik |
 | `package_info_plus` | versi aplikasi di About |
 | `flutter_secure_storage` | JWT ThingsBoard + URL CCTV |
 | `flutter_local_notifications` | channel notifikasi alarm |
 | `shared_preferences` | semua preferensi non-rahasia |
-| `http` | REST ThingsBoard + OpenWeatherMap |
+| `http` | REST ThingsBoard |
 | `share_plus` | ekspor CSV |
 | `intl` / `flutter_localizations` | format tanggal, locale |
 | `path_provider` | **tidak dipakai** — CSV dibagikan dari memori, dan `path_provider_android` di-pin ke 2.2.23 agar tidak menarik NDK |
@@ -769,13 +776,12 @@ foreground(true) → alarm sync → fetch pertama.
 | ThingsBoard REST | ✅ | login, token refresh, timeseries, history |
 | ThingsBoard WebSocket | ✅ | subscribe `LATEST_TELEMETRY` per device, backoff capped 8 s |
 | ThingsBoard push | ❌ | butuh event rule + Push Gateway |
-| OpenWeatherMap | ✅ | current + forecast, GPS |
 | FNN / XAI | ❌ | menunggu model & format output stabil |
 | `share_plus` | ✅ | ekspor CSV energy report |
 | `package_info_plus` | ✅ | versi di About, **tidak pernah hardcode** |
 | `flutter_secure_storage` | ✅ | token ThingsBoard + URL CCTV |
 | `local_auth` | ✅ | login biometrik |
-| `geolocator` | ✅ | koordinat weather, runtime permission |
+| ~~`geolocator`~~ | **⛔** | tidak ada lagi; tidak ada permission lokasi di manifest |
 | `webview_flutter` | ✅ | CCTV |
 
 ---
@@ -798,88 +804,77 @@ foreground(true) → alarm sync → fetch pertama.
 
 ## 18. Celah yang diketahui
 
-Semua **terverifikasi dengan membaca kode** pada 27 September 2026. Yang tidak
-diverifikasi ada di §18.7.
+Semua **terverifikasi dengan membaca kode** pada 28 September 2026. Dari versi
+sebelumnya, tujuh celah fungsional sudah diperbaiki pada rilis 1.6.0 dan satu
+terbukti bukan celah; keduanya dikeluarkan dari daftar ini, bersama simbol-simbol
+mati yang sudah dihapus — riwayat perbaikannya ada di `CHANGELOG.md`. Yang belum
+diverifikasi di perangkat ada di §18.5.
 
 ### 18.1 Celah fungsional
 
-1. **Field City di Settings Weather tidak punya efek.** Dashboard hanya memanggil
-   `getCurrentWeather()` / `getForecast()`, yang keduanya me-resolve posisi dari
-   **GPS saja**. `getWeatherByCity` hanya dipakai oleh tombol Test Connection, dan
-   `cachedLocationName` tidak punya konsumen.
-2. **"Blank limits are not monitored" tidak benar untuk lima dari enam field.**
-   `_readLimit` jatuh ke default non-null kalau key hilang atau tidak bisa
-   di-parse, jadi mengosongkan field Min **mengembalikan default**, bukan mematikan
-   sisi itu. Hanya `environment_tds_max` yang benar-benar nullable. Teks subtitle
-   section menyatakan sebaliknya.
-3. **Toggle environment alert mematikan alarm, bukan warna grid.**
-   `EnvironmentGrid` tetap mewarnai pembacaan di luar batas.
-4. **Energi report memakai kebijakan perbandingan berbeda** dari Energy analytics —
+1. **Energi report memakai kebijakan perbandingan berbeda** dari Energy analytics —
    tidak ada ambang 0.1 kWh, jadi `-100% from the previous period` masih bisa
    muncul di sana untuk masalah yang sudah diperbaiki di kartu analytics.
-5. **Tombol CSV tidak pernah menampilkan "Preparing CSV…".**
-   `sharingNotifier` ditulis tapi tidak pernah didengarkan, jadi tombol tidak pernah
-   rebuild. Double-tap guard tetap bekerja karena dicek di service.
-6. **`Reopen` tidak pernah sampai ke store native.** `updateAlarm` hanya
-   meneruskan kalau `acknowledged == true`, dan Reopen mengaturnya jadi false.
-7. **`cctv_url` tidak dihapus saat logout**, jadi pengguna berikutnya di perangkat
-   itu mewarisi URL stream sebelumnya.
-8. **Date strip di Overview tidak mengubah apa pun** yang terlihat di Overview.
-9. **Tap notifikasi alarm tidak menavigate ke mana pun.** `MainActivity` menerima
-   `EXTRA_ALARM_ID` lewat `onNewIntent` dan `launchAlarmId()` bisa membacanya, tapi
-   tidak ada consumer Dart yang memakainya.
+2. **Halaman Hydroponics dan Fish tidak punya grafik.** `_prefixForPage`
+    mengembalikan `null` untuk keduanya, jadi tidak ada request histori sama sekali.
+    Yang menghalangi: `TelemetryChartCard` memakai daftar sufiks tetap
+    `voltage`/`current`/`power` (`const suffixes` di `chart_card.dart`) dan
+    `HistoryKeys` hanya punya tiga field, jadi pH dan turbidity tidak bisa di-chart
+    tanpa generalisasi widget itu lebih dulu.
+3. **Sensor turbidity dibaca 2396 NTU.** Untuk akuikultur, air jernih ada di bawah
+    30 NTU. Kemungkinan besar sensor belum dikalibrasi atau skalanya berbeda, tapi
+    **belum diverifikasi di perangkat** — lihat §18.5.
+4. **OpenWeatherMap sudah dihapus, jadi tidak ada lagi prakiraan ke depan.**
+    `power_dc` dan `lux` adalah pengukuran, bukan prediksi. Yang hilang adalah
+    suhu dan kelembapan luar, angin, tutupan awan, serta forecast. Kalau
+    prakiraan dibutuhkan lagi, jalurnya bukan API cuaca melainkan backend push
+    atau prediksi FNN-XAI — `PRD_PLTS_Monitoring_App.md` §7.4 sudah menandai arah
+    itu, dan keduanya butuh jalur yang belum ada.
 
 ### 18.2 Kode mati / tidak terjangkau
 
 | Simbol | Status |
 |---|---|
-| `WeatherCard.forecast` | diterima, **tidak pernah dirender**. `/onecall` tetap dipanggil tiap fetch |
 | `ConnectionHealth.statusMessage` (label ketiga) | **tidak terjangkau** — banner hanya dirender di cabang `failed` atau `stale` |
-| `_connectionStatusVisible`, `_connectionStatusTimer` | tidak pernah ditulis |
 | `_cctvKeepAlive` | tidak pernah ditulis, jadi CCTV tidak rebuild |
-| `SeriesStats.average` | dihitung, tidak pernah ditampilkan |
 | `EnergyForecastResult`: `peakUsageAt`, `batteryStateOfCharge`, `sampleStart`, `sampleEnd`, `hasPeakUsage`, `hasBatteryEstimate` | dihitung, tidak pernah dipakai |
-| `solarProductionFactor`, `solarIrradiance` | dihitung; `solarProductionFactor` tanpa consumer |
-| `ThingsBoardClient.fetchHistory` | **tidak ada pemanggil** |
-| `clearCctvUrl`, `WeatherService.clearCache` | tidak ada pemanggil |
-| `AlarmTokenStore.updateAccessToken` | tidak ada pemanggil |
-| `AlarmBridge.isScheduled()`, `launchAlarmId()` | tidak ada pemanggil |
-| `AlarmBridgeStatus.configSavedAt` | di-parse, tidak ditampilkan |
-| `ExportButton.onShare`, `.isDark` | tidak pernah dipakai |
-| `ConnectionHealth.recordReconnect`, `.reset` | tidak pernah dipanggil, jadi `reconnectCount` selalu 0 |
-| `ConnectionHealth` status `error` dan `degraded` | **tidak terjangkau** — semua jalur error mengoper `degraded: true` |
-| `batteryCapacityKwh` | tidak pernah diteruskan, selalu null |
-| `full_capacity_ah` | tidak meng-override `decimals`, jadi 2 desimal tidak seperti tetangganya |
-| 48 entri hourly + 48 entri daily | dibangun dari `/onecall` tiap fetch lalu dibuang |
+
+Belasan entri tabel versi sebelumnya sudah tertutup pada rilis 1.6.0 dan tidak
+lagi dicatat di sini: `fetchHistory`, `clearCctvUrl` dan `launchAlarmId` kini
+punya pemanggil; `SeriesStats.average`, `batteryCapacityKwh`,
+`ExportButton.onShare`/`.isDark`, `recordReconnect`/`.reset`,
+`updateAccessToken`, `isScheduled`, `configSavedAt`,
+`_connectionStatusVisible`/`_connectionStatusTimer`, `solarProductionFactor`/
+`solarIrradiance`, status `error`, `full_capacity_ah` decimals, dan baris
+48+48 entri `/onecall` semuanya sudah dihapus dari kode.
 
 ### 18.3 Perilaku yang counter-intuitive
 
 Bukan bug, tapi mudah disalahpahami:
 
-- `ThingsBoardClient.fetch` **tidak pernah menerima deadline**, jadi timeout
-  per-request selalu cap 4 detik, tidak diturunkan dari sisa budget — hanya
-  `refresh` yang menerimanya.
+- Timeout per-request kini bisa diturunkan dari `deadline` (`_timeoutFor` di
+  `thingsboard_api.dart`), tapi tidak ada pemanggil production yang mengirim
+  nilai selain null — sisa budget poll belum benar-benar di-*share* ke tiap
+  request dan tetap berhenti di cap bawaan.
 - `readDevices` tidak pernah mengembalikan null, jadi cabang
   `"session ended; background check disabled"` tidak terjangkau, dan refresh yang
   ditolak menghasilkan **dua** `finish()` dengan pesan kedua yang menang di
   `lastOutcome`.
 - `_fetchWithRetry` melewati refresh token juga, jadi saat jaringan mati satu batch
   bisa menghasilkan 8 request per device.
-- WebSocket tidak menulis cache offline dan tidak mengirim ping — koneksi idle yang
-  tutup hanya ketahuan lewat `onDone`.
+- WebSocket tidak mengirim ping — koneksi idle yang tutup hanya ketahuan lewat
+  `onDone`. (Tulisan cache offline-nya sudah ada sejak rilis 1.6.0.)
 - Channel importance terkunci saat pembuatan, jadi `importance:` dari Dart tidak
   pernah berlaku untuk channel yang sudah ada.
-- `WeatherService.dispose()` hanya melepas referensi Dart; tidak ada stream yang
-  ditutup.
 - `AlarmStateStore.records()` mengurutkan dengan `optLong` pada nilai yang
   sebenarnya string ISO-8601, jadi pengurutannya no-op. Tidak terlihat oleh
   pengguna karena `AlarmHistoryService` mengurutkan ulang setelah merge.
 
 ### 18.4 Celah test
 
-- Tidak ada test untuk `EnergyReportService.load` dan `EnergyReportData`.
-- Tidak ada widget test untuk `LivePowerCard`, `EnvironmentGrid`, atau
-  `EnergySummaryCard` — dan tiga regresi label di sesi ini lolos seluruh gate.
+- `EnergySummaryCard` belum punya widget test — dan tiga regresi label di sesi
+  27 Sep lolos seluruh gate tanpa ada satu pun widget test UI yang menangkapnya.
+  `LivePowerCard` dan `MetricGrid` kini sudah punya.
 - `SettingsScreen` tidak punya widget test; `settings_screen_test.dart` memeriksa
   9 dari 10 judul kategori, tanpa `Background checks`.
 - `AlarmCheckRunner` tidak punya test JVM; butuh perangkat.
@@ -895,17 +890,39 @@ Bukan bug, tapi mudah disalahpahami:
 - **Layout di ukuran layar selain 1220×2712 @ density 520.** Tiga tempat paling
   mungkin pecah: bar tiga item power flow, legenda chart tiga seri, dua tile
   Energy analytics.
-- **Stream CCTV end-to-end** di URL produksi.
+- **Stream CCTV end-to-end** di URL produksi, dan stream kedua `?src=cam2`.
+- **Halaman Fish dan Hydroponics belum pernah dibuka di perangkat.** Keduanya
+  memakai pola `List<Widget Function()>` yang sama dengan halaman Battery, tapi
+  tidak ada yang pernah memverifikasi bahwa `itemCount: 6`, urutan tab, dan dua
+  `CctvScreen` benar-benar bekerja di layar.
+- **Dua WebView bisa hidup bersamaan.** `CctvScreen` embedded tidak membuat
+  `WebViewController` sampai `_startStream()` dipanggil, yaitu sampai user menekan
+  tombol play — jadi halaman yang tidak dipakai tidak memakai bandwidth. Tapi kalau
+  user memutar cam1 di Hydroponics lalu cam2 di Fish, keduanya tetap mounted
+  karena `PageView` mempertahankan halaman tetangga. Dua WebView Android pada satu
+  perangkat adalah beban memori yang nyata, dan ini belum diukur.
+- **Pembacaan turbidity 2395 NTU** belum ditelusuri. Kalau sensor memang
+  setelompong, halaman ini menampilkan angka yang salah secara absolut dan tidak
+  ada yang bisa memperingatkaninya.
 - **Energy report dengan data bulan penuh** — window selalu ~2 bulan dan ThingsBoard
   membatasi query agregat di bawah 31 hari.
-- **Apa yang terjadi ketika ThingsBoard menjalankan > 2 device.**
+- **ThingsBoard sekarang menjalankan 4 device, bukan 3.** App sudah menyebut semuanya, tapi hanya ketiga device lama yang pernah diverifikasi di perangkat.
 
 ### 18.6 Konvensi tanda sensor
 
-BMS pada perangkat uji melaporkan **arus dan daya negatif saat charging**:
-halaman Battery menampilkan `Current -0.97 A` dan `Power -12.92 W` sementara SOC
-naik di 69 %. Ini berlawanan dengan asumsi yang paling umum, dan sudah
-menyebabkan dua kesalahan terpisah yang keduanya terlihat seperti perbaikan.
+BMS pada perangkat uji **berganti konvensi saat hardware diganti**, dan kedua
+konvensi terukur pada 27 September 2026:
+
+- **BMS sebelumnya:** halaman Battery menampilkan `Power -12.92 W` sementara SOC
+  *naik* di 69 % — negatif berarti charging.
+- **BMS sekarang:** `Power -22 W` sementara SOC *turun* — negatif berarti
+  discharging.
+
+Tanda itu sendiri tidak bisa memutuskan arah; hanya tren SOC yang bisa. Karena itu
+pemetaan terpusat di `batteryChargeState` (`lib/utils/battery_sign.dart`) dan
+dipin oleh `battery_sign_convention_test.dart` — persis karena klaim "negatif =
+charging" pernah tertulis di dokumentasi ini dan bertahan setelah hardware yang
+mendeskripsikannya sudah tidak ada.
 
 Tiga aturan, semuanya sudah dilanggar sekali:
 
@@ -918,8 +935,10 @@ Tiga aturan, semuanya sudah dilanggar sekali:
 3. **Nol bukan arah.** Tiga status: charging, standby, discharging. Di bawah 1 W
    hasilnya noise, dan label dua-pilihan akan berkedip beberapa kali semenit.
 
-Konvensi ini terukur di **satu** device. Ganti BMS tanpa mengukur ulang akan
-membalik semua tampilan.
+Konvensi ini terukur di **satu** device per BMS. Ganti BMS tanpa mengukur ulang
+akan membalik semua tampilan tanpa indikator error apa pun; caranya terdokumentasi
+di komentar `battery_sign.dart` — amati tren SOC satu menit dengan tanda tetap,
+lalu perbarui test dengan pengukuran di reason string-nya.
 
 ---
 
@@ -942,7 +961,7 @@ membalik semua tampilan.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 227 test
+flutter test                                    # 273 test
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 
@@ -957,7 +976,10 @@ cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 | `alarm_rules_test.dart` | device tanpa pembacaan bukan stale; TDS tanpa batas atas |
 | `alarm_parity_test.dart` + `AlarmParityTest.kt` | evaluator Dart == evaluator Kotlin |
 | `settings_validation_test.dart` | batas per sensor, termasuk TDS tanpa plafon |
+| `settings_save_regression_test.dart` | save menulis semua key; field kosong menyimpan null, bukan default; error save terlihat |
+| `alarm_path_thresholds_to_rules_test.dart` | threshold Settings → rules → JSON native, kelompok Environment dan Fish |
+| `metric_grid_test.dart` | `showGridColors` mengunci tag breach; tag `Stale data` tetap tampil saat alerts mati |
+| `live_power_card_test.dart` | konvensi tanda BMS: negatif = discharging, positif = charging |
 | `color_helpers_test.dart` | tidak ada rotasi hue otomatis; setiap warna teks lolos AA pada permukaan nyata |
 | `thingsboard_api_test.dart` | token/session, WebSocket URI, key set, cache offline |
 | `thingsboard_realtime_service_test.dart` | lifecycle service, konfigurasi device, model telemetry |
-| `weather_service_test.dart` | current weather + One Call, serialisasi, computed properties |
