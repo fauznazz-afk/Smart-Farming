@@ -90,7 +90,7 @@ aturan yang lahir dari riwayat itu ada di §18.6.
 | Bottom nav GlassNavBar | tombol melebar saat dipilih, menyusut jadi tombol bulat 64 px saat scroll turun ≥ 12 px, 380 ms |
 | App bar transparan dengan blur progress | `DecoratedBox` berbasis progress scroll, di-quantize agar tidak rebuild tiap frame |
 | Pull-to-refresh | semua halaman; di Overview juga refresh histori energi |
-| Gesture chart tidak ganti halaman | pointer aktif → `NeverScrollableScrollPhysics` |
+| Gesture chart tidak ganti halaman | `ChartGestureLockPhysics` — gate yang meneruskan physics dasar, bukan `NeverScrollableScrollPhysics` yang mematikan snapping. Delegasinya ke `createBallisticSimulation` baru benar pada 29 September 2026; sebelumnya fling jatuh ke friksi dan pager berjalan melewati ujungnya |
 | Akses cepat app bar | Reload (disabled saat loading) · Alarm History · Settings |
 
 ### Hero card — `LivePowerCard`
@@ -341,8 +341,12 @@ sebagai alarm. Dashboard dan modul native mengevaluasi daftar yang sama.
 | Environment | `environment_{sensor}_low` | warning | sensor | `value < min` |
 | Environment | `environment_{sensor}_high` | warning | sensor | `value > max` |
 
-Maksimal **7 aturan energi + 6 aturan lingkungan = 13** (terverifikasi di
-perangkat: 13 aturan ter-push).
+Empat perangkat, jadi aturan energi adalah `low_soc` + satu pasang
+`stale_`/`offline_` per perangkat. Yang terverifikasi di perangkat pada
+29 September 2026: **19 aturan ter-push untuk 4 perangkat** — 9 energi
+(`low_soc` + 4 × 2) dan 10 batas lingkungan. Angka itu bergantung pada limit
+yang benar-benar tersimpan, bukan pada kode: lihat §18.7, di mana satu batas
+ternyata tidak pernah ter-arm.
 
 `offline` dan `stale` sengaja dua kondisi berbeda: 10 menit sunyi adalah hiccup,
 satu jam adalah sensor mati. Default `offlineMinutes` 60, sengaja jauh di atas
@@ -374,7 +378,7 @@ rangeHigh : {label} too high: {value} {unit} (limit {limit} {unit})
 **Pesan ini diduplikasi di dua bahasa** — Dart (`formatAlarmMessage`) dan Kotlin
 (`AlarmMessageFormat.kt`) — karena notifikasi dibangun saat Dart tidak berjalan.
 Keduanya dipin oleh `android/app/src/test/resources/alarm_parity_vectors.json`
-(17 skenario), yang diputar ulang oleh `test/alarm_parity_test.dart` **dan**
+(23 skenario), yang diputar ulang oleh `test/alarm_parity_test.dart` **dan**
 `AlarmParityTest.kt`. Regenerate dengan
 `dart run tool/generate_alarm_parity_fixture.dart`.
 
@@ -891,10 +895,16 @@ Bukan bug, tapi mudah disalahpahami:
   mungkin pecah: bar tiga item power flow, legenda chart tiga seri, dua tile
   Energy analytics.
 - **Stream CCTV end-to-end** di URL produksi, dan stream kedua `?src=cam2`.
-- **Halaman Fish dan Hydroponics belum pernah dibuka di perangkat.** Keduanya
-  memakai pola `List<Widget Function()>` yang sama dengan halaman Battery, tapi
-  tidak ada yang pernah memverifikasi bahwa `itemCount: 6`, urutan tab, dan dua
-  `CctvScreen` benar-benar bekerja di layar.
+- ~~**Halaman Fish dan Hydroponics belum pernah dibuka di perangkat.**~~
+  **Terverifikasi 29 September 2026.** Keduanya dirender di Xiaomi 24090RA29G:
+  Hydroponics menampilkan grid 3+2 (Temperature, Humidity, PV Temp, Light, TDS)
+  lalu kartu CCTV; Fish menampilkan Water Quality 2×2 (pH, Temperature,
+  Turbidity, Water Level) lalu kartu CCTV. Grid Environment menampilkan tag
+  `1 out of range` dan hanya Humidity yang diberi border merah, sesuai aturan
+  "hanya pelanggaran yang berwarna". Card CCTV menunjukkan `STANDBY` dan
+  `Camera ready` tanpa autoplay, di kedua halaman. Yang **masih** belum terbukti:
+  `itemCount: 6` hanya relevan bila halaman digulir sampai bawah — kedua
+  screenshot menunjukkan konten penuh tanpa perlu menggulir.
 - **Dua WebView bisa hidup bersamaan.** `CctvScreen` embedded tidak membuat
   `WebViewController` sampai `_startStream()` dipanggil, yaitu sampai user menekan
   tombol play — jadi halaman yang tidak dipakai tidak memakai bandwidth. Tapi kalau
@@ -939,6 +949,42 @@ Konvensi ini terukur di **satu** device per BMS. Ganti BMS tanpa mengukur ulang
 akan membalik semua tampilan tanpa indikator error apa pun; caranya terdokumentasi
 di komentar `battery_sign.dart` — amati tren SOC satu menit dengan tanda tetap,
 lalu perbarui test dengan pengukuran di reason string-nya.
+
+### 18.7 Default di Settings bukan limit yang tersimpan
+
+Ditemukan di perangkat pada 29 September 2026, dan sudah diperbaiki — dicatat di
+sini karena mekanismenya akan mendapat call site baru setiap rilis.
+
+**Yang terjadi.** Fish tank alerts menampilkan `Max (NTU) 100` dengan sakelar
+aktif, sementara turbidity terbaca 2396 NTU dan grid Fish tidak memberi warna
+apa pun. Grid itu benar: tidak ada limit, jadi tidak ada yang dilanggar. Yang
+berdusta adalah layar Settings. Field itu berisi **default yang belum
+pernah disimpan** — `load()` mempertahankan prefill ketika key tidak ada, dan
+prefill itu secara visual identik dengan nilai yang tersimpan. Native
+konsekuennya mencatat `19 rule(s)`, bukan 20: batas turbidity memang tidak
+pernah masuk ke preference store.
+
+**Kenapa bisa terjadi.** Key `fish_turbidity_max` baru lahir di 1.6.0. Kalau
+pengguna menyimpan Settings sebelum rilis itu, semua limit lain tersimpan dan
+hanya yang baru ini yang tidak. Tidak ada yang rusak, tidak ada yang error, dan
+tidak ada yang memberi tahu: field-nya diisi, sakelarnya nyala, dan grid-nya
+diam.
+
+**Perbaikannya** di `EnvRangeSetting`, bukan di parameter turbidity:
+`minIsPrefill` / `maxIsPrefill` terisi true kalau ada default **dan** ada key,
+`load()` membersihkannya hanya kalau key benar-benar ditemukan, `save()`
+membersihkannya setelah berhasil. Di UI, angka prefill dirender miring-redup
+dengan caption `Not saved yet`, dan tiap section menyebut jumlahnya sekali.
+Pinned oleh `test/settings_prefill_test.dart`.
+
+**Yang masih belum tertutup.** Kalau sebuah limit ditambahkan ke `defaults` dan
+`*Ranges` tanpa satu baris pun, ia akan tampil sebagai prefill — itu memang
+perilaku yang diinginkan sekarang. Risiko yang tersisa adalah limit yang
+ditambahkan ke `AlarmThresholds.minFor`/`maxFor` tapi **tidak** punya
+`defaultMin`/`defaultMax` di `SettingsController`: field-nya kosong, jadi tidak
+ada penanda, dan tidak monitored — konsisten, tapi tidak terlihat. Menutup itu
+berarti membuat daftar `minFor`/`maxFor` dan daftar field Settings diuji
+saling cocok, dan itu belum ada.
 
 ---
 

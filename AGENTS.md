@@ -49,8 +49,11 @@ Three layers, consistently applied:
    state. `TelemetryCard(data:, metrics:, seedColor:)`, not a `MetricCard` that
    pulls from `DashboardScreenState`.
 3. **No singletons for data.** Values arrive as named parameters. The only
-   singletons are the two real stores: `AlarmHistoryService` (SharedPreferences
-   backed) and the `WeatherService` the dashboard holds for its lifetime.
+   singleton left is the one real store, `AlarmHistoryService`
+   (SharedPreferences backed). There used to be a second one — `WeatherService`,
+   held for the dashboard's lifetime — but the whole OpenWeatherMap integration
+   was removed in 1.6.0 (`FEATURE.md` §8). Do not reintroduce a service-holding
+   singleton "just for caching".
 
 `provider` is declared in `pubspec.yaml` but **never imported**. The app uses raw
 `ChangeNotifier` plus `ListenableBuilder` / `AnimatedBuilder` and a custom
@@ -307,7 +310,71 @@ worth keeping, because each of these is easy to break by accident:
 Do not relax any of these without re-reading the reasoning above. Two of the
 findings that mattered most were in code written the same week.
 
-## Environment (CachyOS / Arch)
+## Environment
+
+**The project has been built on two machines, and the toolchain is not
+identical between them.** Flutter, Dart and the RAM class are the same on both,
+so nothing in this repo has to change when you switch — but the *paths* and the
+*shell* do, and getting them wrong is the first thing that breaks a build.
+
+### Windows — current machine
+
+Shell is **PowerShell** (`pwsh`), not cmd and not bash. Write PowerShell syntax
+in anything addressed to the user.
+
+| Component | Version | Path |
+|---|---|---|
+| Flutter | 3.47.5 stable | `C:\src\flutter` (already on `PATH`) |
+| Dart | 3.13.4 | ships with Flutter |
+| OpenJDK | 21 | `C:\Program Files\Java\jdk-21` |
+| JDK Flutter hands to `flutter build` | 25 (Android Studio JBR) | `C:\Program Files\Android\Android Studio\jbr` |
+| Android SDK | 36.0.0 | `C:\Users\Fauzan\AppData\Local\Android\Sdk` (already on `PATH`) |
+| adb | — | `...\Android\Sdk\platform-tools` (already on `PATH`) |
+| Gradle user home | — | `C:\Users\Fauzan\.gradle` |
+| RAM / cores | 7,3 GB / 8 | same class as the Linux box, so `concurrency: 1` still applies |
+
+`flutter` and `adb` need **no** `PATH` change. `ANDROID_HOME`, `ANDROID_SDK_ROOT`
+and `JAVA_HOME` are **not** set in the environment.
+
+`gradlew.bat` nevertheless runs without `JAVA_HOME`, because the wrapper falls
+back to `java` on `PATH` — Oracle's `javapath` shim, Java 21. That fallback
+works, but it is a shim and not the JDK, so set it explicitly when you want the
+toolchain to be deterministic:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
+```
+
+Note the asymmetry, because it is the kind of thing that costs an afternoon:
+`flutter build` passes Android Studio's JBR (Java 25) down to Gradle, while a
+direct `gradlew.bat` call uses `JAVA_HOME` (Java 21). Both were verified to
+compile and build this project. If Gradle ever behaves differently between the
+two invocations, that is the first thing to check.
+
+**`android/local.properties` is machine-specific and git-ignored.** A checkout
+that moved between machines still holds the *other* machine's paths, and this is
+the most common cause of a first-build failure here:
+
+```
+sdk.dir=C\:\\Users\\Fauzan\\AppData\\Local\\Android\\Sdk
+flutter.sdk=C\:\\src\\flutter
+```
+
+Flutter rewrites this file itself, so a wrong value usually self-heals on the
+next `flutter` command. It does **not** self-heal for a bare `gradlew.bat`,
+which reads the file directly — that is how a stale Linux path surfaces as
+`flutter.sdk not set in local.properties` on a machine that plainly has Flutter
+installed. Check this file first whenever a build dies before the Dart or Kotlin
+stage.
+
+Deliberately not installed, and not needed for an Android build: **Visual
+Studio** ("Desktop development with C++"), so `flutter build windows` cannot
+work, and **Chrome**, so `flutter run -d chrome` cannot work. Both appear red in
+`flutter doctor` and both are irrelevant to this app, which is Android-only —
+the alarm module is native Kotlin, and `AlarmBridge` latches to no-op everywhere
+else.
+
+### Linux — CachyOS / Arch, previous machine
 
 Toolchain lives in `$HOME`, only the JDK needs root:
 
@@ -326,9 +393,11 @@ bash — write fish syntax, not bash.
 `~/dev/setup-energrow.sh` re-creates the whole toolchain idempotently.
 `./setup-energrow.sh --check` audits without changing anything.
 
-## dl.google.com is throttled — use curl
+## `dl.google.com` is throttled — use `curl`
 
-**This is the single biggest time sink on this machine.**
+**This was the single biggest time sink on the Linux machine.** It is a property
+of *that machine's network*, not of the project, and it has **never been
+re-measured on Windows** — see the caveat at the end of this section.
 
 AGP and the Gradle wrapper download from `dl.google.com` and
 `services.gradle.org` at **65–114 KB/s**. `curl -L` to the same URLs reaches
@@ -359,6 +428,14 @@ before `<url>` inside `<complete>`, and `<host-os>` sits *outside* `<complete>`.
 The NDK ships one `<archive>` per host OS, so the linux entry has to be selected
 explicitly.
 
+**Caveat for Windows.** The Windows machine was never benchmarked for this, and
+the first release build there completed in 386 s with `gradle-9.3.1-bin` and the
+NDK *already present* in `C:\Users\Fauzan\.gradle` and the SDK. So a normal build
+downloads nothing and says nothing about throughput — it is not evidence that
+the throttle is gone. If a first-time Windows build ever stalls on a download,
+assume the same throttle applies and pre-stage with `curl.exe`; only measure
+before claiming otherwise.
+
 ## Gradle memory
 
 `android/gradle.properties` originally requested `-Xmx8G -XX:MaxMetaspaceSize=4G`,
@@ -366,8 +443,17 @@ i.e. 12 GB on a machine with 7.1 GB total. That cannot be satisfied. It is now
 `-Xmx1536M` plus a 1 GB Kotlin daemon. Leave headroom for the DE, a browser and
 adb — the sum must stay under physical RAM or the daemon gets OOM-killed.
 
+The Windows machine is the same class — 7,3 GB and 8 logical cores — so these
+values are correct there too and must not be raised. `dart_test.yaml`'s
+`concurrency: 1` is correct on both for the same reason.
+
+Evidence that the ceiling is real, not theoretical: the Linux checkout arrived
+with three `Daemon compilation failed` logs under `android/.kotlin/errors/`.
+That is the Kotlin daemon losing its fight for memory, and it fails exactly the
+way the OOM warning predicts — a message about compilation, never about memory.
+
 If a build is ever run on a larger machine, raise these. They are tracked in git
-and shared with Windows builds.
+and shared between the Linux and Windows builds.
 
 ## The NDK is downloaded but never used
 
@@ -411,6 +497,11 @@ that if a future dependency genuinely needs the NDK it resolves to the version
 plugins actually request. The unavoidable download is best handled by
 pre-fetching it fast; `~/dev/setup-energrow.sh` does that with `curl`.
 
+On the Windows machine the NDK is likewise already installed and equally
+unused — `ndk\28.2.13676358` and `ndk\30.0.16248370` plus `cmake\3.22.1` and
+`cmake\4.1.2` are all present in the SDK, and the release build produced no
+`libdartjni.so`. Same conclusion, arrived at twice, on two machines.
+
 ## Physical device over wireless debugging
 
 Test device: Xiaomi 24090RA29G, codename `malachite`, Android 16 / API 36,
@@ -432,7 +523,10 @@ Gotchas, all hit in practice:
   port is the one the main Wireless debugging screen shows.
 - **A mismatched key fails as "failed to connect", not "refused".** The local
   `~/.android/adbkey` is created fresh on first use, so a phone that was paired
-  from another machine needs "Revoke pairings" then re-pairing.
+  from another machine needs "Revoke pairings" then re-pairing. This bites
+  specifically on a machine switch: the key lives at
+  `C:\Users\<user>\.android\adbkey` on Windows, so the phone paired with Linux
+  has never seen the Windows key and will fail until it is re-paired.
 - Flutter only accepts `-d` as `IP:port`; the mDNS serial form is rejected even
   though it appears in `flutter devices`.
 - adb 37 auto-registers mDNS-discovered devices, so one physical phone shows up as
@@ -448,9 +542,11 @@ actually bitten:
   modified. `.gitattributes` (`* text=auto eol=lf`) plus `git config
   core.autocrlf input` in this repo fixed it permanently. Do not reintroduce
   CRLF churn.
-- `local.properties` is git-ignored and machine-specific. It held Windows paths
-  (`C:\src\flutter`). Flutter regenerates it, but a first-build failure is worth
-  checking there first.
+- `local.properties` is git-ignored and machine-specific. It has now held paths
+  from **both** machines — `C:\src\flutter` first, then `/home/fzn/dev/flutter`
+  after the project moved to Linux, then Windows again. Flutter regenerates it,
+  but a first-build failure is worth checking there first, and a bare
+  `gradlew.bat` needs it to already be right.
 - NTFS is case-insensitive. Verified safe: the only same-named Dart files are
   `chart_card.dart` in two different directories. Keep it that way.
 - Gradle writes thousands of small files to `build/` and `.dart_tool/`. This works
@@ -459,20 +555,32 @@ actually bitten:
 ## Test suite
 
 ```
-flutter analyze     # must stay clean
-flutter test        # 273 tests
-cd android && ./gradlew :app:testDebugUnitTest   # 11 tests, alarm parity + host allowlist
+flutter analyze                                          # must stay clean
+flutter test                                             # 273 tests
+cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 
-The Gradle unit tests need `JAVA_HOME` and `ANDROID_HOME` exported. They exist to
-replay `alarm_parity_vectors.json` through the Kotlin evaluator, because that
-half of the alarm logic has no other coverage and cannot be reached from
-`flutter test`. `org.json` is a stub in a local unit test classpath and throws,
-which is why `build.gradle.kts` puts a real `org.json` in front of it for the test
-source set only.
+All three were re-run green on Windows on 29 September 2026. On Windows the
+third command is `.\gradlew.bat` instead of `./gradlew`:
 
-`dart_test.yaml` sets `concurrency: 1` **on purpose**. The machine has 7.1 GB RAM
-and only 1.4–2.4 GB free during a test run; the Dart compiler and the test
+```powershell
+flutter analyze
+flutter test
+cd android; .\gradlew.bat :app:testDebugUnitTest --console=plain
+```
+
+It resolves `JAVA_HOME` from `java` on `PATH` when the variable is unset, so on
+Windows it runs without any environment setup at all. On Linux both
+`JAVA_HOME` and `ANDROID_HOME` are required and must be exported first.
+
+The Gradle unit tests exist to replay `alarm_parity_vectors.json` through the
+Kotlin evaluator, because that half of the alarm logic has no other coverage and
+cannot be reached from `flutter test`. `org.json` is a stub in a local unit test
+classpath and throws, which is why `build.gradle.kts` puts a real `org.json` in
+front of it for the test source set only.
+
+`dart_test.yaml` sets `concurrency: 1` **on purpose**. Both machines have ~7 GB
+of RAM and only 1.4–2.4 GB free during a test run; the Dart compiler and the test
 isolate compete and the loser gets OOM-killed. The symptom is misleading —
 "did not complete" for a whole file, or a bare "loading x.dart" failure, with no
 stack trace, and the failing file moves between runs. **Do not raise the
@@ -578,22 +686,24 @@ after each load.
   Upgrading `flutter_secure_storage` to 11.x would require also upgrading
   `flutter_secure_storage_platform_interface` (pinned in dev_dependencies
   for testing). This is a **coordinated upgrade** — do not attempt it piecemeal.
-- `thingsboard_api.dart` (~500 lines) is the integration core and has 24 tests
+- `thingsboard_api.dart` (~560 lines) is the integration core and has 24 tests
   covering token/session handling, WebSocket URI construction, telemetry key
   sets, and offline caching. `thingsboard_realtime_service.dart` has 21 tests
   covering service lifecycle, device configuration, and telemetry models.
-  `weather_service.dart` has 15 tests covering both current-weather and One
-  Call API parsing, serialization, and computed properties.
-- `WeatherForecast.fromJson` now uses `WeatherData.fromOneCallJson` to correctly
-  parse One Call API payloads. Previously it used `WeatherData.fromJson` which read
-  `main.temp` / `wind.speed` / `coord` — keys that do not exist in that format.
-- `WeatherService.searchCities` calls the geocoding endpoint over HTTPS (was
-  cleartext HTTP, fixed in commit 1ecafc5).
-- `WeatherService` now has a `dispose()` method that releases the GPS handle
-  and cached coordinates. The dashboard calls it in its own `dispose()`.
+- **Everything about weather in this file used to be here and is now gone.** The
+  `WeatherService`, its 15 tests, the One Call parsing fix, the HTTPS geocoding
+  fix, and the `dispose()`/GPS-handle work were all deleted together with the
+  OpenWeatherMap integration in 1.6.0 — see `FEATURE.md` §8 for what was lost
+  and why. Kept as a note because the reasoning is worth having: the integration
+  was removed for duplicating numbers that other tabs already showed, and because
+  `weather_api_key` was the only credential in plain `SharedPreferences` instead
+  of secure storage. The lesson generalises — a new integration that only
+  re-presents existing telemetry is a candidate for the same treatment, and a new
+  credential belongs in `flutter_secure_storage` from the first commit.
 - `dart_test.yaml`, the JVM heap in `gradle.properties`, and the
-  `gradle-wrapper` `-bin` distribution are Linux-motivated but tracked in git, so
-  they affect Windows builds too.
+  `gradle-wrapper` `-bin` distribution were chosen for the 7 GB Linux machine but
+  are tracked in git, so they apply to Windows builds too. The Windows machine is
+  the same RAM class, so the values are still correct there.
 - The alarm module is Android-only and nothing degrades gracefully yet. On iOS,
   desktop and web, `AlarmBridge` sees `MissingPluginException`, latches
   `isUnavailable`, and every call becomes a no-op. That is safe but means

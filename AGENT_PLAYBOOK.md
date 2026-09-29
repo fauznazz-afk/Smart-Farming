@@ -22,7 +22,7 @@ kecuali dua, dan ketiganya menjawab pertanyaan yang berbeda.
 | # | File | Yang harus Anda dapatkan dari sana |
 |---|---|---|
 | 1 | `AGENTS.md` | Aturan yang tidak boleh dilanggar **dan alasannya**. Termasuk §"Background alarms are native Kotlin", §"Security posture", §"Colour is never varied automatically", §"The battery sign convention", dan §"dl.google.com is throttled". |
-| 2 | `FEATURE.md` | Apa yang **sudah ada**. §18 mencantumkan celah yang diketahui — 9 celah fungsional, 20+ simbol mati, 7 perilaku counterintuitive, 5 celah test, 6 hal yang belum pernah dilihat di perangkat. |
+| 2 | `FEATURE.md` | Apa yang **sudah ada**. §18 mencantumkan celah yang diketahui — 4 celah fungsional, 3 simbol mati, 6 perilaku counterintuitive, 5 celah test, dan 8 hal yang belum pernah dilihat di perangkat. |
 | 3 | `progress.md` | Riwayat keputusan dan alasannya. §9A "Percobaan yang Gagal - Jangan Diulang" dan §11 "Gotcha" adalah bagian yang paling menyelamatkan waktu. |
 | 4 | `CHANGELOG.md` | Section `[Unreleased]` — apa yang sudah dikerjakan tapi belum dirilis, supaya Anda tidak mengerjakannya dua kali. |
 | 5 | `PRD_PLTS_Monitoring_App.md` | Arah produk. §7 memuat rekomendasi berikutnya yang **sudah diurutkan** — baca sebelum/usulan jangan membuat prioritas sendiri. |
@@ -43,19 +43,19 @@ Kalau ada yang belum bisa Anda jawab, **Anda belum cukup membaca**.
 
 | Angka | Nilai |
 |---|---|
-| File Dart di `lib/` | 67 |
-| Baris Dart | ~14 300 |
+| File Dart di `lib/` | 68 |
+| Baris Dart | ~13 200 |
 | File Kotlin | 15 (13 di modul alarm) |
-| File test | 14, melaporkan **227 test** |
-| File terbesar | `lib/screens/dashboard_screen.dart` — 1 541 baris |
+| File test | 19, melaporkan **273 test** |
+| File terbesar | `lib/screens/dashboard_screen.dart` — 1 745 baris |
 
 Lima file yang paling sering jadi sumber bug, karena isinya besar dan dipakai
 semua halaman:
 
 | File | Kenapa |
 |---|---|
-| `lib/screens/dashboard_screen.dart` | State, polling, riwayat, evaluasi alarm, dan susunan 5 halaman dalam satu file. 1 541 baris. |
-| `lib/utils/alarm_rules.dart` | Satu-satunya definisi apa yang Counts sebagai alarm. Duplikasinya ada di Kotlin. |
+| `lib/screens/dashboard_screen.dart` | State, polling, riwayat, evaluasi alarm, dan susunan 5 halaman dalam satu file. 1 745 baris. |
+| `lib/utils/alarm_rules.dart` | Satu-satunya definisi apa yang dihitung sebagai alarm. Duplikasinya ada di Kotlin. |
 | `lib/widgets/liquid_glass.dart` | `LiquidGlassCard` dan `AmbientBackground` dipakai semua kartu. Perubahan di sini terlihat di mana-mana. |
 | `lib/services/thingsboard_api.dart` | Client REST, lifecycle token, cache offline. |
 | `lib/screens/dashboard/widgets/chart_card.dart` | Chart 3 seri, sumbu, tooltip, statistik. |
@@ -160,8 +160,8 @@ tool/generate_alarm_parity_fixture.dart
   perubahannya memang disengaja.
 - Setelah mengubah string, jalankan **kedua** sisi:
   `flutter test test/alarm_parity_test.dart` dan
-  `cd android && ./gradlew :app:testDebugUnitTest`. Kalau Anda hanya menjalankan
-  yang Dart, Anda belum memverifikasi apa pun.
+  `cd android && ./gradlew :app:testDebugUnitTest` (Windows: `.\gradlew.bat`).
+  Kalau Anda hanya menjalankan yang Dart, Anda belum memverifikasi apa pun.
 
 ### 4.2 Aturan alarm: satu daftar untuk dua evaluator
 
@@ -189,19 +189,28 @@ Ubah satu, ubah yang lain.
 
 ## 5. Lingkungan — angka yang harus Anda tahu sebelum menjadwalkan sesuatu
 
+Repo ini pernah dibangun di **dua mesin**: CachyOS/Arch lalu Windows 11. Angka
+RAM dan core sama-sama 7 GB, jadi keputusan di sini berlaku untuk keduanya.
+Yang berbeda adalah shell dan path, jadi **tanyakan atau cek mana yang aktif**
+sebelum menulis perintah untuk user.
+
 | Fakta | Nilai | Konsekuensi |
 |---|---|---|
-| RAM total | 7 249 MB | — |
-| RAM tersedia saat diukur | 1 834 MB | **hanya satu proses build/test boleh jalan** |
-| CPU | 8 core | — |
+| RAM total | 7 249 MB (Linux) · 7,3 GB (Windows) | — |
+| RAM tersedia saat diukur | 1 834 MB (Linux) · 0,4 GB (Windows, saat Gradle jalan) | **hanya satu proses build/test boleh jalan** |
+| CPU | 8 core (kedua mesin) | — |
 | `dart_test.yaml` | `concurrency: 1` | **dengan sengaja**; naikkan hanya setelah cek RAM |
-| Shell default | **fish**, bukan bash | tulis sintaks fish di pesan ke user; skrip shell tetap bash |
-| `flutter analyze` | ~5 s | jalankan sering, jangan ditunda |
-| `flutter test` | ~23 s | jalankan setiap perubahan |
-| `cd android && ./gradlew :app:testDebugUnitTest` | ~7 s | hanya setelah alarm/rule berubah |
-| `flutter build apk --release` | 2–4 menit | **letakkan di latar belakang** |
-| `dl.google.com` | 65–114 KB/s | **jangan pernah** biarkan AGP/Gradle mengunduh; pakai `curl -fL` (7–44 MB/s). Detail di `AGENTS.md`. |
+| Shell default | **fish** di Linux, **PowerShell** di Windows | pakai sintaks shell yang sedang aktif |
+| `flutter analyze` | ~5 s (Linux) · 15 s (Windows) | jalankan sering, jangan ditunda |
+| `flutter test` | ~23 s (Linux) · ~45 s (Windows) | jalankan setiap perubahan |
+| `cd android && ./gradlew :app:testDebugUnitTest` | ~7 s (Linux) · 2 m 50 s (Windows, cold) | hanya setelah alarm/rule berubah |
+| `flutter build apk --release` | 2–4 menit (Linux) · 386 s (Windows, cold) | **letakkan di latar belakang** |
+| `dl.google.com` | 65–114 KB/s **di Linux saja** | **jangan pernah** biarkan AGP/Gradle mengunduh di Linux; pakai `curl -fL`. Detail di `AGENTS.md`. |
 | NDK | terunduh ~2,3 GB, **tidak terpakai** | jangan coba "memperbaikinya" |
+
+Angka Windows diukur pada build **cold**, jadi angka warm akan jauh lebih kecil.
+Jangan membandingkan angka satu mesin dengan yang lain dan menyimpulkan ada
+regresi performa — itu mengukur cache, bukan kode.
 
 ### kenapa `concurrency: 1`
 
@@ -212,10 +221,56 @@ memori, atau kegagalan telanjang "loading x.dart" tanpa stack trace, dan file ya
 gagal **berpindah-pindah antar run**. Mengganti gejalanya dengan berulang-ulang
 menjalankan test adalah cara yang salah. Biarkan satu proses.
 
+Bukti bahwa batasnya nyata: checkout dari mesin Linux membawa tiga log
+`Daemon compilation failed` di `android/.kotlin/errors/` — Kotlin daemon kalah
+melawan memori, dan pesannya menyebut kompilasi, tidak pernah menyebut memori.
+
+### OOM baru yang terukur di Windows
+
+Terjadi nyata pada 29 September 2026, dan bentuknya persis seperti yang
+dideskripsikan di atas — jadi ini bukan kerusakan yang perlu dicari di dalam test:
+
+```
+flutter analyze; flutter test
+# -> "cctv_test.dart: CctvViewport offline offers retry and back (did not complete)"
+#    ... and 10 more
+# -> Exited with code 1
+```
+
+Dijalankan terpisah, `flutter analyze` tulis "No issues found!" dan
+`flutter test` tulis "All tests passed!" 273. Tidak ada kode yang berubah di
+antara keduanya.
+
+Penyebabnya bukan `concurrency: 1` yang salah — itu sudah benar. Penyebabnya
+**Gradle daemon yang masih hidup** dari `flutter build apk --release` sebelumnya,
+masih memegang ~1 GB saat test mulai. Free RAM saat itu 1,4 GB, dan compiler Dart
+ikut mengambil bagian. Setelah daemon selesai, run kedua langsung hijau.
+
+Jadi aturan praktisnya:
+
+- **Jangan merangkai `flutter analyze` dan `flutter test` dalam satu perintah**
+  tepat setelah build Gradle. Jalankan `./gradlew --stop`
+  (`.\gradlew.bat --stop` di Windows) lebih dulu, atau sisipkan jeda.
+- Kalau `flutter test` gagal dengan `did not complete` atau `loading x.dart`
+  tanpa stack trace, **cek free RAM dan proses yang masih hidup sebelum membaca
+  kode test.** Hampir pasti OOM.
+
 Konsekuensi untuk agen: **jangan pernah menjalankan dua `flutter test` bersamaan,
 dan jangan minta agen backgroundEQ menjalankan test.** A jalankan di akhir.
 
 ### Path yang perlu Anda export
+
+Windows — hampir tidak ada yang perlu, `flutter` dan `adb` sudah ada di `PATH`:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"   # opsional; lihat catatan di bawah
+```
+
+`gradlew.bat` berjalan tanpa `JAVA_HOME` karena wrapper memakai `java` di `PATH`.
+`ANDROID_HOME`, `ANDROID_SDK_ROOT` dan `JAVA_HOME` tidak di-set di environment,
+jadi jangan menulis perintah yang bergantung pada variabel itu ada.
+
+Linux:
 
 ```bash
 export PATH="$HOME/dev/flutter/bin:$PATH"
@@ -223,6 +278,19 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 export ANDROID_HOME=$HOME/Android/Sdk
 export PATH="$HOME/Android/Sdk/platform-tools:$PATH"
 ```
+
+### Perintah yang berbeda per mesin
+
+| Aksi | Linux | Windows |
+|---|---|---|
+| Gradle | `cd android && ./gradlew …` | `cd android; .\gradlew.bat …` |
+| Sanity check file | `grep -qU $'\r' file` | `Select-String -Pattern "`r" -Quiet file` (atau `git` saja) |
+| Loop normalisation CRLF | loop bash + `awk` | loop PowerShell, atau `git add --renormalize .` |
+| Heredoc | `python3 - <<'PY' … PY` | PowerShell tidak punya heredoc yang sama; pakai `@'…'@` atau file sementara |
+
+**Aturan umum:** jangan pernah menempelkan perintah bash ke user Windows. Kalau
+perlu sesuatu yang hanya ada di bash, katakan perintahnya Linux dan sebut bahwa
+tidak jalan di sini — lebih baik daripada memberi perintah yang pasti gagal.
 
 ---
 
@@ -247,19 +315,23 @@ Kalau Anda hanya mengingat satu bagian, ini bagiannya.
    pernah dicetak meski untuk "memverifikasi" — periksa **kunci yang ada**, bukan
    nilainya.
 6. **Satu `[Unreleased]` saja di `CHANGELOG.md`.** Entri yang bertentangan dengan
-   kondisi akhir diperbaiki, bukan ditumpuk._merge yang bersih juga diperbaiki.
+   kondisi akhir diperbaiki, bukan ditumpuk. Merge yang bersih juga diperbaiki.
 7. **Verifikasi klaim yang sudah tertulis di komentar.** Komentar "in Indonesian"
    setelah Anda menerjemahkan UI jadi fakta salah yang sekarang mengarahkan orang
    salah.
 8. **Jangan menambahkan dependensi untuk masalah yang bisa diselesaikan dengan
    kode yang sudah ada.** Provider, geocoding, dan csv sudah pernah dihapus
    karena tidak pernah di-import.
+9. **Jangan menempelkan perintah bash ke user Windows.** Shell aktifnya
+   PowerShell, dan `grep`, `awk`, heredoc, dan `sleep` tidak ada di sana.
+   Perintah yang benar-benar lintas-platform harus ditulis ulang per shell; jika
+   tidak sempat, katakan bahwa itu perintah Linux.
 
 ---
 
 ## 7. Jebakan yang sudah memakan waktu
 
-Diurutkan menurut biaya yang pernahiserserobot.
+Diurutkan menurut biaya yang pernah menyita waktu.
 
 ### 7.1 Konten file bisa berubah di balik layar
 
@@ -269,6 +341,11 @@ Kata Indonesia berubah menjadi CJK atau Hangul di beberapa dokumen — termasuk 
 PRD dan `progress.md` milik sesi ini.
 
 Gejalanya sangat mudah disalahpahami: file *terlihat* benar.
+
+Baru terjadi lagi saat dokumen ini ditulis di Windows: beberapa kata Indonesia
+mengubah bentuknya menjadi CJK di draf yang masih halfway jadi, dan tidak
+terdeteksi sampai pemeriksaan karakter dijalankan. Jadi ini bukan hanya teoritis
+untuk mesin ini.
 
 ```bash
 # 1. CRLF
@@ -286,7 +363,29 @@ for f in ('PRD_PLTS_Monitoring_App.md','progress.md','CHANGELOG.md','AGENTS.md')
 "
 ```
 
-Jalankan dua perintah itu setelah setiap perubahan dokumen yang besar.
+Setara di Windows, tanpa `python3`:
+
+```powershell
+foreach ($f in (git status --porcelain | ForEach-Object { $_.Substring(3) })) {
+  if (Test-Path $f -PathType Leaf) {
+    $b = [IO.File]::ReadAllBytes($f)
+    if ($b -contains 13) { "CRLF: $f" }
+  }
+}
+foreach ($f in @('AGENTS.md','AGENT_PLAYBOOK.md','FEATURE.md','progress.md',
+                 'CHANGELOG.md','README.md','PRD_PLTS_Monitoring_App.md')) {
+  $bad = [IO.File]::ReadAllText($f).ToCharArray() |
+    Where-Object { ($_ -ge [char]0x4e00 -and $_ -le [char]0x9fff) -or
+                   ($_ -ge [char]0xac00 -and $_ -le [char]0xd7af) -or
+                   ($_ -ge [char]0x3040 -and $_ -le [char]0x30ff) } |
+    Select-Object -Unique
+  if ($bad) { "$f CORRUPT: $($bad -join '')" } else { "$f OK" }
+}
+```
+
+Jalankan dua pemeriksaan itu setelah setiap perubahan dokumen yang besar, di
+mesin mana pun. `AGENT_PLAYBOOK.md` sendiri ikut diperiksa, karena ia yang
+mendeskripsikan perangkapnya.
 
 ### 7.2 Backtick di dalam `python3 -c "..."` dihapus oleh bash
 
@@ -357,6 +456,84 @@ bawah angka besarnya, dan sebagai label capsule. Dua yang pertama dihapus.
 angka yang paling tidak boleh hilang. Satu angka per baris.
 
 
+### 7.10 `screencap` mengembalikan layar hitam saat ada jendela `FLAG_SECURE`
+
+Terjadi nyata pada 29 September 2026, dan Mahal karena saya membaca resulting
+layar hitam sebagai "aplikasi hang" lalu dilaporkan sebagai temuan.
+
+Aplikasi EnerGrow lewat layar kunci biometrik saat cold start. Prompt sidik jarinya
+bukan window aplikasi: MIUI menampilkannya sebagai **dua `com.miui.securitycenter
+/.FloatingWindow`**. Jendela itu `FLAG_SECURE`, dan selama ada jendela secure di
+layar, `adb shell screencap` mengembalikan **hitam penuh untuk seluruh display** —
+bukan hanya area window-nya. Yang tetap terlihat cuma satu cincin brightness
+180 di y≈2438, yaitu indikator sidik jari, dan itu membuat file PNG-nya kecil
+(31 KB) dan *byte-identical* antar dua screenshot yang diambil 3 detik terpisah.
+
+Tiga kesalahan yang lahir dari sana, semuanya karena mempercayai yang dilihat:
+
+1. "Layar hitam" → dilaporkan sebagai bug aplikasi. Bukan.
+2. "Spinner" → dilaporkan sebagai `CircularProgressIndicator` yang macet. Justru
+   cincin penuh, abu-abu, ketebalan seragam — bukan busur berputar.
+3. "Aplikasi tidak merespons" → saya memindai `BLASTBufferQueue` yang melaporkan
+   120 fps, jadi jelas *sedang* merender.
+
+Cara mengenali dalam satu detik, sebelum menebak apa pun:
+
+```powershell
+# 1. jendela secure milik siapa
+adb shell dumpsys window windows | Select-String "FloatingWindow|Biometric|Fingerprint"
+# 2. tutup prompt-nya, lalu lihat apakah layarnya kembali
+adb shell input keyevent KEYCODE_BACK
+# 3. dua screenshot 3 detik apart, bandingkan ukuran file
+adb shell screencap -p /sdcard/a.png; Start-Sleep 3; adb shell screencap -p /sdcard/b.png
+adb pull /sdcard/a.png; adb pull /sdcard/b.png
+```
+
+Kalau ukuran file lompat dari ~31 KB ke ~1,1 MB setelah prompt ditutup, itu
+bukan bug — itu `screencap` yang sebelumnya diblokir. **Ukuran file PNG adalah
+sinyal yang lebih cepat dan lebih jujur daripada menatap gambarnya.**
+
+Konsekuensi praktis: **aplikasi yang butuh biometrik tidak bisa diuji visual
+sambil prompt-nya terbuka.** Selama itu terbuka, satu-satunya yang bisa dibuktikan
+adalah `logcat`, `dumpsys`, dan `pm`.
+
+### 7.11 `shouldAcceptUserOffset` tidak meng-gate drag sentuh
+
+Ditemukan 29 September 2026, saat memperbaiki bug "infinite page" di pager
+dashboard. Komentar lama di `chart_gesture_lock.dart` mengklaim flag-nya
+*"consulted when a drag begins, not when the widget is built"*. Itu **salah**
+untuk Flutter 3.47.5, dan membaca sumbernya memakan lima menit yang tidak
+dibuang-buang:
+
+`shouldAcceptUserOffset` hanya dibaca di tiga tempat, dan tidak satu pun di
+tengah-tengah drag sentuh:
+
+| Tempat | Kapan |
+|---|---|
+| `ScrollPositionWithSingleContext.applyNewDimensions` | saat layout — hasilnya di-cache jadi `canDrag` |
+| `ScrollableState._receivedPointerSignal` | hanya `PointerScrollEvent` (scroll wheel) |
+| `scrollable_helpers.dart`, `scrollbar.dart` | aksi scroll & scrollbar |
+
+Artinya `canDrag` **latch**: `setCanDrag(false)` melepas
+`_gestureRecognizers`, dan tidak ada yang memasangnya lagi tanpa
+`setCanDrag(true)`, yang hanya dipanggil dari `applyNewDimensions`.
+
+Dua konsekuensi yang harus diingat:
+
+- **`allowUserScrolling` bukan gate per-gestur.** Ia dibaca saat `Scrollable`
+  memutuskan boleh drag — saat build. Mengikutinya membuat kunci lengket.
+  Hook yang benar adalah `shouldAcceptUserOffset`, dan meski pun begitu ia hanya
+  berefek lewat relayout yang kebetulan terjadi saat jari ditekan (`fl_chart`
+  repaint saat pointer bergerak, jadi jalurnya memang ada).
+- **Physics yang meng-*gate* harus meneruskan semua method, bukan cuma yang
+ _accept_ gesture.** `createBallisticSimulation` yang tidak diteruskan membuat
+  fling jatuh ke friksi biasa dan pager kehilangan snap — itu bug "infinite
+  page", dan test dengan **satu** swipe tetap lulus. Uji butuh delapan swipe.
+
+Dan aturan yang berlaku untuk semua di atas: **verifikasi klaim dengan mengukur,
+bukan dengan melihat.** Saya salah membaca layar hitam dua kali dan salah
+melaporkan tiga bug yang bukan bug sebelum berhenti dan mengukurnya.
+
 ---
 
 ## 8. Gate verifikasi
@@ -365,6 +542,7 @@ angka yang paling tidak boleh hilang. Satu angka per baris.
 murah dan menangkap paling banyak kesalahan sebelum test jalan.
 
 ```bash
+# Linux
 export PATH="$HOME/dev/flutter/bin:$PATH"
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 export ANDROID_HOME=$HOME/Android/Sdk
@@ -374,6 +552,17 @@ flutter test             # wajib "All tests passed!"   ~23 s
 cd android && ./gradlew :app:testDebugUnitTest --console=plain   # 11 test, ~7 s
 ```
 
+```powershell
+# Windows — flutter dan adb sudah di PATH, tidak ada yang perlu di-set
+flutter analyze          # wajib "No issues found!"   ~15 s
+flutter test             # wajib "All tests passed!"   ~45 s
+cd android; .\gradlew.bat :app:testDebugUnitTest --console=plain   # 11 test, 2 m 50 s cold
+```
+
+Angka di komentar adalah **cold** di Windows dan **warm** di Linux. Bandingkan
+hanya terhadap gate ("No issues found", "All tests passed", BUILD SUCCESSFUL),
+jangan terhadap durasi.
+
 Aturan tambahan:
 
 - `flutter test` **hanya boleh satu proses.** Kalau muncul
@@ -382,7 +571,11 @@ Aturan tambahan:
 - Gradle hanya wajib kalau alarm, rule, atau `AlarmMessageFormat.kt` berubah.
 - Kalau Anda menambahkan test, hitung ulang angka yang Anda sebut di dokumen dan
   di commit message. Angka basi lebih merusak daripada tidak menyebutnya.
-- APK release: `flutter build apk --release`, 2–4 menit. **Latar belakang.**
+- APK release: `flutter build apk --release`, 2–4 menit di Linux, ~6 menit cold
+  di Windows. **Latar belakang.**
+- Kalau release build di Windows gagal sebelum tahap Dart/Kotlin, periksa
+  `android/local.properties` duluan — isinya masih path mesin Linux. Detail di
+  `AGENTS.md` §Environment.
 
 ### Verifikasi di perangkat — dan apa yang harus Anda akui belum terbukti
 
@@ -390,6 +583,7 @@ Tidak semua bisa dibuktikan dengan test. Untuk yang tidak bisa, lakukan ini dan
 **katakan apa yang tidak Anda lihat** di output.
 
 ```bash
+# Linux
 export PATH="$HOME/Android/Sdk/platform-tools:$PATH"
 D=192.168.18.44:<port>          # port berubah-ubah setiap layar mati, lihat catatan di bawah
 adb -s $D install -r build/app/outputs/flutter-apk/app-release.apk
@@ -398,6 +592,30 @@ sleep 22
 adb -s $D shell screencap -p /sdcard/s.png
 adb -s $D pull /sdcard/s.png /tmp/opencode/s.png
 ```
+
+```powershell
+# Windows — adb sudah di PATH
+$D = "192.168.18.44:<port>"
+adb -s $D install -r build/app/outputs/flutter-apk/app-release.apk
+adb -s $D shell am start -n tech.mbkm.energrow/.MainActivity
+Start-Sleep -Seconds 22
+adb -s $D shell screencap -p /sdcard/s.png
+adb -s $D pull /sdcard/s.png "$env:TEMP\opencode\s.png"
+```
+
+`grep -A4` pada output `dumpsys` dan `aapt2` tidak ada di PowerShell. Gunakan
+`Select-String -Pattern "CHECK_ALARMS" -Context 0,4`, dan untuk cek release APK
+lebih andal daripada memanggil `aapt2` dengan path yang panjang:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.0.0\aapt2.exe" `
+  dump xmltree build\app\outputs\flutter-apk\app-release.apk --file AndroidManifest.xml |
+  Select-String -Pattern "Alarm\w*Receiver"
+```
+
+Hasil yang benar hanya `AlarmCheckReceiver` dan `AlarmBootReceiver`.
+`AlarmDebugReceiver` **tidak boleh muncul** — kalau muncul, release APK
+membocorkan komponen debug.
 
 Yang hanya bisa dibuktikan di perangkat:
 
@@ -458,6 +676,21 @@ git add -A
 git diff --cached --name-only | grep -iE "key.properties|\.jks|\.apk" && echo "JANGAN COMMIT" || echo "aman"
 ```
 
+```powershell
+git status --short
+# normalisasi line ending — di NTFS ini bukan masalah teoretis,
+# tapi git add --renormalize adalah satu perintah dan menutup semua kasus
+git add --renormalize -A
+git add -A
+$leak = git diff --cached --name-only | Select-String -Pattern "key.properties|\.jks|\.apk"
+if ($leak) { "JANGAN COMMIT: $leak" } else { "aman" }
+```
+
+`.gitattributes` sudah fijar `* text=auto eol=lf` dan `core.autocrlf` sudah
+`input` di repo ini, jadi `--renormalize` biasanya tidak menemukan apa-apa.
+Jalankan tetap — biayanya satu perintah, dan yang dicegah adalah 126 file
+tampak berubah tanpa satu pun perubahan nyata.
+
 Pengecekan terakhir itu **wajib**: `android/key.properties` dan
 `android/upload-keystore.jks` harus tetap tidak pernah masuk.
 
@@ -478,13 +711,13 @@ Yang dilakukan:
   melihat sesuatu di perangkat, katakan begitu.
 - Kalau Anda menolak permintaan, sebutkan alasannya dalam satu kalimat, lalu
   kerjakan bagian yang bisa dikerjakan.
-- Kalau permintaan Anda_-nya tidak jelas dan salah paham akan membuang banyak
+- Kalau permintaan Anda tidak jelas dan salah paham akan membuang banyak
   kerja, ajukan satu pertanyaan alih-alih menebak.
 
 Yang tidak dilakukan:
 
 - Menyatakan "sudah beres" atau "lulus" tanpa menyebutkan apa yang dijalankan.
-- Menyembunyikan kegagalan di tengah jalan. conventionally kegagalan lebih
+- Menyembunyikan kegagalan di tengah jalan. Secara konvensi, kegagalan lebih
   berharga daripada keberhasilan karena bisa diulang.
 - Menolak perubahan hanya karena preferensi. Security dan kebenaran data
   boleh dibantah; taste dan layout tidak.
@@ -499,4 +732,6 @@ Yang tidak dilakukan:
 3. Alarm punya **dua implementasi dan satu fixture** — ubah ketiganya atau
    tidak ubah sama sekali.
 4. `flutter analyze` → `flutter test` → Gradle. Satu proses test saja.
+   Di Windows perintah Gradle-nya `.\gradlew.bat`, dan `android/local.properties`
+   harus sudah menunjuk ke mesin yang sedang dipakai.
 5. Yang tidak bisa Anda buktikan, katakan tidak bisa Anda buktikan.

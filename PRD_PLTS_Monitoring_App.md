@@ -185,19 +185,28 @@ panjang ada di `FEATURE.md` §18 (celah yang diketahui).
 1. **Tutup celah test yang masih ada.** `energy_report_service.dart` dan
    `alarm_notification_service.dart` baru punya test untuk helper-nya; yang belum
    tercover adalah pemanggilan method channel dan lifecycle scheduling.
-   `weather_card.dart` (331 baris) dan `energy_report/widgets/chart_card.dart`
-   (297 baris) belum pernah di-refactor dan belum punya test widget.
-   **Prioritas khusus: widget test untuk `LivePowerCard` dan `EnvironmentGrid`.**
-   Pada sesi 27 September 2026, tiga regresi label ditemukan **hanya dengan melihat
-   layar** — `PV Output` yang muncul tiga kali di satu kartu, satuan yang
-   terpotong jadi `109....`, dan label yang ellipsised hanya saat verdict muncul.
-   Semuanya lolos `flutter analyze`, lolos build, dan lolos test yang ada.
-2. **Kunci konvensi tanda baterai dengan test, bukan dengan catatan.** BMS ini
-   dilaporkan minus saat charging, terukur di satu perangkat. Belum diketahui
-   apakah device yang sama memakai konvensi yang sama, dan apakah
-   `energy_forecast_service.dart` yang memakai `.abs()` sudah benar untuk semua
-   kasus. Ganti BMS tanpa test ini akan membalik semua tampilan tanpa satu pun
-   indikator yang merah.
+   `energy_report/widgets/chart_card.dart` (280 baris) belum pernah di-refactor
+   dan belum punya test widget. **`EnergySummaryCard` (339 baris) juga belum
+   punya widget test sama sekali** — itu celah yang paling mungkin menangkap
+   regresi label berikutnya, karena tiga regresi label di sesi 27 September 2026
+   lolos `flutter analyze`, lolos build, dan lolos seluruh test yang ada:
+   `PV Output` yang muncul tiga kali dalam satu kartu, satuan yang terpotong
+   jadi `109....`, dan label yang ellipsised hanya saat verdict muncul.
+   ~~Widget test untuk `LivePowerCard` dan `EnvironmentGrid`~~ — **selesai di
+   1.6.0** (`live_power_card_test.dart`, `metric_grid_test.dart`), dan keduanya
+   langsung menangkap lima assertion yang gagal, termasuk dua yang memakai
+   konvensi tanda BMS yang sudah diganti. `weather_card.dart` (331 baris) juga
+   **sudah tidak ada** — integrasi cuaca dicabut di 1.6.0, lihat `FEATURE.md` §8.
+2. ~~**Kunci konvensi tanda baterai dengan test, bukan dengan catatan.**~~
+   **Selesai di 1.6.0** — `battery_sign_convention_test.dart` dan
+   `energy_forecast_service_test.dart` sekarang memegangnya, dan
+   `battery_sign.dart` memusatkan pemetaannya. Yang ternyata masih terbuka bukan
+   "belum diuji", melainkan "terukur di satu device per BMS": pack di perangkat
+   uji sudah **berganti** dan kedua konvensinya terukur, dengan masa lalu ketika
+   negatif berarti charging (`FEATURE.md` §18.6). Langkah berikutnya adalah
+   memperbarui pengukuran itu setiap kali hardware berganti — punya test
+   sekarang berarti test itu gagal dan memberi tahu, bukan diam-diam membalik
+   semua tampilan.
 
 ### 7.2 Verifikasi yang belum pernah dilakukan
 

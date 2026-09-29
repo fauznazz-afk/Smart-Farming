@@ -1,5 +1,73 @@
 ## [Unreleased]
 
+### Fixed
+
+- **Swiping a tab no longer walks past the end of the dashboard.** Eight swipes
+  left on the Overview tab landed on page nine of a four-tab pager. The gate
+  class that stops a chart drag from also changing page,
+  `ChartGestureLockPhysics`, decided whether a gesture was *accepted* but never
+  what happened when it was *released*: it did not delegate
+  `createBallisticSimulation`, so the fling fell through to `ScrollPhysics`'s
+  plain friction simulation instead of `PageScrollPhysics`'s spring. A pager
+  without that spring is not a pager — it coasts to wherever friction ends and
+  keeps taking velocity past the end of the content. Delegating the fling
+  restores the snap. It also stopped overriding `allowUserScrolling`, which is
+  read when `Scrollable` installs a drag recognizer rather than when a gesture
+  starts, so a chart drag could switch dragging off and lifting the finger
+  could not switch it back on; paging then stayed dead until an unrelated
+  rebuild arrived, up to ten seconds on a dashboard that polls every ten.
+
+  Pinned by `test/chart_gesture_lock_test.dart`, which had no equivalent: the
+  class landed in 1.6.0 with no coverage at all. The eight-swipe case is the
+  regression guard, because a single swipe passes even with the bug.
+
+- **A limit shown in Settings is no longer indistinguishable from a limit that is
+  actually being enforced.** The Fish tank alerts section showed
+  `Max (NTU) 100` with its switch on while turbidity read 2396 NTU and the grid
+  stayed silent. Nothing was broken and nothing threw: `SettingsController`
+  keeps the shipped default in the field when the preference key is missing, and
+  that prefill looked exactly like a stored value. The native side had been
+  configured with 19 rules, and 19 is the count *without* a turbidity rule — 20
+  with one — so the key had never been written. It had no chance to be: the key
+  was introduced in 1.6.0, after the last time these settings were saved, so
+  every other limit persisted and only the new one did not. A user reading that
+  screen believed the tank was guarded at 100 NTU when no rule anywhere
+  enforced it.
+
+  Fixed in the mechanism rather than the parameter, because every future release
+  that adds a limit hits the same path: `EnvRangeSetting` now tracks whether
+  each side holds an unsaved default, `load()` clears that only when the key is
+  actually found, and `save()` clears it once the write succeeds. A prefilled
+  number renders in the faint italic with a `Not saved yet` caption, and each
+  section says once how many limits are showing defaults and are not monitored
+  yet. Pinned by `test/settings_prefill_test.dart`.
+
+  The grid was right to stay silent — with no limit there is nothing to breach —
+  and it is now backed by `test/fish_turbidity_grid_test.dart`, because the fish
+  specs shared a widget with the greenhouse ones without ever being exercised
+  against it.
+
+### Documentation
+
+- `AGENTS.md` and `AGENT_PLAYBOOK.md` now describe both build machines. The
+  project moved from CachyOS/Arch to Windows, and the difference that actually
+  breaks a build is `android/local.properties` still holding the other
+  machine's paths: Flutter rewrites that file for itself, but a bare
+  `gradlew.bat` reads it directly, which is how a stale Linux path surfaces as
+  `flutter.sdk not set in local.properties` on a machine that plainly has
+  Flutter installed. The `dl.google.com` throttle is now scoped to the Linux
+  machine and explicitly marked as never re-measured on Windows — a normal
+  Windows build downloads nothing because the Gradle distribution and the NDK
+  are already in the Gradle user home, so its speed says nothing about
+  throughput.
+- `FEATURE.md` corrected three stale figures: the alarm parity fixture has 23
+  scenarios, not 17, and the device now pushes 19 rules across 4 devices rather
+  than 13. The Fish and Hydroponics pages moved out of §18.5, having been seen
+  on the device for the first time on 29 September 2026, and the prefill
+  mechanism is recorded as §18.7.
+- `PRD_PLTS_Monitoring_App.md` §7.1 marked two items done that 1.6.0 finished
+  and dropped `weather_card.dart`, which no longer exists.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added
