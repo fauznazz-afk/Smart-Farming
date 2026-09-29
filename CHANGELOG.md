@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-29
+
 ### Fixed
 
 - **The shipped turbidity default was arming an alarm that could never clear.**

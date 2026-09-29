@@ -19,10 +19,20 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 28 September 2026, batch menuju rilis 1.6.0 di atas
-`origin/main` = `422a699`. Flutter 3.47.5 / Dart 3.13.4, target Android (API 36).
-`flutter analyze` bersih, `flutter test` 273 lulus,
-`./gradlew :app:testDebugUnitTest` 11 lulus.
+**Status verifikasi:** 29 September 2026, rilis 1.6.1 di atas `origin/main` =
+`a115f2f`. Flutter 3.47.5 / Dart 3.13.4, target Android (API 36).
+`flutter analyze` bersih, `flutter test` **320 lulus** di 23 file,
+`./gradlew :app:testDebugUnitTest` 11 lulus. Suite dijalankan dalam delapan
+batch karena mesin 7 GB ini OOM kalau sekali jalan.
+
+**Yang sudah dilihat di perangkat pada 29 September 2026.** Kedelapan butir
+§18.5 yang bisa ditutup ditutup: halaman Fish dan Hydroponics terbuka dan
+merender benar; nilai negatif di hero card tampil sebagai `Discharging -28 W`
+dengan label yang benar; energy report terbuka dengan label perbandingan yang
+cocok dengan kartu analytics dan jalur `No comparison data yet` masih utuh;
+delapan geser ke kiri pada pager berhenti di tab terakhir. Yang **tidak** bisa
+dibuktikan: nama Oktober dan Desember, karena date picker report tidak bergerak
+melewati bulan berjalan.
 
 **Konvensi tanda sensor.** BMS saat ini melaporkan **minus saat discharging** —
 terukur 27 September 2026 setelah BMS diganti: `Power -22 W` sementara SOC turun.
@@ -624,7 +634,7 @@ kalau Settings mengembalikan `changed == true`.
 | **Fish tank alerts** | Enable fish tank alerts | `fish_alerts_enabled` | bool | on | ✅ untuk alarm dan warna grid |
 | | pH min / max | `fish_ph_min` / `_max` | String | 6 / 8.5 | ✅ |
 | | Water temperature min / max | `fish_temp_min` / `_max` | String | 20 / 30 | ✅ |
-| | Turbidity max (tanpa batas bawah) | `fish_turbidity_max` | String | 100 | ✅ |
+| | Turbidity max (tanpa batas bawah, **tanpa default**) | `fish_turbidity_max` | String | **kosong** | ✅ |
 | ~~Weather~~ | ~~OpenWeatherMap API key~~ | ~~`weather_api_key`~~ | — | — | **⛔ dihapus** |
 | **CCTV source** | Hydroponics / Fish stream URL | `cctv_url` / `cctv_url_fish` (**secure storage**) | String | URL camera | ✅ |
 | **Performance** | Liquid glass blur | `performance_mode` | bool | on | ✅ (on = blur **mati**) |
@@ -634,8 +644,12 @@ kalau Settings mengembalikan `changed == true`.
 
 Default limit lingkungan: suhu 15–35 °C · kelembapan 40–85 % · TDS ≥ 800 ppm ·
 stale 10 mnt · offline 60 mnt · SOC 20 %.
-Default limit ikan: pH 6–8.5 · suhu air 20–30 °C · turbidity ≤ 100 NTU (tanpa
-batas bawah, karena air keruh tidak punya "terlalu jernih").
+Default limit ikan: pH 6–8.5 · suhu air 20–30 °C. **Turbidity tidak punya default
+sama sekali** — bukan karena batas bawahnya tidak bermakna, melainkan karena
+sensor di perangkat uji membaca 2396 lalu 3000 NTU sementara panduan
+akuakultur menyebut 100 NTU sudah keruh, jadi skalanya bukan skala yang
+diasumsikan dan belum ada yang memastikan apa yang diukur. Field-nya kosong
+dan tidak dipantau sampai user mengisinya; lihat §18.7.
 
 ### Validasi
 
@@ -816,18 +830,28 @@ diverifikasi di perangkat ada di §18.5.
 
 ### 18.1 Celah fungsional
 
-1. **Energi report memakai kebijakan perbandingan berbeda** dari Energy analytics —
-   tidak ada ambang 0.1 kWh, jadi `-100% from the previous period` masih bisa
-   muncul di sana untuk masalah yang sudah diperbaiki di kartu analytics.
+1. ~~**Energi report memakai kebijakan perbandingan berbeda** dari Energy
+   analytics.~~ **Perbaiki di 1.6.1.** `comparisonLabel` tidak punya ambang
+   0,1 kWh, jadi `-100% from the previous period` muncul di sana untuk masalah
+   yang sudah diperbaiki di kartu. Sekarang keduanya mengimpor
+   `kMeaningfulEnergyKwh` dari `lib/utils/energy_comparison.dart`; sebelumnya itu
+   dua literal di dua file, dan yang tidak pernah diperbaiki justru yang di
+   report. Wording tetap berbeda per permukaan dan itu disengaja.
 2. **Halaman Hydroponics dan Fish tidak punya grafik.** `_prefixForPage`
     mengembalikan `null` untuk keduanya, jadi tidak ada request histori sama sekali.
     Yang menghalangi: `TelemetryChartCard` memakai daftar sufiks tetap
     `voltage`/`current`/`power` (`const suffixes` di `chart_card.dart`) dan
     `HistoryKeys` hanya punya tiga field, jadi pH dan turbidity tidak bisa di-chart
     tanpa generalisasi widget itu lebih dulu.
-3. **Sensor turbidity dibaca 2396 NTU.** Untuk akuikultur, air jernih ada di bawah
-    30 NTU. Kemungkinan besar sensor belum dikalibrasi atau skalanya berbeda, tapi
-    **belum diverifikasi di perangkat** — lihat §18.5.
+3. **Sensor turbidity membaca 2396 lalu 3000 NTU.** Untuk akuikultur, air jernih
+   ada di bawah 30 NTU, jadi sensor ini jelas bukan pada skala yang diasumsikan —
+   selisihnya sekitar 30 kali. Kemungkinan besar belum dikalibrasi atau satuannya
+   berbeda, dan **belum ada yang memastikan apa yang diukur**. Konsekuensinya
+   nyata: default lama 100 NTU pernah ter-arm dan menghasilkan "Turbidity too
+   high: 3000.0 NTU (limit 100.0 NTU)" setiap menit tanpa pernah bisa bersih.
+   Defaultnya sudah dihapus di 1.6.1 dan batas atasnya juga, jadi user bisa
+   memilih sendiri begitu skalanya diketahui. Sisa masalahnya adalah pertanyaan
+   perangkat keras, bukan kode.
 4. **OpenWeatherMap sudah dihapus, jadi tidak ada lagi prakiraan ke depan.**
     `power_dc` dan `lux` adalah pengukuran, bukan prediksi. Yang hilang adalah
     suhu dan kelembapan luar, angin, tutupan awan, serta forecast. Kalau
@@ -954,6 +978,27 @@ lalu perbarui test dengan pengukuran di reason string-nya.
 
 Ditemukan di perangkat pada 29 September 2026, dan sudah diperbaiki — dicatat di
 sini karena mekanismenya akan mendapat call site baru setiap rilis.
+
+**Dua tahap, dan tahap kedua lebih serius dari yang pertama.** Yang pertama
+ditemukan hanya dengan menghitung aturan: prefill di Settings terlihat identik
+dengan nilai tersimpan, sehingga `Max (NTU) 100` bisa tampil sementara tidak ada
+rule yang menegakkan apa pun (native mencatat 19 rule, bukan 20). Itu diperbaiki
+dengan flag `minIsPrefill`/`maxIsPrefill`.
+
+Yang kedua muncul setelah flag itu bekerja: begitu user **menyimpan**, batas 100
+itu benar-benar ter-arm — dan sensor membaca 2396 lalu 3000 NTU, jadi hasilnya
+`Turbidity too high: 3000.0 NTU (limit 100.0 NTU)` setiap menit, tanpa pernah
+bisa bersih. **Memperbaiki penyesatan visual tidak memperbaiki defaultnya.**
+lebih baik daripada menampilkan apa pun* adalah prinsip yang benar untuk sensor
+yang **dikalibrasi**; di sini tidak ada angka yang bisa jujur, karena skala sensor
+nya belum diketahui. Jadi default turbidity dihapus, batas atasnya juga, dan
+user yang menentukan sendiri angkanya.
+
+Pelajaran yang lebih luas: **mekanisme "default di-arm saat save" punya dua sisi
+yang tidak selalu sama.** Untuk pH dan suhu air, prefill 6.5 dan 20 adalah tebakan
+yang masuk akal. Untuk turbidity, prefill apa pun adalah tebakan tentang sensor
+yang belum diukur. Penanda prefill membuat yang pertama jujur; hanya penghapusan
+default yang membuat yang kedua jujur.
 
 **Yang terjadi.** Fish tank alerts menampilkan `Max (NTU) 100` dengan sakelar
 aktif, sementara turbidity terbaca 2396 NTU dan grid Fish tidak memberi warna
