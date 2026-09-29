@@ -203,16 +203,109 @@ void main() {
   group('comparisonLabel', () {
     test('handles a missing baseline', () {
       expect(comparisonLabel(5, null), 'No comparison data yet');
+      // A null is "no previous period at all" and is answered before any
+      // arithmetic, so a zero current must not turn it into something else.
+      expect(comparisonLabel(0, null), 'No comparison data yet');
     });
 
     test('handles a zero baseline without dividing by zero', () {
       expect(comparisonLabel(5, 0), 'Previous period: 0 kWh');
+      // This wording is the report's own and is kept deliberately: the card
+      // says 'Nothing to compare yet' here, but that string is pinned by
+      // test/energy_summary_card_test.dart and the two files are not allowed to
+      // drift into each other's vocabulary.
+      expect(comparisonLabel(0, 0), 'Previous period: 0 kWh');
     });
 
     test('describes growth, decline, and no change', () {
       expect(comparisonLabel(12, 10), '+20% from the previous period');
       expect(comparisonLabel(8, 10), '-20% from the previous period');
       expect(comparisonLabel(10, 10), 'Same as the previous period');
+    });
+
+    // The threshold is 0.1 kWh, matching
+    // EnergySummaryCard._meaningfulPrevious. Everything below is a ratio
+    // withheld, and the wording is copied from the card's branch structure so
+    // the dashboard and the report cannot describe the same two numbers
+    // differently.
+    test('does not claim a loss when the previous period was rounding noise',
+        () {
+      // The reported defect: 0.01 kWh then nothing. The old code printed
+      // '-100% from the previous period', which reads as a catastrophic loss.
+      expect(comparisonLabel(0, 0.01), isNot(contains('%')));
+      expect(comparisonLabel(0, 0.01), 'No production');
+    });
+
+    test('withholds a ratio just below the threshold as well', () {
+      // 0.09 is still under 0.1, and a current of zero makes the old code
+      // print '-100% from the previous period'.
+      expect(comparisonLabel(0, 0.09), isNot(contains('%')));
+      expect(comparisonLabel(0, 0.09), 'No production');
+    });
+
+    test('spells out a small current against an empty previous period', () {
+      // Both periods are below 0.1 kWh, but the current one is not zero, so the
+      // figure is quoted instead of a ratio being claimed. The threshold is
+      // 0.1, not the 0.01 the value is displayed to, which is why 0.04 and 0.02
+      // are not simply "0.00 kWh".
+      expect(comparisonLabel(0.04, 0.02), '0.04 kWh, none last period');
+      expect(comparisonLabel(0.09, 0.01), '0.09 kWh, none last period');
+    });
+
+    test('withholds a ratio when only the previous period is below it', () {
+      // previous = 0.05 is noise, so there is no baseline to divide by, even
+      // though the current period is substantial. The card's branch for this.
+      expect(comparisonLabel(5, 0.05), 'Nothing to compare yet');
+      expect(comparisonLabel(5, 0.05), isNot(contains('%')));
+    });
+
+    test('starts reporting a ratio at exactly the threshold', () {
+      // 0.1 is not "less than" the threshold, so a 0 -> 0.1 change is a real
+      // 100% and is stated. This pins the boundary from both sides.
+      expect(comparisonLabel(0.2, 0.1), '+100% from the previous period');
+      expect(comparisonLabel(0.2, 0.099999), 'Nothing to compare yet');
+    });
+  });
+
+  group('formatMonthLabel', () {
+    test('renders every month in English', () {
+      // The list had 'Oktober' and 'Desember' in it while the other ten were
+      // English and the app's only locale is en_US, so an October report read
+      // "Oktober 2026" on screen and in the exported CSV (the Period row of
+      // buildEnergyCsv). There was no test on this function at all.
+      const expected = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
+      for (var month = 1; month <= 12; month++) {
+        expect(
+          formatMonthLabel(DateTime(2026, month)),
+          '${expected[month - 1]} 2026',
+          reason: 'month $month must render as an English name',
+        );
+      }
+    });
+
+    test('uses the year of the date it is given', () {
+      expect(formatMonthLabel(DateTime(2025, 10)), 'October 2025');
+      expect(formatMonthLabel(DateTime(2026, 12, 31, 23, 59)), 'December 2026');
+    });
+
+    test('rejects an Indonesian spelling outright', () {
+      // Stated explicitly rather than relying only on the list above, so the
+      // intent survives an edit that only changes one string.
+      expect(formatMonthLabel(DateTime(2026, 10)), isNot('Oktober 2026'));
+      expect(formatMonthLabel(DateTime(2026, 12)), isNot('Desember 2026'));
     });
   });
 

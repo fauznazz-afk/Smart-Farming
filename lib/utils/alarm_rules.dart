@@ -321,13 +321,37 @@ class AlarmThresholds {
   // Fish tank defaults, chosen for a tropical ornamental fish tank.
   //
   // pH 6.5-8.5 covers most tropical fish. Water temperature 20-30 C covers
-  // the common range for tropical species. Turbidity above 100 NTU is visibly
-  // cloudy and indicates a filtration problem.
+  // the common range for tropical species.
   static const double defaultFishPhMin = 6.5;
   static const double defaultFishPhMax = 8.5;
   static const double defaultFishTempMin = 20;
   static const double defaultFishTempMax = 30;
-  static const double defaultFishTurbidityMax = 100;
+
+  /// No default turbidity limit, and there is no number that could honestly be
+  /// one.
+  ///
+  /// This used to ship as 100 NTU, chosen because real aquaculture guidance
+  /// treats 100 NTU as visibly cloudy. The sensor on the test device reports
+  /// 2396 NTU and later 2993.5 NTU for the same tank, which is about thirty
+  /// times the clearest-water figure quoted for this kind of sensor. The scale
+  /// is simply not the documented one, and nobody has established what it
+  /// actually measures.
+  ///
+  /// That made the default a lie in both directions at once. Arming it, which
+  /// is what happened the moment a user saved the Fish tank alerts section,
+  /// produced a permanent warning alarm against a reading no configuration
+  /// could satisfy: "Turbidity too high: 2993.5 NTU (limit 100.0 NTU)", every
+  /// minute, indefinitely. And leaving it unconfigured meant the field showed a
+  /// number that looked armed and was not.
+  ///
+  /// Any replacement would be a guess about a sensor nobody has calibrated, and
+  /// a guess that fails high is worse than no limit at all: it manufactures an
+  /// alarm that can never clear. The same reasoning already governs the display
+  /// of `lux` and `water_level_percent` — displayed, never graded, because
+  /// inventing a limit the user never set is worse than showing nothing. The
+  /// upper bound is now unbounded too, so the user can set whatever the sensor
+  /// actually reads once its scale is known.
+  static const double? defaultFishTurbidityMax = null;
 
   static const int defaultLowSoc = 20;
   static const int defaultStaleMinutes = 10;

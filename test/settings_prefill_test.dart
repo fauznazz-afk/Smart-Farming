@@ -39,9 +39,10 @@ void main() {
       ranges.firstWhere((r) => r.id == id);
 
   group('a default is not a saved limit', () {
-    test('turbidity is flagged when its key was never stored', () async {
-      // The exact state of the test device: pH and water temperature were saved
-      // by an earlier release, turbidity was added in 1.6.0 and never armed.
+    test('turbidity is left empty, because no default is honest', () async {
+      // The exact state of the test device after a save: pH and water
+      // temperature were stored by an earlier release, turbidity was added in
+      // 1.6.0 and was armed at the old 100 NTU default.
       final c = await controller(
         initial: {
           SettingsKeys.fishPhMin: '6',
@@ -54,14 +55,17 @@ void main() {
       final turbidity = byId(c.fishRanges, 'turbidity');
       expect(
         turbidity.max.text,
-        '100',
-        reason: 'The default is still prefilled, so the user is shown the value '
-            'they would get by saving.',
+        isEmpty,
+        reason: 'The default was removed. The sensor reads 2396 and then 2993.5 '
+            'NTU, so any shipped number is a guess about a sensor nobody has '
+            'calibrated, and a guess that fails high is an alarm that can never '
+            'clear.',
       );
       expect(
         turbidity.maxIsPrefill,
-        isTrue,
-        reason: 'Nothing is enforcing this number, so the screen has to say so.',
+        isFalse,
+        reason: 'An empty field is not a prefill, so it must not be marked as '
+            'one. Blank already means "not monitored" in this section.',
       );
 
       // The limits that really were saved must not be flagged, or the marker
@@ -94,24 +98,34 @@ void main() {
       }
     });
 
-    test('a one-sided range only flags the side that has a key', () async {
+    test('a one-sided range with no default has nothing to flag', () async {
       final c = await controller();
       final turbidity = byId(c.fishRanges, 'turbidity');
       // Upper bound only: there is no min key, so there is nothing to arm and
       // nothing to warn about on that side.
       expect(turbidity.minKey, isNull);
       expect(turbidity.minIsPrefill, isFalse);
-      expect(turbidity.maxIsPrefill, isTrue);
+      // And no default, so the max side is empty too. An empty field is not a
+      // prefill and must not be dressed as one — the section's own "Blank
+      // limits are not monitored" already covers it, and the marker exists to
+      // separate a *number* that looks armed from one that is.
+      expect(turbidity.max.text, isEmpty);
+      expect(turbidity.maxIsPrefill, isFalse);
     });
 
     test('saving clears the flag, because the value is now enforced', () async {
       final c = await controller();
-      final turbidity = byId(c.fishRanges, 'turbidity');
-      expect(turbidity.maxIsPrefill, isTrue);
+      // The environment temperature range, which still ships a default. Turbidity
+      // cannot be used here any more: with no default its field is empty, and
+      // saving an empty field removes the key rather than writing one, so there
+      // would be nothing to become "saved".
+      final temp = byId(c.envRanges, 'temp');
+      expect(temp.maxIsPrefill, isTrue);
+      expect(temp.max.text, isNotEmpty);
 
       expect(await c.save(), isNull);
       expect(
-        turbidity.maxIsPrefill,
+        temp.maxIsPrefill,
         isFalse,
         reason: 'After a save the key exists and a rule is armed, so the field '
             'is no longer showing an unsaved default.',
@@ -121,13 +135,13 @@ void main() {
       // treats it as saved. Read it back explicitly because the helper seeds a
       // fresh mock store, so a plain reload would just start from empty again.
       final stored = (await SharedPreferences.getInstance())
-          .getString(SettingsKeys.fishTurbidityMax);
-      expect(stored, '100');
+          .getString(SettingsKeys.environmentTempMax);
+      expect(stored, isNotNull);
 
       final reloaded =
-          await controller(initial: {SettingsKeys.fishTurbidityMax: stored!});
+          await controller(initial: {SettingsKeys.environmentTempMax: stored!});
       expect(
-        byId(reloaded.fishRanges, 'turbidity').maxIsPrefill,
+        byId(reloaded.envRanges, 'temp').maxIsPrefill,
         isFalse,
         reason: 'The key is in the store, so this is a saved limit and must not '
             'be marked as an unsaved default.',

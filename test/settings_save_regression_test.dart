@@ -119,6 +119,7 @@ void main() {
         isNull,
         reason: 'turbidity is upper bound only, which is the shape that broke save()',
       );
+      turbidity.max.text = '2500';
 
       final error = await controller.save();
 
@@ -128,6 +129,13 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       // The turbidity write sits after the minKey access that used to throw, so
       // it only lands when the loop runs to the end.
+      //
+      // A value is typed in first because the turbidity default was removed:
+      // saving an empty field deliberately removes the key, so with a blank
+      // field this probe could not tell "the loop finished" from "the key was
+      // dropped for being empty". 2500 is also above the 2396 the sensor was
+      // reading, which is the whole reason the upper cap went.
+      expect(turbidity.max.text, '2500');
       expect(prefs.getString(SettingsKeys.fishTurbidityMax), turbidity.max.text);
       expect(prefs.getString(SettingsKeys.fishTurbidityMax), isNotEmpty);
       expect(

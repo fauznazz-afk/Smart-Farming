@@ -2,6 +2,45 @@
 
 ### Fixed
 
+- **The shipped turbidity default was arming an alarm that could never clear.**
+  The sensor on the test device reads 2396 NTU and later 3000 NTU for the same
+  tank, against a default limit of 100 NTU chosen from real aquaculture
+  guidance — so the sensor is not on the scale that guidance assumes, and
+  nobody has established what it measures. The moment a user saved the Fish tank
+  alerts section, that default became a live rule and produced "Turbidity too
+  high: 3000.0 NTU (limit 100.0 NTU)" every minute, indefinitely. There is no
+  replacement number: any value is a guess about an uncalibrated sensor, and a
+  guess that fails high is worse than no limit, because it manufactures an
+  alarm that can never resolve. The default is now null, the field starts empty,
+  and "Blank limits are not monitored" is the whole story. The upper cap, removed
+  in the previous commit, is what lets a user now set a limit above 3000 once the
+  scale is known.
+
+- **The energy report no longer contradicts the dashboard card about the same
+  two numbers.** `comparisonLabel` in the report had no minimum-meaningful
+  threshold while `EnergySummaryCard` had one at 0.1 kWh, so a period that
+  produced 0.01 kWh followed by one that produced none read "-100% from the
+  previous period" in the report and "Nothing to compare yet" on the dashboard,
+  in the same session. The threshold was also duplicated as two literals in two
+  files, and the copy that had never been fixed was the report's, so the two
+  were one forgotten edit away from disagreeing again. It is now a single
+  `kMeaningfulEnergyKwh` in `lib/utils/energy_comparison.dart`, imported by both.
+  The wording is still deliberately different per surface: the card's two tiles
+  sit side by side and wrap independently, the report's label has a full line.
+
+  Correcting an earlier claim in this changelog: the misleading "-100%" does
+  **not** reach the exported CSV. `totals_card.dart` calls `comparisonLabel` from
+  a `Semantics(label:)` and a `Text`, both on screen. The CSV is built by
+  `csv_builder.dart`, which does not call it.
+
+- **October and December render in English.** `_monthNames` in
+  `energy_report/utils/format_helpers.dart` listed 'Oktober' and 'Desember'
+  among ten English names, in an app whose locale is en_US, so a monthly report
+  for those months said "Oktober 2026". Unlike the previous defect this one did
+  reach exported files: `csv_builder.dart` writes `formatMonthLabel` into the
+  `Period` row. `formatMonthLabel` had no test at all, so there was nothing to
+  stop the Indonesian spellings coming back; there are now twelve assertions.
+
 - **Swiping a tab no longer walks past the end of the dashboard.** Eight swipes
   left on the Overview tab landed on page nine of a four-tab pager. The gate
   class that stops a chart drag from also changing page,
@@ -46,6 +85,39 @@
   and it is now backed by `test/fish_turbidity_grid_test.dart`, because the fish
   specs shared a widget with the greenhouse ones without ever being exercised
   against it.
+
+### Added
+
+- **Turbidity can now be set to any value the sensor reports.** It was capped at
+  1000 NTU while the sensor reads 2396 and then 3000, so the field rejected
+  anything higher with "Turbidity cannot be higher than 1000" and the alert could
+  not be configured against reality at all. The cap is removed the way TDS
+  already has none, for the reason the TDS comment in `alarm_rules.dart` gives:
+  a cap low enough to look safe gets crossed by every real reading, which makes
+  the alert unreachable rather than safe. A cap of 10000 would be the same bug at
+  a different scale, so there is no new magic number. The lower bound stays at 0
+  because a negative NTU reading cannot be real.
+
+  The bound went unnoticed because the sensor bounds tests in
+  `settings_validation_test.dart` only ever reached into `envRanges`. A new
+  "fish sensor bounds" group pins the three fish ranges in display order, the pH
+  and water temperature caps that are left in place because those are physically
+  real limits, turbidity having no upper cap, values up to 100000 validating, and
+  a negative value still being rejected.
+
+- **`EnergySummaryCard` has a widget test for the first time.** A 339-line widget
+  on the Overview tab that no test had ever looked at, in a repo where three
+  label regressions once passed `flutter analyze`, a release build and the entire
+  suite. Eighteen tests now pin the title, the period selector, the method note,
+  both tiles, the forecast block, the empty state and the 0.1 kWh comparison
+  threshold, with every asserted string carrying the widget line it was copied
+  from so a rename fails here rather than reaching a device.
+
+- **`ChartBounds.maxY` is covered for a non-positive peak, and the Settings
+  category list is complete.** The y range stays strictly increasing for peaks of
+  0, -1 and -1e6, which is what stops fl_chart drawing an inverted axis. The
+  settings test was asserting eight of ten category titles, missing both "Fish
+  tank alerts" and "Background checks".
 
 ### Documentation
 

@@ -7,7 +7,7 @@ import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _pumpSettings(WidgetTester tester) async {
-  // A tall surface keeps all nine category tiles laid out at once, so the
+  // A tall surface keeps all ten category tiles laid out at once, so the
   // lazily built ListView does not need scrolling in these assertions.
   tester.view.physicalSize = const Size(900, 1600);
   tester.view.devicePixelRatio = 1.0;
@@ -39,22 +39,51 @@ Future<void> _pumpSettings(WidgetTester tester) async {
 }
 
 void main() {
+  // Order and strings are taken from buildSettingsSections in
+  // lib/screens/settings/settings_section.dart, which returns ten sections.
   testWidgets('lists every settings category', (tester) async {
     await _pumpSettings(tester);
 
     expect(find.text('Settings'), findsOneWidget);
     for (final title in [
-      'Appearance',
-      'Monitoring',
-      'Energy alerts',
-      'Environment alerts',
-      'CCTV source',
-      'Performance',
-      'About',
-      'Account',
+      'Appearance', // settings_section.dart:34
+      'Monitoring', // settings_section.dart:40
+      'Energy alerts', // settings_section.dart:46
+      'Environment alerts', // settings_section.dart:52
+      'Fish tank alerts', // settings_section.dart:58
+      'CCTV source', // settings_section.dart:64
+      'Performance', // settings_section.dart:70
+      'Background checks', // settings_section.dart:76
+      'About', // settings_section.dart:82
+      'Account', // settings_section.dart:88
     ]) {
       expect(find.text(title), findsOneWidget, reason: 'missing $title');
     }
+  });
+
+  // settings_section.dart:144-165 builds one ListTile per section, so the
+  // rendered tile count is the section count. This is what catches a section
+  // that exists in the list but is never laid out.
+  testWidgets('renders one tile per category', (tester) async {
+    await _pumpSettings(tester);
+
+    // settings_screen.dart:144 - `itemCount: _sections.length`.
+    expect(find.byType(ListTile), findsNWidgets(10));
+  });
+
+  testWidgets('opens the background checks category', (tester) async {
+    await _pumpSettings(tester);
+
+    // settings_section.dart:75-80 - the section that was not asserted before.
+    await tester.tap(find.text('Background checks'));
+    await tester.pumpAndSettle();
+
+    // settings_section.dart:77 - the subtitle is rendered by
+    // settings_screen.dart:150 as the detail page's own subtitle.
+    expect(
+      find.text('Is the alarm check running, and can Android delay it?'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows the app version on the About section', (tester) async {

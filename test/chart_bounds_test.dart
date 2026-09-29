@@ -152,6 +152,79 @@ void main() {
       expect(ChartBounds.fromSeries([seriesOf(points)]).minY, 0);
     });
 
+    // chart_data.dart:127 - `final maxY = maximum <= 0 ? 1.0 : maximum * 1.1;`
+    // The `<= 0` branch is a flat 1.0, not a padded multiple of the data. The
+    // series that reach it are real: battery power and current are negative
+    // while the pack discharges, so an all-negative window is ordinary.
+    test('falls back to a flat maxY of 1.0 when the peak is zero or below', () {
+      final allZero = [
+        at(DateTime(2026, 3, 10, 1), 0),
+        at(DateTime(2026, 3, 10, 2), 0),
+      ];
+      final zeroBounds = ChartBounds.fromSeries([seriesOf(allZero)]);
+      expect(zeroBounds.maxY, 1.0);
+      // chart_data.dart:126 - minimum is 0, which is not < 0, so minY is flat 0.
+      expect(zeroBounds.minY, 0);
+      // chart_data.dart:133 - niceStep(1.0, divisions: 4) = 0.25.
+      expect(zeroBounds.chartInterval, closeTo(0.25, 1e-9));
+
+      final allNegative = [
+        at(DateTime(2026, 3, 10, 1), -1),
+        at(DateTime(2026, 3, 10, 2), -1),
+      ];
+      final negativeBounds = ChartBounds.fromSeries([seriesOf(allNegative)]);
+      expect(negativeBounds.maxY, 1.0);
+      // chart_data.dart:126 - minimum is padded 10%, so -1.1.
+      expect(negativeBounds.minY, closeTo(-1.1, 1e-9));
+      // chart_data.dart:133 - niceStep(2.1, divisions: 4) = 1.0.
+      expect(negativeBounds.chartInterval, closeTo(1.0, 1e-9));
+    });
+
+    // The 1.0 fallback is a fixed constant while minY tracks the data, so a
+    // deep negative series is padded far more at the bottom than the top.
+    // Pinned because it is the visible shape of a discharging battery chart.
+    test('pads an all-negative series 10% below but a flat 1.0 above', () {
+      final points = [
+        at(DateTime(2026, 3, 10, 1), -10),
+        at(DateTime(2026, 3, 10, 2), -20),
+      ];
+      final bounds = ChartBounds.fromSeries([seriesOf(points)]);
+      // chart_data.dart:126 - minimum -20 padded by 10%.
+      expect(bounds.minY, closeTo(-22.0, 1e-9));
+      // chart_data.dart:127 - maximum -10 takes the flat fallback, so the
+      // positive headroom is 11.0 while the negative headroom is 2.0.
+      expect(bounds.maxY, 1.0);
+      expect(bounds.minY, lessThan(-20));
+      // chart_data.dart:133 - niceStep(23.0, divisions: 4) = 10.0.
+      expect(bounds.chartInterval, closeTo(10.0, 1e-9));
+    });
+
+    // chart_card.dart:329-330 hands minY and maxY straight to LineChartData, so
+    // the fallback has to keep the range strictly increasing or fl_chart has an
+    // inverted axis. Asserted across the whole <= 0 branch rather than by hand.
+    test('keeps the y range increasing for every non-positive peak', () {
+      // Typed as <double> because a bare literal list mixing 0.0 with -1 infers
+      // List<num>, and `at` takes a double.
+      for (final peak in <double>[0.0, -0.0001, -1, -12.5, -1e6]) {
+        final points = [
+          at(DateTime(2026, 3, 10, 1), peak),
+          at(DateTime(2026, 3, 10, 2), peak * 2 - 1),
+        ];
+        final bounds = ChartBounds.fromSeries([seriesOf(points)]);
+        expect(
+          bounds.maxY,
+          greaterThan(bounds.minY),
+          reason: 'maxY ${bounds.maxY} is not above minY ${bounds.minY} '
+              'for a series peaking at $peak',
+        );
+        expect(
+          bounds.chartInterval,
+          greaterThan(0),
+          reason: 'a non-positive peak gave a non-positive y interval',
+        );
+      }
+    });
+
     test('detects a multi-day range', () {
       final week = [
         at(DateTime(2026, 3, 1), 1),

@@ -91,9 +91,15 @@ class SettingsController extends ChangeNotifier {
     // reading, which cannot be real.
     //
     // No upper cap, for the same reason TDS has none: the sensor on the test
-    // device reads 2396 NTU, so a cap low enough to look safe is crossed by
-    // every real reading and the turbidity alert becomes impossible to
-    // configure against reality. 1000 NTU was such a cap.
+    // device reads 2396 NTU and later 2993.5, so a cap low enough to look safe
+    // is crossed by every real reading and the turbidity alert becomes
+    // impossible to configure against reality. 1000 NTU was such a cap.
+    //
+    // And no default either, so the field starts empty rather than prefilled.
+    // See the comment on `AlarmThresholds.defaultFishTurbidityMax` for why there
+    // is no number that could honestly be one. An empty field plus the section's
+    // own "Blank limits are not monitored" is honest; a prefill of 100 NTU is
+    // an alarm waiting to fire forever.
     EnvRangeSetting(
       id: 'turbidity',
       label: 'Turbidity',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/dashboard/utils/color_helpers.dart';
 import '../services/energy_forecast_service.dart';
+import '../utils/energy_comparison.dart';
 import 'liquid_glass.dart';
 
 class EnergySummaryCard extends StatelessWidget {
@@ -74,7 +75,13 @@ class EnergySummaryCard extends StatelessWidget {
   }
 
   /// Below this, two periods are both too small for a ratio to mean anything.
-  static const double _meaningfulPrevious = 0.1;
+  ///
+  /// Shared with the energy report's `comparisonLabel` through
+  /// [kMeaningfulEnergyKwh]. The two used to hold separate `0.1` literals, and
+  /// the report's was the copy that had never been fixed — so the same pair of
+  /// numbers could be called a 20% fall on the dashboard and a rounding
+  /// artefact in the report.
+  static const double _meaningfulPrevious = kMeaningfulEnergyKwh;
 
   Widget _metric({
     required String title,
