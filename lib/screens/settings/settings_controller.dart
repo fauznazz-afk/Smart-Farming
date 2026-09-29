@@ -86,7 +86,14 @@ class SettingsController extends ChangeNotifier {
       defaultMin: AlarmThresholds.defaultFishTempMin,
       defaultMax: AlarmThresholds.defaultFishTempMax,
     ),
-    // Upper bound only: turbidity has no meaningful lower limit.
+    // Upper bound only: turbidity has no meaningful lower limit, so `minKey` is
+    // null and the lower `minAllowed: 0` only exists to reject a negative
+    // reading, which cannot be real.
+    //
+    // No upper cap, for the same reason TDS has none: the sensor on the test
+    // device reads 2396 NTU, so a cap low enough to look safe is crossed by
+    // every real reading and the turbidity alert becomes impossible to
+    // configure against reality. 1000 NTU was such a cap.
     EnvRangeSetting(
       id: 'turbidity',
       label: 'Turbidity',
@@ -94,7 +101,6 @@ class SettingsController extends ChangeNotifier {
       minKey: null,
       maxKey: SettingsKeys.fishTurbidityMax,
       minAllowed: 0,
-      maxAllowed: 1000,
       defaultMax: AlarmThresholds.defaultFishTurbidityMax,
     ),
   ];

@@ -273,4 +273,60 @@ void main() {
       );
     });
   });
+
+  group('fish sensor bounds', () {
+    // Deliberately a second helper rather than a parameterised `byId`: the
+    // `sensor bounds` group above searches envRanges only, and widening it
+    // would make an envRanges regression show up under a fish test name.
+    EnvRangeSetting fishById(String id) =>
+        _controller.fishRanges.firstWhere((setting) => setting.id == id);
+
+    test('exposes the three fish sensors in display order', () {
+      expect(
+        _controller.fishRanges.map((setting) => setting.id),
+        ['ph', 'water_temp', 'turbidity'],
+      );
+    });
+
+    test('caps pH and water temperature at plausible ranges', () {
+      expect(fishById('ph').minAllowed, 0);
+      expect(fishById('ph').maxAllowed, 14);
+      expect(fishById('water_temp').minAllowed, 0);
+      expect(fishById('water_temp').maxAllowed, 50);
+    });
+
+    test('does not cap turbidity, which the sensor legitimately exceeds', () {
+      final turbidity = fishById('turbidity');
+      expect(turbidity.minAllowed, 0);
+      expect(
+        turbidity.maxAllowed,
+        isNull,
+        reason: 'the sensor on the test device reads 2396 NTU, so a 1000 NTU '
+            'cap made it impossible to set a limit that matched reality and the '
+            'turbidity alert could never be configured usefully',
+      );
+      // And the real values must validate.
+      for (final value in ['3000', '5000', '100000']) {
+        turbidity.max.text = value;
+        expect(validateEnvRange(turbidity, errorLabel: 'Turbidity'), isNull);
+      }
+    });
+
+    test('still rejects a negative turbidity limit', () {
+      final turbidity = fishById('turbidity');
+      turbidity.max.text = '-1';
+      expect(
+        validateEnvRange(turbidity, errorLabel: 'Turbidity'),
+        'Turbidity cannot be lower than 0.0.',
+      );
+    });
+
+    test('turbidity is upper bound only, so it has no minimum field', () {
+      // `minKey: null` is what makes the field disappear. An unguarded
+      // `minKey!` on this range used to throw on load and on save.
+      final turbidity = fishById('turbidity');
+      expect(turbidity.minKey, isNull);
+      expect(turbidity.maxKey, SettingsKeys.fishTurbidityMax);
+    });
+  });
 }
