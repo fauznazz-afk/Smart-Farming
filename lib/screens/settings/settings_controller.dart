@@ -145,20 +145,27 @@ class SettingsController extends ChangeNotifier {
     // Every environment range has both keys today, but the fish list proved
     // that a one-sided range is a real shape: an unguarded `minKey!` there
     // threw, so the same guard is kept on both loops.
-    for (final range in envRanges) {
+    //
+    // A key that is present clears the prefill flag; a key that is missing
+    // leaves it set, because the field is then still showing the shipped default
+    // and no rule is enforcing it. Keeping the prefill text in that case is
+    // deliberate — it is what the user would type anyway — but it used to be
+    // indistinguishable from a stored limit, which is how a "Max 100 NTU" could
+    // sit in the field while nothing monitored turbidity.
+    for (final range in [...envRanges, ...fishRanges]) {
       if (range.minKey != null) {
-        range.min.text = p.getString(range.minKey!) ?? range.min.text;
+        final stored = p.getString(range.minKey!);
+        if (stored != null) {
+          range.min.text = stored;
+          range.minIsPrefill = false;
+        }
       }
       if (range.maxKey != null) {
-        range.max.text = p.getString(range.maxKey!) ?? range.max.text;
-      }
-    }
-    for (final range in fishRanges) {
-      if (range.minKey != null) {
-        range.min.text = p.getString(range.minKey!) ?? range.min.text;
-      }
-      if (range.maxKey != null) {
-        range.max.text = p.getString(range.maxKey!) ?? range.max.text;
+        final stored = p.getString(range.maxKey!);
+        if (stored != null) {
+          range.max.text = stored;
+          range.maxIsPrefill = false;
+        }
       }
     }
     selectedSeed = themeController.seedColor;
@@ -262,6 +269,12 @@ class SettingsController extends ChangeNotifier {
       // The dashboard reads the stream URLs from secure storage, not prefs.
       await saveCctvUrl(cctvUrl.text.trim());
       await saveFishCctvUrl(fishCctvUrl.text.trim());
+      // Everything on screen has just been written, so no field is still
+      // showing an unsaved default. Cleared here rather than on the next load
+      // so the marker disappears the moment the save succeeds.
+      for (final range in [...envRanges, ...fishRanges]) {
+        range.markSaved();
+      }
       return null;
     } finally {
       saving = false;

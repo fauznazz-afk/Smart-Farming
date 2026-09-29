@@ -112,6 +112,7 @@ class EnvironmentAlertsSection extends StatelessWidget {
               settings.update(() => settings.envAlerts = value),
         ),
         for (final range in settings.envRanges) EnvRangeField(setting: range),
+        UnsavedDefaultsNote(ranges: settings.envRanges),
       ],
     );
   }
@@ -140,6 +141,7 @@ class FishAlertsSection extends StatelessWidget {
               settings.update(() => settings.fishAlerts = value),
         ),
         for (final range in settings.fishRanges) EnvRangeField(setting: range),
+        UnsavedDefaultsNote(ranges: settings.fishRanges),
       ],
     );
   }

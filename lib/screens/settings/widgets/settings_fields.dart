@@ -92,20 +92,44 @@ class SettingsIconBadge extends StatelessWidget {
 
 /// Decimal text field that accepts negative values.
 class NumberField extends StatelessWidget {
-  const NumberField({super.key, required this.controller, this.label});
+  const NumberField({
+    super.key,
+    required this.controller,
+    this.label,
+    this.inactive = false,
+  });
 
   final TextEditingController controller;
   final String? label;
 
+  /// True while the field holds a shipped default that has never been saved, so
+  /// no alarm rule is enforcing it yet.
+  ///
+  /// The value itself is printed in the faint colour rather than given a badge,
+  /// because the number still has to be readable — it is the value the user
+  /// would get after saving. Only its *status* is different, and the section
+  /// says so once in words instead of every field repeating it.
+  final bool inactive;
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(
         decimal: true,
         signed: true,
       ),
-      decoration: InputDecoration(labelText: label),
+      style: inactive
+          ? theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
+            )
+          : null,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: inactive ? 'Not saved yet' : null,
+      ),
     );
   }
 }
@@ -126,11 +150,13 @@ class EnvRangeField extends StatelessWidget {
           Text(setting.label, style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 6),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: NumberField(
                   controller: setting.min,
                   label: 'Min (${setting.unit})',
+                  inactive: setting.minIsPrefill,
                 ),
               ),
               const SizedBox(width: 10),
@@ -138,9 +164,58 @@ class EnvRangeField extends StatelessWidget {
                 child: NumberField(
                   controller: setting.max,
                   label: 'Max (${setting.unit})',
+                  inactive: setting.maxIsPrefill,
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One line saying how many limits are still showing an unsaved default.
+///
+/// Exists because a default sitting in a field reads exactly like a stored one,
+/// and the two are not the same thing: a stored limit has a rule behind it, a
+/// default does not. The per-field mark is a colour and a "Not saved yet"
+/// caption, which is deliberately quiet; this is the sentence that makes the
+/// consequence plain, stated once instead of on every field.
+class UnsavedDefaultsNote extends StatelessWidget {
+  const UnsavedDefaultsNote({super.key, required this.ranges});
+
+  final List<EnvRangeSetting> ranges;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final count = ranges
+        .where((r) => r.minIsPrefill || r.maxIsPrefill)
+        .length;
+    if (count == 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 15,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              count == 1
+                  ? '1 limit is shown as a default. It is not monitored until '
+                      'you save.'
+                  : '$count limits are shown as defaults. They are not '
+                      'monitored until you save.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ],
       ),

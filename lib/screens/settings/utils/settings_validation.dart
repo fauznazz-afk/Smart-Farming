@@ -13,7 +13,20 @@ class EnvRangeSetting {
     double? defaultMin,
     double? defaultMax,
   }) : min = TextEditingController(text: _format(defaultMin)),
-       max = TextEditingController(text: _format(defaultMax));
+       max = TextEditingController(text: _format(defaultMax)),
+       // A default typed into the field is not yet a limit. It only becomes one
+       // when Settings writes it out, and until then the alarm engine reads the
+       // key, finds nothing, and treats the sensor as unmonitored. So a field
+       // holding a default starts out flagged as inactive, and the flag is only
+       // cleared by a load that actually found a stored value.
+       //
+       // Without this the screen showed a number for a limit that was not armed:
+       // a user who saved their settings before a limit existed kept seeing the
+       // new default in the field, and reasonably concluded the tank was
+       // guarded. It was found on a test device reading 2396 NTU against a
+       // "Max 100 NTU" that no rule anywhere was enforcing.
+       minIsPrefill = defaultMin != null && minKey != null,
+       maxIsPrefill = defaultMax != null && maxKey != null;
 
   /// Stable id of the sensor, e.g. `temp`.
   final String id;
@@ -40,6 +53,18 @@ class EnvRangeSetting {
 
   final TextEditingController min;
   final TextEditingController max;
+
+  /// True while the field still holds the shipped default rather than something
+  /// the user has saved, so no rule is enforcing it yet.
+  bool minIsPrefill;
+  bool maxIsPrefill;
+
+  /// Marks both sides as stored. Called after a successful save, because from
+  /// that moment the values on screen are the values the alarm engine reads.
+  void markSaved() {
+    minIsPrefill = false;
+    maxIsPrefill = false;
+  }
 
   bool get isEmpty => min.text.trim().isEmpty && max.text.trim().isEmpty;
 
