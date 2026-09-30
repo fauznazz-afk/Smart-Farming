@@ -18,7 +18,9 @@ ESP32 sensor → ESP-NOW → ESP32 gateway → MQTT → ThingsBoard CE (Orange P
 Battery telemetry does **not** go through the ESP32. It is read from a Bluetooth
 BMS and publishes to its own ThingsBoard device.
 
-Version lives in `pubspec.yaml` (`1.6.0+12` as of 28 September 2026).
+Version lives in `pubspec.yaml` (`1.6.1+13` as of 30 September 2026; five
+commits past the 1.6.1 tag are unreleased and belong to 1.7.0 — the surface
+system, the navigation and the chart set all changed, which is not a patch).
 `package_info_plus` reads it at runtime, so never hardcode a version string in
 the UI.
 
@@ -60,18 +62,89 @@ Three layers, consistently applied:
 `Bound` widget (`screens/dashboard/utils/bound.dart`) for granular rebuilds.
 Do not introduce `provider` without a reason to migrate the whole app.
 
-### Colour is never varied automatically
+`Bound` **had no test at all** until `test/bound_test.dart` was added. Its token
+contract is unenforced by the compiler: any parent rebuild that passes a new
+closure over new plain data without also changing the token is silently dropped,
+and `_visualToken` is a hand-maintained list of everything that has to be in it.
+Two entries in that list were added *after* a real bug, so the failure mode is
+real and the symptom — the AC card under the PV header — is device-only. If you
+add a value a `Bound` builder reads, add it to `_visualToken` in the same change,
+and expect `test/bound_test.dart` to be the thing that tells you if you forget.
 
-A user picks one accent in Settings. Everything derived from it stays that hue.
-`metricColor` and `strongMetricColor` take an `index` parameter and **ignore it**,
-and `test/color_helpers_test.dart` fails if they start using it.
+### One declaration per page's telemetry
 
-This is not an oversight. A 40-degree hue rotation per index was implemented so
-the PV, AC and battery pages would be distinguishable by colour, and it was
-reverted: the user reported the app as uglier, and they were right about the
-reason. A colour the user did not choose is a colour they cannot predict, and the
-screens stopped looking themed and started looking arbitrary. The pages are
-distinguished by their title and icon, which is unambiguous.
+What a page charts lives in `screens/dashboard/widgets/chart_groups.dart`, and
+the history request keys, the legend, the statistics row and the axis all read
+from it. This is the whole reason greenhouse pH and fish turbidity could not be
+plotted, and getting there meant undoing three things together: a three-field
+`HistoryKeys` record, a `const suffixes` list of three names indexed by position,
+and a `historyDeviceForPrefix` that sent every non-battery page to the PZEM
+meter — so a request for `ph` went to a device that does not publish it, and
+would have failed silently rather than loudly.
+
+**Do not add a key in one place and a label in another.** The old chart derived
+its storage key from a prefix and a suffix index while the screen derived its
+lookup from a prefix and a literal, and the only reason they agreed was that both
+lists had exactly three entries in the same order. Adding a fourth to one would
+have compiled, passed every test, and plotted nothing.
+
+**Group by unit, not by convenience.** Two series share a Y axis only when their
+units make the comparison real — which is why `temp_dht` and `temp_ds18b20` share
+one and lux does not share with anything. A chart whose shape is an artefact of
+the units is worse than no chart, because it looks like a reading.
+
+### Soft-UI surfaces, and why they are opaque
+
+The surface system is opaque soft-UI: a card is the **same colour as the page**,
+and all of its depth comes from a dual shadow pair with one light source, from
+the top left, app-wide. `design_tokens.dart` is the only place a fill, a radius,
+a shadow or a duration is written.
+
+The opacity is the load-bearing part, and it is the opposite of what the app used
+to do. Card fills were a gradient at alpha 0.44 to 0.66, composited over three
+large radial-gradient orbs, so the rendered fill varied continuously with the
+pixel. `test/color_helpers_test.dart` has always asserted contrast against
+opaque constants, which is what made its claim true rather than approximately
+true.
+
+Three things that are easy to break:
+
+**The light-mode page must stay a mid-tone.** It is `#E1E7E4`. It was
+`#F1F4F2`, and that is close enough to white that the light half of every
+shadow pair had nowhere to be lighter *to* — only the dark half showed, and
+every card read as flat Material with a grey edge. Do not "brighten" it. This is
+the single most consequential value in the token file.
+
+**The hairline must stay neutral.** It was tinted with the theme accent, which
+put a green outline on every card and silently undid the entire migration: a
+coloured border is a drawn edge, and a drawn edge is the thing this style exists
+to replace. It is a very light neutral now, kept because WCAG 1.4.11 wants 3:1
+for a component boundary and no test measures it.
+
+**`AppCard` must keep its transparent `Material` between the decorated box and
+the content.** An opaque fill paints over the ink layer of the nearest Material
+above it, so every `ListTile`, `SwitchListTile` and `InkWell` inside a card has
+its splash and hover state covered. `settings_screen_test.dart` catches this as a
+test failure; the navigation bar's own ink is the same defect and has no test.
+
+There is one rule here that is about *content* rather than about surfaces, and it
+is older than any of this: **the app never varies a hue automatically.**
+`metricColor` and `strongMetricColor` take an `index` and **ignore it**, and
+`test/color_helpers_test.dart` fails if they start using it. A 40-degree rotation
+per index was implemented so the PV, AC and battery pages would be
+distinguishable by colour, and it was reverted because a colour the user did not
+choose is a colour they cannot predict.
+
+The chart series are the documented exception and they now have a second half.
+A chart group with more than one series uses the fixed red/green/blue triad in
+the same order, because three lightness steps of one hue are indistinguishable on
+a phone. A group with a **single** series uses the user's accent, and that is not
+a preference: there is nothing to distinguish it from, and painting it red would
+give one colour two meanings in one app — "this is the voltage series" on one page
+and "something is wrong" on another, in an app whose own rule is that a status
+colour means a condition rather than an identity. The triad is **reused, never
+extended**; adding a hue to accommodate a new chip is the same mistake as the
+rotation, running the other way.
 
 The same reasoning applies to `kAccentPalette`. It has four entries, two of which
 are genuinely close in hue, and separating them by moving `Ocean cyan` was also
@@ -556,7 +629,7 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-flutter test                                             # 273 tests
+flutter test                                             # 338 tests, jalankan per-file
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 

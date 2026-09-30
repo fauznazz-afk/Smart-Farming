@@ -5,9 +5,12 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 28 September 2026 (sesi keenam)
-- **Status**: rilis **1.6.0 (build 12)** diterbitkan 28 September 2026. Semua
-  perubahan di-commit; `main` dan tag `v1.6.0` ter-push ke `origin/main`. Rilis
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 30 September 2026 (sesi ketujuh)
+- **Status**: rilis **1.6.1 (build 13)** di `origin/main`. Setelah itu, **empat
+  commit tanpa tag rilis** yang mengubah sistem secara mendasar — `pubspec.yaml`
+  masih `1.6.1+13`. Rilis berikutnya harus memotong seluruh `[Unreleased]` di
+  `CHANGELOG.md` sebagai **1.7.0**, bukan 1.6.2: surface system, navigasi, dan
+  set chart berubah, yang tidak memenuhi syarat patch. Rilis
   sebelumnya: 1.5.0 (27 September 2026, commit `24189a0`).
 
 ---
@@ -25,7 +28,7 @@ export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
 export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
 flutter analyze          # harus: No issues found
-flutter test             # harus: 273/273 (19 file)
+flutter test             # harus: 338/338 (24 file) — jalankan PER-FILE, mesin 7 GB OOM kalau sekali jalan
 cd android && ./gradlew :app:testDebugUnitTest   # harus: 11
 git log --oneline -5     # lihat commit terakhir
 ```
@@ -304,8 +307,8 @@ lib/                                    62 file, 11.445 baris
     energy_report/                      widgets dan utils
     alarm_history_screen.dart           402 baris, belum di-refactor
     login_screen.dart
-  widgets/                              design system (liquid_glass, energy cards)
-  test/                                 19 file, 273 test, ~4.500 baris
+  widgets/                              primitif permukaan (AppCard/AppTile/AppBadge — nama file `liquid_glass` tidak akurat)
+  test/                                 24 file, 338 test, ~5.400 baris
 ```
 
 ### Konvensi yang perlu dijaga
@@ -949,7 +952,7 @@ adalah **fish**, bukan bash.
 
 ```bash
 flutter analyze                    # harus: No issues found
-flutter test                       # harus: 273/273
+flutter test                       # harus: 338/338 (PER-FILE)
 flutter build apk --release        # warm ~2-3 menit
 
 # Perangkat (HP Xiaomi 24090RA29G, Android 16)

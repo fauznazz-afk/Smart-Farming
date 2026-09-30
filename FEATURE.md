@@ -19,20 +19,34 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 29 September 2026, rilis 1.6.1 di atas `origin/main` =
-`a115f2f`. Flutter 3.47.5 / Dart 3.13.4, target Android (API 36).
-`flutter analyze` bersih, `flutter test` **320 lulus** di 23 file,
-`./gradlew :app:testDebugUnitTest` 11 lulus. Suite dijalankan dalam delapan
-batch karena mesin 7 GB ini OOM kalau sekali jalan.
+**Status verifikasi:** 30 September 2026, pada `b61eef5` (di atas rilis 1.6.1).
+Flutter 3.47.5 / Dart 3.13.4, target Android (API 36). `flutter analyze` bersih,
+`flutter test` **338 lulus** di 24 file, `./gradlew :app:testDebugUnitTest` 11
+lulus. Suite dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB
+ini OOM kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan
+file yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap
+baseline yang di-`git stash`: suite yang sama gagal dengan cara yang sama tanpa
+perubahan kode apa pun.
 
-**Yang sudah dilihat di perangkat pada 29 September 2026.** Kedelapan butir
-§18.5 yang bisa ditutup ditutup: halaman Fish dan Hydroponics terbuka dan
-merender benar; nilai negatif di hero card tampil sebagai `Discharging -28 W`
-dengan label yang benar; energy report terbuka dengan label perbandingan yang
-cocok dengan kartu analytics dan jalur `No comparison data yet` masih utuh;
-delapan geser ke kiri pada pager berhenti di tab terakhir. Yang **tidak** bisa
-dibuktikan: nama Oktober dan Desember, karena date picker report tidak bergerak
-melewati bulan berjalan.
+**Yang sudah dilihat di perangkat pada 30 September 2026** (Xiaomi 24090RA29G,
+`malachite`, 1220×2712 @ density 520/513, lewat USB, mode light **dan** dark):
+
+- Keempat tab terbuka dan merender; **tujuh chart** menarik data nyata:
+  Hydroponics Temperature (Air 45,88 °C vs **Panel 62,53 °C**), Humidity,
+  Light (maks 54.612 lx), TDS (min 795,81 / maks 2509,07 ppm); Fish pH
+  (6,37–7,75) dan Temperature `suhu` (24,99–31,53 °C) — `suhu` adalah key yang
+  benar-benar dipublikasikan device dan kekhawatiran bahwa ia kosong **tidak
+  terbukti**
+- Sistem permukaan soft-UI terverifikasi di kedua mode: pasangan bayangan
+  terbaca, kartu elevated, chip **inset** vs **raised**, tidak ada hijau di tepi
+  kartu
+- 20 rule ter-push ke modul native, session loaded, tidak ada crash di logcat
+- 120 fps dilaporkan **oleh pemilik perangkat**, bukan diukur dengan
+  `dumpsys gfxinfo` — belum ada bukti frame rate dari alat
+
+**Yang masih belum pernah dilihat di perangkat:** stream CCTV end-to-end pada
+URL produksi, energy report dengan data bulan penuh, dan nama Oktober/Desember
+(§18.5).
 
 **Konvensi tanda sensor.** BMS saat ini melaporkan **minus saat discharging** —
 terukur 27 September 2026 setelah BMS diganti: `Power -22 W` sementara SOC turun.
@@ -167,22 +181,74 @@ Calendar: rentang `today−90 … today`, locale `en_US`.
 
 ## 3. Chart
 
-Tiga seri **bersamaan**, RGB solid, **sumbu Y dinamis dengan nilai nyata**.
+**Tujuh chart di empat halaman.** Dideklarasikan sekali di
+`dashboard/widgets/chart_groups.dart`; kunci request, legenda, statistik, dan
+sumbu semuanya dibaca dari deklarasi itu, jadi satu halaman tidak bisa meminta
+kunci yang tidak digambar atau menggambar kunci yang tidak diminta.
 
-| Seri | Satuan | Terang | Gelap | Key histori |
-|---|---|---|---|---|
-| Voltage | V | `#E53935` | `#FF5252` | `voltage_dc` / `voltage_ac` / `voltage` |
-| Current | A | `#43A047` | `#69F0AE` | `current_dc` / `current_ac` / `current` |
-| Power | W | `#1E88E5` | `#448AFF` | `power_dc` / `power_ac` / `power` |
+**Pengelompokan ditentukan oleh satuan**, dan itu sifat data, bukan pilihan
+tata letak. Page prefix → grup:
+
+| Prefix | Halaman | Grup | Seri per grup |
+|---|---|---|---|
+| `pv` | Power | 1 | `voltage_dc` · `current_dc` · `power_dc` |
+| `ac` | Power | 1 | `voltage_ac` · `current_ac` · `power_ac` |
+| `battery` | Power | 1 | `voltage` · `current` · `power` |
+| `env` | Hydroponics | **4** | Temperature (`temp_dht` + `temp_ds18b20`) · Humidity · Light · TDS |
+| `fish` | Fish Tank | **3** | pH · Temperature (`suhu`) · Turbidity |
+
+Tegangan/arus/daya satu sumbu karena satu sistem listrik dalam besaran yang
+bisa dibandingkan. Dua sensor suhu satu sumbu karena keduanya derajat Celsius —
+dan itulah **titiknya**: jarak panel terhadap udara adalah pembacaan yang
+dibutuhkan orang greenhouse, dan dua chart terpisah menyembunyikannya. Di
+perangkat, panel memuncak 62,53 °C melawan udara 45,88 °C. Lux, persen, dan ppm
+tidak berbagi sumbu dengan apa pun, dan bersama-sama akan menghasilkan chart
+yang bentuknya artefak satuan, bukan greenhouse.
+
+`water_level_percent` **tidak** punya chart: un-monitored di seluruh aplikasi,
+tanpa limit dan tanpa `metric`, dan chart akan menyajikannya sebagai tren
+primary yang selama ini tidak pernah diperlakukan demikian.
+
+### Warna seri
+
+| Kondisi | Warna |
+|---|---|
+| Grup multi-seri | Triad `#E53935` / `#43A047` / `#1E88E5` (gelap: `#FF5252` / `#69F0AE` / `#448AFF`), urutan yang sama |
+| Grup satu-seri | **Accent pengguna** |
+
+Grup satu-seri memakai accent karena tidak ada yang perlu dibedakan, dan merah di
+sana akan punya dua arti dalam satu aplikasi. Triad **dipakai ulang, bukan
+diperluas** — menambah hue untuk accommodate chip baru adalah kesalahan yang
+sama dengan rotasi hue yang pernah di-revert, terbalik.
 
 | Aspek | Nilai |
 |---|---|
-| Sumbu Y | `minY = min<0 ? min*1.1 : 0`, `maxY = max*1.1`, interval `niceStep(4)` |
+| Sumbu Y | `minY = min<0 ? min*1.1 : 0`; `interval = niceStep(maxY-minY, 4)`; `maxY` **di-snap ke kelipatan interval** |
+| Label sumbu Y | semua pakai `faintColor`. Nilai **sebelumnya**: light `0xFF64748B` = 4,30:1 (gagal AA), dark `0xFFB7C4BD` = abu ke-4 yang berbeda |
+| Label paling atas | `AxisSide.top` — menggantung **di bawah** garisnya sendiri, bukan di tengah. Di tengah, separuhnya keluar dari plot dan terpotong padding kartu |
 | Sumbu X | `DD/MM` bila rentang > 1 hari, else `HH:MM`; tick tepi digeser 16 px |
 | Downsample | ≤ 180 titik mentah, else 90 bucket × (min, max) |
 | Legenda | ikon + nama + nilai terbaru per seri |
-| Statistik | `Last` / `min` / `max` per seri, satu baris masing-masing |
-| Tooltip | waktu + ketiga nilai dalam satuan masing-masing |
+| Statistik | `Last` / `min` / `max` per seri, satu baris masing-masing, **16dp antar kolom dan 2dp antar baris** |
+| Tooltip | waktu + seluruh nilai dalam satuan masing-masing |
+| Animasi data | **mati** (`duration: Duration.zero`) di kedua chart |
+| Cache bounds | per `prefix/grupTitle`, **bukan** per prefix — empat kartu satu halaman akan berbagi batas tanpa itu |
+
+### Yang tidak ada lagi di header chart
+
+Ikon kalender dihapus, dan bersamanya **satu-satunya jalan ke range picker
+kustom**. Date strip hanya bisa memilih satu hari. Rentang yang sedang dilihat
+tetap named di header, jadi tidak menjadi ambigu. Kalau dikembalikan, tempat
+yang benar adalah app bar.
+
+### Tidak diputuskan
+
+**Sumbu Y pH dimulai dari 0.** Datanya hidup di 6,37–7,75 dalam rentang 0–10,
+jadi penurunan 7,75 → 6,37 terjekan di seperlima plot. Nol adalah baseline
+yang jujur untuk lux dan watt, di mana nol berarti sesuatu, dan tidak untuk
+indeks tanpa dimensi. Apakah indeks terbatas boleh tidak berpatok ke nol
+adalah keputusan tentang grup mana yang indeks dan mana besaran — belum
+diubah secara global.
 | Rentang | hari ini = 24 jam bergulir · hari lalu = 00:00–23:59 · kustom = 00:00–23:59:59.999 |
 | Sampling | ≤ 1 hari → 5 mnt · ≤ 7 hari → 30 mnt · ≤ 30 hari → 2 jam · else 6 jam |
 | Indikator | `Live` / `Polling` (state WebSocket, **bukan** sumber chart) |
@@ -637,9 +703,9 @@ kalau Settings mengembalikan `changed == true`.
 | | Turbidity max (tanpa batas bawah, **tanpa default**) | `fish_turbidity_max` | String | **kosong** | ✅ |
 | ~~Weather~~ | ~~OpenWeatherMap API key~~ | ~~`weather_api_key`~~ | — | — | **⛔ dihapus** |
 | **CCTV source** | Hydroponics / Fish stream URL | `cctv_url` / `cctv_url_fish` (**secure storage**) | String | URL camera | ✅ |
-| **Performance** | Liquid glass blur | `performance_mode` | bool | on | ✅ (on = blur **mati**) |
+| ~~Performance~~ | ~~Liquid glass blur~~ | ~~`performance_mode`~~ | — | — | **⛔ dihapus 1.7.0** — kunci tetap di SharedPreferences, tidak dibaca siapa pun |
 | **Background checks** | 5 baris status + Check now + Battery settings | — | read-only | — | ✅ |
-| **About** | App version | — | read-only | `v1.6.0+12` | ✅ |
+| **About** | App version | — | read-only | dari `pubspec.yaml` (`1.6.1+13`) | ✅ |
 | **Account** | Logout | — | tombol | — | ✅ |
 
 Default limit lingkungan: suhu 15–35 °C · kelembapan 40–85 % · TDS ≥ 800 ppm ·
@@ -696,24 +762,50 @@ so alarms are only reported while the app is open."*
 
 ## 14. Tema dan visual
 
+**Sistem permukaan soft-UI, opaque, satu arah cahaya.** Ini menggantikan
+"liquid glass" yang ada sampai rilis 1.6.1. Alasan dan sejarah
+keputusannya ada di `AGENTS.md` §"Soft-UI surfaces" dan di `CHANGELOG.md`
+1.7.0.
+
 | Fitur | Detail |
 |---|---|
 | Mode | System / Light / Dark, `ColorScheme.fromSeed` |
-| Accent | 4 pilihan: EnerGrow green · Solar amber · Ocean cyan · Forest teal |
-| Glass | `BackdropFilter` diaktifkan saat `performance_mode == false` — **switch ON berarti blur MATI** |
-| Card | `LiquidGlassCard` dengan border hairline **yang mengikuti accent** via `colorScheme.primary` |
-| Rebuild granular | `Bound` dengan token, jadi ganti tema hanya membangun ulang kartu yang terlihat |
-| Aksesibilitas | `faintColor` dan `statusOk/Warn/Bad` diukur terhadap permukaan nyata; `test/color_helpers_test.dart` menjaga klaim itu |
+| Accent | 4 pilihan: EnerGrow green · Solar amber · Ocean cyan · Forest teal — **tidak pernah diubah otomatis** |
+| Token layer | `dashboard/utils/design_tokens.dart`: `AppSurfaces`, `AppRadius`, `AppElevation`, `appDivider`, `AppMotion`. Satu-satunya tempat fill, radius, pasangan bayangan, dan durasi ditulis |
+| Primitif | `AppCard` (+`inset` / `pressed`), `AppTile`, `AppBadge`, `AppDivider`, `DateStripChip`, `AppBackground` — semuanya di `widgets/liquid_glass.dart` (nama file tidak lagi akurat) |
+| Fill | **Opaque.** Kartu = warna halaman. Kelembaman dibawa pasangan bayangan, bukan transparansi |
+| Halaman light | **Mid-tone `#E1E7E4`**, bukan putih. Hampir putih membuat separuh bayangan tidak punya tempat untuk menjadi lebih terang, dan hasilnya terbaca Material, bukan soft-UI |
+| Arah cahaya | Dari kiri-atas, seluruh aplikasi. `AppElevation.raised` / `.inset` |
+| Radius | Satu skala: `card 16` · `pill 22` · `tile 14` · `inset 12` · `badge 10` · `bar 4`. Sebelumnya 12 nilai dari 3 sampai 28 |
+| Border | Netral, sangat tipis — **bukan** accent. Border berwarna adalah tepi yang digambar, dan tepi yang digagradalah yang harus digantikan gaya ini |
+| Tombol | `filledButtonTheme` diturunkan dari seed pengguna. Fill + label dihitung per mode, bukan diwarisi dari `ColorScheme.fromSeed` |
+| Blur | **Tidak ada.** `BackdropFilter` dan orb gradient dihapus; section Performance dihapus |
+| Rebuild granular | `Bound` dengan token. Punya test pertamanya di `test/bound_test.dart` (13 kasus) |
+| Aksesibilitas | `faintColor` dan `statusOk/Warn/Bad` diukur terhadap permukaan opaque nyata; `test/color_helpers_test.dart` menjaga klaim itu |
 
 **Aturan warna yang berlaku di seluruh aplikasi:**
 
 1. **Warna tidak pernah berubah otomatis.** `metricColor` menerima `index` dan
    **sengaja mengabaikannya**. Rotasi hue pernah dicoba dan dibatalkan.
 2. **Hijau bukan untuk kondisi baik.** Hanya pelanggaran yang diberi warna.
-3. **Pengecualian yang didokumentasikan:** seri chart perangkat tetap merah,
-   hijau, biru — tiga warna yang jelas lebih mudah dibaca daripada tiga langkah
-   lightness dari satu hue, dan dash pattern untuk membedakannya terbaca seperti
-   garis rusak.
+3. **Seri chart: triad merah/hijau/biru untuk grup multi-seri, accent untuk
+   grup satu-seri.** Pengecualian yang didokumentasikan di `AGENTS.md` tetap berlaku untuk
+   tegangan/arus/daya. Kartu satu-seri memakai accent karena tidak ada yang perlu
+   dibedakan — dan warna merah di sana akan punya dua arti dalam satu app.
+4. **Triad dipakai ulang, bukan diperluas.** Menambah hue baru untuk
+   accommodate chip baru adalah kesalahan yang sama dengan rotasi hue, terbalik.
+
+### Yang dihapus dan tidak ada lagi
+
+- `LiquidGlassCard`, `AmbientBackground`, `GlassDateChip`, `GlassNavBar` (nama)
+- `_AmbientOrbsPainter` dan tiga gradient radial — cat full-screen termahal di
+  app, dan tidak di-gate oleh toggle Performance yang subjudulnya menjanjikan
+  "flat cards, smoother scrolling"
+- Section **Performance** di Settings, beserta `performanceMode` di
+  `AppThemeController`. Kunci `performance_mode` **tetap** di SharedPreferences
+  dan tidak dibaca siapa pun
+- `filledButtonTheme` yang tidak pernah ada — itu sebabnya tombol di dark mode
+  pernah menampilkan label putih di atas hijau terang (~1,5:1)
 
 ---
 
@@ -822,11 +914,28 @@ foreground(true) → alarm sync → fetch pertama.
 
 ## 18. Celah yang diketahui
 
-Semua **terverifikasi dengan membaca kode** pada 28 September 2026. Dari versi
-sebelumnya, tujuh celah fungsional sudah diperbaiki pada rilis 1.6.0 dan satu
-terbukti bukan celah; keduanya dikeluarkan dari daftar ini, bersama simbol-simbol
-mati yang sudah dihapus — riwayat perbaikannya ada di `CHANGELOG.md`. Yang belum
+Semua **terverifikasi dengan membaca kode** pada 28 September 2026, dan
+diperbarui pada 30 September 2026 setelah restyle soft-UI dan penambahan chart.
+Dari versi sebelumnya, delapan celah fungsional sudah diperbaiki — tujuh pada
+rilis 1.6.0, satu pada 1.6.1, dan §18.1 butir 2 pada 1.7.0 — dan satu terbukti
+bukan celah; semuanya dikeluarkan dari daftar ini, bersama simbol-simbol mati
+yang sudah dihapus. Riwayat perbaikannya ada di `CHANGELOG.md`. Yang belum
 diverifikasi di perangkat ada di §18.5.
+
+### 18.0 Celah yang dibuat oleh 1.7.0 dan masih terbuka
+
+1. **Sumbu Y pH terpatok ke nol.** Datanya 6,37–7,75 dalam rentang 0–10, jadi
+   penurunan 7,75 → 6,37 terjekan di seperlima plot. `minY = min<0 ? min*1.1 : 0`
+   benar untuk lux dan watt, di mana nol berarti sesuatu, dan salah untuk indeks
+   tanpa dimensi. Belum diputuskan.
+2. **Range picker kustom tidak terjangkau.** Ikon kalender di header chart
+   adalah satu-satunya jalan ke `showDateRangePicker`, dan semuanya dihapus.
+   Date strip hanya bisa memilih satu hari.
+3. **`FilledButton` masih blok accent rata.** Bentuk dan kontrasnya sudah benar,
+   tapi neumorphism yang ketat akan membuatnya raised atau inset.
+4. **Kotak hitam CCTV di light mode** masih menusuk di halaman neumorphic terang.
+   `0xFF080D0A` adalah permukaan di belakang video, bukan permukaan bertema, dan
+   belum diputuskan apa yang benar di sana.
 
 ### 18.1 Celah fungsional
 
@@ -837,12 +946,19 @@ diverifikasi di perangkat ada di §18.5.
    `kMeaningfulEnergyKwh` dari `lib/utils/energy_comparison.dart`; sebelumnya itu
    dua literal di dua file, dan yang tidak pernah diperbaiki justru yang di
    report. Wording tetap berbeda per permukaan dan itu disengaja.
-2. **Halaman Hydroponics dan Fish tidak punya grafik.** `_prefixForPage`
-    mengembalikan `null` untuk keduanya, jadi tidak ada request histori sama sekali.
-    Yang menghalangi: `TelemetryChartCard` memakai daftar sufiks tetap
-    `voltage`/`current`/`power` (`const suffixes` di `chart_card.dart`) dan
-    `HistoryKeys` hanya punya tiga field, jadi pH dan turbidity tidak bisa di-chart
-    tanpa generalisasi widget itu lebih dulu.
+2. ~~**Halaman Hydroponics dan Fish tidak punya grafik.**~~ **Perbaiki.** Tiga
+   hal menghalanginya sekaligus dan ketiganya harus dibongkar bersama:
+   `HistoryKeys` adalah record tiga field (`voltage`/`current`/`power`) dan
+   `TelemetryChartCard` menyusun kuncinya sebagai
+   `'${prefix}_${suffixes[index]}'` dari `const suffixes` yang juga berisi tiga
+   nama — **dua daftar fixed-length yang paralel**, dengan tidak ada yang
+   memastikan keduanya tetap sepadan; `_prefixForPage` mengembalikan `null` untuk
+   kedua halaman, dan prefix null berarti tidak ada request; dan
+   `historyDeviceForPrefix` mengirim semua yang bukan battery ke PZEM, jadi
+   request `ph` akan diterbitkan ke device yang tidak mempublikasikannya — itu
+   sebab kedua greenhouse tidak pernah bisa di-chart, dan sebabnya ia akan
+   gagal senyap. Sekarang ketiganya satu deklarasi di `chart_groups.dart`.
+   Tujuh chart, diverifikasi di perangkat — lihat §3.
 3. **Sensor turbidity membaca 2396 lalu 3000 NTU.** Untuk akuikultur, air jernih
    ada di bawah 30 NTU, jadi sensor ini jelas bukan pada skala yang diasumsikan —
    selisihnya sekitar 30 kali. Kemungkinan besar belum dikalibrasi atau satuannya
@@ -1052,7 +1168,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 273 test
+flutter test                                    # 338 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 

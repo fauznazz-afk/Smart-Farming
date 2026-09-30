@@ -46,7 +46,7 @@ Kalau ada yang belum bisa Anda jawab, **Anda belum cukup membaca**.
 | File Dart di `lib/` | 68 |
 | Baris Dart | ~13 200 |
 | File Kotlin | 15 (13 di modul alarm) |
-| File test | 19, melaporkan **273 test** |
+| File test | 24, melaporkan **338 test** |
 | File terbesar | `lib/screens/dashboard_screen.dart` — 1 745 baris |
 
 Lima file yang paling sering jadi sumber bug, karena isinya besar dan dipakai
@@ -56,7 +56,9 @@ semua halaman:
 |---|---|
 | `lib/screens/dashboard_screen.dart` | State, polling, riwayat, evaluasi alarm, dan susunan 5 halaman dalam satu file. 1 745 baris. |
 | `lib/utils/alarm_rules.dart` | Satu-satunya definisi apa yang dihitung sebagai alarm. Duplikasinya ada di Kotlin. |
-| `lib/widgets/liquid_glass.dart` | `LiquidGlassCard` dan `AmbientBackground` dipakai semua kartu. Perubahan di sini terlihat di mana-mana. |
+| `lib/widgets/liquid_glass.dart` | Primitif permukaan: `AppCard`, `AppTile`, `AppBadge`, `AppDivider`, `AppBackground`, `DateStripChip`. Dipakai semua kartu. **Nama file tidak lagi akurat.** Perubahan di sini terlihat di mana-mana. |
+| `lib/screens/dashboard/utils/design_tokens.dart` | **Satu-satunya tempat** fill, radius, pasangan bayangan, atau durasi ditulis. Kalau sebuah warna permukaan atau radius muncul di file lain, itu bug. |
+| `lib/screens/dashboard/widgets/chart_groups.dart` | Apa yang tiap halaman gambar. Kunci request, legenda, statistik, dan sumbu semua membacanya — tidak boleh ada daftar telemetry kedua di tempat lain. |
 | `lib/services/thingsboard_api.dart` | Client REST, lifecycle token, cache offline. |
 | `lib/screens/dashboard/widgets/chart_card.dart` | Chart 3 seri, sumbu, tooltip, statistik. |
 
@@ -238,7 +240,7 @@ flutter analyze; flutter test
 ```
 
 Dijalankan terpisah, `flutter analyze` tulis "No issues found!" dan
-`flutter test` tulis "All tests passed!" 273. Tidak ada kode yang berubah di
+`flutter test` tulis "All tests passed!" 338. Tidak ada kode yang berubah di
 antara keduanya.
 
 Penyebabnya bukan `concurrency: 1` yang salah — itu sudah benar. Penyebabnya
@@ -568,6 +570,26 @@ Aturan tambahan:
 - `flutter test` **hanya boleh satu proses.** Kalau muncul
   `did not complete` atau `loading x.dart` tanpa stack trace, itu OOM — bukan
   test yang gagal. Jangan mencari penyebab di dalam test.
+- **Jalankan suite per-file dengan percobaan ulang, bukan sekali jalan.** Pada
+  30 September 2026 `flutter test` tanpa argumen gagal pada 1–2 file yang
+  **berpindah-pindah antar run**, dan `git stash` + baseline gagal dengan cara
+  yang sama — jadi ini mesin, bukan kode. Polanya yang dipakai:
+
+  ```powershell
+  Get-Process dart -ErrorAction SilentlyContinue | Stop-Process -Force
+  $sum = 0
+  foreach ($f in (Get-ChildItem test -Filter *_test.dart | Sort-Object Name)) {
+    for ($t = 1; $t -le 3; $t++) {
+      $out = (flutter test $f.FullName 2>&1 | Out-String)
+      if ($out -match '\+(\d+): All tests passed') { $sum += [int]$Matches[1]; break }
+      Start-Sleep 3
+    }
+  }
+  "TOTAL: $sum"
+  ```
+
+  Kalau sebuah file gagal **tiga kali berturut-turut**, barulah itu test yang
+  benar-benar rusak.
 - Gradle hanya wajib kalau alarm, rule, atau `AlarmMessageFormat.kt` berubah.
 - Kalau Anda menambahkan test, hitung ulang angka yang Anda sebut di dokumen dan
   di commit message. Angka basi lebih merusak daripada tidak menyebutnya.

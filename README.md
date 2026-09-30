@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-273%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-338%20Dart%20%2B%2011%20Kotlin-4CAF50">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
@@ -76,7 +76,9 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 
 - Dashboard real-time dengan navigasi **Overview**, **Power** (PV / AC / Battery
   dalam satu tab bersegmen), **Hydroponics**, dan **Fish**
-- Chart histori 24 jam untuk Voltage, Current, dan Power tiap sumber energi
+- **Tujuh chart histori** — Power (PV / AC / Battery, masing-masing tiga seri), Hydroponics
+  (Temperature dua sensor pada satu sumbu, Humidity, Light, TDS), Fish (pH, Temperature, Turbidity).
+  Dikelompokkan **berdasarkan satuan**, jadi hanya deret yang bisa dibandingkan yang berbagi sumbu Y
 - Update real-time lewat **WebSocket ThingsBoard**, dengan polling REST sebagai cadangan
 - Auto-refresh tiap 10 detik + pull-to-refresh, intervalnya bisa diatur
 - Indikator usia telemetry terakhir, sehingga data basi tidak disamarakan jadi data segar
@@ -111,8 +113,8 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 - Dua stream CCTV (go2rtc) — greenhouse di Hydroponics dan `?src=cam2` di Fish —
   dengan allowlist host, dan status koneksi yang jujur
   (standby / connecting / live / offline)
-- Dark & light mode, empat pilihan aksen, mode glass yang bisa dipecah untuk scrolling
-  lebih halus
+- Dark & light mode, empat pilihan aksen, dan sistem permukaan **soft-UI opaque**
+  (kartu se warna halaman, kedalaman dari pasangan bayangan satu arah cahaya)
 - Konfigurasi ThingsBoard tersimpan di secure storage, bukan di teks biasa
 
 ---
@@ -165,7 +167,7 @@ lib/
 │   └── connection_health_service.dart
 ├── screens/                         # Login, dashboard, laporan, settings, CCTV, riwayat
 ├── theme/app_theme_controller.dart
-└── widgets/                         # Glass design system + kartu ringkasan
+└── widgets/                         # Primitif permukaan (AppCard, AppTile, AppBadge) — nama file `liquid_glass.dart` sudah tidak akurat
 
 android/app/src/
 ├── main/kotlin/tech/mbkm/energrow/
@@ -278,6 +280,7 @@ Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
 - [x] ThingsBoard REST + WebSocket real-time, indikator "Live" hijau
 - [x] Login Customer User, display name dari server tampil
 - [x] Tab PV / AC / Battery dengan chart 3 seri
+- [x] Chart Hydroponics (Temperature dua sensor, Humidity, Light, TDS) dan Fish (pH, Temperature, Turbidity)
 - [x] Energy analytics, termasuk proyeksi runtime baterai
 - [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
 - [x] Biometric gate (sidik jari)
@@ -306,7 +309,8 @@ diukur pada 1.4.0: 1038 ms.
   atau dibuang vendor power manager. Dua trigger dipakai untuk mengurangi risiko ini,
   dan secara nonaktif battery optimisation untuk EnerGrow di pengaturan Xiaomi.
 - **Video CCTV membebani baterai** — WebView decoding berjalan di perangkat sementara
-  dashboard tetap polling. Aktifkan *Smooth Glass Mode* untuk mengurangi beban render.
+  dashboard tetap polling. Aliran ini sudah diisolasi di balik `RepaintBoundary` dan
+  tidak melakukan rebuild, tapi tetap boros; tidak ada pengaturan untuk 이를.
 - **Sumbu Y dibulatkan** — label sumbu memakai angka bersih (1 / 2 / 2,5 / 5), jadi nilai
   ekstrem bisa membuat label berbeda dari angka yang tercatat.
 

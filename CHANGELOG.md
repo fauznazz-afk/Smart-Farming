@@ -1,5 +1,146 @@
 ## [Unreleased]
 
+### Added
+
+- **The greenhouse and the fish tank have charts.** Seven in total, all drawing
+  real data: Hydroponics gets Temperature (the two sensors on one axis), Humidity,
+  Light and TDS; Fish gets pH, Temperature and Turbidity. Both pages had none at
+  all, and the reason was structural rather than missing work — see Fixed below.
+- `test/bound_test.dart`, the first coverage `Bound` has ever had. Thirteen cases
+  pinning the caching, the token comparison, the listener swap, and the
+  reused-`State` splice that PV/AC/Battery depend on. Its token contract has
+  already failed twice in this repo, and both times the symptom was the AC card
+  sitting under the PV header, visible only on a device.
+
+### Fixed
+
+- **The chart could not draw anything but voltage, current and power.** Three
+  things blocked it together: `HistoryKeys` was a three-field record and
+  `TelemetryChartCard` composed its lookup key from a `const suffixes` list of
+  the same three names, so there was no field for pH and no slot to name it;
+  `_prefixForPage` returned null for the two pages, and a null prefix means no
+  request; and `historyDeviceForPrefix` sent everything that was not the battery
+  to the PZEM meter, so a request for `ph` would have been issued against a
+  device that does not publish it. All three now come from one declaration, so a
+  page cannot request keys nothing draws. PV, AC and Battery are unchanged.
+- **Buttons in dark mode were white text on light green**, about 1.5:1.
+  `filledButtonTheme` had never existed, so every `FilledButton` was a raw
+  Material block at the framework's own radius and `ColorScheme.fromSeed`'s
+  light `onPrimary`. The fill and the label are now derived from the user's own
+  seed at a lightness chosen per mode.
+- **The card hairlines were tinted with the theme accent**, putting a green
+  outline on every card in the app. A coloured border is a drawn edge, and a
+  drawn edge is the one thing the soft-UI surface exists to replace — it was
+  undoing the whole migration on its own. The hairline stays, because WCAG 1.4.11
+  wants 3:1 for a component boundary and no test measures it, but it is now a
+  very light neutral aligned with the light source.
+- **The soft-UI surfaces did not read as soft UI.** The light page was close
+  enough to white that the light half of every shadow pair had nowhere to be
+  lighter *to*, so only the dark half showed and every card read as flat Material
+  with a grey edge. The page is a mid-tone now and the shadow pair is retuned for
+  it.
+- **Scrolled content was legible through the app bar.** The scrim was 86% opaque,
+  and a 17sp bold greeting stayed plainly readable behind the title.
+- **Both y axes drew two labels on top of each other.** The dashboard snapped
+  `maxY = max * 1.1` to a whole number of intervals; the energy report divided
+  the padded maximum by four and got `0.12 / 0.23 / 0.35 / 0.46` — each correct
+  to two decimals, none of them a number anyone would write. Both now use
+  `niceStep`, and the top label hangs below its own line instead of being
+  centred on a line the plot has no room above.
+- **Alarm severity colours failed WCAG AA**: `0xFFF57C00` measured 2.44:1 and
+  `0xFFD32F2F` 4.50:1 as 11 to 13dp text, a second unpinned palette one file from
+  the measured one. The background check's "ok" was the EnerGrow seed hardcoded,
+  so a user who picked Solar amber got green beside an amber theme, at 2.70:1.
+  The CCTV status pill drew its 9dp label at 1.66:1. The login error was 3.67:1.
+  Chart axis labels were 4.30:1. All now use the measured palette.
+- **The alert banner read as salmon.** Darkening `_alertAccent` to stop it being
+  the third amber in its file was a judgement made without measuring the result,
+  and the result was pink. It is orange again.
+- **Cards, list tiles and nav items lost their ink.** An opaque card fill paints
+  over the ink layer of the nearest Material above it, so every `ListTile`,
+  `SwitchListTile` and `InkWell` inside a card had its splash painted and then
+  covered — pressing a tab gave no feedback at all. A transparent `Material` now
+  sits between each card's decorated box and its content.
+- **The statistics columns ran together** on a two-series chart, so `min 22.73 C`
+  ran straight into the `Panel` column and two readings looked like one line of
+  text.
+
+### Changed
+
+- **The whole surface system is opaque soft-UI**, replacing the "liquid glass"
+  that had no token layer at all: one card primitive beside roughly thirty-five
+  hand-written `BoxDecoration`s, six card treatments, three shadow vocabularies
+  and twelve radius values. `design_tokens.dart` now holds every fill, radius,
+  shadow pair and duration. The three full-screen ambient orb gradients are gone;
+  they existed only so the translucent cards had something to reveal, and they
+  were the most expensive paint in the app — while not being gated by the
+  Performance setting whose own subtitle promised "flat cards, smoother
+  scrolling".
+- **Telemetry rebuilds are narrowed per device.** A WebSocket frame from the
+  battery used to rebuild the greenhouse card, which could not have drawn
+  anything different, and `PageView` keeps the Power page alive while the user
+  reads Overview, so that rebuild happened off-screen too. Five cards that each
+  read exactly one device now have their own counter. The four consumers that
+  genuinely read across devices stay on the wide one.
+- `markConnecting` is no longer called on the poll path. It fired a real
+  notification every poll and the status strip has no branch that renders the
+  state it described.
+- The CCTV WebView is isolated behind a `RepaintBoundary`. It is a
+  virtual-display texture invalidating 30 to 60 times a second, and a live stream
+  was re-rasterising the whole page display list around it.
+- **The navigation bar lost its labels and is now as wide as its contents.** The
+  labels never fit — `Hydroponics` measures 62dp in a 60dp slot — and the width
+  carried no information, because each destination is already named by the header
+  of the page it opens. The 48dp tap target and the semantic labels are
+  unchanged, so only the visible text went.
+- The camera moves above the readings on both the greenhouse and the fish page.
+  It was last because those pages had no chart, so a camera at the bottom meant
+  scrolling past every number to reach the one control that is not a number.
+- The energy report's list is a `ListView.builder`, so the bar chart is not
+  constructed on the loading, error and empty paths, and the settings
+  `ListenableBuilder` no longer wraps the whole Scaffold, which was rebuilding the
+  app bar and the save button on every dropdown.
+- The energy report's bar chart no longer animates on every rebuild, matching
+  the dashboard's line chart which already opted out.
+
+### Removed
+
+- **The Performance setting**, and `performanceMode` with it. It promised frosted
+  cards and smoother scrolling; the `BackdropFilter` it gated had exactly one
+  caller in the entire app, and everything else it named is gone. A switch that
+  says it does nothing is still a switch. The `performance_mode` key is left in
+  SharedPreferences and read by nobody.
+- **The chart header's calendar button**, and with it the only route to a custom
+  date range. The date strip can only pick a single day. The range is still named
+  in the header, so nothing becomes ambiguous, and if it comes back it belongs in
+  the app bar. Six of these buttons were about to exist on the greenhouse page
+  alone.
+- The environment grid's breach border. It was the third channel for a state the
+  range caption and the out-of-range tag already carry, and signalling one
+  condition three ways reads as a checklist rather than a reading.
+- The energy report's title said "Energi Analytics", a half-translation left in
+  from 1.3.1, on a screen whose body reads "Summary" and "hours with data".
+
+### Known gaps introduced here
+
+- **The pH chart's y axis starts at zero.** Its data lives between 6.37 and 7.75
+  in a 0 to 10 range, so the drop from 7.75 to 6.37 is squeezed into the top
+  fifth of the plot. Zero is the honest baseline for lux and watts, where it
+  means something, and not for a dimensionless index. Undecided, and not changed
+  globally on a hunch.
+
+### Verification
+
+`flutter analyze` clean. `flutter test` **338 passing** in 24 files, run per-file
+with up to three attempts because this 7 GB machine OOMs on a single run and
+reports it as `did not complete` with no stack trace — confirmed against a
+stashed baseline, where the same suite fails the same way with no code change.
+`./gradlew :app:testDebugUnitTest` 11 passing. Release build installed on the
+Xiaomi 24090RA29G and both colour modes checked by screenshot across all four
+tabs, the energy report and Settings. 120 fps is the device owner's report; no
+`dumpsys gfxinfo` measurement has been taken. Never seen on a device: the CCTV
+stream end to end, and the energy report with a full month of data.
+
 ## [1.6.1] - 2026-09-29
 
 ### Fixed
