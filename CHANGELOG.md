@@ -111,14 +111,21 @@
 
 ### Known gaps found, not fixed
 
-- **`energy_report_screen.dart` has `_pickPeriod()` with zero call sites.** The
-  report's date is pinned to whatever `_selectedDate` initialised to, with no way
-  to change it — dead code *and* a missing control, which is worse than the
-  dashboard gap that was just fixed. Different screen, deliberately untouched.
-- **The icon ring on a resolved alarm row is still a red `severityColor` wash.**
-  The same tense argument applies, but that ring carries "this was a critical
-  alarm", which is a historical fact stated nowhere else on the row. Recolouring
-  it would drop information, so it needs the severity to survive somewhere first.
+- ~~**`energy_report_screen.dart` has `_pickPeriod()` with zero call sites.**~~
+  **The premise was false.** It is wired to the report's own `PeriodSelector`
+  button at the top of the list, and the date was never locked. The agent I gave
+  it to checked the call graph instead of taking my word for it, and the four
+  real defects it found while looking are fixed — see above. Recording this
+  because it is the second confident "dead code" report in this repo that was
+  wrong, `AGENTS.md` having already recorded the first, and neither started as a
+  measurement.
+- ~~**The icon ring on a resolved alarm row is still a red `severityColor`
+  wash.**~~ **Fixed.** A resolved row's ring is now ordinary text colour and its
+  caption reads `Resolved · Critical` / `Resolved · Warning`, so the severity
+  survives as a word rather than a hue. A word survives greyscale, being read
+  aloud, and a screenshot; a ring does not.
+- ~~**The icon ring on a resolved alarm row is still a red `severityColor`
+  wash.**~~ **Fixed.** See above; the severity moved into the caption as a word.
 
 ### Fixed (earlier in this release)
 

@@ -13,6 +13,45 @@ import 'energy_report/widgets/data_note.dart';
 import 'energy_report/widgets/empty_and_error_views.dart';
 import 'energy_report/widgets/export_button.dart';
 
+/// The single canonical representation of a selected period.
+///
+/// Time-of-day is always dropped, and monthly collapses to the 1st. These two
+/// live in this file rather than in `energy_report/utils/period_buckets.dart`
+/// only because of an agent-ownership boundary, not by preference: the
+/// repository rule is that pure logic belongs in `utils/`, and this is pure
+/// logic with no widget or I/O in it. If the next change touches
+/// `period_buckets.dart` anyway, move these two there and re-export nothing —
+/// they have exactly one caller and one test file.
+///
+/// The collapse matters because `_selectedDate` has three readers that all
+/// format it — the period button label, the CSV `Period` row and the CSV
+/// filename — and the monthly view aggregates the whole month, so a day-of-month
+/// picked by accident is a value that carries no meaning and shows up in a
+/// filename the user then shares.
+DateTime canonicalPeriodDate(DateTime value, {required bool monthly}) =>
+    monthly
+        ? DateTime(value.year, value.month)
+        : DateTime(value.year, value.month, value.day);
+
+/// Whether moving from [current] to [next] changes the window the service fetches.
+///
+/// [EnergyReportService.load] is month-scoped by construction: it reads from the
+/// first of the previous month through the first of the next, in 28-day chunks.
+/// That deliberate over-fetch is what lets `previousPeriodTotals` answer *both*
+/// the preceding-day question (daily) and the preceding-month question (monthly)
+/// from a single round of requests, so the "compared with the previous period"
+/// wording stays true without a second fetch.
+///
+/// The consequence is that this predicate is month-scoped, and both directions
+/// matter. A day change inside one month must **not** re-request — the buckets
+/// are already resident and `bucketsForPeriod` filters them in memory, so a
+/// reload would be a wasted ThingsBoard round trip for a purely client-side
+/// result. A month change **must** re-request, because the resident buckets
+/// cover a different window entirely and would otherwise show a stale month that
+/// still renders confidently.
+bool periodWindowChanged(DateTime current, DateTime next) =>
+    current.year != next.year || current.month != next.month;
+
 class EnergyReportScreen extends StatefulWidget {
   const EnergyReportScreen({super.key, required this.api});
 
@@ -75,22 +114,51 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   }
 
   Future<void> _pickPeriod() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final current = canonicalPeriodDate(_selectedDate, monthly: _monthly);
     final selected = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      // The 1st in monthly mode, so the grid opens on the first of the month the
+      // label already names. Otherwise it opens on whatever day-of-month happens
+      // to be in `_selectedDate`, which reads as though that day were the period.
+      initialDate: current,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: _monthly ? 'Select the report month' : 'Select the report date',
+      // Today, not tomorrow. `showDatePicker` builds its grid from the calendar
+      // *day* of `lastDate`, so the old `now.add(one day)` made tomorrow a
+      // selectable cell — and tomorrow has no telemetry by definition, so that
+      // cell could only ever resolve to the empty view. Same guard the dashboard
+      // applies with its own `lastDate: today`.
+      lastDate: today,
+      // The picker's chrome is localised from this, not from the strings passed
+      // in. Without it the day headers and month names follow the *device*
+      // locale, which put Indonesian text inside this otherwise entirely
+      // English screen. The dashboard hit exactly this and pinned it at
+      // `_pickDateFromCalendar`; this dialog was the one that was missed.
+      locale: const Locale('en', 'US'),
+      // Honest about the day grid in monthly mode. `showDatePicker` has no
+      // month-only mode (`DatePickerMode.year` still lands on a day), and the
+      // month is what the view aggregates, so the day cell is a no-op there —
+      // saying so beats letting the user hunt for which cell "is" the month.
+      helpText: _monthly
+          ? 'Select any day in the report month'
+          : 'Select the report date',
+      cancelText: 'Cancel',
+      confirmText: 'Apply',
     );
-    if (selected == null) return;
-    final monthChanged =
-        selected.year != _selectedDate.year ||
-        selected.month != _selectedDate.month;
+    if (selected == null || !mounted) return;
+    final next = canonicalPeriodDate(selected, monthly: _monthly);
+    // Re-picking the period already shown is not a change. Guarding here rather
+    // than comparing the raw `DateTime`s matters because `_selectedDate` starts
+    // life as `DateTime.now()` and so carries a time-of-day that `==` would
+    // never match.
+    if (next == current) return;
+    final windowChanged = periodWindowChanged(current, next);
     _touchedBucketNotifier.value = null;
     setState(() {
-      _selectedDate = selected;
+      _selectedDate = next;
     });
-    if (monthChanged) await _load();
+    if (windowChanged) await _load();
   }
 
   @override

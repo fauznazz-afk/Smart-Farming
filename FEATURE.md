@@ -21,7 +21,7 @@ AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
 **Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**372 lulus** di 26 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
+**380 lulus** di 27 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
 Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
 kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
 yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
@@ -1023,11 +1023,20 @@ diverifikasi di perangkat ada di §18.5.
    komentar file token sendiri ada untuk cegah. Margin navbar dinaikkan 14 → 24 dp
    pada saat yang sama; kalau tidak, pil akan menonjol 10 dp dari kolom konten
    dan setiap halaman akan memperlihatkan langkah di bawah.
-6. **`energy_report_screen.dart` punya `_pickPeriod()` dengan nol call site.**
-   Found oleh agent, di luar file yang dia miliki jadi tidak disentuh. Laporan
-   energinya terkunci ke tanggal `_selectedDate` diinisialisasi, dengan **tidak
-   ada cara mengubahnya** — dead code plus kontrol yang hilang, bukan sekadar
-   pemindahan tempat. Lebih buruk daripada gap range picker di dashboard.
+6. ~~**`energy_report_screen.dart` punya `_pickPeriod()` dengan nol call site.**~~
+   **Premis saya salah; agent yang saya beri tugas mengecek call graph-nya dan
+   tidak memercayai kata-kata saya.** `_pickPeriod` tersambung ke tombol
+   `PeriodSelector` milik laporan sendiri di `energy_report_screen.dart:227`, dan
+   tanggalnya tidak pernah terkunci. Yang benar ada **empat**, semuanya sudah
+   diperbaiki: dialog tanpa `locale` (di ponsel Indonesia header hari berbahasa
+   Indonesia di layar yang seluruhnya Inggris — bug yang sama sudah pernah
+   diperbaiki di dashboard), `lastDate` besok sehingga tanggal tanpa telemetry bisa
+   dipilih, `helpText` mode bulanan menjanjikan pemilih bulan tapi memberi grid
+   hari, dan `await` tanpa `!mounted` sebelum `setState`.
+
+   Ini kali kedua klaim "dead code" yang yakin tapi salah di repo ini;
+   `AGENTS.md` sudah merekam yang pertama (`dashboard_screen._history`). Keduanya
+   bermula dari laporan, bukan dari pengukuran.
 
 ### 18.0b Dua bug yang ditemukan sesi ini, keduanya kelas yang sama
 
@@ -1312,7 +1321,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 372 test, jalankan PER-FILE (OOM)
+flutter test                                    # 380 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 

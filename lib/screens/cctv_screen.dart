@@ -7,6 +7,79 @@ import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
 import 'dashboard/utils/design_tokens.dart';
 
+/// The matte the video is seen against. **Not a themed surface, and never to
+/// become one.**
+///
+/// This is the most-argued-about colour in the app, and `FEATURE.md` §18.0
+/// item 4 records it as undecided. It is decided, and the decision is that the
+/// *frame* changes and the *matte* does not.
+///
+/// **Why the fill cannot be `AppSurfaces.page(isDark)`.** A dim image against a
+/// light surround reads brighter and loses shadow detail, which is why
+/// broadcast and cinema put video on black. Measured rather than assumed, with
+/// a representative dim greenhouse frame as the content:
+///
+/// | content            | on this ground | on the light page |
+/// |--------------------|----------------|-------------------|
+/// | `#202824`          | **1.30:1**     | 12.05:1           |
+/// | `#404844`          | 2.08:1         | 7.52:1            |
+/// | `#141816` (payload)| **1.09:1**     | 14.29:1           |
+///
+/// On a light panel the surround is 12x brighter than the frame and 14x
+/// brighter than the dark detail inside it. The eye adapts to the surround, the
+/// surround becomes the reference, and the image flattens into it. Daylight
+/// does not rescue this: ambient light changes neither number, because the ratio
+/// that matters is internal to the panel.
+///
+/// The last row is the one that settles it. What a user opens this screen for
+/// is *is the equipment box open, is there water on the floor, did anything
+/// move* — a judgement about dark regions. Putting the brightest thing in the
+/// panel immediately outside the darkest thing the user is looking for is the
+/// wrong way round, and it is the same failure `AppElevation.inset` has
+/// documented all along: a well needs an interior darker than its surround, and
+/// this interior is already at the bottom of the range.
+///
+/// **A light bezel was rejected for the same reason, more expensively.** Putting
+/// a themed band between the page and the video would make the panel a card
+/// *and* keep a bright surround hard against the frame — the naive fix's whole
+/// defect in a smaller footprint. Costed on the 381dp content column recorded
+/// in `FEATURE.md` §18.0 item 5: a 6dp bezel is 6.2 % less video, 8dp is
+/// 8.2 %, 12dp is 12.2 %. Paying real image area to make the camera look worse
+/// is the trade this comment exists to prevent.
+///
+/// **What was actually wrong, then.** The fill was never the defect; the
+/// absence of a shadow was. This panel was the only surface in the app painted
+/// with no `boxShadow` at all, and in a style where depth is carried *entirely*
+/// by the dual shadow pair, a shape with no shadow whose fill is 15.62:1 from
+/// the page is a hole by definition. Adding [AppElevation.raised] costs no
+/// video area and puts the panel on the same footing as every card around it.
+///
+/// **Dark mode: nothing to fix, and the same call is still correct.** Measured
+/// against `AppSurfaces.pageDark`, this ground is **1.19:1** — the panel is
+/// already effectively the page, so there is no hole and no cliff. The raised
+/// pair still applies, and does much less, because a black shadow on a near-black
+/// surface is a small relative move. Stated rather than left implicit, because
+/// "the dark-mode fix is the absence of a fix" is the kind of thing that gets
+/// read as an oversight.
+///
+/// **No border.** WCAG 1.4.11 is already satisfied by the fill at 15.62:1,
+/// five times the 3:1 it asks for, and `AppElevation.hairline` cannot be reused
+/// here even if it were needed: that constant is `0x99FFFFFF`, tuned to be a
+/// 1.25:1 whisper on the page, and it measures **19.58:1** on this matte. The
+/// same constant means opposite things on the two fills, and the wrong one of
+/// those meanings is a drawn white rim, which is the failure
+/// `design_tokens.dart` says soft UI exists to remove.
+///
+/// The value is already a very dark neutral carrying the page's own green
+/// cast — `g-r` is 5/255 here against 6/255 on `pageLight` — so "a very dark
+/// neutral derived from the page's hue" was, in effect, already what shipped.
+/// Lifting it would cost the perceived contrast above and buy nothing.
+///
+/// The same colour is the WebView's own background, and has to stay identical
+/// to it: that is what the go2rtc page paints as its letterbox, so a mismatch
+/// would put a second rectangle inside this one.
+const Color cctvVideoGround = Color(0xFF080D0A);
+
 /// Web view player for the go2rtc stream page.
 ///
 /// The stream is never started automatically unless [fullScreen] is set, so
@@ -25,7 +98,11 @@ class CctvScreen extends StatefulWidget {
 }
 
 class _CctvScreenState extends State<CctvScreen> {
-  static const _pageBackground = Color(0xFF080D0A);
+  /// The WebView's own background. See [cctvVideoGround]: the video's matte and
+  /// the panel's fill have to be the same colour, because this is what the
+  /// go2rtc page paints its letterbox in, and a mismatch would put a second
+  /// rectangle inside this one.
+  static const _pageBackground = cctvVideoGround;
 
   WebViewController? _controller;
   bool _playing = false;
@@ -149,6 +226,13 @@ class _CctvScreenState extends State<CctvScreen> {
 
   Widget _buildFullScreen(BuildContext context) {
     return Scaffold(
+      // Pure black, and `Colors.black` rather than `cctvVideoGround` on
+      // purpose. This route is the strongest case for a dark surround rather
+      // than the weakest: there is no page behind it, the system bars are
+      // hidden, and no app chrome is visible at all, so there is nothing for the
+      // panel to belong to and nothing to integrate with. It is also the one
+      // place the perceived-contrast argument costs nothing to honour, because
+      // honouring it is what the user came here for.
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
@@ -230,37 +314,85 @@ class _CctvScreenState extends State<CctvScreen> {
             ],
           ),
         ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ColoredBox(
-              color: _pageBackground,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _buildViewport(context),
-                  if (status == CctvStatus.live)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Row(
-                        children: [
-                          CctvRoundControl(
-                            icon: Icons.fullscreen_rounded,
-                            tooltip: 'Full screen',
-                            onPressed: _openFullScreen,
-                          ),
-                          const SizedBox(width: 8),
-                          CctvRoundControl(
-                            icon: Icons.stop_rounded,
-                            tooltip: 'Stop stream',
-                            onPressed: _stopStream,
-                          ),
-                        ],
+        // The panel's frame, and the whole of the fix.
+        //
+        // It was a bare `ClipRRect` around a `ColoredBox` with **no shadow at
+        // all**, which made it the only surface in the app that carried no depth
+        // cue. On the light page that reads as a hole rather than as an object,
+        // and the reason is the missing shadow rather than the fill: this app
+        // expresses depth exclusively through the dual shadow pair, so a shape
+        // with no shadow is by definition a cut in the page and not a block on
+        // it. `cctvVideoGround` documents why the fill stays what it is and why
+        // the naive alternative (make the panel the page colour) was rejected
+        // with measurements — the short version is that a light surround puts
+        // the page 12x brighter than the frame and 14x brighter than the dark
+        // detail the user opened this screen to look at.
+        //
+        // `raised`, not `inset`, and the choice is forced by the fill rather than
+        // preferred: an inset well is expressed by darkening its interior below
+        // its surround, and there is nothing left to give — the strongest value
+        // the light inset pair can put on this matte measures 1.20:1. A well here
+        // would collapse, so the panel is a block standing on the page, which is
+        // also what a monitor on a desk is.
+        //
+        // The shadow is painted on the *page*, outside this rect, which is the
+        // only part of it the matte does not swallow: light mode drops the page
+        // from luminance 0.788 to 0.381 at the contact shadow, and dark mode
+        // gets the same pair over `#1A211F`.
+        //
+        // `AppRadius.pill`, not a literal `22`. The value is unchanged — 22 is
+        // what shipped, and it is also the pill radius — so this is a
+        // de-duplication rather than a restyle, and the panel keeps the one
+        // radius in the scale meant to read as a separate physical object.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.all(AppRadius.pill),
+            boxShadow: AppElevation.raised(isDark),
+          ),
+          // The clip stays *inside* the decorated box rather than outside it.
+          // `ClipRRect` would cut the shadow off at the rect it clips, so a
+          // single outer `ClipRRect` — which is what this used to be — cannot
+          // carry a `boxShadow` at all. Nesting is the only arrangement where
+          // both survive.
+          //
+          // The platform view is untouched by this: the same `ClipRRect` ->
+          // `AspectRatio` -> `ColoredBox` -> `Stack` chain still wraps
+          // `CctvViewport`, and `CctvViewport` still owns the `RepaintBoundary`
+          // around the `WebViewWidget`. Nothing here is animated, blended or
+          // clipped per frame, so video frames continue to re-rasterise only
+          // the boundary that already isolated them.
+          child: ClipRRect(
+            borderRadius: AppRadius.all(AppRadius.pill),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ColoredBox(
+                color: _pageBackground,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildViewport(context),
+                    if (status == CctvStatus.live)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Row(
+                          children: [
+                            CctvRoundControl(
+                              icon: Icons.fullscreen_rounded,
+                              tooltip: 'Full screen',
+                              onPressed: _openFullScreen,
+                            ),
+                            const SizedBox(width: 8),
+                            CctvRoundControl(
+                              icon: Icons.stop_rounded,
+                              tooltip: 'Stop stream',
+                              onPressed: _stopStream,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -326,8 +458,10 @@ class _InfoBar extends StatelessWidget {
         // page — so no alpha of it can reach 3:1, and this bar would have sat at
         // 1.54:1. `boundaryEdge` is a neutral at 3.04:1, which is what WCAG
         // 1.4.11 asks for, and it is worth a grey line on this one control: the
-        // bar is the only thing separating the video from the Reload button, and
-        // it sits over footage rather than over a themed card.
+        // bar is the only thing separating the video panel above it from the
+        // Reload button, and it abuts a matte rather than a themed card, so the
+        // boundary has to hold on its own rather than being carried by a shared
+        // fill.
         border: Border.all(color: AppElevation.boundaryEdge(isDark: isDark)),
       ),
       child: Row(

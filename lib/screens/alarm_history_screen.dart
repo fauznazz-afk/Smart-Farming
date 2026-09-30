@@ -194,7 +194,37 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       itemBuilder: (context, index) {
         final alarm = alarms[index];
         final isExpanded = _expandedIds.contains(alarm.id);
-        final severityColor = _colorForSeverity(alarm.severity, isDark);
+        // **The ring is a status colour only while the condition is live.**
+        // `_statusBadge` already gave up its green pill for a resolved row
+        // because `statusOk` reads in the present tense, and leaving the ring on
+        // `severityColor` is the same mistake one element to the left: a red
+        // circle on a row that is a statement about the past, printed directly
+        // above a live critical alarm whose ring is red *because* there is a
+        // problem right now. One hue, two opposite jobs, one screen — which is
+        // the defect the single-series chart rule exists to prevent.
+        //
+        // The counter-argument was real and it is the reason this is a two-part
+        // change rather than a recolour. Recolouring alone *does* drop
+        // information: nothing else on the row says how serious this was, and
+        // `_statusBadge` deliberately prints the word "Resolved" in that slot
+        // instead of "Critical"/"Warning", so on a resolved row the severity was
+        // genuinely carried by the ring alone. It is now carried by a **word**
+        // in that same slot instead (`Resolved · Critical`), which is a better
+        // carrier than the hue was: it survives being read aloud, in a
+        // screenshot, by someone who cannot resolve red, and greyscale. The
+        // severity is also queryable independently through the Critical and
+        // Warning filters, so nothing rests on the ring any more.
+        //
+        // The neutral is [appPrimaryText] — the app's own ordinary text colour,
+        // already on this row and already measured against this card — at the
+        // same 0.15/0.28 alphas the wash and border used, so the ring keeps its
+        // shape and the row does not lose a badge. No hue was added, and
+        // nothing here was given a colour that means "resolved"; the resolved
+        // state is stated in words, exactly where it already was.
+        final isResolved = alarm.resolved;
+        final ringColor = isResolved
+            ? appPrimaryText(isDark)
+            : _colorForSeverity(alarm.severity, isDark);
         return AppCard(
           isDark: isDark,
           padding: EdgeInsets.zero,
@@ -228,18 +258,18 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: severityColor.withValues(alpha: 0.15),
+                        color: ringColor.withValues(alpha: 0.15),
                         // The wash alone left the circle with no edge of its
                         // own; against the now-opaque card it read as a
                         // floating smudge rather than a badge.
                         border: Border.all(
-                          color: severityColor.withValues(alpha: 0.28),
+                          color: ringColor.withValues(alpha: 0.28),
                         ),
                       ),
                       child: Icon(
                         _iconForType(alarm.type),
                         size: 20,
-                        color: severityColor,
+                        color: ringColor,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -291,7 +321,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _statusBadge(alarm, severityColor, isDark),
+                        _statusBadge(alarm, ringColor, isDark),
                         PopupMenuButton<_AlarmAction>(
                           tooltip: 'Alarm actions',
                           onSelected: (action) => _applyAction(action, alarm),
@@ -349,14 +379,23 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  Widget _statusBadge(AlarmRecord alarm, Color severityColor, bool isDark) {
-    final label = alarm.resolved
-        ? 'Resolved'
-        : alarm.acknowledged
-        ? 'Acknowledged'
-        : alarm.severity == AlarmSeverity.critical
+  Widget _statusBadge(AlarmRecord alarm, Color ringColor, bool isDark) {
+    final severityLabel = alarm.severity == AlarmSeverity.critical
         ? 'Critical'
         : 'Warning';
+    // The state word and the severity word are orthogonal facts about the
+    // record, and this slot is the only place on the row that names either.
+    // A live row can afford to show them one at a time because the ring beside
+    // it is *severity*-coloured and is doing that job in the present tense. A
+    // resolved row has no live ring to lean on — the ring is neutral, because a
+    // past-tense row in a live-status colour is the defect this badge was
+    // already fixed for — so both words are printed here instead. That is what
+    // keeps "this was critical" on the row after the ring stops carrying it.
+    final label = alarm.resolved
+        ? 'Resolved · $severityLabel'
+        : alarm.acknowledged
+        ? 'Acknowledged'
+        : severityLabel;
     // **A resolved alarm is a record, and that is what the treatment is
     // derived from.** The badge used to take `statusOk`, on the reading that a
     // problem being absent is good news. Two rules in AGENTS.md say otherwise
@@ -389,9 +428,11 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     // every case — it is never silent — and what it gives up is the thing that
     // was making a *historical* row look like a *live* one.
     //
-    // Nothing is lost. The word "Resolved" is still in the same position, in
-    // ordinary text, and a word is a better carrier of this than a hue anyway:
-    // the reader who cannot resolve the green could not have read it before.
+    // Nothing is lost. The words "Resolved" and the severity are still in the
+    // same position, in ordinary text, and a word is a better carrier of this
+    // than a hue anyway: the reader who cannot resolve the green could not have
+    // read it before, and the same goes for the red ring this slot now also
+    // covers.
     if (alarm.resolved) {
       return Padding(
         // `AppBadge`'s own padding, kept so a row does not change width as it
@@ -414,7 +455,11 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     // nor-bad slot rather than ordinary text. Both replaced raw `Colors.green`
     // and `Colors.blue` here; those are tuned for large fills and measured about
     // 2.3:1 and 3.0:1 as 10dp text.
-    final color = alarm.acknowledged ? statusAlert(isDark) : severityColor;
+    //
+    // `ringColor` is the severity colour on this path, not the neutral: the
+    // caller only substitutes the neutral for a resolved row, and this branch is
+    // reached only when the row is not resolved.
+    final color = alarm.acknowledged ? statusAlert(isDark) : ringColor;
     return AppBadge(
       isDark: isDark,
       color: color,
