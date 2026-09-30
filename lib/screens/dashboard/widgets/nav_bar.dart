@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../utils/color_helpers.dart';
@@ -74,11 +76,11 @@ class GlassNavBar extends StatelessWidget {
           // margin is a point taken from an already narrow slot. The bar used to
           // have five tabs and 16 dp of air; both had to give when the Hydroponics
           // and Fish tabs arrived.
-          minimum: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
-              height: 64,
+              height: 52,
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: LayoutBuilder(
@@ -106,8 +108,21 @@ class GlassNavBar extends StatelessWidget {
                     // rather than rebuilt: `AnimatedContainer` lerps a
                     // `Decoration`, and `BoxDecoration.lerp` lerps `BoxShadow`.
                     alignment: Alignment.centerLeft,
-                    width: isCollapsed ? 64 : constraints.maxWidth,
-                    height: 64,
+                    // Sized to its contents, not to the screen.
+                    //
+                    // A full-width bar for four icons leaves a third of a phone
+                    // with nothing in it, and the destinations are already
+                    // named by the header of the page each one opens -- so the
+                    // width was carrying no information. 56dp a slot is four
+                    // times the icon with a 48dp target inside it, and the cap
+                    // keeps it sane if a fifth tab ever arrives.
+                    width: isCollapsed
+                        ? 52
+                        : math.min(
+                            constraints.maxWidth,
+                            kNavDestinations.length * 56.0,
+                          ),
+                    height: 52,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       // The same dual-shadow pair every card in the app uses, so
@@ -161,18 +176,31 @@ class GlassNavBar extends StatelessWidget {
                                 duration: AppMotion.state,
                                 curve: AppMotion.both,
                                 child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
                                   children: [
                                     for (var i = 0;
                                         i < kNavDestinations.length;
                                         i++)
-                                      _NavItem(
-                                        index: i,
-                                        destination: kNavDestinations[i],
-                                        selectedIndex: selectedIndex,
-                                        isDark: isDark,
-                                        seedColor: seedColor,
-                                        primary: primary,
-                                        onTap: () => onSelect(i),
+                                      // Sized rather than `Expanded`, because
+                                      // the bar is now as wide as its contents and
+                                      // an `Expanded` inside an unbounded-looking
+                                      // row would just re-inflate it back to the
+                                      // full width. The 48 box is still the tap
+                                      // target; the padding around it is the
+                                      // breathing room that used to come from the
+                                      // extra width.
+                                      SizedBox(
+                                        width: 48,
+                                        child: _NavItem(
+                                          index: i,
+                                          destination: kNavDestinations[i],
+                                          selectedIndex: selectedIndex,
+                                          isDark: isDark,
+                                          seedColor: seedColor,
+                                          primary: primary,
+                                          onTap: () => onSelect(i),
+                                        ),
                                       ),
                                   ],
                                 ),
@@ -331,20 +359,23 @@ class _NavItem extends StatelessWidget {
       index: index,
       isDark: isDark,
     );
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: destination.label,
-        child: InkWell(
-          onTap: onTap,
-          // The bar's own pill radius, so a ripple on one item follows the
-          // shape of the container it sits in rather than a bare 20 that
-          // happened to match the old card radius.
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: SizedBox(
-            height: 64,
-            child: Center(
+    // Not `Expanded`. The bar is sized to its contents now, so an `Expanded`
+    // here would ask for all the remaining width and put the bar straight back
+    // to full screen -- which is exactly what it was before. The caller wraps
+    // this in a fixed 48 box, so the tap target is unchanged.
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: destination.label,
+      child: InkWell(
+        onTap: onTap,
+        // The bar's own pill radius, so a ripple on one item follows the
+        // shape of the container it sits in rather than a bare 20 that
+        // happened to match the old card radius.
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: SizedBox(
+          height: 52,
+          child: Center(
               child: AnimatedSwitcher(
                 duration: AppMotion.state,
                 switchInCurve: AppMotion.enter,
@@ -356,42 +387,12 @@ class _NavItem extends StatelessWidget {
                         color: primary,
                         isDark: isDark,
                       )
-                    : Column(
+                    : Icon(
                         key: ValueKey('unsel_$index'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(destination.icon, size: 20, color: tint),
-                          const SizedBox(height: 2),
-                          Text(
-                            destination.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: false,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              // 11, not 8. Shrinking this to 8 was my suggestion
-                              // and it was wrong: 11sp is `label-small`, the
-                              // smallest style in the entire Material type scale,
-                              // so 8px was off the scale entirely. Material 2 says
-                              // "Don't shrink text to fit on a single line" and
-                              // Material 3 says "Don't reduce the type size to fit
-                              // more characters into a destination label".
-                              //
-                              // At 11sp "Hydroponics" measures 62dp and the slot is
-                              // 60dp, so it still does not fit — which is the actual
-                              // finding, and it is a tab-count problem rather than a
-                              // font problem. Six slots at Material 2's documented
-                              // 80dp portrait minimum need 480dp; this phone is
-                              // 380dp. Fixing that means fewer tabs, not smaller
-                              // text.
-                              fontSize: 11,
-                              color: tint,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        destination.icon,
+                        size: 22,
+                        color: tint,
                       ),
-              ),
             ),
           ),
         ),

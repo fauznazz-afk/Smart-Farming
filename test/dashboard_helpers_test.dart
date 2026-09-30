@@ -3,16 +3,65 @@ import 'package:plts_monitoring/models/telemetry_model.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/energy_helpers.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/history_range.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/telemetry_helpers.dart';
+import 'package:plts_monitoring/services/thingsboard_api.dart';
 
 void main() {
   group('historyKeysForPrefix', () {
+    // These used to be asserted through named getters on a three-field record.
+    // The record is a list now, because a page's charts are no longer a fixed
+    // trio -- and the reason they are a list is that greenhouse and fish
+    // readings could not be charted at all while the fields were fixed.
     test('maps pv/ac/battery to their telemetry keys', () {
-      expect(historyKeysForPrefix('pv').voltage, 'voltage_dc');
-      expect(historyKeysForPrefix('pv').power, 'power_dc');
-      expect(historyKeysForPrefix('ac').voltage, 'voltage_ac');
-      expect(historyKeysForPrefix('ac').power, 'power_ac');
-      expect(historyKeysForPrefix('battery').voltage, 'voltage');
-      expect(historyKeysForPrefix('battery').power, 'power');
+      expect(
+        historyKeysForPrefix('pv'),
+        containsAll(<String>['voltage_dc', 'current_dc', 'power_dc']),
+      );
+      expect(historyKeysForPrefix('ac'), contains('voltage_ac'));
+      expect(historyKeysForPrefix('ac'), contains('power_ac'));
+      expect(historyKeysForPrefix('battery'), contains('voltage'));
+      expect(historyKeysForPrefix('battery'), contains('power'));
+    });
+
+    test('asks the greenhouse device for the keys its charts plot', () {
+      final keys = historyKeysForPrefix('env');
+      expect(
+        keys,
+        containsAll(<String>[
+          'temp_dht',
+          'temp_ds18b20',
+          'humidity_dht',
+          'lux',
+          'tds_ppm',
+        ]),
+      );
+      // Nothing extra: a key no chart plots is a request the user pays for and
+      // nobody reads.
+      expect(keys, hasLength(5));
+    });
+
+    test('asks the fish device for the keys its charts plot', () {
+      expect(
+        historyKeysForPrefix('fish'),
+        containsAll(<String>['ph', 'suhu', 'turbidity_ntu']),
+      );
+      expect(historyKeysForPrefix('fish'), hasLength(3));
+    });
+
+    test('an unknown prefix requests nothing', () {
+      expect(historyKeysForPrefix('nope'), isEmpty);
+    });
+  });
+
+  group('historyDeviceForPrefix', () {
+    test('routes each page to the device that actually publishes its keys', () {
+      // This is the second reason the greenhouse was never chartable: everything
+      // that was not the battery was sent to the PZEM meter, so a request for
+      // `ph` would have gone to a device that does not publish it.
+      expect(historyDeviceForPrefix('pv'), ThingsBoardApi.devicePzem);
+      expect(historyDeviceForPrefix('ac'), ThingsBoardApi.devicePzem);
+      expect(historyDeviceForPrefix('battery'), ThingsBoardApi.deviceBattery);
+      expect(historyDeviceForPrefix('env'), ThingsBoardApi.deviceSensor);
+      expect(historyDeviceForPrefix('fish'), ThingsBoardApi.deviceFish);
     });
   });
 

@@ -5,16 +5,18 @@ import 'package:flutter/material.dart';
 import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
+import 'chart_groups.dart';
 import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/history_range.dart';
 
 /// Human readable name for a dashboard page prefix.
-String prefixTitle(String prefix) => switch (prefix) {
-  'pv' => 'PV',
-  'ac' => 'AC',
-  _ => 'Battery',
-};
+///
+/// This used to fall through to `'Battery'` for anything it did not recognise,
+/// which is a quiet way to be wrong: the greenhouse prefix would have titled its
+/// chart "Battery" and nobody would have known why until someone opened that
+/// page. The names live with the charts now.
+String prefixTitle(String prefix) => chartPageTitle(prefix) ?? prefix;
 
 /// Title + range label + live/polling indicator above a telemetry chart.
 class ChartSectionHeader extends StatelessWidget {
@@ -89,33 +91,19 @@ class ChartSectionHeader extends StatelessWidget {
             ],
           ),
         ),
-        Semantics(
-          button: true,
-          label: 'Choose custom telemetry date range',
-          child: IconButton(
-            tooltip: 'Choose date range',
-            // 48, the Material floor, and the `visualDensity: compact` and the
-            // 32dp `constraints` are both gone. They compounded: compact density
-            // shrinks the default 48dp box, and the explicit constraint shrank it
-            // again, so the target was 32dp — a third under the minimum and a
-            // poor one to hit with the same thumb that is scrolling the chart.
-            // The icon is unchanged at 18dp, and it is centred in the larger box,
-            // so the only thing that moved is the edge of the target.
-            padding: EdgeInsets.zero,
-            onPressed: onPickRange,
-            icon: Icon(
-              Icons.calendar_month_outlined,
-              size: 18,
-              // `faintColor`, not the raw `white70` / `black54` pair that
-              // `color_helpers.dart` replaced for failing AA. This is a graphic
-              // rather than text, so 3:1 would be the bar — but the control it
-              // sits in has no other visible edge, so clearing the text bar is
-              // the safer choice.
-              color: faintColor(isDark),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
+        // The calendar button is gone, and so is the only route to a custom
+        // date range. It was the one place `showDateRangePicker` was reachable;
+        // the date strip on Overview can only pick a single day. The range the
+        // user is looking at is still named in the label beside the title, so
+        // nothing becomes ambiguous -- it just cannot be changed from here.
+        //
+        // It was also a control that had been through three sizes: it was 32dp
+        // with `visualDensity: compact` stacked on an explicit tighter
+        // constraint, then it was raised to the 48dp Material floor, and now
+        // there is nothing to hit. Six of these were about to exist across the
+        // greenhouse and fish pages alone, which is most of the reason to
+        // remove it rather than keep shrinking it.
+        //
         // Says "Updating" only while a request for this view is actually in
         // flight, and nothing at all otherwise.
         //
@@ -194,27 +182,45 @@ class ChartSectionHeader extends StatelessWidget {
 /// the chart is the one place in the app where an identity of "voltage is red" is
 /// worth more than consistency with the surrounding theme.
 class _MetricSpec {
-  const _MetricSpec(this.label, this.unit, this.icon, this.light, this.dark);
+  const _MetricSpec(this.series, this.icon);
 
-  final String label;
-  final String unit;
+  /// The declared series: the telemetry key, the label, the unit, and either the
+  /// fixed triad colour or null for "use the user's accent".
+  final ChartSeriesSpec series;
+
   final IconData icon;
 
-  /// The series colour in each mode. Two values rather than a closure, because a
-  /// `const` list cannot hold a function call and this table wants to be
-  /// `const` so a stray edit shows up as a compile error rather than as a
-  /// rebuild.
-  final int light;
-  final int dark;
+  String get label => series.label;
 
-  Color color(bool isDark) => Color(isDark ? dark : light);
+  String get unit => series.unit;
+
+  Color color(bool isDark, Color accent) => series.color(isDark, accent);
 }
 
-const _metricSpecs = [
-  _MetricSpec('Voltage', 'V', Icons.bolt_outlined, 0xFFE53935, 0xFFFF5252),
-  _MetricSpec('Current', 'A', Icons.electrical_services_outlined, 0xFF43A047,
-      0xFF69F0AE),
-  _MetricSpec('Power', 'W', Icons.wb_sunny_outlined, 0xFF1E88E5, 0xFF448AFF),
+/// The icon a declared series is drawn with in the legend.
+///
+/// Kept here rather than on [ChartSeriesSpec] because it is presentation for the
+/// one chart widget, while the spec is shared with the request builder and
+/// should not need to import Material to say "this is a pH reading".
+IconData _iconForSeries(ChartSeriesSpec spec) => switch (spec.key) {
+  'voltage_dc' || 'voltage_ac' || 'voltage' => Icons.bolt_outlined,
+  'current_dc' || 'current_ac' || 'current' =>
+    Icons.electrical_services_outlined,
+  'power_dc' || 'power_ac' || 'power' => Icons.wb_sunny_outlined,
+  'temp_dht' => Icons.device_thermostat,
+  'temp_ds18b20' => Icons.thermostat,
+  'humidity_dht' => Icons.water_drop,
+  'lux' => Icons.light_mode,
+  'tds_ppm' => Icons.science,
+  'ph' => Icons.science_outlined,
+  'suhu' => Icons.thermostat,
+  'turbidity_ntu' => Icons.blur_on,
+  _ => Icons.show_chart,
+};
+
+List<_MetricSpec> _specsFor(ChartGroup group) => [
+  for (final series in group.series)
+    _MetricSpec(series, _iconForSeries(series)),
 ];
 
 /// A series paired with the spec that named and coloured it.
@@ -233,6 +239,7 @@ class TelemetryChartCard extends StatelessWidget {
   const TelemetryChartCard({
     super.key,
     required this.prefix,
+    required this.group,
     required this.isDark,
     required this.points,
     required this.spots,
@@ -247,6 +254,11 @@ class TelemetryChartCard extends StatelessWidget {
   });
 
   final String prefix;
+
+  /// What this card plots. One group per card, because two series on one card
+  /// only make sense when they share a unit — which is why the greenhouse gets
+  /// four cards and the electrical pages get one.
+  final ChartGroup group;
 
   /// The theme accent, so the plotted series follows the chosen palette.
   final Color seedColor;
@@ -264,13 +276,23 @@ class TelemetryChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scaled = _buildSeries();
+    final specs = _specsFor(group);
+    final accent = metricColor(
+      seedColor: seedColor,
+      index: 0,
+      isDark: isDark,
+    );
+    final scaled = _buildSeries(specs, accent);
+    // The cache key has to name the group, not just the page. A page that draws
+    // four cards -- the greenhouse -- would otherwise have every card share the
+    // first card's bounds, and a lux axis from 0 to 190,000 would be applied to
+    // a humidity axis from 0 to 90.
     final bounds = boundsCache.putIfAbsent(
-      prefix,
+      '$prefix/${group.title}',
       () => ChartBounds.fromSeries(scaled.map((s) => s.series).toList()),
     );
     final hasData = scaled.any((item) => item.series.points.isNotEmpty);
-    final title = prefixTitle(prefix);
+    final title = group.title;
 
     return AppCard(
       isDark: isDark,
@@ -278,7 +300,11 @@ class TelemetryChartCard extends StatelessWidget {
       // height; reserving it pushed everything below the fold for nothing.
       height: (loading || !hasData) ? 170 : 400,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel: '$title voltage, current and power '
+      // The label used to read "$title voltage, current and power", hard-coded,
+      // so a pH chart announced itself as a power chart. It now names the
+      // series it actually draws, which is the only version of this string that
+      // a screen reader can say out loud.
+      semanticLabel: '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
           '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
       child: loading
           ? const Center(child: CircularProgressIndicator())
@@ -286,7 +312,7 @@ class TelemetryChartCard extends StatelessWidget {
           ? const Center(child: Text('No data for this range'))
           : Column(
               children: [
-                _SeriesLegend(series: scaled, isDark: isDark),
+                _SeriesLegend(series: scaled, isDark: isDark, accent: accent),
                 const SizedBox(height: 10),
                 Expanded(
                   child: Listener(
@@ -302,26 +328,37 @@ class TelemetryChartCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(children: scaled.map((s) => _SeriesStatistics(s)).toList()),
+                // A gap between the columns, and a little air above them.
+                //
+                // These sat edge to edge with no separation, so on the
+                // greenhouse temperature chart "min 22.73 °C" ran straight into
+                // the "Panel" column and the two readings read as one line of
+                // text. A 1px rule would have been a third thing to look at
+                // between the plot and the numbers; whitespace is enough.
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    for (var i = 0; i < scaled.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 16),
+                      _SeriesStatistics(scaled[i]),
+                    ],
+                  ],
+                ),
               ],
             ),
     );
   }
 
-  /// All three metrics, plotted raw against one shared Y axis.
-  List<_Scaled> _buildSeries() {
-    return [
-      for (var i = 0; i < _metricSpecs.length; i++)
-        _seriesFor(_metricSpecs[i], i),
-    ];
+  List<_Scaled> _buildSeries(List<_MetricSpec> specs, Color accent) {
+    return [for (final spec in specs) _seriesFor(spec, accent)];
   }
 
-  _Scaled _seriesFor(_MetricSpec spec, int index) {
-    // The history keys are English, while the labels shown to the user are not.
-    // Deriving one from the other is what let them drift apart in the first
-    // place, so the suffix is written out and the key is composed here.
-    const suffixes = ['voltage', 'current', 'power'];
-    final key = '${prefix}_${suffixes[index]}';
+  _Scaled _seriesFor(_MetricSpec spec, Color accent) {
+    // The key comes from the declaration, not from composing a prefix and an
+    // index. `const suffixes = ['voltage', 'current', 'power']` indexed by
+    // position was correct for exactly three pages and wrong for every other
+    // one, and nothing about it said so.
+    final key = spec.series.key;
     final seriesPoints = points[key] ?? const <TelemetryPoint>[];
     return _Scaled(
       ChartSeries(
@@ -329,7 +366,7 @@ class TelemetryChartCard extends StatelessWidget {
         spec.unit,
         seriesPoints,
         spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        spec.color(isDark),
+        spec.color(isDark, accent),
         stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,
@@ -467,8 +504,19 @@ class TelemetryChartCard extends StatelessWidget {
           // Real values, chosen by `niceStep` from the data's own range. The
           // interval is not a percentage of anything: a reader can take a value
           // off this axis and use it.
+          //
+          // The topmost label hangs *below* its own line rather than being
+          // centred on it. Centred, the upper half of it sits outside the plot
+          // and the card's padding cuts it in half -- which is exactly what
+          // "40000" looked like on the greenhouse Light chart, sliced through
+          // the middle by the app bar. The same defect was fixed on the energy
+          // report's axis first and this one was left, which is how two charts
+          // in one app can disagree about whether their top label is readable.
           getTitlesWidget: (value, meta) => SideTitleWidget(
-            axisSide: meta.axisSide,
+            axisSide:
+                value >= bounds.maxY - bounds.chartInterval / 2
+                ? AxisSide.top
+                : meta.axisSide,
             space: 4,
             child: Text(formatAxisNumber(value), style: labelStyle),
           ),
@@ -548,7 +596,7 @@ class _SeriesStatistics extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             'Last ${formatAxisNumber(stats.latest)} ${series.unit}',
             maxLines: 1,
@@ -558,12 +606,14 @@ class _SeriesStatistics extends StatelessWidget {
           // One figure per line. "min 6.98 V  maks 21.43 V" on a single line
           // overflowed a third of the width and ellipsised to "109....", which
           // is the one number a reader cannot afford to lose.
+          const SizedBox(height: 2),
           Text(
             'min ${formatAxisNumber(stats.minimum)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 11),
           ),
+          const SizedBox(height: 2),
           Text(
             'max ${formatAxisNumber(stats.maximum)} ${series.unit}',
             maxLines: 1,
@@ -578,10 +628,17 @@ class _SeriesStatistics extends StatelessWidget {
 
 /// One row per series: swatch, name, and the live value in its own unit.
 class _SeriesLegend extends StatelessWidget {
-  const _SeriesLegend({required this.series, required this.isDark});
+  const _SeriesLegend({
+    required this.series,
+    required this.isDark,
+    required this.accent,
+  });
 
   final List<_Scaled> series;
   final bool isDark;
+
+  /// The user's accent, for a group whose single series has no fixed colour.
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {

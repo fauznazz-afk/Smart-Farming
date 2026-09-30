@@ -1,13 +1,17 @@
 import '../../../services/thingsboard_api.dart';
+import '../widgets/chart_groups.dart';
 
 /// The telemetry keys requested for a dashboard page prefix.
-class HistoryKeys {
-  const HistoryKeys(this.voltage, this.current, this.power);
-
-  final String voltage;
-  final String current;
-  final String power;
-}
+///
+/// A list, because a page's charts are no longer a fixed trio. This was a
+/// three-field record — `voltage`, `current`, `power` — and `TelemetryChartCard`
+/// composed its key as `'${prefix}_${suffixes[index]}'` from a matching list of
+/// its own. Two parallel fixed-length lists, which is why pH and turbidity could
+/// not be charted: there was no field to put them in and no slot to name them.
+///
+/// The keys now come from `chartGroupsForPrefix`, so the request and the plot
+/// are derived from one declaration and cannot disagree.
+typedef HistoryKeys = List<String>;
 
 /// A resolved time-series request window plus its sampling interval.
 typedef HistoryWindow = ({
@@ -18,17 +22,21 @@ typedef HistoryWindow = ({
   String deviceId,
 });
 
-/// Maps a page prefix to the telemetry keys it charts.
-HistoryKeys historyKeysForPrefix(String prefix) => switch (prefix) {
-  'pv' => const HistoryKeys('voltage_dc', 'current_dc', 'power_dc'),
-  'ac' => const HistoryKeys('voltage_ac', 'current_ac', 'power_ac'),
-  _ => const HistoryKeys('voltage', 'current', 'power'),
-};
+/// Maps a page prefix to the telemetry keys its charts plot.
+HistoryKeys historyKeysForPrefix(String prefix) => chartKeysForPrefix(prefix);
 
 /// Maps a page prefix to its ThingsBoard device id.
-String historyDeviceForPrefix(String prefix) => prefix == 'battery'
-    ? ThingsBoardApi.deviceBattery
-    : ThingsBoardApi.devicePzem;
+///
+/// The greenhouse and the fish tank are separate devices, which is the second
+/// reason they were never chartable: this sent anything that was not `battery`
+/// to the PZEM meter, so a request for `ph` would have been issued against a
+/// device that does not publish it.
+String historyDeviceForPrefix(String prefix) => switch (prefix) {
+  'battery' => ThingsBoardApi.deviceBattery,
+  'env' => ThingsBoardApi.deviceSensor,
+  'fish' => ThingsBoardApi.deviceFish,
+  _ => ThingsBoardApi.devicePzem,
+};
 
 /// Builds a stable cache key for a selected day or custom range.
 String historySelectionKey({required DateTime rangeStart, DateTime? rangeEnd}) =>

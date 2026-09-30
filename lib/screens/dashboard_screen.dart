@@ -33,6 +33,7 @@ import 'dashboard/utils/history_range.dart';
 import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
 import 'dashboard/widgets/chart_card.dart';
+import 'dashboard/widgets/chart_groups.dart';
 import 'dashboard/widgets/date_strip.dart';
 import 'dashboard/widgets/power_sub_tabs.dart';
 import 'dashboard/widgets/system_status_strip.dart';
@@ -929,7 +930,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       histories = await widget.api.fetchHistoryForKeys(
         window.deviceId,
-        [window.keys.voltage, window.keys.current, window.keys.power],
+        window.keys,
         start: window.start,
         end: window.end,
         intervalMs: window.intervalMs,
@@ -957,22 +958,30 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  /// Files a history response under the keys the chart looks them up by.
+  ///
+  /// The maps are keyed by the bare telemetry key now, not by
+  /// `'${prefix}_$metric'`. That composed name was the other half of the old
+  /// fixed-trio assumption: the chart derived its lookup key from a prefix and
+  /// a suffix index while this derived its storage key from a prefix and a
+  /// literal, and the only reason they ever agreed was that both lists had
+  /// exactly three entries in the same order.
   void _storeHistory(
     String prefix,
     HistoryKeys keys,
     Map<String, List<TelemetryPoint>> histories,
   ) {
-    for (final (metric, key) in [
-      ('voltage', keys.voltage),
-      ('current', keys.current),
-      ('power', keys.power),
-    ]) {
+    for (final key in keys) {
       final points = histories[key] ?? [];
-      _history['${prefix}_$metric'] = points;
-      _chartSpots['${prefix}_$metric'] = processSpots(points);
-      _chartStats['${prefix}_$metric'] = SeriesStats.fromPoints(points);
+      _history[key] = points;
+      _chartSpots[key] = processSpots(points);
+      _chartStats[key] = SeriesStats.fromPoints(points);
     }
-    _chartBounds.remove(prefix);
+    // Every group on this page, not just the prefix: the greenhouse draws four
+    // cards off one fetch, and each has its own memoised bounds.
+    for (final group in chartGroupsForPrefix(prefix)) {
+      _chartBounds.remove('$prefix/${group.title}');
+    }
     _historyLoaded.add(prefix);
   }
 
@@ -1002,12 +1011,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   // turbidity cannot be charted without generalising that widget. A null prefix
   // also means no history request is fired for those pages.
   //
-  // Only the Power page has a prefix, and which one depends on the sub-tab the
-  // user has selected inside it, so this cannot be a plain lookup any more. Four
-  // callers depend on it agreeing with what is actually on screen: the history
-  // fetch, pull-to-refresh, the date-change reload and the pending-refresh check.
-  String? _prefixForPage(int index) =>
-      index == 1 ? kPowerSubTabs[_powerSubNotifier.value].prefix : null;
+  // Which page's history this is, and which of its devices to read.
+  //
+  // The Power page's answer depends on the sub-tab the user has selected inside
+  // it, so this cannot be a plain lookup. Four callers depend on it agreeing with
+  // what is actually on screen: the history fetch, pull-to-refresh, the
+  // date-change reload and the pending-refresh check.
+  //
+  // The greenhouse and the fish tank were absent here until now, which is why
+  // neither had a chart: a null prefix means no history request, and a missing
+  // request means there is nothing to plot. They have prefixes, and
+  // `historyDeviceForPrefix` sends each to its own device.
+  String? _prefixForPage(int index) => switch (index) {
+    1 => kPowerSubTabs[_powerSubNotifier.value].prefix,
+    2 => 'env',
+    3 => 'fish',
+    _ => null,
+  };
 
   /// The status strip's battery cell is a shortcut to the battery readings, which
   /// are now a view inside the Power tab rather than a tab. Both halves have to
@@ -1745,7 +1765,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _bindRevision(
       _chartRevision,
       isDark,
-      () => _chartCard('pv', isDark),
+      () => _chartCard('pv', chartGroupsForPrefix('pv').single, isDark),
     ),
   ];
 
@@ -1783,7 +1803,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _bindRevision(
       _chartRevision,
       isDark,
-      () => _chartCard('ac', isDark),
+      () => _chartCard('ac', chartGroupsForPrefix('ac').single, isDark),
     ),
   ];
 
@@ -1831,17 +1851,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     () => _bindRevision(
       _chartRevision,
       isDark,
-      () => _chartCard('battery', isDark),
+      () => _chartCard('battery', chartGroupsForPrefix('battery').single, isDark),
     ),
   ];
 
   // ── Hydroponics page ──────────────────────────────────────────────────────────
-  /// The greenhouse sensors plus the camera that was previously a tab of its own.
+  /// The greenhouse sensors, their history, and the camera that was previously a
+  /// tab of its own.
   ///
-  /// No chart: `_prefixForPage` returns null for this page, so no history request
-  /// is made and the chart section is absent entirely rather than empty. Adding
-  /// one later means generalising TelemetryChartCard off its fixed
-  /// voltage/current/power series, not just adding a case here.
+  /// The charts came after generalising `TelemetryChartCard` off its fixed
+  /// voltage/current/power series, which is the work this page was waiting on.
+  /// Four cards rather than one, because lux, per cent and parts per million do
+  /// not share an axis with each other; only the two temperature sensors do, and
+  /// putting those two together is the point -- the gap between the air and the
+  /// panel is the reading.
+  ///
+  /// The history request is shared: all four groups come from one fetch of the
+  /// greenhouse device, keyed by the same list the charts look up.
   List<Widget Function()> _hydroponicsPage(bool isDark) {
     return [
       () => GlassPageHeader(
@@ -1855,22 +1881,40 @@ class _DashboardScreenState extends State<DashboardScreen>
         isDark: isDark,
       ),
       () => const SizedBox(height: 10),
-      () => _bindRevision(
-        _sensorRevision,
-        isDark,
-        () => _environmentGrid(isDark),
-      ),
-      () => const SizedBox(height: 8),
+      // The camera comes first, above the readings.
+      //
+      // It was last because this page had no chart, so the grid was the whole
+      // page and the camera was the thing underneath it. With four charts now
+      // below, a camera at the bottom meant scrolling past every reading and
+      // every plot to reach the one control that is not a number -- and the
+      // thing you want to check most often is the thing furthest from the top.
       () => Bound(
         listenable: _cctvKeepAlive,
         token: _cctvUrl,
         builder: () => CctvScreen(streamUrl: _cctvUrl),
       ),
+      () => const SizedBox(height: 8),
+      () => _bindRevision(
+        _sensorRevision,
+        isDark,
+        () => _environmentGrid(isDark),
+      ),
+      // One `Bound` around all four cards rather than four around four: the
+      // groups are a fixed list, so they move together, and four boundaries
+      // would let three cards rebuild for a bounds change on the fourth.
+      () => Bound(
+        listenable: _chartRevision,
+        token: isDark,
+        builder: () => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _chartSections('env', isDark),
+        ),
+      ),
     ];
   }
 
   // ── Fish page ─────────────────────────────────────────────────────────────────
-  /// Water quality for the fish tank, plus the second camera.
+  /// Water quality for the fish tank, its history, and the second camera.
   ///
   /// The metric list mirrors ThingsBoardApi.fishKeys exactly. `turbidity_keruh`
   /// and `turbidity_voltage` are intentionally not here: the first is a boolean
@@ -1889,12 +1933,23 @@ class _DashboardScreenState extends State<DashboardScreen>
         isDark: isDark,
       ),
       () => const SizedBox(height: 10),
-      () => _bindRevision(_fishRevision, isDark, () => _fishGrid(isDark)),
-      () => const SizedBox(height: 8),
+      // Camera first, for the same reason as the greenhouse: it is the one
+      // control on the page that is not a number, so it belongs where the eye
+      // lands rather than below three charts.
       () => Bound(
         listenable: _cctvKeepAlive,
         token: _cctvUrlFish,
         builder: () => CctvScreen(streamUrl: _cctvUrlFish),
+      ),
+      () => const SizedBox(height: 8),
+      () => _bindRevision(_fishRevision, isDark, () => _fishGrid(isDark)),
+      () => Bound(
+        listenable: _chartRevision,
+        token: isDark,
+        builder: () => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _chartSections('fish', isDark),
+        ),
       ),
     ];
   }
@@ -1932,9 +1987,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _chartCard(String prefix, bool isDark) {
+  Widget _chartCard(String prefix, ChartGroup group, bool isDark) {
     return TelemetryChartCard(
       prefix: prefix,
+      group: group,
       isDark: isDark,
       seedColor: _seedColor,
       points: _history,
@@ -1947,5 +2003,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       rangeEnd: _selectedRangeEnd,
       onPointerActive: _setChartPointerActive,
     );
+  }
+
+  /// One header plus one card per group a prefix declares.
+  ///
+  /// The electrical pages declare a single three-series group, so this renders
+  /// exactly what it rendered before. The greenhouse declares four, which is why
+  /// the page grew its first charts at all.
+  List<Widget> _chartSections(String prefix, bool isDark) {
+    final pageTitle = chartPageTitle(prefix);
+    if (pageTitle == null) return const [];
+    return [
+      for (final group in chartGroupsForPrefix(prefix)) ...[
+        _chartSectionHeader(group.title, prefix, isDark),
+        _chartCard(prefix, group, isDark),
+      ],
+    ];
   }
 }
