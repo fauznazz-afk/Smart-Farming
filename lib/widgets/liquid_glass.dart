@@ -29,7 +29,7 @@ class AmbientBackground extends StatelessWidget {
                     ? const Color(0xFF0D1410)
                     : const Color(0xFFF2F5F3),
               ),
-              CustomPaint(painter: _AmbientOrbsPainter(isDark: isDark)),
+              CustomPaint(painter: _AmbientOrbsPainter.of(isDark)),
             ],
           ),
         ),
@@ -43,6 +43,19 @@ class _AmbientOrbsPainter extends CustomPainter {
   const _AmbientOrbsPainter({required this.isDark});
 
   final bool isDark;
+
+  // One instance per brightness, reused for the lifetime of the app.
+  //
+  // This cannot be a `const` at the call site: `isDark` is a runtime field, and
+  // a const constructor invocation requires compile-time constant arguments.
+  // Caching the two instances instead means a dashboard rebuild — of which
+  // there are seven distinct `setState` sites — stops allocating a painter it
+  // will immediately discard. `shouldRepaint` compares `isDark` only, so
+  // handing back the same instance for the same brightness is correct.
+  static const _dark = _AmbientOrbsPainter(isDark: true);
+  static const _light = _AmbientOrbsPainter(isDark: false);
+
+  static _AmbientOrbsPainter of(bool isDark) => isDark ? _dark : _light;
 
   @override
   void paint(Canvas canvas, Size size) {

@@ -182,6 +182,25 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _cctvUrlFish = defaultAllowedFishCctvUrl;
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
   final ValueNotifier<int> _liveRevision = ValueNotifier(0);
+  // One counter per ThingsBoard device, for the cards that read exactly one
+  // device each.
+  //
+  // `_liveRevision` has to stay wide: the status strip, both banners and the hero
+  // card read state spread across all four devices, so any change has to reach
+  // them. But the PV/AC/Battery cards and the two `MetricGrid`s read one device
+  // and nothing else, and the socket delivers frames two or three times a second,
+  // so a frame from the BMS was rebuilding a greenhouse card that could not have
+  // drawn anything different. Each counter below is bumped only when its own
+  // device's values differ, by the same `sameTelemetry` test the wide path
+  // already uses, so a device that publishes unchanged values now costs nothing.
+  //
+  // Safe to be narrower because each consumer's builder reads only the device
+  // named here; the theme, seed colour, performance mode and alarm thresholds it
+  // also reads are already part of `_visualToken`, which rebuilds it on change.
+  final ValueNotifier<int> _batteryRevision = ValueNotifier(0);
+  final ValueNotifier<int> _pzemRevision = ValueNotifier(0);
+  final ValueNotifier<int> _sensorRevision = ValueNotifier(0);
+  final ValueNotifier<int> _fishRevision = ValueNotifier(0);
   final ValueNotifier<int> _energyRevision = ValueNotifier(0);
   final ValueNotifier<int> _chartRevision = ValueNotifier(0);
   final ValueNotifier<bool> _chartPointerActiveNotifier = ValueNotifier(false);
@@ -231,6 +250,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     _appBarBlurProgress.dispose();
     _chartPointerActiveNotifier.dispose();
     _liveRevision.dispose();
+    _batteryRevision.dispose();
+    _pzemRevision.dispose();
+    _sensorRevision.dispose();
+    _fishRevision.dispose();
     _energyRevision.dispose();
     _chartRevision.dispose();
     _alertMessages.dispose();
@@ -370,7 +393,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_telemetryRequestInFlight) return;
     _telemetryRequestInFlight = true;
     final started = DateTime.now();
-    _connectionHealth.markConnecting(ConnectionTransport.rest);
+    // No `markConnecting(ConnectionTransport.rest)` here, deliberately.
+    //
+    // It fired a real `notifyListeners()` on every single poll, because
+    // `connecting != connected` and the following `markSuccess` produced no
+    // notification of its own: the status went to `connected` and stayed there.
+    // The strip rebuilds its banner switcher to draw that, and none of its four
+    // branches render a connecting state. Nothing else reads the status either —
+    // `statusMessage` only reaches the screen through a banner that is showing a
+    // fetch failure or a stale device, and both of those override the label; the
+    // in-flight state is `_telemetryRequestInFlight` above, not this.
     try {
       final results = await Future.wait([
         widget.api.fetchBatteryData(),
@@ -381,13 +413,20 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       final now = DateTime.now();
       final wasLoading = _loading;
+      // Per device rather than one `changed`, because each card is now rebuilt by
+      // the counter for the device it reads. A tick that moved the BMS and
+      // nothing else must not announce itself to the greenhouse grid.
+      final batteryChanged = !sameTelemetry(_battery, results[0]);
+      final pzemChanged = !sameTelemetry(_pzem, results[1]);
+      final sensorChanged = !sameTelemetry(_sensor, results[2]);
+      final fishChanged = !sameTelemetry(_fish, results[3]);
       final changed =
           _loading ||
           _error != null ||
-          !sameTelemetry(_battery, results[0]) ||
-          !sameTelemetry(_pzem, results[1]) ||
-          !sameTelemetry(_sensor, results[2]) ||
-          !sameTelemetry(_fish, results[3]);
+          batteryChanged ||
+          pzemChanged ||
+          sensorChanged ||
+          fishChanged;
       final timestampChanged =
           _lastSuccessfulTelemetryAt == null ||
           now.difference(_lastSuccessfulTelemetryAt!).inMinutes >= 1;
@@ -424,6 +463,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         updatedAt: now,
       );
       _notifyLive(wasLoading: wasLoading, changed: changed || timestampChanged);
+      _notifyDeviceRevisions(
+        battery: batteryChanged,
+        pzem: pzemChanged,
+        sensor: sensorChanged,
+        fish: fishChanged,
+        // Once a minute, whichever device moved.
+        //
+        // `MetricGrid` decides its own "Stale data" tag at build time, from
+        // `DateTime.now()` against that device's `lastUpdate`, so a grid that is
+        // never rebuilt goes on claiming freshness for a sensor that has died.
+        // The wide counter used to hide that by rebuilding it several times a
+        // second as a side effect; a per-minute bump to four small widgets does
+        // the same job without the cost.
+        all: timestampChanged,
+      );
       _evaluateEnergyAlerts();
       final lastEnergyUpdate = _energyUpdatedAt;
       if (lastEnergyUpdate == null ||
@@ -465,6 +519,30 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  /// Announces a telemetry change to the one card per device that reads it.
+  ///
+  /// Each flag is the result of `sameTelemetry` for that device alone, so a card
+  /// is only ever rebuilt for a difference it could actually draw. [all] bumps
+  /// all four at once, for the once-a-minute refresh described at the call site.
+  ///
+  /// Called on the first paint as well, where `_notifyLive` only calls
+  /// `setState`. That is not redundant: `Bound` caches its child, and its
+  /// `didUpdateWidget` does not re-run the builder when the listenable and the
+  /// token are both unchanged, so a plain `setState` leaves any `Bound` that was
+  /// built before the data arrived still showing no data.
+  void _notifyDeviceRevisions({
+    bool battery = false,
+    bool pzem = false,
+    bool sensor = false,
+    bool fish = false,
+    bool all = false,
+  }) {
+    if (all || battery) _batteryRevision.value++;
+    if (all || pzem) _pzemRevision.value++;
+    if (all || sensor) _sensorRevision.value++;
+    if (all || fish) _fishRevision.value++;
+  }
+
   /// Falls back to cached telemetry when every live device fetch failed.
   Future<void> _applyOfflineFallback() async {
     if (_battery != null || _pzem != null || _sensor != null) {
@@ -493,6 +571,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       latestValues: split.fish,
       lastUpdate: cached.lastUpdate,
     );
+    // The four slots were just filled from cache where they were null, so each
+    // card needs its rebuild. `_fetchAll` may only `setState` on this path.
+    _notifyDeviceRevisions(all: true);
   }
 
   void _handleRealtimeConnection(bool connected) {
@@ -569,6 +650,19 @@ class _DashboardScreenState extends State<DashboardScreen>
     _error = null;
     _loading = false;
     _notifyLive(wasLoading: wasLoading, changed: changed);
+    // One frame, one device, one card. The same `sameTelemetry` gate above
+    // decides it, so a frame whose values are already on screen rebuilds
+    // nothing at all now, not the whole tree.
+    switch (deviceId) {
+      case ThingsBoardApi.deviceBattery:
+        _notifyDeviceRevisions(battery: changed);
+      case ThingsBoardApi.devicePzem:
+        _notifyDeviceRevisions(pzem: changed);
+      case ThingsBoardApi.deviceSensor:
+        _notifyDeviceRevisions(sensor: changed);
+      case ThingsBoardApi.deviceFish:
+        _notifyDeviceRevisions(fish: changed);
+    }
     _evaluateEnergyAlerts();
   }
 
@@ -1225,15 +1319,15 @@ class _DashboardScreenState extends State<DashboardScreen>
           strokeWidth: 2.5,
           displacement: 58,
           edgeOffset:
-              MediaQuery.of(context).padding.top + kToolbarHeight,
+              MediaQuery.paddingOf(context).top + kToolbarHeight,
           onRefresh: _refreshCurrentPage,
           child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
               16,
-              MediaQuery.of(context).padding.top + kToolbarHeight - 6,
+              MediaQuery.paddingOf(context).top + kToolbarHeight - 6,
               16,
-              MediaQuery.of(context).padding.bottom + 76,
+              MediaQuery.paddingOf(context).bottom + 76,
             ),
             itemCount: items.length,
             itemBuilder: (context, itemIndex) => items[itemIndex](),
@@ -1625,7 +1719,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
-      _liveRevision,
+      _pzemRevision,
       isDark,
       () => _telemetryCard(
         _pzem,
@@ -1661,7 +1755,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
-      _liveRevision,
+      _pzemRevision,
       isDark,
       () => _telemetryCard(
         _pzem,
@@ -1699,7 +1793,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ),
     () => const SizedBox(height: 10),
     () => _bindRevision(
-      _liveRevision,
+      _batteryRevision,
       isDark,
       () => _telemetryCard(
         _battery,
@@ -1754,7 +1848,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         isDark: isDark,
       ),
       () => const SizedBox(height: 10),
-      () => _bindRevision(_liveRevision, isDark, () => _environmentGrid(isDark)),
+      () => _bindRevision(
+        _sensorRevision,
+        isDark,
+        () => _environmentGrid(isDark),
+      ),
       () => const SizedBox(height: 8),
       () => Bound(
         listenable: _cctvKeepAlive,
@@ -1784,7 +1882,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         isDark: isDark,
       ),
       () => const SizedBox(height: 10),
-      () => _bindRevision(_liveRevision, isDark, () => _fishGrid(isDark)),
+      () => _bindRevision(_fishRevision, isDark, () => _fishGrid(isDark)),
       () => const SizedBox(height: 8),
       () => Bound(
         listenable: _cctvKeepAlive,

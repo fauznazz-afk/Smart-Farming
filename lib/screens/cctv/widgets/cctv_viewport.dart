@@ -77,7 +77,12 @@ class CctvViewport extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (webView != null && status.showsVideo)
-          WebViewWidget(controller: webView),
+          // Isolated so a video frame only re-rasterises the video surface and
+          // not the page display list around it. The overlays stay outside the
+          // boundary: they change a handful of times per session but blend over
+          // the video, so re-rasterising them on every frame would cost more
+          // than the repaints this boundary avoids.
+          RepaintBoundary(child: WebViewWidget(controller: webView)),
         if (status == CctvStatus.standby)
           CctvStandbyOverlay(primary: primary, onStart: onStart),
         if (status == CctvStatus.connecting) const CctvLoadingOverlay(),
