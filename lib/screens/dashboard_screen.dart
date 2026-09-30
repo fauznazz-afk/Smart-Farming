@@ -75,6 +75,32 @@ import 'settings_screen.dart';
 /// that cannot be checked without the device.
 const double _pageHorizontalMargin = 24;
 
+/// The gap between two cards on the same page.
+///
+/// **This is a shadow-geometry value, not a spacing preference, and the number
+/// comes from a pixel measurement.** The card gap was 10, and the ambient half of
+/// the raised shadow pair reaches 20dp at 1σ — the part that actually draws the
+/// edge, `sigma = blurRadius / 2 = 11` plus the 9dp offset. So in a 10dp gap the
+/// upper card's shadow is cut off while it is still about 8% darker than the page,
+/// and it stops at a hard edge rather than fading. Two cards then read as one
+/// block with a smudge between them, which is the "there is something wrong here"
+/// look reported from the device.
+///
+/// At 20dp the shadow completes its 1σ falloff inside the gap, so the page colour
+/// appears in the middle and each card reads as standing on the surface rather
+/// than as part of the next one. 24 was considered and rejected: it is the
+/// horizontal margin, and matching it vertically costs real screen on a dense
+/// page for a shadow that has already resolved at 20.
+const double _cardGap = 20;
+
+/// The gap above a chart section header, which is a different job from [\_cardGap].
+///
+/// Larger than the card gap because a header belongs to what follows it, and it
+/// needs the previous card's shadow to have finished before the label lands. It
+/// also carries more text than a card boundary does, so a bare 20dp made the
+/// header look attached to the card above it.
+const double _chartHeaderGap = 28;
+
 /// Main monitoring dashboard: overview, PV, AC, battery, and CCTV tabs.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -1121,22 +1147,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     _reloadHistoryForCurrentPage();
   }
 
-  /// Says what the app bar's range control is currently set to.
-  ///
-  /// The same [describeHistoryRange] the chart headers use, so the tooltip and
-  /// the header cannot disagree about which window the charts hold — a second
-  /// formatter here would be exactly the drift `history_range.dart` exists to
-  /// prevent. `setState` in [_pickDateFromCalendar] and [_selectDate] rebuilds
-  /// the app bar, so this follows both ways of changing the selection.
-  String _dateRangeTooltip() {
-    final label = describeHistoryRange(
-      selectedDate: _selectedDate,
-      rangeStart: _selectedRangeStart,
-      rangeEnd: _selectedRangeEnd,
-    );
-    return 'Telemetry range: $label. Tap to change';
-  }
-
   Future<void> _pickDateFromCalendar() async {
     final now = DateTime.now();
     final today = startOfDay(now);
@@ -1310,31 +1320,25 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
       actions: [
-        // The only route to a custom date range, and it lives here because the
-        // per-card button was removed -- correctly, since six of them were about
-        // to exist on the greenhouse and fish pages alone.
+        // No date-range button here, and that is the user's call.
         //
-        // The app bar is the right home for it: the chart header already names
-        // the range the user is looking at, so the control is never ambiguous,
-        // and it is the one place that is on screen on all four tabs. The strip
-        // on Overview reaches the same dialog, but that strip exists only on
-        // Overview -- so on Power, Hydroponics and Fish the date could not be
-        // changed at all, and changing it meant going back to Overview, picking
-        // a range and coming forward again.
+        // It was added in this release to fix a real gap -- the range picker had
+        // become unreachable -- and the reasoning was that the app bar is the one
+        // place on screen on all four tabs. It sat between the "EnerGrow" wordmark
+        // and the history icon, and the user read it as clutter next to the logo.
         //
-        // Two calendar glyphs rather than a badge or a coloured dot: a range is
-        // a different *kind* of selection from a day, and the accent is already
-        // spoken for by the strip's 'Range' / 'Pick a day' label on the one page
-        // that shows both.
-        IconButton(
-          tooltip: _dateRangeTooltip(),
-          icon: Icon(
-            _selectedRangeStart != null && _selectedRangeEnd != null
-                ? Icons.date_range_outlined
-                : Icons.calendar_month_outlined,
-          ),
-          onPressed: _pickDateFromCalendar,
-        ),
+        // The gap is therefore back, and honestly: `DateStrip` on Overview is the
+        // only route to a custom range again, so on Power, Hydroponics and Fish
+        // the date cannot be changed without going back to Overview. That was the
+        // state before this release and it is a worse experience than a slightly
+        // crowded app bar.
+        //
+        // Recording it rather than quietly reverting, because the reasoning for
+        // putting it here was sound and the reason for taking it out is that it
+        // looked wrong in the one place the user looks at first. If the range
+        // control is wanted back, the app bar is still the only chrome shared by
+        // all four tabs -- but it should be a single control that also carries the
+        // current date, not an icon that duplicates what the date strip says.
         IconButton(
           tooltip: 'Alarm History',
           icon: const Icon(Icons.history_outlined),
@@ -1813,7 +1817,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       isDark: isDark,
     ),
-    () => const SizedBox(height: 10),
+    () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
       isDark,
@@ -1828,7 +1832,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
     ),
-    () => const SizedBox(height: 16),
+    () => const SizedBox(height: _chartHeaderGap),
     () => _chartSectionHeader('PV', 'pv', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
@@ -1849,7 +1853,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       isDark: isDark,
     ),
-    () => const SizedBox(height: 10),
+    () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
       isDark,
@@ -1866,7 +1870,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
     ),
-    () => const SizedBox(height: 16),
+    () => const SizedBox(height: _chartHeaderGap),
     () => _chartSectionHeader('AC', 'ac', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
@@ -1887,7 +1891,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       isDark: isDark,
     ),
-    () => const SizedBox(height: 10),
+    () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _batteryRevision,
       isDark,
@@ -1914,7 +1918,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
     ),
-    () => const SizedBox(height: 16),
+    () => const SizedBox(height: _chartHeaderGap),
     () => _chartSectionHeader('Battery', 'battery', isDark),
     () => const SizedBox(height: 8),
     () => _bindRevision(
@@ -1949,7 +1953,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         isDark: isDark,
       ),
-      () => const SizedBox(height: 10),
+      () => const SizedBox(height: _cardGap),
       // The camera comes first, above the readings.
       //
       // It was last because this page had no chart, so the grid was the whole
@@ -2001,7 +2005,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         isDark: isDark,
       ),
-      () => const SizedBox(height: 10),
+      () => const SizedBox(height: _cardGap),
       // Camera first, for the same reason as the greenhouse: it is the one
       // control on the page that is not a number, so it belongs where the eye
       // lands rather than below three charts.

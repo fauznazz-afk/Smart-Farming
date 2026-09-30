@@ -2,6 +2,25 @@
 
 ### Fixed
 
+- **The time axis printed the same label up to five times.** The rule was
+  `spansMultipleDays ? DD/MM : HH:MM` — a boolean on the range. On any window
+  longer than a day, every tick inside a day rendered as that day, so the PV
+  chart read `29/09 30/09 30/09 30/09 30/09 01/10` and three of the five said
+  nothing. The label now carries whatever the tick's position makes necessary:
+  the time alone in a single-day window, the date alone when the interval is a
+  day or more, and on a multi-day window with sub-daily ticks the date at each
+  day turn and the time in between.
+- **A day-turn label was printed on top of its neighbours.** The first version of
+  that fix printed `30/09 01:00`, which is unambiguous and also unrenderable —
+  eleven characters at a six-hour spacing is wider than the gap, and the axis
+  read `19:0000/09 01:00 07:00 13:00 19:0001/10 01:00` on the device. A day turn
+  now prints the date alone, the same width as the time it replaces. The test
+  asserts distinctness *and* width, because "no two labels are equal" is
+  necessary and not sufficient: the device found what the unit test could not
+  predict.
+- **`isDayBoundaryTick` compared epoch days, not local ones.** `value / 86400000`
+  counts from midnight UTC, seven hours behind WIB, so a tick at local 00:00 was
+  not recognised as a day turn at all. Caught by the sweep test on its first run.
 - **`AppTile` was below WCAG AA and the test measuring it deliberately excluded
   it.** Tiles fill with `AppSurfaces.track` and text is drawn on them: measured in
   light mode, `faintColor` 3.85:1, `statusOk` 3.85, `statusWarn` 3.87, `statusBad`
@@ -15,6 +34,39 @@
   fill to `AppSurfaces.input` (4.99–5.02:1) *and* `AppElevation.inset`. Each half
   is guarded separately — reverting the fill alone fails two tests, dropping the
   shadow alone fails one.
+
+### Changed
+
+- **A one-series chart puts its statistics on one line.** Four of the seven
+  chart groups have a single series, and the three-line block per series existed
+  to stop two series' readings running together — a consequence of splitting the
+  card's width. A one-series card has the whole width, so the same three lines
+  were three lines of vertical space describing one quantity. The unit is now
+  printed once at the end rather than three times, and the figures scale down
+  rather than ellipsise: turbidity was truncating to `max 300…`, which is the
+  exact failure the stacked layout existed to prevent.
+- **The greenhouse and fish tank charts are shorter** — 260dp for a single-series
+  card, 300 for the two-sensor temperature card that still needs its height. Four
+  charts at a fixed 400dp put the fourth about 1,600dp down a page, on the two
+  pages whose whole purpose is a glance. The height travels with the group
+  declaration, so it is a property of what the page charts rather than a
+  page-index conditional in the screen.
+- **Cards are 20dp apart instead of 10, and it is a shadow measurement rather
+  than a preference.** The ambient half of the raised pair reaches 20dp at 1σ,
+  which is the part that actually draws the edge, so in a 10dp gap the upper
+  card's shadow was cut off while still ~8% darker than the page and stopped at
+  a hard edge. Two cards read as one block with a smudge between them. At 20dp
+  the falloff completes and the page colour appears in the middle.
+- **The navigation bar is centred** and its selected destination has its filled
+  accent circle back. It was left-aligned when it became content-sized, which put
+  four icons hard against the left edge with a third of a phone empty on the
+  right. The circle came out with the `AnimatedSwitcher` and should not have —
+  what was wrong was the cross-fade, not the circle, and a hue on a small icon is
+  a far weaker "you are here" than a 44dp disc.
+- The date-range control is out of the app bar, at the user's request: it sat
+  between the wordmark and the history icon and read as clutter. The gap that
+  fixed is therefore back — `DateStrip` on Overview is the only route to a custom
+  range again, so the other three tabs cannot change the date.
 - **The "Resolved" alarm badge was green, which the app's own colour rule
   forbids.** The stronger argument is tense rather than hue. `statusOk` is a
   status colour, and on this screen a status colour can only mean a condition

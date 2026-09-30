@@ -59,9 +59,32 @@ class ChartSeriesSpec {
   }
 }
 
+/// The card height for a chart that draws one series on the greenhouse or the
+/// fish tank.
+///
+/// 400 is the default everywhere else and it is sized for a three-series card
+/// with a three-line statistics block. A one-series card on those pages carries a
+/// legend of one name and a single line of statistics instead, so the same
+/// 400dp is mostly empty plot. The arithmetic behind the reduction is on
+/// [ChartGroup.height].
+const double _compactHeight = 260;
+
+/// The two-sensor greenhouse temperature card, which keeps the multi-series
+/// statistics block and so needs more of the plot back.
+///
+/// It is the one chart on those pages that genuinely needs its height: the whole
+/// point of putting the air and panel sensors on one axis is seeing the gap
+/// between them, and on the test device that gap is 45.88 against 62.53 degrees.
+/// A flat band 140dp tall would still show it, but 120 would start to cost.
+const double _compactTwoSeriesHeight = 300;
+
 /// A single chart: a title and the series that share its Y axis.
-class ChartGroup {
-  const ChartGroup(this.title, this.series, {this.zeroAnchored = true});
+class ChartGroup {  const ChartGroup(
+    this.title,
+    this.series, {
+    this.zeroAnchored = true,
+    this.height,
+  });
 
   final String title;
   final List<ChartSeriesSpec> series;
@@ -84,6 +107,34 @@ class ChartGroup {
   /// kill: a key in one place and a label in another, agreeing only by
   /// coincidence of ordering.
   final bool zeroAnchored;
+
+  /// This card's height, or null for the default.
+  ///
+  /// **Set on the greenhouse and the fish tank, at the user's request: those
+  /// pages had become a long scroll.** Four charts on Hydroponics and three on
+  /// Fish, each a fixed 400dp card, put the fourth chart about 1,600dp down a
+  /// page — and on a phone that is a scroll to remember, on the two pages whose
+  /// whole point is a glance at a few numbers.
+  ///
+  /// The default is right for the Power page and wrong here, and the reason is
+  /// how much each card is actually saying. A PV/AC/Battery card carries a
+  /// three-series legend, a three-line statistics block per series, and a plot
+  /// that has to be tall enough to show where a 383 W spike sits between two
+  /// near-zero plateaus. A greenhouse card carries **one** series, a legend of
+  /// one name, and a single line of statistics. It is the same number of pixels
+  /// saying a third as much.
+  ///
+  /// 260 is not arbitrary: it is the default minus the height the single-series
+  /// statistics line does not need. The multi-series block is three lines of
+  /// 11sp with 2dp between them, roughly 60dp, and the plot above it still has
+  /// enough vertical room for the shape to read — which matters most for the
+  /// two-sensor temperature card, the one chart on those pages that genuinely
+  /// needs its height.
+  ///
+  /// Declared here for the same reason as [zeroAnchored]: it is a property of
+  /// what the page charts, and the alternative was a page-index conditional in
+  /// the screen, which is the shape this file exists to prevent.
+  final double? height;
 
   /// Every telemetry key this group needs, flattened for the history request.
   List<String> get keys => [for (final s in series) s.key];
@@ -168,16 +219,16 @@ List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
         light: 0xFF43A047,
         dark: 0xFF69F0AE,
       ),
-    ]),
+    ], height: _compactTwoSeriesHeight),
     ChartGroup('Humidity', [
       ChartSeriesSpec(key: 'humidity_dht', label: 'Humidity', unit: '%'),
-    ]),
+    ], height: _compactHeight),
     ChartGroup('Light', [
       ChartSeriesSpec(key: 'lux', label: 'Light', unit: 'lx'),
-    ]),
+    ], height: _compactHeight),
     ChartGroup('TDS', [
       ChartSeriesSpec(key: 'tds_ppm', label: 'TDS', unit: 'ppm'),
-    ]),
+    ], height: _compactHeight),
   ],
 
   // The fish tank. Three charts rather than four: `water_level_percent` is
@@ -197,13 +248,13 @@ List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
   'fish' => const [
     ChartGroup('pH', [
       ChartSeriesSpec(key: 'ph', label: 'pH', unit: ''),
-    ], zeroAnchored: false),
+    ], zeroAnchored: false, height: _compactHeight),
     ChartGroup('Temperature', [
       ChartSeriesSpec(key: 'suhu', label: 'Water', unit: '°C'),
-    ]),
+    ], height: _compactHeight),
     ChartGroup('Turbidity', [
       ChartSeriesSpec(key: 'turbidity_ntu', label: 'Turbidity', unit: 'NTU'),
-    ]),
+    ], height: _compactHeight),
   ],
 
   _ => const [],

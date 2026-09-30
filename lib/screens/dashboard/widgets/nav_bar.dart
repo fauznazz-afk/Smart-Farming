@@ -95,7 +95,13 @@ class GlassNavBar extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: Align(
-                alignment: Alignment.bottomLeft,
+                // Centred, not left. The bar was left-aligned when it became
+                // content-sized, which was correct at the time and wrong on
+                // screen: four icons hard against the left edge with a third of
+                // a phone empty on the right reads as an accident rather than as
+                // a deliberate floating control. Centring it puts the empty space
+                // on both sides, where it reads as the margin it is.
+                alignment: Alignment.bottomCenter,
                 child: LayoutBuilder(
                   builder: (context, constraints) => AnimatedContainer(
                     duration: AppMotion.container,
@@ -438,22 +444,30 @@ class _NavDestination extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          // Transparent rather than the chrome fill: the bar's own fill is
-          // already painted behind this, and filling it again would put an
-          // opaque disc over the pill's shadow where the two meet.
-          color: Colors.transparent,
-          boxShadow: !pressed
-              ? null
-              : (selected
-                  // A block coming up off the page flattens into it.
+          // The selected destination is a raised block in the accent; an
+          // unselected one is nothing at all, just a glyph on the bar.
+          //
+          // The filled circle was removed with the `AnimatedSwitcher` and should
+          // not have been: it was the only thing telling the user where they
+          // are, and an accent-coloured glyph on a chrome fill is a much weaker
+          // signal — a hue is easy to miss on a small icon, a 44dp disc is not.
+          // What went wrong was the cross-fade, not the circle.
+          color: selected ? primary : Colors.transparent,
+          boxShadow: selected
+              // A block coming up off the page flattens into it.
+              ? (pressed
                   ? AppElevation.pressed(isDark)
-                  // An icon with no block of its own gains one that is cut in.
-                  : AppElevation.insetDeep(isDark)),
+                  : AppElevation.raised(isDark))
+              // An icon with no block of its own gains a well around it.
+              : (pressed ? AppElevation.insetDeep(isDark) : null),
         ),
         child: Icon(
           selected ? selectedIcon : icon,
           size: 22,
-          color: selected ? primary : tint,
+          // White on the accent, which is the one place the app puts light text
+          // on a saturated fill. `filledButtonTheme` in `main.dart` measures this
+          // pair for the same reason and lands on the same answer.
+          color: selected ? Colors.white : tint,
         ),
       ),
     );

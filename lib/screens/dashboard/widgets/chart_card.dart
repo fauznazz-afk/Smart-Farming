@@ -301,7 +301,13 @@ class TelemetryChartCard extends StatelessWidget {
       isDark: isDark,
       // A loading spinner or an empty message does not need a full plot's worth of
       // height; reserving it pushed everything below the fold for nothing.
-      height: (loading || !hasData) ? 170 : 400,
+      //
+      // The full-plot height is the default and the greenhouse and fish tank ask
+      // for less, which is a property of what those pages chart and therefore
+      // travels with the group declaration rather than being decided here.
+      height: (loading || !hasData)
+          ? 170
+          : (group.height ?? 400),
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
       // The label used to read "$title voltage, current and power", hard-coded,
       // so a pH chart announced itself as a power chart. It now names the
@@ -339,14 +345,33 @@ class TelemetryChartCard extends StatelessWidget {
                 // text. A 1px rule would have been a third thing to look at
                 // between the plot and the numbers; whitespace is enough.
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    for (var i = 0; i < scaled.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 16),
-                      _SeriesStatistics(scaled[i]),
+                // One figure per line, but only when there is more than one
+                // series to keep apart.
+                //
+                // Three stacked lines per series exists to stop two series'
+                // readings running together, and that problem is a consequence
+                // of splitting the card's width between them. A single-series
+                // card has the whole width, so the same three lines are just
+                // three lines of vertical space describing one quantity -- and
+                // on the greenhouse and fish pages that is most of the cards,
+                // since four of the seven groups have one series each.
+                //
+                // Measured: at a third of the width "min 6.98 V  max 21.43 V"
+                // ellipsised to "109...." on a three-series card, which is the
+                // one number a reader cannot afford to lose. At full width it
+                // fits with room, so the layout that was forced by the
+                // multi-series case is simply dropped when it does not apply.
+                if (scaled.length == 1)
+                  _SingleSeriesStatistics(scaled.first)
+                else
+                  Row(
+                    children: [
+                      for (var i = 0; i < scaled.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 16),
+                        _SeriesStatistics(scaled[i]),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
               ],
             ),
     );
@@ -541,6 +566,7 @@ class TelemetryChartCard extends StatelessWidget {
                 formatAxisTick(
                   value,
                   spansMultipleDays: bounds.spansMultipleDays,
+                  tickIntervalMs: bounds.timeInterval,
                 ),
                 style: labelStyle,
               ),
@@ -569,6 +595,71 @@ class TelemetryChartCard extends StatelessWidget {
 /// stops being readable, and five rows of numbers competed with the chart for
 /// attention without adding anything, since the range is the only part that is
 /// not already visible in the plot.
+/// The statistics of a card that charts exactly one series, on one line.
+///
+/// The unit is printed once, at the end, rather than three times. Repeating it
+/// per figure is what forced the multi-line layout in the first place: "Last
+/// 7.42 °C / min 6.37 °C / max 7.75 °C" is three copies of the same suffix
+/// saying the same thing, and dropping them is what makes one line enough.
+class _SingleSeriesStatistics extends StatelessWidget {
+  const _SingleSeriesStatistics(this.scaled);
+
+  final _Scaled scaled;
+
+  @override
+  Widget build(BuildContext context) {
+    final series = scaled.series;
+    final stats = series.stats;
+    if (stats == null) return const SizedBox.shrink();
+
+    final unit = series.unit.trim();
+    final suffix = unit.isEmpty ? '' : ' $unit';
+    final text =
+        'Last ${formatAxisNumber(stats.latest)}'
+        '  ·  min ${formatAxisNumber(stats.minimum)}'
+        '  ·  max ${formatAxisNumber(stats.maximum)}$suffix';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          series.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: series.color,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          // Scale down rather than ellipsise.
+          //
+          // Turbidity is the case that decides it: "Last 2786.34 · min 2395.53 ·
+          // max 3001.42 NTU" is 44 characters, and ellipsising it on the device
+          // produced "max 300..." -- which is the same failure the three-line
+          // layout was built to avoid, reintroduced by flattening it. The
+          // original reason for stacking the figures was that losing one is worse
+          // than using another line, and that is still true; `scaleDown` gives
+          // the number back by making the text smaller instead, and 11sp has
+          // room to shrink before it stops being readable.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SeriesStatistics extends StatelessWidget {
   const _SeriesStatistics(this.scaled);
 
