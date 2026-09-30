@@ -18,9 +18,9 @@ ESP32 sensor → ESP-NOW → ESP32 gateway → MQTT → ThingsBoard CE (Orange P
 Battery telemetry does **not** go through the ESP32. It is read from a Bluetooth
 BMS and publishes to its own ThingsBoard device.
 
-Version lives in `pubspec.yaml` (`1.6.1+13` as of 30 September 2026; five
-commits past the 1.6.1 tag are unreleased and belong to 1.7.0 — the surface
-system, the navigation and the chart set all changed, which is not a patch).
+Version lives in `pubspec.yaml` (`1.7.0+14` as of 1 October 2026, tagged
+`v1.7.0`). The surface system, the navigation and the chart set all changed in
+that release, which is why it is a minor and not a patch.
 `package_info_plus` reads it at runtime, so never hardcode a version string in
 the UI.
 
@@ -689,7 +689,7 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-flutter test                                             # 380 tests, jalankan per-file
+flutter test                                             # 452 tests, jalankan per-file
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 

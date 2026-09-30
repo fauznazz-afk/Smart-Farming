@@ -1,4 +1,4 @@
-## [Unreleased]
+## [1.7.0] - 2026-10-01
 
 ### Fixed
 
@@ -205,8 +205,19 @@ feels physical rather than merely moving.
 
 - **The right-hand shadow is clipped by the screen edge.** Cards run to the right
   edge on the Power and Overview pages, so the ambient half of the depth is not
-  visible on that side. This is a layout property and predates this work; left
-  alone deliberately, since fixing it means changing page margins.
+  visible on that side. **Fixed in this release** by raising the page margin to
+  24dp, which is what the ambient's 20dp at 1σ needs.
+- **Dracula has never been seen on a device.** Its shadow alphas were solved so
+  that each shadow's absolute ΔLuminance on `#282A36` matches what the same
+  shadow does on the app's dark page, and the light-to-dark ratio is asserted to
+  hold within 0.7%. That is arithmetic about a relationship to a theme already
+  known to look right. It is not a claim that a card reads as raised on
+  `#282A36`, and nobody has looked. **Check this first if anything about the
+  preset looks wrong.**
+- **The light-mode accent is short of 1.4.11 for a while longer.** The metric
+  icons were fixed by `metricGraphic`, but a fixed HSL lightness cannot serve all
+  four hues — amber needs 0.39 and cyan needs 0.33 — so any other accent-coloured
+  graphic added later needs the same treatment rather than another constant.
 - `FilledButton` is still a flat accent block. Its contrast is right; a strict
   neumorphic treatment would raise or inset it. Not done because it is the one
   control whose fill is the accent, and inverting it would make the accent stop
