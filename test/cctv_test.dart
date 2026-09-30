@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/cctv/utils/cctv_status.dart';
 import 'package:plts_monitoring/screens/cctv/widgets/cctv_viewport.dart';
 import 'package:plts_monitoring/screens/cctv_screen.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/services/cctv_url.dart';
 
 void main() {
@@ -77,7 +78,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: CctvStatusPill(status: CctvStatus.live, isDark: false),
+            body: CctvStatusPill(status: CctvStatus.live, theme: AppTheme.light),
           ),
         ),
       );
@@ -104,7 +105,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: CctvStatusPill(status: status, isDark: false),
+              body: CctvStatusPill(status: status, theme: AppTheme.light),
             ),
           ),
         );

@@ -10,11 +10,18 @@ class GreetingHeader extends StatelessWidget {
   const GreetingHeader({
     super.key,
     required this.displayName,
-    required this.isDark,
+    required this.theme,
   });
 
   final String displayName;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// Required, because the avatar is a **circle filled with
+  /// `AppSurfaces.track`** and Dracula's track is the inverse of both existing
+  /// modes — darker than its page, where light and dark are lighter than theirs.
+  /// A boolean cannot express that difference, so the track token takes the enum.
+  final AppTheme theme;
 
   static String greetingFor(DateTime now) {
     if (now.hour < 12) return 'Good morning';
@@ -31,7 +38,11 @@ class GreetingHeader extends StatelessWidget {
     // as a grey smudge at 28 px inside the circle. The glyph now takes the
     // measured ordinary text colour, the fill is the real track surface rather
     // than a translucent grey, and the ring is a divider at a usable alpha.
-    final glyph = appPrimaryText(isDark);
+    //
+    // `theme.isDark` for the ink, because a text colour is shared by the two
+    // dark presets and a Dracula variant would protect nothing; the *fill* is the
+    // one thing here that is genuinely per-theme, and it takes the enum.
+    final glyph = appPrimaryText(theme.isDark);
     return Row(
       children: [
         Container(
@@ -39,8 +50,10 @@ class GreetingHeader extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppSurfaces.track(isDark),
-            border: Border.all(color: appDivider(isDark: isDark, opacity: 0.28)),
+            color: AppSurfaces.track(theme),
+            border: Border.all(
+              color: appDivider(theme: theme, opacity: 0.28),
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),
@@ -63,14 +76,14 @@ class GreetingHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: appPrimaryText(isDark),
+                  color: appPrimaryText(theme.isDark),
                 ),
               ),
               Text(
                 '${dayNameFull(now.weekday)}, ${now.day} ${monthName(now.month)} ${now.year}',
                 style: TextStyle(
                   fontSize: 13,
-                  color: faintColor(isDark),
+                  color: faintColor(theme.isDark),
                 ),
               ),
             ],

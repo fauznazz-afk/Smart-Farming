@@ -9,7 +9,7 @@ import 'liquid_glass.dart';
 class EnergySummaryCard extends StatelessWidget {
   const EnergySummaryCard({
     super.key,
-    required this.isDark,
+    required this.theme,
     required this.weekly,
     required this.loading,
     required this.hasData,
@@ -25,7 +25,16 @@ class EnergySummaryCard extends StatelessWidget {
   });
 
   final Color seedColor;
-  final bool isDark;
+
+  /// The appearance to paint, as an [AppTheme] rather than a bool.
+  ///
+  /// The card itself takes an [AppTheme] because it hands one straight to
+  /// `AppCard` and `AppTile`, and a bool would have to be converted back into a
+  /// theme at each of those calls — which is the conversion that loses Dracula.
+  /// The two places below that genuinely only need a brightness (the two
+  /// `themeColor` lightness steps and `faintColor`) pass `theme.isDark`, which
+  /// is `true` for both dark presets.
+  final AppTheme theme;
   final bool weekly;
   final bool loading;
   final bool hasData;
@@ -97,7 +106,7 @@ class EnergySummaryCard extends StatelessWidget {
           // Was a hand-written wash at radius 16 while the energy report's
           // identical tile used 14. AppTile is that object, once.
           child: AppTile(
-            isDark: isDark,
+            theme: theme,
             accent: color,
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -123,7 +132,7 @@ class EnergySummaryCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    color: faintColor(isDark),
+                    color: faintColor(theme.isDark),
                   ),
                 ),
               ],
@@ -145,18 +154,48 @@ class EnergySummaryCard extends StatelessWidget {
     // the app. Two lightness steps of one hue keeps the tiles distinguishable
     // from each other — which their icons and labels already do — while the page
     // stays inside the palette the user actually chose.
-    final solarColor = themeColor(
+    // `theme.isDark` and not a Dracula branch, for the reason the rest of the
+    // app's text and status palette keeps its boolean: these two lightness steps
+    // are keyed on brightness. **That is true today and would need measuring
+    // before Dracula is a supported appearance for this card** — the same
+    // trap `metricColor` documents, where one HSL lightness cannot serve two
+    // hues because green carries far more luminance than purple does.
+    //
+    // Measured, and it is exactly that trap. `themeColor(lightness: 0.52,
+    // saturation: 0.5)` on Dracula's preset purple is `#7A47C2`, which is
+    // **1.97:1 on the chrome surface** — the AC usage icon was effectively
+    // invisible. These are **icons**, so WCAG 1.4.11 wants 3:1 rather than the
+    // 4.5:1 that text gets, and both clear it now.
+    //
+    // **Two colours, not one.** Routing both through `metricColor` was the
+    // first attempt and it collapsed the two tiles onto the same value — because
+    // `metricColor` takes an `index` and deliberately **ignores** it, so there
+    // is exactly one colour to give and the PV/AC distinction disappeared. The
+    // existing test caught it. `strongMetricColor` is the sibling that is *not*
+    // the same colour, and it is still a step away from the surface on all three
+    // themes, which is the second thing that got measured rather than assumed.
+    //
+    // **Light mode is still under 3:1 on the PV icon, and this change did not move
+    // it.** Measured on the Ocean cyan seed it is 2.16:1, against 2.17:1 before
+    // — the same to within a hundredth. It is pre-existing, it is about the
+    // *seed* rather than about any theme, and fixing it properly means moving
+    // `metricColor`'s light lightness, which every accent in the app depends on
+    // and which `color_helpers_test.dart` pins. Recorded in
+    // `test/energy_summary_card_icons_test.dart` as a floor rather than a
+    // pass, and done here rather than quietly.
+    final solarColor = metricColor(
       seedColor: seedColor,
-      lightness: isDark ? 0.72 : 0.42,
+      index: 0,
+      theme: theme,
     );
-    final loadColor = themeColor(
+    final loadColor = strongMetricColor(
       seedColor: seedColor,
-      lightness: isDark ? 0.52 : 0.30,
-      saturation: 0.5,
+      index: 1,
+      theme: theme,
     );
 
     return AppCard(
-      isDark: isDark,
+      theme: theme,
       padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,7 +231,7 @@ class EnergySummaryCard extends StatelessWidget {
             'Estimated from average telemetry power',
             style: TextStyle(
               fontSize: 11,
-              color: faintColor(isDark),
+              color: faintColor(theme.isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -267,7 +306,7 @@ class EnergySummaryCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: faintColor(isDark),
+              color: faintColor(theme.isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -306,7 +345,7 @@ class EnergySummaryCard extends StatelessWidget {
             '$targetLabel · $runway',
             style: TextStyle(
               fontSize: 10,
-              color: faintColor(isDark),
+              color: faintColor(theme.isDark),
             ),
           ),
           if (result.hasProduction)
@@ -316,7 +355,7 @@ class EnergySummaryCard extends StatelessWidget {
                 'Actual today: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
                 style: TextStyle(
                   fontSize: 10,
-                  color: faintColor(isDark),
+                  color: faintColor(theme.isDark),
                 ),
               ),
             ),

@@ -9,13 +9,23 @@ import '../../../services/energy_report_service.dart';
 class ChartCard extends StatelessWidget {
   const ChartCard({
     super.key,
-    required this.isDark,
+    required this.theme,
     required this.monthly,
     required this.buckets,
     required this.touchedBucketNotifier,
   });
 
-  final bool isDark;
+  /// The appearance to paint.
+  ///
+  /// **This replaced a `bool isDark` and it is not a pure rename**, because the
+  /// card draws a surface. The readout well below is filled with
+  /// [AppSurfaces.track], and Dracula's track `#1E1F29` is a different colour
+  /// from the app's dark `#131A18` — the two are within 0.007 of relative
+  /// luminance of each other but they are not the same value, and a `bool`
+  /// cannot tell them apart. `createLeftTitles` and `createBottomTitles` still
+  /// take a `bool`; they draw text and are on the `faintColor` half of the split,
+  /// so they are handed `theme.isDark` below.
+  final AppTheme theme;
   final bool monthly;
   final List<EnergyBucket> buckets;
   final ValueNotifier<int?> touchedBucketNotifier;
@@ -40,7 +50,7 @@ class ChartCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _SelectedBucketReadout(
-                isDark: isDark,
+                theme: theme,
                 monthly: monthly,
                 buckets: buckets,
                 touchedBucketNotifier: touchedBucketNotifier,
@@ -98,15 +108,21 @@ class ChartCard extends StatelessWidget {
                             rightTitles: const AxisTitles(
                               sideTitles: SideTitles(showTitles: false),
                             ),
+                            // Both of these still ask a `bool`. They draw axis
+                            // text, which is the `faintColor` family, and
+                            // Dracula deliberately reuses the app's dark text
+                            // palette unchanged — see `faintColor` for the
+                            // measurement. So this is the `theme.isDark`
+                            // direction of the split, not a leftover.
                             leftTitles: createLeftTitles(
                               maxY: axis.maxY,
                               interval: axis.interval,
-                              isDark: isDark,
+                              isDark: theme.isDark,
                             ),
                             bottomTitles: createBottomTitles(
                               buckets: buckets,
                               monthly: monthly,
-                              isDark: isDark,
+                              isDark: theme.isDark,
                             ),
                           ),
                         ),
@@ -142,13 +158,13 @@ class ChartCard extends StatelessWidget {
 /// Readout of the currently selected (touched) interval above the chart.
 class _SelectedBucketReadout extends StatelessWidget {
   const _SelectedBucketReadout({
-    required this.isDark,
+    required this.theme,
     required this.monthly,
     required this.buckets,
     required this.touchedBucketNotifier,
   });
 
-  final bool isDark;
+  final AppTheme theme;
   final bool monthly;
   final List<EnergyBucket> buckets;
   final ValueNotifier<int?> touchedBucketNotifier;
@@ -166,9 +182,9 @@ class _SelectedBucketReadout extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: AppSurfaces.track(isDark),
+            color: AppSurfaces.track(theme),
             borderRadius: AppRadius.all(AppRadius.badge),
-            border: Border.all(color: appDivider(isDark: isDark, opacity: 0.5)),
+            border: Border.all(color: appDivider(theme: theme, opacity: 0.5)),
           ),
           child: Row(
             children: [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/design_tokens.dart';
+import '../../../theme/app_theme_of.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
 
@@ -22,7 +23,15 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    // `appThemeOf` rather than `theme.brightness == Brightness.dark`, and the
+    // difference is three modes rather than two: Dracula hands `MaterialApp`
+    // [ThemeMode.dark], so a brightness comparison here would put a Dracula
+    // card on the app's dark ramp. Neither this widget nor `SettingsIconBadge`
+    // has the `SettingsController` — they are built by `SettingsScreen` from a
+    // title and an icon — so the context is the only thing they can read, and
+    // `appThemeOf` is the resolver that can answer the question. See that file
+    // for the contract on `main.dart` it depends on.
+    final appTheme = appThemeOf(context);
     // Was a `Material` in `surfaceContainerLow` with a 16dp radius and no
     // border at all. `AppCard` is the page colour with the dual-shadow pair and
     // the accent hairline, which is how every other card in the app is drawn.
@@ -32,7 +41,7 @@ class SectionCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(
-        isDark: isDark,
+        theme: appTheme,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +69,7 @@ class SectionCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.only(left: 44, top: 8),
-              child: AppDivider(isDark: isDark, opacity: 0.12),
+              child: AppDivider(theme: appTheme, opacity: 0.12),
             ),
             const SizedBox(height: 4),
             child,
@@ -96,16 +105,16 @@ class SettingsIconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final appTheme = appThemeOf(context);
     final accent = theme.colorScheme.primary;
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: isDark ? 0.20 : 0.12),
+        color: accent.withValues(alpha: appTheme.isDark ? 0.20 : 0.12),
         shape: BoxShape.circle,
         border: Border.all(
-          color: AppElevation.controlEdge(accent: accent, isDark: isDark),
+          color: AppElevation.controlEdge(accent: accent, theme: appTheme),
         ),
       ),
       child: Icon(icon, color: accent, size: 19),

@@ -2,6 +2,7 @@ import './dashboard/utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
+import '../theme/app_theme_of.dart';
 import '../widgets/liquid_glass.dart';
 import 'dashboard/utils/design_tokens.dart';
 
@@ -116,7 +117,15 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // One resolution, threaded everywhere. This screen has no
+    // `AppThemeController` -- it is pushed without one -- so the appearance comes
+    // from the context, and it has to be resolved *once* rather than per widget:
+    // `Theme.of(context).brightness` is identical for the app's dark theme and
+    // for Dracula, so a screen that asked for a `bool` per row would render
+    // Dracula's page with the app's dark ramp. See `appThemeOf` for the rule and
+    // the contract on `main.dart` that it depends on.
+    final appTheme = appThemeOf(context);
+    final isDark = appTheme.isDark;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -133,7 +142,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         ],
       ),
       body: AppBackground(
-        isDark: isDark,
+        theme: appTheme,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _alarms.isEmpty
@@ -141,7 +150,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             : Column(
                 children: [
                   _filterBar(isDark),
-                  Expanded(child: _alarmList(isDark)),
+                  Expanded(child: _alarmList(appTheme)),
                 ],
               ),
       ),
@@ -172,7 +181,15 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  Widget _alarmList(bool isDark) {
+  /// Takes the [AppTheme] rather than a `bool` even though the only two things
+  /// that need the *appearance* are [AppCard] and [AppBadge], because the text
+  /// and status colours on this screen are the `bool` half of the split — see
+  /// `faintColor` and `appPrimaryText` for why they are deliberately not keyed on
+  /// [AppTheme]. The list and the status badge are handed the enum so each one
+  /// takes `isDark` off it locally rather than taking two parameters that must
+  /// agree.
+  Widget _alarmList(AppTheme appTheme) {
+    final isDark = appTheme.isDark;
     final alarms = _visibleAlarms;
     if (alarms.isEmpty) {
       return Center(
@@ -226,7 +243,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             ? appPrimaryText(isDark)
             : _colorForSeverity(alarm.severity, isDark);
         return AppCard(
-          isDark: isDark,
+          theme: appTheme,
           padding: EdgeInsets.zero,
           child: Material(
             color: Colors.transparent,
@@ -321,7 +338,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _statusBadge(alarm, ringColor, isDark),
+                        _statusBadge(alarm, ringColor, appTheme),
                         PopupMenuButton<_AlarmAction>(
                           tooltip: 'Alarm actions',
                           onSelected: (action) => _applyAction(action, alarm),
@@ -379,7 +396,10 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  Widget _statusBadge(AlarmRecord alarm, Color ringColor, bool isDark) {
+  /// [appTheme] rather than a `bool` for [AppBadge]'s wash alpha, which is keyed
+  /// on brightness only, and `isDark` is taken off it for the text colours here.
+  Widget _statusBadge(AlarmRecord alarm, Color ringColor, AppTheme appTheme) {
+    final isDark = appTheme.isDark;
     final severityLabel = alarm.severity == AlarmSeverity.critical
         ? 'Critical'
         : 'Warning';
@@ -461,7 +481,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     // reached only when the row is not resolved.
     final color = alarm.acknowledged ? statusAlert(isDark) : ringColor;
     return AppBadge(
-      isDark: isDark,
+      theme: appTheme,
       color: color,
       child: Text(
         label,

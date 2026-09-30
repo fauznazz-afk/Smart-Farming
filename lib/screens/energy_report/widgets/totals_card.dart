@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/format_helpers.dart';
 import '../utils/period_buckets.dart';
@@ -9,7 +10,7 @@ import '../../../services/energy_report_service.dart';
 class TotalsCard extends StatelessWidget {
   const TotalsCard({
     super.key,
-    required this.isDark,
+    required this.theme,
     required this.monthly,
     required this.selectedDate,
     required this.pvKwh,
@@ -18,7 +19,14 @@ class TotalsCard extends StatelessWidget {
     required this.previousTotals,
   });
 
-  final bool isDark;
+  /// The appearance to paint, as an [AppTheme] rather than a `bool`.
+  ///
+  /// It exists because the two metrics below are [AppTile]s, and a tile paints
+  /// `AppSurfaces.input` — which has a Dracula step of its own, and Dracula's
+  /// `#21222C` is *darker* than its page while the app's dark input is lighter
+  /// than its page. A `bool` would have put the app's direction on Dracula's
+  /// surface. `faintColor` still takes a `bool` and gets `theme.isDark` below.
+  final AppTheme theme;
   final bool monthly;
   final DateTime selectedDate;
   final double pvKwh;
@@ -44,7 +52,7 @@ class TotalsCard extends StatelessWidget {
             Row(
               children: [
                 _TotalMetric(
-                  isDark: isDark,
+                  theme: theme,
                   label: 'PV production',
                   value: pvKwh,
                   previous: previousTotals?.pvKwh,
@@ -53,7 +61,7 @@ class TotalsCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 _TotalMetric(
-                  isDark: isDark,
+                  theme: theme,
                   label: 'AC usage',
                   value: acKwh,
                   previous: previousTotals?.acKwh,
@@ -67,7 +75,7 @@ class TotalsCard extends StatelessWidget {
               '${totalSampleCount(buckets)} samples • ${buckets.length} ${monthly ? 'days' : 'hours'} with data',
               style: TextStyle(
                 fontSize: 12,
-                color: faintColor(isDark),
+                color: faintColor(theme.isDark),
               ),
             ),
           ],
@@ -79,7 +87,7 @@ class TotalsCard extends StatelessWidget {
 
 class _TotalMetric extends StatelessWidget {
   const _TotalMetric({
-    required this.isDark,
+    required this.theme,
     required this.label,
     required this.value,
     required this.previous,
@@ -87,7 +95,7 @@ class _TotalMetric extends StatelessWidget {
     required this.icon,
   });
 
-  final bool isDark;
+  final AppTheme theme;
   final String label;
   final double value;
   final double? previous;
@@ -104,7 +112,7 @@ class _TotalMetric extends StatelessWidget {
           // same widget: two hand-written washes at two radii (16 there, 14
           // here) for one conceptual thing.
           child: AppTile(
-            isDark: isDark,
+            theme: theme,
             accent: color,
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -128,7 +136,7 @@ class _TotalMetric extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    color: faintColor(isDark),
+                    color: faintColor(theme.isDark),
                   ),
                 ),
               ],

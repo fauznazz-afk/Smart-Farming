@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../services/alarm_bridge.dart';
+import '../../../theme/app_theme_of.dart';
 import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/utils/design_tokens.dart';
 
@@ -41,8 +42,19 @@ double _contrastRatio(Color a, Color b) {
 /// exactly what `statusWarn` and friends already do by hand. The accent is
 /// already read from `colorScheme.primary`, which is the seed put through
 /// `ColorScheme.fromSeed`, so this cannot drift from the palette the user set.
-Color _readableAccent(Color accent, bool isDark) {
-  final page = AppSurfaces.page(isDark);
+///
+/// **[appTheme], not a `bool`, and this is the one call site where the two are
+/// not interchangeable in the *lightness walk* as well as the page colour.**
+/// Dracula's page `#282A36` is about 1.7x lighter in relative luminance than the
+/// app's dark page, so a Dracula accent that clears AA on `#1A211F` is not
+/// guaranteed to clear it on `#282A36` — the contrast is measured against a
+/// different surface entirely, and a `bool` would have silently compared against
+/// the wrong one. The walk direction is still keyed on brightness only, because
+/// lightening is the right move on any dark surface and the loop finds the
+/// exact step either way.
+Color _readableAccent(Color accent, AppTheme appTheme) {
+  final isDark = appTheme.isDark;
+  final page = AppSurfaces.page(appTheme);
   if (_contrastRatio(accent, page) >= _minTextContrast) return accent;
   final hsl = HSLColor.fromColor(accent);
   for (var step = 1; step <= 100; step++) {
@@ -243,13 +255,18 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     bool plain = false,
   }) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    // The enum, not a brightness comparison: the accent below is walked until it
+    // clears AA against *this* page, and Dracula's page is a different colour
+    // from the app's dark one while `Theme.of(context).brightness` is identical
+    // for both. This section has no controller, so `appThemeOf` is the source.
+    final appTheme = appThemeOf(context);
+    final isDark = appTheme.isDark;
     // The accent when the row is fine, the measured secondary text when it is
     // not. The old fallback was `onSurface @ 0.70`, an unmeasured alpha blend
     // that happened to land near 5:1 and was the only colour in the app left
     // deriving its own contrast that way. `faintColor` is the pinned pair.
     final color = ok
-        ? _readableAccent(theme.colorScheme.primary, isDark)
+        ? _readableAccent(theme.colorScheme.primary, appTheme)
         : faintColor(isDark);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

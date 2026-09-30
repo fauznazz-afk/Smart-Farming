@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/alarm_rules.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// One reading in a [MetricGrid]: which telemetry key, what to call it, and
 /// whether anything is watching it.
@@ -63,7 +64,7 @@ class MetricGrid extends StatelessWidget {
     required this.title,
     required this.specs,
     required this.values,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     this.columns = 3,
     this.thresholds,
@@ -76,7 +77,17 @@ class MetricGrid extends StatelessWidget {
   final String title;
   final List<MetricSpec> specs;
   final Map<String, double>? values;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// Threaded down to every card in the grid so the whole block agrees with the
+  /// page it sits on. Each card's `AppCard` draws the `raised` pair and its
+  /// accent comes from `metricColor`, and both of those are per-theme with a
+  /// separately derived Dracula answer; the verdicts and captions on top pass
+  /// `theme.isDark`, because a text or status colour is shared by the two dark
+  /// presets.
+  final AppTheme theme;
+
   final Color seedColor;
 
   /// Cards per row. Three suits the five greenhouse readings as 3 + 2; the fish
@@ -130,7 +141,7 @@ class MetricGrid extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
-                color: faintColor(isDark),
+                color: faintColor(theme.isDark),
               ),
             ),
             const Spacer(),
@@ -141,8 +152,7 @@ class MetricGrid extends StatelessWidget {
             if (verdicts.isStale)
               _Tag(
                 text: 'Stale data',
-                color: statusWarn(isDark),
-                isDark: isDark,
+                color: statusWarn(theme.isDark),
               )
             // The breach tag follows showGridColors as well: with alerts off the
             // user has said these limits are not being monitored, and a red "out
@@ -152,8 +162,7 @@ class MetricGrid extends StatelessWidget {
             else if (breached > 0 && showGridColors)
               _Tag(
                 text: '$breached out of range',
-                color: statusBad(isDark),
-                isDark: isDark,
+                color: statusBad(theme.isDark),
               ),
           ],
         ),
@@ -174,7 +183,7 @@ class MetricGrid extends StatelessWidget {
                     value: values?[rows[rowIndex][i].key],
                     verdict: verdicts.verdictFor(rows[rowIndex][i]),
                     limit: limitLabelFor?.call(rows[rowIndex][i]),
-                    isDark: isDark,
+                    theme: theme,
                     seedColor: seedColor,
                     showGridColors: showGridColors,
                   ),
@@ -234,11 +243,15 @@ class _Verdicts {
 
 /// The grid's single verdict, shown only when something is wrong.
 class _Tag extends StatelessWidget {
-  const _Tag({required this.text, required this.color, required this.isDark});
+  /// The tag's colour is chosen by the caller from `statusWarn` / `statusBad`,
+  /// both of which take a brightness. It used to also take an unused `isDark`,
+  /// which is what a `status*` call looks like before anyone checks whether the
+  /// widget reads it — it does not, so the parameter is gone rather than
+  /// converted.
+  const _Tag({required this.text, required this.color});
 
   final String text;
   final Color color;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +272,7 @@ class _MetricCard extends StatelessWidget {
     required this.value,
     required this.verdict,
     required this.limit,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     required this.showGridColors,
   });
@@ -273,17 +286,24 @@ class _MetricCard extends StatelessWidget {
   /// The configured range, shown so a number has something to be read against.
   final String? limit;
 
-  final bool isDark;
+  /// See [MetricGrid.theme].
+  ///
+  /// This card's `AppCard` draws the `raised` pair and its icon takes
+  /// `metricColor`, so both are per-theme. Everything printed on it — the label,
+  /// the unit, the range caption and the breach colour — is text and passes
+  /// `theme.isDark`.
+  final AppTheme theme;
+
   final Color seedColor;
   final bool showGridColors;
 
   @override
   Widget build(BuildContext context) {
-    final faint = faintColor(isDark);
+    final faint = faintColor(theme.isDark);
     final accent = metricColor(
       seedColor: seedColor,
       index: 3,
-      isDark: isDark,
+      theme: theme,
     );
     // Only a breach is coloured. A reading inside its range keeps the card's own
     // accent-tinted outline and an ordinary caption, because "fine" is the boring
@@ -292,10 +312,10 @@ class _MetricCard extends StatelessWidget {
     // text the user had never chosen. The grid's verdict at the top already counts
     // what is out of range.
     final breached = verdict == false;
-    final status = (breached && showGridColors) ? statusBad(isDark) : null;
+    final status = (breached && showGridColors) ? statusBad(theme.isDark) : null;
 
     return AppCard(
-      isDark: isDark,
+      theme: theme,
       padding: const EdgeInsets.all(8),
       // The breach outline is gone, and deliberately. It was the third signal on
       // one card — the coloured caption below and the grid's "N out of range" tag
@@ -342,7 +362,7 @@ class _MetricCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: appPrimaryText(isDark),
+                    color: appPrimaryText(theme.isDark),
                   ),
                 )
               else
@@ -354,7 +374,7 @@ class _MetricCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: appPrimaryText(isDark),
+                      color: appPrimaryText(theme.isDark),
                     ),
                   ),
                 ),

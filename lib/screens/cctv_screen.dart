@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
+import '../theme/app_theme_of.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
 import 'dashboard/utils/design_tokens.dart';
@@ -256,7 +257,10 @@ class _CctvScreenState extends State<CctvScreen> {
             top: 16,
             left: 16,
             // Over the video, so the dark set regardless of the app's theme.
-            child: CctvStatusPill(status: _status, isDark: true),
+            // `AppTheme.dark` rather than the resolved theme: what matters to a
+            // pill floating over camera frames is that it is on the dark half of
+            // the ramp, and the frames have nothing to do with Dracula's palette.
+            child: CctvStatusPill(status: _status, theme: AppTheme.dark),
           ),
         ],
       ),
@@ -265,7 +269,13 @@ class _CctvScreenState extends State<CctvScreen> {
 
   Widget _buildEmbedded(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    // `appThemeOf` rather than a brightness comparison. The panel's shadow and
+    // the info bar's fill are both ramp-dependent, and Dracula hands
+    // `MaterialApp` [ThemeMode.dark], so `isDark` here would be identical for
+    // Dracula and for the app's own dark theme and the panel would be lit by
+    // the wrong shadow pair. This screen has no controller, so the context is
+    // what it has.
+    final appTheme = appThemeOf(context);
     final primary = theme.colorScheme.primary;
     final status = _status;
 
@@ -347,7 +357,7 @@ class _CctvScreenState extends State<CctvScreen> {
         DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: AppRadius.all(AppRadius.pill),
-            boxShadow: AppElevation.raised(isDark),
+            boxShadow: AppElevation.raised(appTheme),
           ),
           // The clip stays *inside* the decorated box rather than outside it.
           // `ClipRRect` would cut the shadow off at the rect it clips, so a
@@ -399,7 +409,7 @@ class _CctvScreenState extends State<CctvScreen> {
         ),
         const SizedBox(height: 12),
         _InfoBar(
-          isDark: isDark,
+          theme: appTheme,
           primary: primary,
           isPlaying: _playing,
           showReload: _playing && !_loading,
@@ -423,14 +433,20 @@ class _CctvScreenState extends State<CctvScreen> {
 /// Explanatory text below the player, with a reload action while live.
 class _InfoBar extends StatelessWidget {
   const _InfoBar({
-    required this.isDark,
+    required this.theme,
     required this.primary,
     required this.isPlaying,
     required this.showReload,
     required this.onReload,
   });
 
-  final bool isDark;
+  /// The appearance to paint. An [AppTheme] rather than a `bool` because the
+  /// bar's fill is [AppSurfaces.chrome], which has a Dracula step of its own —
+  /// Dracula's "current line" is a *lighter* surface than the app's dark chrome,
+  /// and it is the bar that is supposed to separate from the page by fill, so
+  /// taking the dark one there would have flattened exactly the edge this bar
+  /// exists to draw.
+  final AppTheme theme;
   final Color primary;
   final bool isPlaying;
   final bool showReload;
@@ -438,7 +454,11 @@ class _InfoBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // `textTheme`, not `theme`: the field named `theme` is the [AppTheme] this
+    // bar paints with, and a local `theme` for the Material `ThemeData` would
+    // shadow it — which is a silent, type-checked-nothing bug rather than a
+    // compile error only because the two names are different types.
+    final textTheme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -446,7 +466,7 @@ class _InfoBar extends StatelessWidget {
         // light. `AppSurfaces.chrome` is the surface that has to separate from
         // the page by fill rather than by shadow, which is what this is: a bar
         // under the player, with a Reload button in it.
-        color: AppSurfaces.chrome(isDark),
+        color: AppSurfaces.chrome(theme),
         borderRadius: AppRadius.all(AppRadius.card),
         // Was `white | black @ 0.06`, which measures 1.14:1 on the fill. The bar
         // sits under a viewport-sized video and holds a Reload button, so its
@@ -462,7 +482,7 @@ class _InfoBar extends StatelessWidget {
         // Reload button, and it abuts a matte rather than a themed card, so the
         // boundary has to hold on its own rather than being carried by a shared
         // fill.
-        border: Border.all(color: AppElevation.boundaryEdge(isDark: isDark)),
+        border: Border.all(color: AppElevation.boundaryEdge(theme: theme)),
       ),
       child: Row(
         children: [
@@ -477,7 +497,7 @@ class _InfoBar extends StatelessWidget {
               isPlaying
                   ? 'The stream is running on an internet connection.'
                   : 'Press Play when you are ready to watch the camera.',
-              style: theme.textTheme.bodySmall,
+              style: textTheme.textTheme.bodySmall,
             ),
           ),
           if (showReload && onReload != null)

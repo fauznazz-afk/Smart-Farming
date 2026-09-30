@@ -90,16 +90,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Resolved through the controller rather than from
+    // `Theme.of(context).brightness`, because a `Brightness` cannot distinguish
+    // Dracula from the app's dark mode — both are published as
+    // `ThemeMode.dark`. `resolveAppTheme` is the same free function the token
+    // layer and `main.dart` use, so there is one answer and not three.
+    final theme = resolveAppTheme(
+      widget.themeController.option,
+      Theme.of(context).brightness,
+    );
+    final isDark = theme.isDark;
     // `Colors.red` measured 3.33:1 as the 13dp text it is used for here, which
     // is a fail, and the wash behind it was a fixed `red @ 0.12` with no
     // relationship to the theme. `statusBad` is the measured value, pinned by
     // `test/color_helpers_test.dart` against the real card surface.
+    //
+    // `isDark`, and that is measured rather than assumed: the app's dark status
+    // palette clears AA across the whole Dracula ramp, worst case 5.17:1 on the
+    // chrome step. See the note on `statusOk`.
     final errorColor = statusBad(isDark);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(
-        isDark: isDark,
+        theme: theme,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -119,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // go: the fill is opaque and there is no `BackdropFilter` left
                   // to run, and `AppCard` owns its radius.
                   AppCard(
-                    isDark: isDark,
+                    theme: theme,
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

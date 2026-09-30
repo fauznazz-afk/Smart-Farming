@@ -15,7 +15,7 @@ class LivePowerCard extends StatelessWidget {
     required this.soc,
     required this.pzemStale,
     required this.pzemAgeLabel,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
   });
 
@@ -28,25 +28,40 @@ class LivePowerCard extends StatelessWidget {
   final double soc;
   final bool pzemStale;
   final String? pzemAgeLabel;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// The card's own `AppCard` draws the `raised` pair, which Dracula derives
+  /// separately, and the flow strip below it fills its empty-state track with
+  /// **`AppSurfaces.track`** — a token that is *darker* than Dracula's page,
+  /// the inverse of both existing modes. Neither fact survives a boolean, so
+  /// this takes the enum and passes `theme.isDark` only to the text and status
+  /// colours, which are shared by the two dark presets.
+  final AppTheme theme;
+
   final Color seedColor;
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      isDark: isDark,
+      theme: theme,
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel, isDark: isDark, seedColor: seedColor),
+          _Header(
+            pzemStale: pzemStale,
+            ageLabel: pzemAgeLabel,
+            theme: theme,
+            seedColor: seedColor,
+          ),
           const SizedBox(height: 14),
           _PowerFlow(
             pvPower: pvPower,
             acPower: acPower,
             batteryPower: batteryPower,
             soc: soc,
-            isDark: isDark,
+            theme: theme,
             seedColor: seedColor,
           ),
         ],
@@ -82,7 +97,7 @@ class _PowerFlow extends StatelessWidget {
     required this.acPower,
     required this.batteryPower,
     required this.soc,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
   });
 
@@ -90,12 +105,15 @@ class _PowerFlow extends StatelessWidget {
   final double acPower;
   final double batteryPower;
   final double soc;
-  final bool isDark;
+
+  /// See [LivePowerCard.theme].
+  final AppTheme theme;
+
   final Color seedColor;
 
   @override
   Widget build(BuildContext context) {
-    final faint = faintColor(isDark);
+    final faint = faintColor(theme.isDark);
     final solar = pvPower;
     if (solar == null) {
       // No reading is not the same as no output, and saying so is more useful
@@ -135,13 +153,32 @@ class _PowerFlow extends StatelessWidget {
     final loadShare =
         solarForBar <= 0 ? 0.0 : (loadForBar / solarForBar).clamp(0.0, 1.0);
 
+    // `theme.isDark` and not a three-way switch, and that is a deliberate
+    // no-change rather than an oversight: these two are hand-picked HSL
+    // lightnesses, not a token with a per-theme answer, so Dracula takes the
+    // dark values unchanged.
+    //
+    // **They do not all clear AA on Dracula, and that is recorded here rather
+    // than fixed here.** Measured on the Dracula ramp with the preset purple
+    // `#BD93F9` as the seed: 0.74/0.62 reads `#B594E6` at 5.66:1 on the page and
+    // 4.68:1 on chrome, which clears; 0.62 at saturation 0.46 reads `#9672CB` at
+    // 3.77 and 3.13, and the 0.68 in `_SocLine` below reads `#A47BE0` at 4.40
+    // and 3.64. The first is a 24sp bold figure where 3:1 applies, so it is a
+    // margin question; the second is a 12sp percentage, where 4.5:1 applies, so
+    // it is a genuine shortfall on Dracula.
+    //
+    // The repair is to move all three to `metricColor(theme:)`, which is the
+    // function that already solves Dracula's purple (`#C1A3EB`, 6.58 on the page
+    // and 5.45 on chrome). That changes three colours and drops two
+    // hand-picked saturations, so it wants its own measurement rather than
+    // riding along in a signature migration.
     final accent = themeColor(
       seedColor: seedColor,
-      lightness: isDark ? 0.74 : 0.42,
+      lightness: theme.isDark ? 0.74 : 0.42,
     );
     final loadColor = themeColor(
       seedColor: seedColor,
-      lightness: isDark ? 0.62 : 0.34,
+      lightness: theme.isDark ? 0.62 : 0.34,
       saturation: 0.46,
     );
 
@@ -166,7 +203,7 @@ class _PowerFlow extends StatelessWidget {
                 label: 'Solar',
                 watts: solarForBar,
                 color: accent,
-                isDark: isDark,
+                isDark: theme.isDark,
               ),
             ),
             Padding(
@@ -179,7 +216,7 @@ class _PowerFlow extends StatelessWidget {
                 label: 'House',
                 watts: acPower,
                 color: loadColor,
-                isDark: isDark,
+                isDark: theme.isDark,
               ),
             ),
             Padding(
@@ -206,7 +243,7 @@ class _PowerFlow extends StatelessWidget {
                 // either, because the Battery page does not print one.
                 watts: batteryPower,
                 color: accent,
-                isDark: isDark,
+                isDark: theme.isDark,
               ),
             ),
           ],
@@ -244,7 +281,7 @@ class _PowerFlow extends StatelessWidget {
                           ),
                       ],
                     )
-                  : ColoredBox(color: AppSurfaces.track(isDark)),
+                  : ColoredBox(color: AppSurfaces.track(theme)),
             ),
           ),
         ),
@@ -260,7 +297,7 @@ class _PowerFlow extends StatelessWidget {
         // Not tinted by level. Green would be a second colour system beside the
         // theme for a condition that is boring when true, and the user did not
         // choose it; the fill uses the same accent as the rest of the card.
-        _SocLine(soc: soc, isDark: isDark, seedColor: seedColor),
+        _SocLine(soc: soc, theme: theme, seedColor: seedColor),
         const SizedBox(height: 8),
         Text(
           !coversLoad
@@ -271,7 +308,7 @@ class _PowerFlow extends StatelessWidget {
               : 'The array is just covering the house load',
           style: TextStyle(
             fontSize: 11,
-            color: !coversLoad ? statusWarn(isDark) : faint,
+            color: !coversLoad ? statusWarn(theme.isDark) : faint,
           ),
         ),
       ],
@@ -287,21 +324,30 @@ class _PowerFlow extends StatelessWidget {
 class _SocLine extends StatelessWidget {
   const _SocLine({
     required this.soc,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
   });
 
   final double soc;
-  final bool isDark;
+
+  /// See [LivePowerCard.theme].
+  ///
+  /// The track behind the charge bar is the per-theme part: `AppSurfaces.track`
+  /// is *darker* than Dracula's page where it is lighter in light and dark.
+  final AppTheme theme;
+
   final Color seedColor;
 
   @override
   Widget build(BuildContext context) {
-    final faint = faintColor(isDark);
+    final faint = faintColor(theme.isDark);
     final clamped = soc.clamp(0.0, 100.0);
+    // The third of the three hand-picked lightnesses, and the one that misses AA
+    // on Dracula — see the note on `_PowerFlow`'s accent above for the measured
+    // numbers and for why the fix is a separate change.
     final accent = themeColor(
       seedColor: seedColor,
-      lightness: isDark ? 0.68 : 0.38,
+      lightness: theme.isDark ? 0.68 : 0.38,
     );
     return Row(
       children: [
@@ -318,7 +364,7 @@ class _SocLine extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColoredBox(color: AppSurfaces.track(isDark)),
+                  ColoredBox(color: AppSurfaces.track(theme)),
                   FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     widthFactor: clamped / 100,
@@ -337,7 +383,7 @@ class _SocLine extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: appPrimaryText(isDark),
+              color: appPrimaryText(theme.isDark),
             ),
           ),
         ),
@@ -412,13 +458,20 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.pzemStale,
     required this.ageLabel,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
   });
 
   final bool pzemStale;
   final String? ageLabel;
-  final bool isDark;
+
+  /// See [LivePowerCard.theme].
+  ///
+  /// Needed here only for the icon's accent: `metricColor` takes an `AppTheme`
+  /// because Dracula's purple needs its own HSL lightness. Everything else in
+  /// this header is a caption or a status colour and passes `theme.isDark`.
+  final AppTheme theme;
+
   final Color seedColor;
 
   @override
@@ -428,7 +481,11 @@ class _Header extends StatelessWidget {
         Icon(
           Icons.wb_sunny_rounded,
           size: 18,
-          color: metricColor(seedColor: seedColor, index: 2, isDark: isDark),
+          color: metricColor(
+            seedColor: seedColor,
+            index: 2,
+            theme: theme,
+          ),
         ),
         const SizedBox(width: 6),
         // Names the card, not the reading. "PV Output" appeared three times on
@@ -440,7 +497,7 @@ class _Header extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: faintColor(isDark),
+            color: faintColor(theme.isDark),
           ),
         ),
         const Spacer(),
@@ -455,7 +512,9 @@ class _Header extends StatelessWidget {
               Icon(
                 pzemStale ? Icons.warning_amber_rounded : Icons.schedule,
                 size: 12,
-                color: pzemStale ? statusWarn(isDark) : faintColor(isDark),
+                color: pzemStale
+                      ? statusWarn(theme.isDark)
+                      : faintColor(theme.isDark),
               ),
               const SizedBox(width: 4),
               Text(
@@ -463,7 +522,9 @@ class _Header extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: pzemStale ? FontWeight.w600 : FontWeight.w400,
-                  color: pzemStale ? statusWarn(isDark) : faintColor(isDark),
+                  color: pzemStale
+                      ? statusWarn(theme.isDark)
+                      : faintColor(theme.isDark),
                 ),
               ),
             ],

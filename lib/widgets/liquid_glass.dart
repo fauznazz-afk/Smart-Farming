@@ -1,6 +1,7 @@
 import '../screens/dashboard/utils/color_helpers.dart';
 import '../screens/dashboard/utils/design_tokens.dart';
 import '../screens/dashboard/utils/pressable.dart';
+import '../theme/app_theme_of.dart';
 
 import 'package:flutter/material.dart';
 
@@ -23,20 +24,63 @@ class AppBackground extends StatelessWidget {
   const AppBackground({
     super.key,
     required this.child,
-    required this.isDark,
+    required this.theme,
   });
 
   final Widget child;
-  final bool isDark;
+
+  /// The appearance to paint, as an [AppTheme] rather than a bool. It is
+  /// required rather than inferred because the backdrop is the one surface in
+  /// the app that *is* the page, so a caller that guessed wrong here would put
+  /// every card in the frame on the wrong ramp.
+  final AppTheme theme;
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppSurfaces.page(isDark),
+      color: AppSurfaces.page(theme),
       child: child,
     );
   }
 }
+
+// ── Theme resolution for the widget layer ────────────────────────────────────
+
+/// The [AppTheme] the tree is being painted in, for a widget whose caller did
+/// not say.
+///
+/// **This is the widget-layer half of the Dracula migration, and it exists
+/// because a `Brightness` cannot carry the answer.** Every widget in this file
+/// used to fall back to
+/// `isDark ?? Theme.of(context).brightness == Brightness.dark`, and for the two
+/// themes that predated Dracula that was exact. It stopped being exact the
+/// moment a third mode landed: [AppTheme.dracula] hands `MaterialApp`
+/// [ThemeMode.dark], because Material has no third brightness and Dracula is a
+/// dark theme, so `Theme.of(context).brightness` reports the *same*
+/// [Brightness.dark] the app's own dark theme reports. A bool therefore cannot
+/// distinguish them, and every null-[theme] call site would have quietly
+/// rendered Dracula as plain dark — on the wrong page colour, the wrong shadow
+/// alphas and the wrong elevation geometry, all of which are separately derived
+/// values in `design_tokens.dart`.
+///
+/// **Why the scaffold background and not a controller.** `AppThemeController`
+/// has the right answer, but it is a [ChangeNotifier] held by `main.dart` and
+/// threaded down to the three screens that *have* a controller in their
+/// constructor. A leaf widget like [AppCard] does not, there is no
+/// `InheritedWidget` carrying it, and adding one is a change to the app's
+/// plumbing rather than a signature migration. So this reads the theme the same
+/// way `MaterialApp` published it, and it compares against the token
+/// **constant** rather than a hex written here — which is the rule
+/// `color_helpers_test.dart` exists to enforce for its surface lists, and it is
+/// why this cannot go stale the way a hand-written hex did.
+///
+/// The practical contract for whoever owns `main.dart`: the `darkTheme`'s
+/// `scaffoldBackgroundColor` must be `AppSurfaces.page(AppTheme.dracula)` when
+/// the Dracula preset is active, which is already what it is for the other two
+/// presets. If Dracula is ever wired up without that, this returns
+/// [AppTheme.dark] and Dracula renders as the app's dark mode — a visible,
+/// obvious failure rather than a subtle one, which is the right way round.
+AppTheme _appThemeOf(BuildContext context) => appThemeOf(context);
 
 // ── AppCard ──────────────────────────────────────────────────────────────────
 
@@ -55,7 +99,7 @@ class AppCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
-    this.isDark,
+    this.theme,
     this.width,
     this.height,
     this.semanticLabel,
@@ -67,11 +111,16 @@ class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
 
-  /// Null reads the brightness from the context, which is right for a widget
-  /// that is always built under a `MaterialApp`. It is a parameter because the
+  /// Null reads the theme from the context, which is right for a widget that is
+  /// always built under a `MaterialApp`. It is a parameter because the
   /// dashboard passes it down from a single place to keep every card in one
-  /// frame agreeing on which mode it is in.
-  final bool? isDark;
+  /// frame agreeing on which appearance it is in — which is what stops a frame
+  /// from being half Dracula and half the app's dark mode, since `MaterialApp`
+  /// reports both as [Brightness.dark] and the context cannot tell them apart.
+  ///
+  /// This replaced a `bool? isDark`. See [_appThemeOf] for why the fallback had
+  /// to stop being a brightness comparison.
+  final AppTheme? theme;
 
   final double? width;
   final double? height;
@@ -97,23 +146,26 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = isDark ?? Theme.of(context).brightness == Brightness.dark;
+    final theme = this.theme ?? _appThemeOf(context);
     final resolvedAccent = accent ?? Theme.of(context).colorScheme.primary;
 
     final shadows = <BoxShadow>[
       if (pressed)
-        ...AppElevation.pressed(dark)
+        ...AppElevation.pressed(theme)
       else if (!inset)
-        ...AppElevation.raised(dark)
+        ...AppElevation.raised(theme)
       else
-        ...AppElevation.inset(dark),
+        ...AppElevation.inset(theme),
     ];
 
     final decoration = BoxDecoration(
-      color: inset ? AppSurfaces.input(dark) : AppSurfaces.card(dark),
+      color: inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme),
       borderRadius: BorderRadius.circular(AppRadius.card),
       border: Border.all(
-        color: AppElevation.hairline(accent: resolvedAccent, isDark: dark),
+        color: AppElevation.hairline(
+          accent: resolvedAccent,
+          theme: theme,
+        ),
       ),
       boxShadow: shadows,
     );
@@ -176,14 +228,19 @@ class AppTile extends StatelessWidget {
   const AppTile({
     super.key,
     required this.child,
-    required this.isDark,
+    required this.theme,
     this.accent,
     this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     this.inset = true,
   });
 
   final Widget child;
-  final bool isDark;
+
+  /// The appearance to paint. Required rather than optional because a tile is
+  /// small enough that an inferred mode is a misread rather than a subtlety, and
+  /// because it is the surface `color_helpers_test.dart` measures
+  /// `faintColor` and the four status colours against.
+  final AppTheme theme;
 
   /// A low-alpha wash of this colour under the tile.
   ///
@@ -233,14 +290,14 @@ class AppTile extends StatelessWidget {
     final tile = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: inset ? AppSurfaces.input(isDark) : AppSurfaces.card(isDark),
+        color: inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme),
         borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: Border.all(color: appDivider(isDark: isDark, opacity: 0.5)),
+        border: Border.all(color: appDivider(theme: theme, opacity: 0.5)),
         // Without this the lighter fill simply flattens the tile. It was carrying
         // the whole inset read on its own, because a `BoxShadow` paints *outside*
         // the decoration rect and so cannot darken a tile's own interior — the
         // interior is the fill's job, the depth around it is the shadow's.
-        boxShadow: inset ? AppElevation.inset(isDark) : null,
+        boxShadow: inset ? AppElevation.inset(theme) : null,
       ),
       child: child,
     );
@@ -291,7 +348,7 @@ class AppTile extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.tile),
       child: ColoredBox(
-        color: accent!.withValues(alpha: isDark ? 0.20 : 0.14),
+        color: accent!.withValues(alpha: theme.isDark ? 0.20 : 0.14),
         child: tile,
       ),
     );
@@ -306,12 +363,16 @@ class AppBadge extends StatelessWidget {
   const AppBadge({
     super.key,
     required this.child,
-    required this.isDark,
+    required this.theme,
     required this.color,
   });
 
   final Widget child;
-  final bool isDark;
+
+  /// The appearance to paint. The wash alpha is keyed on brightness only —
+  /// Dracula takes the dark value — because the wash is the *same colour* as the
+  /// label on it and every point of alpha is a point of contrast; see below.
+  final AppTheme theme;
   final Color color;
 
   @override
@@ -326,7 +387,7 @@ class AppBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.18 : 0.08),
+        color: color.withValues(alpha: theme.isDark ? 0.18 : 0.08),
         borderRadius: BorderRadius.circular(AppRadius.badge),
       ),
       child: child,
@@ -339,16 +400,16 @@ class AppBadge extends StatelessWidget {
 /// A one physical pixel rule. It was 0.5dp, which is the thinnest line in the
 /// app and renders as a grey smear on a 3x screen.
 class AppDivider extends StatelessWidget {
-  const AppDivider({super.key, required this.isDark, this.opacity = 0.10});
+  const AppDivider({super.key, required this.theme, this.opacity = 0.10});
 
-  final bool isDark;
+  final AppTheme theme;
   final double opacity;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 1,
-      color: appDivider(isDark: isDark, opacity: opacity),
+      color: appDivider(theme: theme, opacity: opacity),
     );
   }
 }
@@ -367,7 +428,7 @@ class DateStripChip extends StatelessWidget {
     required this.dayName,
     required this.dayNumber,
     required this.isSelected,
-    required this.isDark,
+    required this.theme,
     required this.onTap,
     required this.accentColor,
     this.width = 48,
@@ -376,14 +437,22 @@ class DateStripChip extends StatelessWidget {
   final String dayName;
   final int dayNumber;
   final bool isSelected;
-  final bool isDark;
+
+  /// The appearance to paint. Required, because a chip is the app's only
+  /// control that is a *raised block* and a *well* in the same widget, so a
+  /// wrong mode here does not merely shift a colour — it puts `raised` and
+  /// `insetDeep` on the wrong branch of [decorationFor].
+  final AppTheme theme;
   final VoidCallback onTap;
   final Color accentColor;
   final double width;
 
   @override
   Widget build(BuildContext context) {
-    final onAccent = isDark ? const Color(0xFF14201A) : Colors.white;
+    // `theme.isDark`, not a Dracula branch: the ink on an accent fill is a
+    // contrast question and the app's dark ink `#14201A` is the answer for both
+    // dark presets. Nothing here needs Dracula's own accent.
+    final onAccent = theme.isDark ? const Color(0xFF14201A) : Colors.white;
 
     // An unselected chip is a well and a selected one is a block, so the two
     // states differ in more than colour and the press state has to be a third
@@ -396,25 +465,28 @@ class DateStripChip extends StatelessWidget {
           color: accentColor,
           borderRadius: BorderRadius.circular(AppRadius.tile),
           border: Border.all(
-            color: AppElevation.controlEdge(accent: accentColor, isDark: isDark),
+            color: AppElevation.controlEdge(
+              accent: accentColor,
+              theme: theme,
+            ),
           ),
           boxShadow: pressed
-              ? AppElevation.pressed(isDark)
-              : AppElevation.raised(isDark),
+              ? AppElevation.pressed(theme)
+              : AppElevation.raised(theme),
         );
       }
       return BoxDecoration(
-        color: AppSurfaces.page(isDark),
+        color: AppSurfaces.page(theme),
         borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: Border.all(color: appDivider(isDark: isDark)),
+        border: Border.all(color: appDivider(theme: theme)),
         boxShadow: pressed
             // A well that is being pressed is deeper than a well at rest, so it
             // takes the raised pair's scale of offset and blur but stays a well:
             // the light still comes from inside, so this is [AppElevation.inset]
             // with a wider spread rather than the pressed pair, which is the
             // inverse of a raised block and would point the wrong way.
-            ? AppElevation.insetDeep(isDark)
-            : AppElevation.inset(isDark),
+            ? AppElevation.insetDeep(theme)
+            : AppElevation.inset(theme),
       );
     }
 
@@ -447,7 +519,7 @@ class DateStripChip extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? onAccent : faintColor(isDark),
+                          color: isSelected ? onAccent : faintColor(theme.isDark),
                         ),
                       ),
                     ),
@@ -458,7 +530,7 @@ class DateStripChip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isSelected ? onAccent : appPrimaryText(isDark),
+                      color: isSelected ? onAccent : appPrimaryText(theme.isDark),
                     ),
                   ),
                 ],
@@ -476,5 +548,12 @@ class DateStripChip extends StatelessWidget {
 /// It was `Colors.white` or `Colors.black87` chosen at each of a dozen call
 /// sites. Both are fine; having twelve of them is not, because one of them
 /// would eventually be `black54` and that is the failure the AA work was about.
+///
+/// **It still takes a `bool isDark`, and that is the same deliberate split as
+/// `faintColor` and the status colours.** A text colour is shared by the two
+/// dark presets — `#F2F5F3` is 12.97:1 on Dracula's `#282A36`, unchanged — so a
+/// call site in a widget that already has an `AppTheme` passes
+/// `theme.isDark`. See [AppTheme.isDark] for the measurement and the argument
+/// against adding a Dracula text palette.
 Color appPrimaryText(bool isDark) =>
     isDark ? const Color(0xFFF2F5F3) : const Color(0xFF1A211E);

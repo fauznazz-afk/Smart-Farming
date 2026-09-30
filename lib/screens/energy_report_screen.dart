@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/energy_report_service.dart';
 import '../services/thingsboard_api.dart';
+import '../theme/app_theme_of.dart';
 import '../widgets/liquid_glass.dart';
 import 'energy_report/utils/period_buckets.dart';
 import 'energy_report/widgets/period_selector.dart';
@@ -163,7 +164,14 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Resolved once, here, and threaded down. This screen is pushed without a
+    // theme controller, so the context is the only source; and it has to be the
+    // enum rather than a `bool`, because Dracula hands `MaterialApp`
+    // [ThemeMode.dark] and a brightness comparison would be identical for Dracula
+    // and for the app's dark theme. The four cards below all paint ramp
+    // colours, so being wrong here is visible rather than subtle.
+    final appTheme = appThemeOf(context);
+    final isDark = appTheme.isDark;
     final data = _data;
     final buckets = bucketsForPeriod(
       buckets: data?.buckets ?? const <EnergyBucket>[],
@@ -193,7 +201,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
         ],
       ),
       body: AppBackground(
-        isDark: isDark,
+        theme: appTheme,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
@@ -230,7 +238,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                     2 => buckets.isEmpty
                         ? EmptyPeriodView(isDark: isDark, data: data!)
                         : TotalsCard(
-                            isDark: isDark,
+                            theme: appTheme,
                             monthly: _monthly,
                             selectedDate: _selectedDate,
                             pvKwh: totals.pvKwh,
@@ -241,7 +249,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                     3 => buckets.isEmpty
                         ? const SizedBox.shrink()
                         : ChartCard(
-                            isDark: isDark,
+                            theme: appTheme,
                             monthly: _monthly,
                             buckets: buckets,
                             touchedBucketNotifier: _touchedBucketNotifier,

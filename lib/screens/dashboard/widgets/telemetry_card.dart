@@ -4,6 +4,7 @@ import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// Icon + title row used at the top of each detail page.
 class GlassPageHeader extends StatelessWidget {
@@ -18,6 +19,15 @@ class GlassPageHeader extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color accent;
+
+  /// Still a `bool`, and deliberately.
+  ///
+  /// This header is a glyph and a heading: it paints one icon in the raw accent
+  /// at 0.15 alpha and one run of ordinary text, with no surface, no shadow pair
+  /// and no border of its own. Nothing here is per-theme, and `appPrimaryText`
+  /// is the one text colour the two dark presets share, so the correct
+  /// migration is to pass `theme.isDark` rather than to widen the parameter.
+  /// A Dracula call site therefore supplies `theme.isDark` at the boundary.
   final bool isDark;
 
   @override
@@ -53,14 +63,26 @@ class TelemetryCard extends StatelessWidget {
     super.key,
     required this.data,
     required this.metrics,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     required this.staleMinutes,
   });
 
   final DeviceTelemetry? data;
   final List<MetricDef> metrics;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// This one **must** be the enum rather than a bool, and the card itself is the
+  /// reason: `AppCard` draws the `raised` pair and a hairline, and both have
+  /// their own Dracula derivation. It also owns the per-row accent, and
+  /// `metricColor` needs a theme because Dracula's purple wants a different HSL
+  /// lightness than the dark theme's green does for any hue.
+  ///
+  /// The captions below still take `theme.isDark`, because a text colour is
+  /// shared by both dark presets.
+  final AppTheme theme;
+
   final Color seedColor;
   final int staleMinutes;
 
@@ -68,11 +90,11 @@ class TelemetryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final stale = data?.isStale(minutes: staleMinutes) ?? true;
     return AppCard(
-      isDark: isDark,
+      theme: theme,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          if (stale) _StaleNotice(ageLabel: data?.ageLabel, isDark: isDark),
+          if (stale) _StaleNotice(ageLabel: data?.ageLabel, isDark: theme.isDark),
           for (var index = 0; index < metrics.length; index++) ...[
             _MetricRow(
               metric: metrics[index],
@@ -80,11 +102,14 @@ class TelemetryCard extends StatelessWidget {
               accent: metricColor(
                 seedColor: seedColor,
                 index: index,
-                isDark: isDark,
+                theme: theme,
               ),
-              isDark: isDark,
+              isDark: theme.isDark,
             ),
-            if (index < metrics.length - 1) AppDivider(isDark: isDark),
+            // The rule between two rows of one card. `AppDivider`'s default
+            // opacity is the one this was already asking for, so it is passed
+            // through as the theme rather than as a brightness.
+            if (index < metrics.length - 1) AppDivider(theme: theme),
           ],
         ],
       ),

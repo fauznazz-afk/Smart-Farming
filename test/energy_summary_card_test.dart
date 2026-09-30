@@ -24,6 +24,7 @@ void main() {
   Widget card({
     Color seed = seedColor,
     bool isDark = false,
+    AppTheme? theme,
     bool weekly = false,
     bool loading = false,
     bool hasData = true,
@@ -37,7 +38,7 @@ void main() {
     EnergyForecastResult? forecast,
   }) {
     return EnergySummaryCard(
-      isDark: isDark,
+      theme: theme ?? (isDark ? AppTheme.dark : AppTheme.light),
       weekly: weekly,
       loading: loading,
       hasData: hasData,
@@ -487,7 +488,7 @@ void main() {
         );
         expect(
           fill,
-          AppSurfaces.input(false),
+          AppSurfaces.input(AppTheme.light),
           reason: 'the rendered tile surface is the input fill — the same one '
               'color_helpers_test.dart measures faintColor against',
         );

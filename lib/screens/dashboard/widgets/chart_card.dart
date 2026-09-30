@@ -34,7 +34,26 @@ class ChartSectionHeader extends StatelessWidget {
   });
 
   final String title;
+
+  /// Still a `bool`, and deliberately.
+  ///
+  /// Everything this header paints is text or an accent at a hand-picked HSL
+  /// lightness: `appPrimaryText`, `faintColor` and `themeColor(lightness:)`.
+  /// The first two are shared by the two dark presets and take a brightness; the
+  /// third has no `AppTheme` overload, so a bool is the honest parameter here
+  /// and the Dracula call site supplies `theme.isDark`.
+  ///
+  /// **This is also where a known Dracula weakness lives, deliberately not fixed
+  /// in a signature migration.** The three accent call sites below all ask for
+  /// `themeColor(lightness: 0.68)`, which on Dracula's preset purple reads
+  /// `#A47BE0` — measured 4.40:1 on the page and 3.64:1 on chrome, against
+  /// AA's 4.5 for the 10–11sp text they paint. That is why `metricColor` needed
+  /// a per-theme lightness (`#C1A3EB`, 6.58 and 5.45). The repair is to route
+  /// them through `metricColor(theme:)`, which changes three colours and so
+  /// belongs in a change with its own measurement. `live_power_card.dart` has
+  /// the same three numbers and the same note.
   final bool isDark;
+
   final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
@@ -240,7 +259,7 @@ class TelemetryChartCard extends StatelessWidget {
     super.key,
     required this.prefix,
     required this.group,
-    required this.isDark,
+    required this.theme,
     required this.points,
     required this.spots,
     required this.stats,
@@ -262,7 +281,20 @@ class TelemetryChartCard extends StatelessWidget {
 
   /// The theme accent, so the plotted series follows the chosen palette.
   final Color seedColor;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// This card is the strongest case in the directory for the enum over a
+  /// bool: it draws a full `AppCard` (raised pair, hairline, page fill), a
+  /// single-series accent through `metricColor`, grid and axis rules through
+  /// `appDivider`, and the tooltip fill through `AppSurfaces.tooltip` — four
+  /// independently derived per-theme tokens, any of which a boolean would put on
+  /// the dark values while the plot sits on Dracula's page.
+  ///
+  /// The text on the card — the axis labels, the legend's live value, the
+  /// tooltip's caption — passes `theme.isDark`, because those colours are shared
+  /// by the two dark presets and are measured clear of AA on `#282A36` unchanged.
+  final AppTheme theme;
 
   final Map<String, List<TelemetryPoint>> points;
   final Map<String, List<FlSpot>> spots;
@@ -280,7 +312,7 @@ class TelemetryChartCard extends StatelessWidget {
     final accent = metricColor(
       seedColor: seedColor,
       index: 0,
-      isDark: isDark,
+      theme: theme,
     );
     final scaled = _buildSeries(specs, accent);
     // The cache key has to name the group, not just the page. A page that draws
@@ -298,7 +330,7 @@ class TelemetryChartCard extends StatelessWidget {
     final title = group.title;
 
     return AppCard(
-      isDark: isDark,
+      theme: theme,
       // A loading spinner or an empty message does not need a full plot's worth of
       // height; reserving it pushed everything below the fold for nothing.
       //
@@ -321,7 +353,7 @@ class TelemetryChartCard extends StatelessWidget {
           ? const Center(child: Text('No data for this range'))
           : Column(
               children: [
-                _SeriesLegend(series: scaled, isDark: isDark, accent: accent),
+                _SeriesLegend(series: scaled, isDark: theme.isDark, accent: accent),
                 const SizedBox(height: 10),
                 Expanded(
                   child: Listener(
@@ -394,7 +426,12 @@ class TelemetryChartCard extends StatelessWidget {
         spec.unit,
         seriesPoints,
         spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        spec.color(isDark, accent),
+        // The fixed triad is keyed on brightness, not on the theme: a single-series
+        // group has `light` and `dark` both null and falls back to the accent,
+        // and a multi-series one takes its documented red/green/blue. Dracula
+        // takes the dark entry, which is the same rule `ChartSeriesSpec.color`
+        // already encodes.
+        spec.color(theme.isDark, accent),
         stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,
@@ -427,13 +464,13 @@ class TelemetryChartCard extends StatelessWidget {
             // between two rows of a card and too faint for the outline of a
             // floating box that has to separate from an arbitrary series
             // crossing underneath it.
-            color: appDivider(isDark: isDark, opacity: 0.24),
+            color: appDivider(theme: theme, opacity: 0.24),
             width: 1,
           ),
           // Opaque. It was `0xCC18211D` and `0xD9FFFFFF`, so the tooltip was
           // showing whichever line happened to pass beneath it through 20% of
           // its own surface — over a red/green/blue crossing, at 11sp.
-          getTooltipColor: (_) => AppSurfaces.tooltip(isDark),
+          getTooltipColor: (_) => AppSurfaces.tooltip(theme),
           getTooltipItems: (touchedSpots) {
             if (touchedSpots.isEmpty) return const [];
             final time = formatAxisTime(touchedSpots.first.x);
@@ -448,7 +485,12 @@ class TelemetryChartCard extends StatelessWidget {
                 // `appPrimaryText`, replacing `white` and a fourth grey. The
                 // light value was `0xFF17211C`, which was a copy of the card's
                 // text colour made for this one box and pinned nowhere.
-                color: appPrimaryText(isDark),
+                //
+                // `theme.isDark`, not `isDark`: `appPrimaryText` is one of the
+                // text colours the two dark presets share, and the tooltip is
+                // also the one place in this widget that must paint a Dracula
+                // caption on Dracula's own tooltip step.
+                color: appPrimaryText(theme.isDark),
                 fontSize: 11,
                 height: 1.35,
                 fontWeight: FontWeight.w700,
@@ -496,11 +538,14 @@ class TelemetryChartCard extends StatelessWidget {
       horizontalInterval: bounds.chartInterval,
       verticalInterval: bounds.timeInterval,
       getDrawingHorizontalLine: (_) => FlLine(
-        color: appDivider(isDark: isDark, opacity: isDark ? 0.15 : 0.08),
+        // The two opacities are keyed on brightness alone, unchanged: 0.15
+        // horizontal and 0.10 vertical on both dark presets. `appDivider` itself
+        // takes the theme because Dracula's white is its own decision.
+        color: appDivider(theme: theme, opacity: theme.isDark ? 0.15 : 0.08),
         strokeWidth: 1,
       ),
       getDrawingVerticalLine: (_) => FlLine(
-        color: appDivider(isDark: isDark, opacity: isDark ? 0.10 : 0.06),
+        color: appDivider(theme: theme, opacity: theme.isDark ? 0.10 : 0.06),
         strokeWidth: 1,
       ),
     );
@@ -509,13 +554,18 @@ class TelemetryChartCard extends StatelessWidget {
   FlTitlesData _titlesData(ChartBounds bounds) {
     final labelStyle = TextStyle(
       fontSize: 10,
-      // `faintColor`, for both modes. The light value was `0xFF64748B`, a
+      // `faintColor`, for every mode. The light value was `0xFF64748B`, a
       // Tailwind slate that measures 4.30:1 on the light page — under the 4.5:1
       // that `test/color_helpers_test.dart` requires at this size, and a
       // non-pinned literal is exactly how that suite gets bypassed. The dark
       // value measured 7.5:1 and was already fine, so it is folded into the same
       // function rather than left as a hand-picked hex next to a failing one.
-      color: faintColor(isDark),
+      //
+      // The axis is 10sp, the smallest text in the app, and it sits on the plot
+      // fill — which is the page colour, and on Dracula a *lighter* one than the
+      // dark theme's. The dark faint value still measures 6.58:1 there, so no
+      // Dracula variant is warranted; see [AppTheme.isDark].
+      color: faintColor(theme.isDark),
     );
     return FlTitlesData(
       topTitles: const AxisTitles(

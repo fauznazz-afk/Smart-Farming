@@ -37,19 +37,41 @@ import 'package:plts_monitoring/widgets/liquid_glass.dart';
 /// So the list is read out of [AppSurfaces] rather than written here. A literal
 /// in a test that is supposed to describe the app's own tokens is a copy that
 /// can drift, and this one drifted twice, silently, in opposite directions.
-final List<Color> _lightSurfaces = [
-  AppSurfaces.pageLight, // page + card, which are the same colour
-  AppSurfaces.chromeLight, // nav pill, app bar scrim
-  AppSurfaces.inputLight, // input fields
-  AppSurfaces.tooltipLight, // chart tooltip
-  const Color(0xFFFFFFFF), // Material surfaces, e.g. a dialog
-];
+///
+/// **It is read out of `AppSurfaces.captionSurfaces` now rather than assembled
+/// here, and that is the third drift avoided.** Even derived, the list was four
+/// hand-picked constants long, which meant adding a surface to a theme was a
+/// change in *this* file that nothing would remind you to make — and adding a
+/// whole theme, which is what Dracula is, would have left the new theme
+/// untested by default. Reading the whole list means a new theme is covered the
+/// moment it has a page colour, which is what the `AppTheme.values` loop below
+/// now does.
+final List<Color> _lightSurfaces = AppSurfaces.captionSurfaces(AppTheme.light);
 
-final List<Color> _darkSurfaces = [
-  AppSurfaces.pageDark,
-  AppSurfaces.chromeDark,
-  AppSurfaces.inputDark,
-  AppSurfaces.tooltipDark,
+final List<Color> _darkSurfaces = AppSurfaces.captionSurfaces(AppTheme.dark);
+
+/// Dracula's four caption surfaces, read out the same way.
+///
+/// The one that decides every measurement here is the chrome step `#343746`: it
+/// is the lightest surface in the ramp at relative luminance 0.0390, against the
+/// page's 0.0237, so it is what a caption actually sits on when the worst case
+/// is asked for. See `design_tokens.dart` for why the list is derived.
+final List<Color> _draculaSurfaces =
+    AppSurfaces.captionSurfaces(AppTheme.dracula);
+
+/// The five colours every caption and status reading in the app is drawn in.
+///
+/// Grouped because they are the palette whose reuse across the two dark themes
+/// is the load-bearing claim of this file: `faintColor` and the four status
+/// colours take a `bool isDark`, and Dracula passes `AppTheme.dracula.isDark`,
+/// which is `true`. This list is what makes that identity assertionable rather
+/// than a comment.
+List<Color> _captionPalette(bool isDark) => [
+  faintColor(isDark),
+  statusOk(isDark),
+  statusWarn(isDark),
+  statusBad(isDark),
+  statusAlert(isDark),
 ];
 
 /// The fill `AppTile` actually paints, read out of the widget rather than
@@ -82,7 +104,12 @@ final List<Color> _darkSurfaces = [
 /// `ClipRRect`/`ColoredBox` wrap the tile rather than being wrapped by it.
 Future<BoxDecoration> _tileDecoration(WidgetTester tester, bool isDark) async {
   await tester.pumpWidget(
-    MaterialApp(home: AppTile(isDark: isDark, child: const SizedBox.shrink())),
+    MaterialApp(
+      home: AppTile(
+        theme: isDark ? AppTheme.dark : AppTheme.light,
+        child: const SizedBox.shrink(),
+      ),
+    ),
   );
   final container = tester.widget<Container>(find.byType(Container).first);
   return container.decoration! as BoxDecoration;
@@ -136,19 +163,21 @@ void main() {
     test('every index renders the same hue, so one accent means one colour', () {
       final base = hueOf(seed);
       for (var index = 0; index < 6; index++) {
-        expect(
-          hueOf(metricColor(seedColor: seed, index: index, isDark: true)),
-          closeTo(base, 0.5),
-          reason: 'index $index must not rotate the hue',
-        );
+        for (final theme in AppTheme.values) {
+          expect(
+            hueOf(metricColor(seedColor: seed, index: index, theme: theme)),
+            closeTo(base, 0.5),
+            reason: '${theme.name} index $index must not rotate the hue',
+          );
+        }
       }
     });
 
     test('index is accepted but ignored, not a silent source of variation', () {
-      for (final isDark in [true, false]) {
+      for (final theme in AppTheme.values) {
         expect(
-          metricColor(seedColor: seed, index: 0, isDark: isDark),
-          metricColor(seedColor: seed, index: 5, isDark: isDark),
+          metricColor(seedColor: seed, index: 0, theme: theme),
+          metricColor(seedColor: seed, index: 5, theme: theme),
         );
       }
     });
@@ -157,43 +186,197 @@ void main() {
       // The rotation moved "Ocean cyan" far enough that the rendered accent no
       // longer resembled the chosen swatch. Hue equality is the loose check;
       // this is the one that would actually have caught the complaint.
-      for (final isDark in [true, false]) {
+      for (final theme in AppTheme.values) {
         expect(
-          hueOf(metricColor(seedColor: seed, index: 0, isDark: isDark)),
+          hueOf(metricColor(seedColor: seed, index: 0, theme: theme)),
           closeTo(hueOf(seed), 0.5),
-          reason: 'isDark=$isDark',
+          reason: theme.name,
         );
       }
     });
 
-    test('dark mode is lighter than light mode', () {
-      expect(
-        HSLColor.fromColor(
-          metricColor(seedColor: seed, index: 0, isDark: true),
-        ).lightness,
-        greaterThan(
+    test('both dark themes are lighter than the light theme', () {
+      // Dracula belongs with the dark themes on brightness, and this is the
+      // check that keeps it there. It is not free: Dracula's metric lightness
+      // is 0.78 against the dark theme's 0.68, so if somebody "fixed" the
+      // purple contrast problem by dropping it back to 0.68 this fails, which is
+      // exactly the change that would put it at 4.35:1.
+      final light = HSLColor.fromColor(
+        metricColor(seedColor: seed, index: 0, theme: AppTheme.light),
+      ).lightness;
+      for (final theme in [AppTheme.dark, AppTheme.dracula]) {
+        expect(
           HSLColor.fromColor(
-            metricColor(seedColor: seed, index: 0, isDark: false),
+            metricColor(seedColor: seed, index: 0, theme: theme),
           ).lightness,
-        ),
-      );
+          greaterThan(light),
+          reason: theme.name,
+        );
+      }
     });
   });
 
   group('strongMetricColor', () {
     test('is the same hue as metricColor, only heavier', () {
-      for (final isDark in [true, false]) {
+      for (final theme in AppTheme.values) {
         for (var index = 0; index < 4; index++) {
           final plain = HSLColor.fromColor(
-            metricColor(seedColor: seed, index: index, isDark: isDark),
+            metricColor(seedColor: seed, index: index, theme: theme),
           );
           final strong = HSLColor.fromColor(
-            strongMetricColor(seedColor: seed, index: index, isDark: isDark),
+            strongMetricColor(seedColor: seed, index: index, theme: theme),
           );
-          expect(strong.hue, closeTo(plain.hue, 0.5));
-          expect(strong.saturation, greaterThan(plain.saturation));
+          expect(strong.hue, closeTo(plain.hue, 0.5), reason: theme.name);
+          expect(strong.saturation, greaterThan(plain.saturation),
+              reason: theme.name);
         }
       }
+    });
+  });
+
+  group('the Dracula accent', () {
+    // Every number in this group was measured against the real Dracula ramp, and
+    // the assertion is the measured ratio rather than a hex literal. A hex would
+    // pass or fail on rounding and say nothing about *why* the value is the one
+    // it is; the ratio fails the moment the derivation stops clearing AA, which
+    // is the thing that would actually reach a user as an unreadable number.
+    const aa = 4.5;
+
+    /// The four surfaces an accent is ever drawn on.
+    ///
+    /// `AppSurfaces.captionSurfaces` rather than the text list, because the
+    /// accent is not only a caption: it is a progress bar fill, a chart line and
+    /// a nav label, and the chrome step is where it is least legible. The track
+    /// is not included and the reason is on `AppSurfaces.captionSurfaces`: a
+    /// track carries no accent either — the bars are neutral by design, because
+    /// an accent-coloured bar is a second accent competing with the value it
+    /// measures.
+    final surfaces = <Color>[
+      AppSurfaces.pageDracula,
+      AppSurfaces.chromeDracula,
+      AppSurfaces.inputDracula,
+      AppSurfaces.tooltipDracula,
+    ];
+
+    /// Worst case over [surfaces], which is always the chrome step.
+    double worst(Color accent) => surfaces
+        .map((s) => _contrast(accent, s))
+        .reduce(math.min);
+
+    test('the seed is Dracula\'s own purple, and it already clears AA', () {
+      // The finding that makes the preset affordable at all: no derivation, no
+      // re-tuning, no second palette. 5.90:1 on the page, 4.89:1 on chrome.
+      expect(
+        worst(draculaAccent),
+        greaterThanOrEqualTo(aa),
+        reason: 'Dracula\'s purple at ${worst(draculaAccent).toStringAsFixed(2)}:1 '
+            'worst; if this fails the seed was changed, and the seed is supposed '
+            'to be the palette value verbatim',
+      );
+    });
+
+    test('metricColor clears AA on every Dracula surface', () {
+      // The rejected value, for the record: routing Dracula's purple through
+      // the dark theme's own lightness of 0.68 gives `#A479E2`, which is 4.35:1
+      // on the page and 3.60:1 on chrome — under AA on both, and the reason the
+      // accent needs a per-theme lightness at all.
+      final accent = metricColor(
+        seedColor: draculaAccent,
+        index: 0,
+        theme: AppTheme.dracula,
+      );
+      expect(
+        worst(accent),
+        greaterThanOrEqualTo(aa),
+        reason: 'metricColor came out ${worst(accent).toStringAsFixed(2)}:1 '
+            'worst. The derivation is a per-theme HSL lightness, not a hue '
+            'rotation -- if the hue is still 264.7 then the lightness is wrong.',
+      );
+    });
+
+    test('strongMetricColor clears AA, and beats metricColor on contrast', () {
+      // The second half of that assertion is the one that is easy to lose. In
+      // the dark theme `strongMetricColor` is *darker* than `metricColor`, on the
+      // reasoning that more saturation at lower lightness reads heavier. Purple
+      // cannot do that and stay compliant: the strongest purple that clears AA on
+      // chrome at the metric's saturation is 5.16:1, which is quieter than the
+      // metric colour's 5.45. So in Dracula the strong variant has to go up in
+      // lightness, and the property that has to hold is contrast, not the
+      // lightness relationship the other two themes share.
+      final plain = metricColor(
+        seedColor: draculaAccent,
+        index: 0,
+        theme: AppTheme.dracula,
+      );
+      final strong = strongMetricColor(
+        seedColor: draculaAccent,
+        index: 0,
+        theme: AppTheme.dracula,
+      );
+
+      expect(
+        worst(strong),
+        greaterThanOrEqualTo(aa),
+        reason: 'strongMetricColor came out ${worst(strong).toStringAsFixed(2)}:1 '
+            'worst',
+      );
+      expect(
+        worst(strong),
+        greaterThan(worst(plain)),
+        reason: 'a hero value that is quieter than an ordinary one is not '
+            'strong; strong is ${worst(strong).toStringAsFixed(2)}:1 against '
+            'plain ${worst(plain).toStringAsFixed(2)}:1',
+      );
+    });
+
+    test('the accent is still the palette colour, not a rotation of it', () {
+      // One colour the user did not choose is a colour they cannot predict --
+      // the same rule that reverted the 40-degree per-index rotation. Asserted
+      // on Dracula's own seed so that a future "Dracula but warmer" tweak fails
+      // here rather than shipping.
+      for (final theme in AppTheme.values) {
+        expect(
+          hueOf(metricColor(seedColor: draculaAccent, index: 0, theme: theme)),
+          closeTo(hueOf(draculaAccent), 0.5),
+          reason: theme.name,
+        );
+      }
+    });
+
+    test('HSL lightness is not perceptual, which is why 0.78 and not 0.68', () {
+      // The measurement behind the per-theme constant. The same HSL lightness
+      // that is comfortably compliant for the app's green lands under AA for
+      // Dracula's purple, because green carries far more luminance than purple
+      // does at equal lightness. Any single lightness that satisfies one hue
+      // breaks another, so the constant has to be per theme.
+      final green = metricColor(
+        seedColor: const Color(0xFF35A968),
+        index: 0,
+        theme: AppTheme.dark,
+      );
+      final purple = metricColor(
+        seedColor: draculaAccent,
+        index: 0,
+        theme: AppTheme.dracula,
+      );
+      expect(
+        _contrast(purple, AppSurfaces.pageDracula),
+        lessThan(_contrast(green, AppSurfaces.pageDracula)),
+        reason: 'purple ${_contrast(purple, AppSurfaces.pageDracula).toStringAsFixed(2)}:1 '
+            'against green ${_contrast(green, AppSurfaces.pageDracula).toStringAsFixed(2)}:1. '
+            'The dark theme\'s 0.68 would put the purple at 4.35:1, under AA.',
+      );
+    });
+
+    test('presetAccent is Dracula\'s colour and null for the other two', () {
+      expect(presetAccent(AppTheme.dracula), draculaAccent);
+      expect(presetAccent(AppTheme.dark), isNull,
+          reason: 'a null is what makes `presetAccent(theme) ?? seedColor` unable '
+              'to disagree with itself');
+      expect(presetAccent(AppTheme.light), isNull);
+      expect(AppTheme.dracula.usesPresetAccent, isTrue);
+      expect(AppTheme.dark.usesPresetAccent, isFalse);
+      expect(AppTheme.light.usesPresetAccent, isFalse);
     });
   });
 
@@ -219,17 +402,65 @@ void main() {
     test('faintColor, the units and captions', () {
       expectClearsAa('faintColor dark', faintColor(true), _darkSurfaces);
       expectClearsAa('faintColor light', faintColor(false), _lightSurfaces);
+      expectClearsAa('faintColor dracula', faintColor(true), _draculaSurfaces);
     });
 
     test('status colours, used for out-of-range readings', () {
       expectClearsAa('statusOk dark', statusOk(true), _darkSurfaces);
       expectClearsAa('statusOk light', statusOk(false), _lightSurfaces);
+      expectClearsAa('statusOk dracula', statusOk(true), _draculaSurfaces);
       expectClearsAa('statusWarn dark', statusWarn(true), _darkSurfaces);
       expectClearsAa('statusWarn light', statusWarn(false), _lightSurfaces);
+      expectClearsAa('statusWarn dracula', statusWarn(true), _draculaSurfaces);
       expectClearsAa('statusBad dark', statusBad(true), _darkSurfaces);
       expectClearsAa('statusBad light', statusBad(false), _lightSurfaces);
+      expectClearsAa('statusBad dracula', statusBad(true), _draculaSurfaces);
       expectClearsAa('statusAlert dark', statusAlert(true), _darkSurfaces);
       expectClearsAa('statusAlert light', statusAlert(false), _lightSurfaces);
+      expectClearsAa('statusAlert dracula', statusAlert(true), _draculaSurfaces);
+    });
+
+    test('every caption colour clears AA on every theme\'s own surfaces', () {
+      // The enum loop. The five individual assertions above are the ones that
+      // print a readable name on failure, and this is the one that cannot be
+      // forgotten when a theme is added — a hardcoded list of themes is exactly
+      // the `[true, false]` mistake `design_tokens_test.dart` had to be
+      // unpicked from, and it is the reason the surface list was ever a copy.
+      for (final theme in AppTheme.values) {
+        final surfaces = AppSurfaces.captionSurfaces(theme);
+        final names = [
+          'faintColor',
+          'statusOk',
+          'statusWarn',
+          'statusBad',
+          'statusAlert',
+        ];
+        for (var i = 0; i < _captionPalette(theme.isDark).length; i++) {
+          expectClearsAa(
+            '${names[i]} on ${theme.name}',
+            _captionPalette(theme.isDark)[i],
+            surfaces,
+          );
+        }
+      }
+    });
+
+    test('Dracula reuses the dark palette rather than adding one', () {
+      // The guard against a later reader "fixing" Dracula by giving it its own
+      // text colours. It is the identity, not an approximation: `faintColor` and
+      // the four status colours still take a `bool isDark`, and a Dracula call
+      // site passes `AppTheme.dracula.isDark`, which is `true`. So the six
+      // Dracula-facing lines resolve to the same five constants as the dark
+      // theme's, and a duplicated palette would be protecting nothing -- it
+      // would be five more values to keep in step with the surfaces.
+      expect(AppTheme.dracula.isDark, isTrue,
+          reason: 'the whole reason there is no Dracula text palette');
+      for (final color in _captionPalette(true)) {
+        expect(_captionPalette(AppTheme.dracula.isDark), contains(color));
+      }
+      expect(_captionPalette(true), _captionPalette(AppTheme.dracula.isDark));
+      expect(_captionPalette(false), isNot(_captionPalette(true)),
+          reason: 'and the light palette must stay a separate set of constants');
     });
 
     testWidgets('AppTile draws text, so its own fill is a text surface', (

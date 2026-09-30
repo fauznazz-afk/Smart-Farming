@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../widgets/liquid_glass.dart';
 import '../utils/date_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// Seven-day quick-pick strip with a calendar button for custom ranges.
 class DateStrip extends StatelessWidget {
@@ -12,7 +13,7 @@ class DateStrip extends StatelessWidget {
     required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
-    required this.isDark,
+    required this.theme,
     required this.accentColor,
     required this.onSelectDate,
     required this.onPickRange,
@@ -22,7 +23,16 @@ class DateStrip extends StatelessWidget {
   final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// Required rather than a `bool`, and not optional either: the strip's only
+  /// per-theme decision is the fill of the *selected* chip, and
+  /// `DateStripChip` puts `raised` and `insetDeep` on opposite branches of the
+  /// same widget. Passing a boolean down would give a Dracula chip the app's
+  /// dark alphas, which are solved for a different page luminance.
+  final AppTheme theme;
+
   final Color accentColor;
   final ValueChanged<DateTime> onSelectDate;
   final VoidCallback onPickRange;
@@ -51,7 +61,7 @@ class DateStrip extends StatelessWidget {
                 icon: Icon(
                   Icons.calendar_month_outlined,
                   size: 16,
-                  color: faintColor(isDark),
+                  color: faintColor(theme.isDark),
                 ),
               ),
               const SizedBox(width: 4),
@@ -63,14 +73,14 @@ class DateStrip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: faintColor(isDark),
+                    color: faintColor(theme.isDark),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 rangeStart != null ? 'Range' : 'Pick a day',
-                style: TextStyle(fontSize: 11, color: faintColor(isDark)),
+                style: TextStyle(fontSize: 11, color: faintColor(theme.isDark)),
               ),
             ],
           ),
@@ -92,7 +102,7 @@ class DateStrip extends StatelessWidget {
                       dayName: dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
                       isSelected: rangeStart == null && _isSameDay(days[i], selectedDate),
-                      isDark: isDark,
+                      theme: theme,
                       accentColor: accentColor,
                       onTap: () => onSelectDate(days[i]),
                     ),

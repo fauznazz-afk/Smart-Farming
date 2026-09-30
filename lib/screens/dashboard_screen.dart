@@ -268,7 +268,21 @@ class _DashboardScreenState extends State<DashboardScreen>
   // offers the switch and a stored value should not be silently discarded; the
   // switch itself is being relabelled to match what it now does, which is
   // nothing on this screen.
-  Color get _seedColor => widget.themeController.seedColor;
+  /// The accent every widget on this screen derives its colour from.
+  ///
+  /// **This is `AppThemeController.accent` and not `seedColor`, and the
+  /// difference is the whole preset.** For light and dark, `accent` *is*
+  /// `seedColor` — `presetAccent` returns `null` for both — so nothing about the
+  /// existing two modes changes. Under Dracula it is the palette's purple,
+  /// which is what makes this screen agree with the page it is drawn on: passing
+  /// the raw seed here would have put the user's green through
+  /// `metricColor(theme: AppTheme.dracula)` and produced light *green* numbers
+  /// on a purple page, at Dracula's accent lightness and therefore at Dracula's
+  /// contrast.
+  ///
+  /// The stored seed is untouched underneath, which is why switching back to
+  /// light or dark restores whatever the user last picked.
+  Color get _accent => widget.themeController.accent;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   @override
@@ -1246,22 +1260,40 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // **The single resolution every card in this frame agrees on.**
+    //
+    // It used to be `Theme.of(context).brightness == Brightness.dark`, which was
+    // exact for the two themes that existed and stopped being exact when Dracula
+    // landed: Dracula is published as `ThemeMode.dark`, so the brightness reads
+    // the same as the app's own dark mode and cannot tell them apart. Going
+    // through [resolveAppTheme] with the controller's stored option is what
+    // recovers the third value.
+    //
+    // It is resolved *here*, once, and threaded down as a parameter. That is the
+    // documented reason the parameter exists: a `MaterialApp` publishes one
+    // `ThemeData` for the whole subtree, so a widget that inferred its own mode
+    // could disagree with its neighbours and produce a frame that is half Dracula
+    // and half the app's dark mode. `AppCard.theme` and `DateStripChip.theme`
+    // are required rather than optional for exactly the same reason.
+    final theme = resolveAppTheme(
+      widget.themeController.option,
+      Theme.of(context).brightness,
+    );
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: _buildAppBar(isDark),
+      appBar: _buildAppBar(theme),
       body: AppBackground(
-        isDark: isDark,
-        child: _buildBody(isDark),
+        theme: theme,
+        child: _buildBody(theme),
       ),
       extendBody: true,
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
         builder: (context, _, _) => GlassNavBar(
           selectedIndex: _selectedIndex,
-          isDark: isDark,
-          seedColor: _seedColor,
+          theme: theme,
+          seedColor: _accent,
           collapsed: _navCollapsed,
           onSelect: _selectPage,
           onExpand: () => _navCollapsed.value = false,
@@ -1270,7 +1302,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(bool isDark) {
+  PreferredSizeWidget _buildAppBar(AppTheme theme) {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -1283,7 +1315,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           // The scrim has to match the page it fades in over, or the app bar
           // shows as a slightly different shade of the same colour once you
           // scroll. These were the old scaffold hexes; the page moved.
-          final baseColor = AppSurfaces.page(isDark);
+          final baseColor = AppSurfaces.page(theme);
           return DecoratedBox(
             decoration: BoxDecoration(
               // Opaque, and that is a fix. This was `0.86 * progress`, so 14% of
@@ -1296,9 +1328,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: baseColor.withValues(alpha: progress),
               border: Border(
                 bottom: BorderSide(
-                  color: (isDark ? Colors.white : Colors.black).withValues(
-                    alpha: 0.08 * progress,
-                  ),
+                  color: (theme.isDark ? Colors.white : Colors.black)
+                      .withValues(
+                        alpha: 0.08 * progress,
+                      ),
                 ),
               ),
             ),
@@ -1353,7 +1386,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildBody(bool isDark) {
+  Widget _buildBody(AppTheme theme) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null && _battery == null) {
       return TelemetryErrorView(message: _error!, onRetry: _fetchAll);
@@ -1370,7 +1403,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       itemCount: 4,
       onPageChanged: _onPageChanged,
-      itemBuilder: (context, index) => _buildPage(index, isDark),
+      itemBuilder: (context, index) => _buildPage(index, theme),
     );
   }
 
@@ -1398,7 +1431,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Widget _buildPage(int index, bool isDark) {
+  Widget _buildPage(int index, AppTheme theme) {
     // One status strip, not three. They used to stack, and a phone in offline
     // mode showed a green "polling active" line directly above an orange
     // "offline" line, which is two opposite claims about the same connection
@@ -1414,8 +1447,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Connection state is different and stays everywhere, because a page of
     // numbers that cannot be trusted needs to say so wherever it is displayed.
     final items = <Widget Function()>[
-      () => _statusStripBuilder(isDark, showAlerts: index == 0),
-      ..._pageContentFor(index, isDark),
+      () => _statusStripBuilder(theme, showAlerts: index == 0),
+      ..._pageContentFor(index, theme),
     ];
     return RepaintBoundary(
       child: NotificationListener<ScrollNotification>(
@@ -1444,20 +1477,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  List<Widget Function()> _pageContentFor(int index, bool isDark) {
+  List<Widget Function()> _pageContentFor(int index, AppTheme theme) {
     // The `_ =>` arm renders Overview, so a page index added to the PageView
     // without an arm here shows the Overview page twice with no error anywhere.
     return switch (index) {
-      1 => _powerPage(isDark),
-      2 => _hydroponicsPage(isDark),
-      3 => _fishPage(isDark),
-      _ => _overviewPage(isDark),
+      1 => _powerPage(theme),
+      2 => _hydroponicsPage(theme),
+      3 => _fishPage(theme),
+      _ => _overviewPage(theme),
     };
   }
 
   // ── Banners ──────────────────────────────────────────────────────────────────
   Object get _visualToken => Object.hash(
-    _seedColor,
+    _accent,
     _selectedDate,
     _displayName,
     // The thresholds belong here. Bound only rebuilds when the listenable fires or
@@ -1478,14 +1511,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     _powerSubNotifier.value,
   );
 
+  /// Binds a polling-driven subtree to one listenable and one token.
+  ///
+  /// The theme is part of the token because it is part of what every card inside
+  /// reads, and this is the mechanism `AGENTS.md` warns about: a `Bound` whose
+  /// builder closes over new data without a matching token change is silently
+  /// dropped. It was a `bool` here before, which meant dark and Dracula hashed
+  /// the same and switching between them would not have rebuilt anything; the
+  /// enum makes the two distinct, which is the whole reason the token type
+  /// changed with it.
   Widget _bindRevision(
     Listenable listenable,
-    bool isDark,
+    AppTheme theme,
     Widget Function() builder,
   ) {
     return Bound(
       listenable: listenable,
-      token: Object.hash(_visualToken, isDark),
+      token: Object.hash(_visualToken, theme),
       builder: builder,
     );
   }
@@ -1496,10 +1538,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// beats offline mode, which beats an active alarm, which beats stale devices.
   /// Only the most important thing is ever shown, so the strip cannot contradict
   /// itself and does not push the page content off screen.
-  Widget _statusStripBuilder(bool isDark, {required bool showAlerts}) {
+  Widget _statusStripBuilder(AppTheme theme, {required bool showAlerts}) {
     return _bindRevision(
       _connectionChromeListenable,
-      isDark,
+      theme,
       () {
         final failed = _error != null;
         final offline = _isOfflineMode;
@@ -1518,7 +1560,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: _error,
-            isDark: isDark,
+            // `theme.isDark`, not `theme`: this banner paints only text and
+            // status colours, which the two dark presets share. Widening its
+            // parameter would have been protecting nothing — see the note on
+            // `ConnectionStatusBanner.isDark`.
+            isDark: theme.isDark,
             visible: true,
             onRetry: _fetchAll,
           );
@@ -1526,7 +1572,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (offline) {
           return _bindRevision(
             _liveRevision,
-            isDark,
+            theme,
             () => BannerSwitcher(
               visible: true,
               identity: 'offline:${_cachedTelemetryTime ?? ''}',
@@ -1541,7 +1587,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (showAlerts) {
           return _bindRevision(
             _alertMessages,
-            isDark,
+            theme,
             () => BannerSwitcher(
               visible: alerts.isNotEmpty,
               // The identity is the set of messages, so a *change* of alarm
@@ -1558,7 +1604,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: null,
-            isDark: isDark,
+            isDark: theme.isDark,
             visible: true,
             onRetry: _fetchAll,
           );
@@ -1578,17 +1624,17 @@ class _DashboardScreenState extends State<DashboardScreen>
 
 
   // ── Overview page ────────────────────────────────────────────────────────────
-  List<Widget Function()> _overviewPage(bool isDark) {
+  List<Widget Function()> _overviewPage(AppTheme theme) {
     return [
-      () => GreetingHeader(displayName: _displayName, isDark: isDark),
+      () => GreetingHeader(displayName: _displayName, theme: theme),
       () => const SizedBox(height: 8),
-      () => _dateStrip(isDark),
+      () => _dateStrip(theme),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, isDark, () => _heroCard(isDark)),
+      () => _bindRevision(_liveRevision, theme, () => _heroCard(theme)),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_energyRevision, isDark, () => _energySummaryCard(isDark)),
+      () => _bindRevision(_energyRevision, theme, () => _energySummaryCard(theme)),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, isDark, () => _dualCards(isDark)),
+      () => _bindRevision(_liveRevision, theme, () => _dualCards(theme)),
       // The environment grid used to sit here. It moved to the Hydroponics page,
       // where it belongs with the camera looking at the same greenhouse, and
       // Overview is now only what the power system is doing. The readings did not
@@ -1596,24 +1642,24 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
   }
 
-  Widget _dateStrip(bool isDark) {
+  Widget _dateStrip(AppTheme theme) {
     return DateStrip(
       days: _stripDays,
       selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
-      isDark: isDark,
+      theme: theme,
       accentColor: strongMetricColor(
-        seedColor: _seedColor,
+        seedColor: _accent,
         index: 0,
-        isDark: isDark,
+        theme: theme,
       ),
       onSelectDate: _selectDate,
       onPickRange: _pickDateFromCalendar,
     );
   }
 
-  Widget _heroCard(bool isDark) {
+  Widget _heroCard(AppTheme theme) {
     return LivePowerCard(
       pvPower: _pzem?.latestValues['power_dc'],
       acPower: _pzem?.latestValues['power_ac'] ?? 0.0,
@@ -1639,15 +1685,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       soc: _battery?.latestValues['soc'] ?? 0.0,
       pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
       pzemAgeLabel: _pzem?.ageLabel,
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
     );
   }
 
-  Widget _energySummaryCard(bool isDark) {
+  Widget _energySummaryCard(AppTheme theme) {
     return EnergySummaryCard(
-      seedColor: _seedColor,
-      isDark: isDark,
+      seedColor: _accent,
+      theme: theme,
       weekly: _weeklyEnergySummary,
       loading: _energyLoading,
       hasData:
@@ -1669,7 +1715,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _dualCards(bool isDark) {
+  Widget _dualCards(AppTheme theme) {
     return SystemStatusStrip(
       lowSocThreshold: _thresholds.lowSoc,
       activeAlerts: _activeAlertIds.length,
@@ -1687,19 +1733,19 @@ class _DashboardScreenState extends State<DashboardScreen>
         power: _pzem?.latestValues['power_ac'] ?? 0.0,
         frequency: _pzem?.latestValues['frequency_ac'] ?? 0.0,
       ),
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
       onOpenBattery: _openBatteryFromStrip,
     );
   }
 
-  Widget _environmentGrid(bool isDark) {
+  Widget _environmentGrid(AppTheme theme) {
     return MetricGrid(
       title: 'Environment',
       specs: kEnvironmentSpecs,
       values: _sensor?.latestValues,
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
       // The grid grades each reading against the same thresholds the alarms use,
       // so a number on screen always has something to be read against.
       thresholds: _thresholds,
@@ -1713,13 +1759,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _fishGrid(bool isDark) {
+  Widget _fishGrid(AppTheme theme) {
     return MetricGrid(
       title: 'Water Quality',
       specs: kFishSpecs,
       values: _fish?.latestValues,
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
       // Fish thresholds now exist (pH, water temperature, turbidity), so the
       // grid grades these readings against them exactly as the environment grid
       // does — the background alarm and the page the reading lives on must not
@@ -1749,14 +1795,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// and re-runs every cached page's closure list — none of which have anything to
   /// do with which sub-view is selected. Same pattern the nav bar already uses for
   /// [_selectedPage].
-  List<Widget Function()> _powerPage(bool isDark) {
+  List<Widget Function()> _powerPage(AppTheme theme) {
     return [
       () => ValueListenableBuilder<int>(
         valueListenable: _powerSubNotifier,
         builder: (context, sub, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _powerSelector(isDark, sub),
+            _powerSelector(theme, sub),
             const SizedBox(height: 12),
             // The page builders hand back lazily-invoked closures so the outer
             // ListView only realises visible items. Inside this one Column they
@@ -1764,9 +1810,9 @@ class _DashboardScreenState extends State<DashboardScreen>
             // child is the chart, and that is a `Bound` whose child is cached and
             // only rebuilt when the chart revision actually bumps.
             ...switch (sub) {
-              0 => _pvPage(isDark),
-              1 => _acPage(isDark),
-              _ => _batteryPage(isDark),
+              0 => _pvPage(theme),
+              1 => _acPage(theme),
+              _ => _batteryPage(theme),
             }.map((make) => make()),
           ],
         ),
@@ -1774,7 +1820,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
   }
 
-  Widget _powerSelector(bool isDark, int selected) {
+  Widget _powerSelector(AppTheme theme, int selected) {
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<int>(
@@ -1806,24 +1852,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     unawaited(_fetchHistoryFor(prefix));
   }
 
-  List<Widget Function()> _pvPage(bool isDark) => [
+  List<Widget Function()> _pvPage(AppTheme theme) => [
     () => GlassPageHeader(
       title: 'PV Status',
       icon: Icons.wb_sunny,
       accent: strongMetricColor(
-        seedColor: _seedColor,
+        seedColor: _accent,
         index: 0,
-        isDark: isDark,
+        theme: theme,
       ),
-      isDark: isDark,
+      // `theme.isDark`, not `theme`: the header is a glyph and a heading with no
+      // surface of its own, and the one text colour it uses is shared by both
+      // dark presets. See the note on `GlassPageHeader.isDark`.
+      isDark: theme.isDark,
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      isDark,
+      theme,
       () => _telemetryCard(
         _pzem,
-        isDark,
+        theme,
         const [
           MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
           MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
@@ -1833,33 +1882,33 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ),
     () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('PV', 'pv', isDark),
+    () => _chartSectionHeader('PV', 'pv', theme),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
-      isDark,
-      () => _chartCard('pv', chartGroupsForPrefix('pv').single, isDark),
+      theme,
+      () => _chartCard('pv', chartGroupsForPrefix('pv').single, theme),
     ),
   ];
 
-  List<Widget Function()> _acPage(bool isDark) => [
+  List<Widget Function()> _acPage(AppTheme theme) => [
     () => GlassPageHeader(
       title: 'AC Status',
       icon: Icons.power,
       accent: strongMetricColor(
-        seedColor: _seedColor,
+        seedColor: _accent,
         index: 1,
-        isDark: isDark,
+        theme: theme,
       ),
-      isDark: isDark,
+      isDark: theme.isDark,
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      isDark,
+      theme,
       () => _telemetryCard(
         _pzem,
-        isDark,
+        theme,
         const [
           MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
           MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
@@ -1871,33 +1920,33 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ),
     () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('AC', 'ac', isDark),
+    () => _chartSectionHeader('AC', 'ac', theme),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
-      isDark,
-      () => _chartCard('ac', chartGroupsForPrefix('ac').single, isDark),
+      theme,
+      () => _chartCard('ac', chartGroupsForPrefix('ac').single, theme),
     ),
   ];
 
-  List<Widget Function()> _batteryPage(bool isDark) => [
+  List<Widget Function()> _batteryPage(AppTheme theme) => [
     () => GlassPageHeader(
       title: 'Battery Status',
       icon: Icons.battery_charging_full,
       accent: strongMetricColor(
-        seedColor: _seedColor,
+        seedColor: _accent,
         index: 2,
-        isDark: isDark,
+        theme: theme,
       ),
-      isDark: isDark,
+      isDark: theme.isDark,
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _batteryRevision,
-      isDark,
+      theme,
       () => _telemetryCard(
         _battery,
-        isDark,
+        theme,
         const [
           MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
           MetricDef('current', 'Current', 'A', Icons.swap_horiz),
@@ -1919,12 +1968,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ),
     () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('Battery', 'battery', isDark),
+    () => _chartSectionHeader('Battery', 'battery', theme),
     () => const SizedBox(height: 8),
     () => _bindRevision(
       _chartRevision,
-      isDark,
-      () => _chartCard('battery', chartGroupsForPrefix('battery').single, isDark),
+      theme,
+      () => _chartCard('battery', chartGroupsForPrefix('battery').single, theme),
     ),
   ];
 
@@ -1941,17 +1990,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   ///
   /// The history request is shared: all four groups come from one fetch of the
   /// greenhouse device, keyed by the same list the charts look up.
-  List<Widget Function()> _hydroponicsPage(bool isDark) {
+  List<Widget Function()> _hydroponicsPage(AppTheme theme) {
     return [
       () => GlassPageHeader(
         title: 'Hydroponics',
         icon: Icons.eco,
         accent: strongMetricColor(
-          seedColor: _seedColor,
+          seedColor: _accent,
           index: 0,
-          isDark: isDark,
+          theme: theme,
         ),
-        isDark: isDark,
+        isDark: theme.isDark,
       ),
       () => const SizedBox(height: _cardGap),
       // The camera comes first, above the readings.
@@ -1969,18 +2018,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => const SizedBox(height: 8),
       () => _bindRevision(
         _sensorRevision,
-        isDark,
-        () => _environmentGrid(isDark),
+        theme,
+        () => _environmentGrid(theme),
       ),
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries
       // would let three cards rebuild for a bounds change on the fourth.
       () => Bound(
         listenable: _chartRevision,
-        token: isDark,
+        token: theme,
         builder: () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: _chartSections('env', isDark),
+          children: _chartSections('env', theme),
         ),
       ),
     ];
@@ -1993,17 +2042,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// and `turbidity_voltage` are intentionally not here: the first is a boolean
   /// the numeric parser would flatten to a confident 0, the second is the
   /// sensor's own supply rail.
-  List<Widget Function()> _fishPage(bool isDark) {
+  List<Widget Function()> _fishPage(AppTheme theme) {
     return [
       () => GlassPageHeader(
         title: 'Fish Tank',
         icon: Icons.set_meal,
         accent: strongMetricColor(
-          seedColor: _seedColor,
+          seedColor: _accent,
           index: 0,
-          isDark: isDark,
+          theme: theme,
         ),
-        isDark: isDark,
+        isDark: theme.isDark,
       ),
       () => const SizedBox(height: _cardGap),
       // Camera first, for the same reason as the greenhouse: it is the one
@@ -2015,13 +2064,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         builder: () => CctvScreen(streamUrl: _cctvUrlFish),
       ),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_fishRevision, isDark, () => _fishGrid(isDark)),
+      () => _bindRevision(_fishRevision, theme, () => _fishGrid(theme)),
       () => Bound(
         listenable: _chartRevision,
-        token: isDark,
+        token: theme,
         builder: () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: _chartSections('fish', isDark),
+          children: _chartSections('fish', theme),
         ),
       ),
     ];
@@ -2029,43 +2078,47 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _telemetryCard(
     DeviceTelemetry? data,
-    bool isDark,
+    AppTheme theme,
     List<MetricDef> metrics,
   ) {
     return TelemetryCard(
       data: data,
       metrics: metrics,
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
       staleMinutes: _staleTelemetryMinutes,
     );
   }
 
-  Widget _chartSectionHeader(String title, String prefix, bool isDark) {
+  Widget _chartSectionHeader(String title, String prefix, AppTheme theme) {
     // A notifier rather than reading the set directly: adding or removing a prefix
     // from `_historyRequestInFlight` mutates a plain Set, which rebuilds nothing.
     return ValueListenableBuilder<int>(
       valueListenable: _historyBusyNotifier,
       builder: (context, _, _) => ChartSectionHeader(
         title: title,
-        isDark: isDark,
+        // `theme.isDark`: the section header is text plus two accents at
+        // hand-picked HSL lightnesses, and `themeColor` has no `AppTheme`
+        // overload. See the note on `ChartSectionHeader.isDark` — including the
+        // Dracula weakness it records there.
+        isDark: theme.isDark,
         selectedDate: _selectedDate,
         rangeStart: _selectedRangeStart,
         rangeEnd: _selectedRangeEnd,
         realtimeConnected: _realtimeConnected,
-        seedColor: _seedColor,
+        seedColor: _accent,
         onPickRange: _pickDateFromCalendar,
         refreshing: _historyRequestInFlight.contains(prefix),
       ),
     );
   }
 
-  Widget _chartCard(String prefix, ChartGroup group, bool isDark) {
+  Widget _chartCard(String prefix, ChartGroup group, AppTheme theme) {
     return TelemetryChartCard(
       prefix: prefix,
       group: group,
-      isDark: isDark,
-      seedColor: _seedColor,
+      theme: theme,
+      seedColor: _accent,
       points: _history,
       spots: _chartSpots,
       stats: _chartStats,
@@ -2083,13 +2136,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// The electrical pages declare a single three-series group, so this renders
   /// exactly what it rendered before. The greenhouse declares four, which is why
   /// the page grew its first charts at all.
-  List<Widget> _chartSections(String prefix, bool isDark) {
+  List<Widget> _chartSections(String prefix, AppTheme theme) {
     final pageTitle = chartPageTitle(prefix);
     if (pageTitle == null) return const [];
     return [
       for (final group in chartGroupsForPrefix(prefix)) ...[
-        _chartSectionHeader(group.title, prefix, isDark),
-        _chartCard(prefix, group, isDark),
+        _chartSectionHeader(group.title, prefix, theme),
+        _chartCard(prefix, group, theme),
       ],
     ];
   }

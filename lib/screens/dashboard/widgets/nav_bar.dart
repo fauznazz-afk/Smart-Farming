@@ -47,7 +47,7 @@ class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
     required this.selectedIndex,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     required this.collapsed,
     required this.onSelect,
@@ -55,7 +55,16 @@ class GlassNavBar extends StatelessWidget {
   });
 
   final int selectedIndex;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// Required rather than a `bool`, because this bar draws a shadow pair and a
+  /// chrome fill and *all four* `AppElevation` pairs have their own Dracula set —
+  /// a boolean would silently put the app's dark alphas on Dracula's lighter
+  /// page. Threaded down from the dashboard like every other card in the frame,
+  /// so the bar and the cards above it cannot disagree.
+  final AppTheme theme;
+
   final Color seedColor;
   final ValueNotifier<bool> collapsed;
   final ValueChanged<int> onSelect;
@@ -69,7 +78,7 @@ class GlassNavBar extends StatelessWidget {
         final primary = strongMetricColor(
           seedColor: seedColor,
           index: selectedIndex,
-          isDark: isDark,
+          theme: theme,
         );
         return SafeArea(
           top: false,
@@ -149,7 +158,12 @@ class GlassNavBar extends StatelessWidget {
                       // it. It had one `black @ 0.40` drop shadow and nothing
                       // catching light on the other side, which is the old
                       // glass model rather than the current one.
-                      boxShadow: AppElevation.raised(isDark),
+                      //
+                      // The theme's own pair, not the dark one reached through
+                      // `isDark`: Dracula solves its own alphas, and this bar sits
+                      // over the page margin where its ambient shadow is at its
+                      // most visible.
+                      boxShadow: AppElevation.raised(theme),
                     ),
                     // A `Material` here, before the `InkWell`s below, and not
                     // only at the Scaffold.
@@ -176,12 +190,12 @@ class GlassNavBar extends StatelessWidget {
                           // those alphas revealed was the page — which
                           // `AppSurfaces.chrome` already steps away from by one
                           // value, so the translucency bought nothing.
-                          color: AppSurfaces.chrome(isDark),
+                          color: AppSurfaces.chrome(theme),
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
                             color: AppElevation.hairline(
                               accent: primary,
-                              isDark: isDark,
+                              theme: theme,
                             ),
                           ),
                         ),
@@ -215,7 +229,7 @@ class GlassNavBar extends StatelessWidget {
                                           index: i,
                                           destination: kNavDestinations[i],
                                           selectedIndex: selectedIndex,
-                                          isDark: isDark,
+                                          theme: theme,
                                           seedColor: seedColor,
                                           primary: primary,
                                           onTap: () => onSelect(i),
@@ -233,7 +247,7 @@ class GlassNavBar extends StatelessWidget {
                                 curve: AppMotion.both,
                                 child: _CollapsedNavItem(
                                   selectedIndex: selectedIndex,
-                                  isDark: isDark,
+                                  theme: theme,
                                   primary: primary,
                                   onTap: onExpand,
                                 ),
@@ -258,13 +272,18 @@ class GlassNavBar extends StatelessWidget {
 class _CollapsedNavItem extends StatelessWidget {
   const _CollapsedNavItem({
     required this.selectedIndex,
-    required this.isDark,
+    required this.theme,
     required this.primary,
     required this.onTap,
   });
 
   final int selectedIndex;
-  final bool isDark;
+
+  /// See [GlassNavBar.theme]. The collapsed circle is a raised block in the
+  /// accent that flattens into the bar when pressed, so it needs both the
+  /// `raised` and the `pressed` pair, and both are per-theme.
+  final AppTheme theme;
+
   final Color primary;
   final VoidCallback onTap;
 
@@ -294,8 +313,8 @@ class _CollapsedNavItem extends StatelessWidget {
                 // press flattens it into the bar, same as an expanded item.
                 color: primary,
                 boxShadow: pressed
-                    ? AppElevation.pressed(isDark)
-                    : AppElevation.raised(isDark),
+                    ? AppElevation.pressed(theme)
+                    : AppElevation.raised(theme),
               ),
               child: Icon(
                 destination.selectedIcon,
@@ -315,7 +334,7 @@ class _NavItem extends StatelessWidget {
     required this.index,
     required this.destination,
     required this.selectedIndex,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     required this.primary,
     required this.onTap,
@@ -334,7 +353,9 @@ class _NavItem extends StatelessWidget {
   /// silently selected the nearest tab instead of none.
   final int selectedIndex;
 
-  final bool isDark;
+  /// See [GlassNavBar.theme].
+  final AppTheme theme;
+
   final Color seedColor;
   final Color primary;
   final VoidCallback onTap;
@@ -351,7 +372,7 @@ class _NavItem extends StatelessWidget {
     final tint = metricColor(
       seedColor: seedColor,
       index: index,
-      isDark: isDark,
+      theme: theme,
     );
     // Not `Expanded`. The bar is sized to its contents now, so an `Expanded`
     // here would ask for all the remaining width and put the bar straight back
@@ -388,7 +409,7 @@ class _NavItem extends StatelessWidget {
               selected: selected,
               primary: primary,
               tint: tint,
-              isDark: isDark,
+              theme: theme,
               selectedIcon: destination.selectedIcon,
               icon: destination.icon,
             ),
@@ -418,7 +439,7 @@ class _NavDestination extends StatelessWidget {
     required this.selected,
     required this.primary,
     required this.tint,
-    required this.isDark,
+    required this.theme,
     required this.selectedIcon,
     required this.icon,
   });
@@ -426,7 +447,16 @@ class _NavDestination extends StatelessWidget {
   final bool selected;
   final Color primary;
   final Color tint;
-  final bool isDark;
+
+  /// See [GlassNavBar.theme].
+  ///
+  /// This one draws **three** different pairs from the same widget: `raised` and
+  /// `pressed` for the selected block, and `insetDeep` for an unselected glyph
+  /// being pressed. Each has its own Dracula set, and the sign of every offset
+  /// differs between the two branches — which is the mistake the comment below
+  /// warns about, and the reason this cannot be collapsed to one lookup.
+  final AppTheme theme;
+
   final IconData selectedIcon;
   final IconData icon;
 
@@ -456,10 +486,10 @@ class _NavDestination extends StatelessWidget {
           boxShadow: selected
               // A block coming up off the page flattens into it.
               ? (pressed
-                  ? AppElevation.pressed(isDark)
-                  : AppElevation.raised(isDark))
+                  ? AppElevation.pressed(theme)
+                  : AppElevation.raised(theme))
               // An icon with no block of its own gains a well around it.
-              : (pressed ? AppElevation.insetDeep(isDark) : null),
+              : (pressed ? AppElevation.insetDeep(theme) : null),
         ),
         child: Icon(
           selected ? selectedIcon : icon,

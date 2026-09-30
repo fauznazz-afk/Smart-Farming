@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
 
@@ -69,7 +70,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -100,7 +101,7 @@ void main() {
               'tds_ppm': 800, // in range
               'water_temp': 24.0, // in range
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -125,7 +126,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now().subtract(const Duration(minutes: 30)),
@@ -144,7 +145,7 @@ void main() {
             title: 'Environment',
             specs: specs,
             values: null,
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -169,7 +170,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: true,
+            theme: AppTheme.dark,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -193,7 +194,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -218,7 +219,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -250,7 +251,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
@@ -279,7 +280,7 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now().subtract(const Duration(minutes: 30)),
@@ -301,7 +302,7 @@ void main() {
             title: 'Environment',
             specs: const [],
             values: const {},
-            isDark: false,
+            theme: AppTheme.light,
             seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),

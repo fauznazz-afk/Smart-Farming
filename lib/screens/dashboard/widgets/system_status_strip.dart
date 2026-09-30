@@ -44,7 +44,7 @@ class SystemStatusStrip extends StatelessWidget {
     super.key,
     required this.battery,
     required this.ac,
-    required this.isDark,
+    required this.theme,
     required this.seedColor,
     required this.onOpenBattery,
     required this.lowSocThreshold,
@@ -53,7 +53,15 @@ class SystemStatusStrip extends StatelessWidget {
 
   final BatteryStatus battery;
   final AcStatus ac;
-  final bool isDark;
+
+  /// The appearance to paint, as an `AppTheme`.
+  ///
+  /// Required because the strip's own `AppCard` draws the `raised` pair and a
+  /// hairline, and both have a separately derived Dracula set. The three
+  /// verdicts and the two rules between them pass `theme.isDark` down, since a
+  /// status colour is shared by the two dark presets.
+  final AppTheme theme;
+
   final Color seedColor;
   /// Takes the user to the battery readings.
   ///
@@ -87,7 +95,7 @@ class SystemStatusStrip extends StatelessWidget {
       onTap: onOpenBattery,
       semanticLabel: 'Battery and grid status. Opens the battery readings.',
       child: AppCard(
-        isDark: isDark,
+        theme: theme,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
@@ -113,10 +121,10 @@ class SystemStatusStrip extends StatelessWidget {
               // The threshold is printed because "baterai 18%" means nothing on
               // its own; whether that is a problem is the user's setting.
               detail: 'min ${lowSocThreshold.toStringAsFixed(0)}%',
-              isDark: isDark,
+              isDark: theme.isDark,
               seedColor: seedColor,
             ),
-            _divider(isDark),
+            _divider(theme),
             _Verdict(
               icon: gridOk ? Icons.check_circle_outline : Icons.error_outline,
               label: 'AC grid',
@@ -124,18 +132,18 @@ class SystemStatusStrip extends StatelessWidget {
               ok: gridOk,
               detail: '${ac.voltage.toStringAsFixed(0)} V · '
                   '${ac.frequency.toStringAsFixed(0)} Hz',
-              isDark: isDark,
+              isDark: theme.isDark,
               seedColor: seedColor,
             ),
             if (activeAlerts > 0) ...[
-              _divider(isDark),
+              _divider(theme),
               _Verdict(
                 icon: Icons.notifications_active,
                 label: 'Alarm',
                 value: '$activeAlerts',
                 ok: false,
                 detail: 'active',
-                isDark: isDark,
+                isDark: theme.isDark,
                 seedColor: seedColor,
               ),
             ],
@@ -145,11 +153,17 @@ class SystemStatusStrip extends StatelessWidget {
     );
   }
 
-  Widget _divider(bool dark) => Container(
+  /// The one-pixel rule between two verdicts.
+  ///
+  /// `AppTheme`, not `bool`, because `appDivider` keys on the theme and Dracula
+  /// reuses the dark white rather than carrying a third value — see
+  /// [appDivider]. The opacity is still keyed on brightness alone, unchanged:
+  /// 0.10 on both dark presets, 0.08 in light.
+  Widget _divider(AppTheme theme) => Container(
     width: 1,
     height: 34,
     margin: const EdgeInsets.symmetric(horizontal: 12),
-    color: appDivider(isDark: dark, opacity: dark ? 0.10 : 0.08),
+    color: appDivider(theme: theme, opacity: theme.isDark ? 0.10 : 0.08),
   );
 }
 

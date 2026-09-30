@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../theme/app_theme_of.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../utils/cctv_status.dart';
@@ -10,7 +11,7 @@ class CctvStatusPill extends StatelessWidget {
   const CctvStatusPill({
     super.key,
     required this.status,
-    this.isDark,
+    this.theme,
   });
 
   final CctvStatus status;
@@ -18,15 +19,26 @@ class CctvStatusPill extends StatelessWidget {
   /// Which side of the page the pill is drawn on.
   ///
   /// Null reads the app's theme, which is right for the embedded pill. The
-  /// full-screen pill passes `true` explicitly, because it floats over the
-  /// video, which is dark whatever the app's theme is doing — the contrast that
-  /// matters here is against what is *behind* the text, not against the
-  /// settings. Same null-means-read-from-context shape as `AppCard.isDark`.
-  final bool? isDark;
+  /// full-screen pill passes [AppTheme.dark] explicitly, because it floats over
+  /// the video, which is dark whatever the app's theme is doing — the contrast
+  /// that matters here is against what is *behind* the text, not against the
+  /// settings.
+  ///
+  /// **This is an [AppTheme] and not a `bool` for the same reason `AppCard`'s
+  /// `theme` is.** [AppBadge] needs the enum for its wash alpha, and the value
+  /// that says "the app is in a dark theme" is exactly the value that cannot say
+  /// *which* dark theme. Passing `AppTheme.dark` for the over-video case is
+  /// correct rather than a downgrade: the pill there is drawn on camera frames,
+  /// which have nothing to do with Dracula's palette, and what it needs from the
+  /// enum is the dark half of the wash ramp. `AppTheme.dracula` would paint the
+  /// identical colour, and naming the constant that is actually meant is the
+  /// difference between the call site and a reader having to work it out.
+  final AppTheme? theme;
 
   @override
   Widget build(BuildContext context) {
-    final dark = isDark ?? Theme.of(context).brightness == Brightness.dark;
+    final appTheme = theme ?? appThemeOf(context);
+    final dark = appTheme.isDark;
     // The dot keeps the status hue; the label uses the measured text colour.
     final dotColor = status.color;
     final textColor = status.textColor(dark);
@@ -35,7 +47,7 @@ class CctvStatusPill extends StatelessWidget {
       label: 'CCTV status: ${label.toLowerCase()}',
       liveRegion: true,
       child: AppBadge(
-        isDark: dark,
+        theme: appTheme,
         color: textColor,
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -158,8 +170,17 @@ class CctvStandbyOverlay extends StatelessWidget {
                   // button. So it takes the neutral edge that clears 3:1
                   // against the standby scrim it is drawn on, rather than the
                   // themed one that would be invisible on a bright frame.
+                  //
+                  // `AppTheme.dark`, not the resolved theme and not Dracula: this
+                  // circle is drawn over camera frames of unknown luminance, so
+                  // the only thing that decides its contrast is the scrim behind
+                  // it, and the scrim is the same in every appearance. Naming the
+                  // constant says that; passing a `true` boolean would say
+                  // "dark, apparently", and resolving the real theme would say
+                  // "Dracula's page decides" — which is the one of the three
+                  // that would be wrong.
                   border: Border.all(
-                    color: AppElevation.boundaryEdge(isDark: true),
+                    color: AppElevation.boundaryEdge(theme: AppTheme.dark),
                   ),
                 ),
                 child: const Icon(

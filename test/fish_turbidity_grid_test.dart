@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_specs.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
@@ -54,7 +55,7 @@ void main() {
         title: 'Water Quality',
         specs: kFishSpecs,
         values: values,
-        isDark: true,
+        theme: AppTheme.dark,
         seedColor: seedColor,
         thresholds: thresholds,
         limitLabelFor: (spec) => environmentLimitLabel(spec, thresholds),
@@ -80,7 +81,7 @@ void main() {
         title: 'Water Quality',
         specs: kFishSpecs,
         values: values,
-        isDark: true,
+        theme: AppTheme.dark,
         seedColor: seedColor,
         thresholds: thresholds,
         limitLabelFor: (spec) => environmentLimitLabel(spec, thresholds),
