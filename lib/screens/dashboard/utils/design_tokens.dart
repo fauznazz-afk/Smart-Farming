@@ -157,44 +157,99 @@ class AppElevation {
   // ended up not actually using them: raised and inset have different geometry
   // because a well is smaller than a block sitting on the page.
 
-  /// A raised card: casts down-right, catches light up-left.
+  /// **Why a raised surface has three shadows and not two, and why the third is
+  /// the one that makes it look deep.**
   ///
-  /// Both halves have to be visible or this is not a soft-UI surface at all,
-  /// it is a card with a drop shadow. The first version of this file had the
-  /// light half at `blurRadius: 10, offset: (-3, -3)` on a near-white page,
-  /// where it was invisible, and the dark half carrying everything — which is
-  /// why the first device pass read as flat Material with grey edges rather
-  /// than as a raised block. The pair is now tuned for the mid-tone page: a
-  /// slightly stronger dark half and a tighter, brighter light half, so the
-  /// highlight is a defined lip along the top and left rather than a diffuse
-  /// glow.
+  /// A pair of equal shadows reads as a *float*: one dark blur and one light
+  /// blur of the same size, and the eye gets two soft halos with no surface
+  /// between them. What real extruded objects have is a *contact shadow* — the
+  /// tight, dark line right where the object meets what it sits on — and only
+  /// then the soft ambient one spreading away from it. Two distinct distances
+  /// is what makes the card read as a solid block with a measurable thickness
+  /// rather than as a glowing rectangle.
+  ///
+  /// So the dark half is now two shadows at different scales:
+  ///
+  ///  * **contact**, small offset and small blur. This is the lip. It is what
+  ///    the eye uses to find the edge of the card, and it is the only one of the
+  ///    three that is nearly opaque.
+  ///  * **ambient**, roughly twice the offset and three times the blur. This
+  ///    gives the card weight and makes it feel like it is standing off the
+  ///    page.
+  ///
+  /// and the light half is one broad shadow up and to the left, doing the job
+  /// the ambient one does on the other side. The asymmetry is deliberate: a
+  /// light source produces a small hard highlight and a wide soft bounce, and
+  /// mirroring the dark pair exactly is what makes CSS neumorphism look like a
+  /// 1990s bevel.
+  ///
+  /// **This costs nothing in contrast, and that is the whole reason the work
+  /// went here rather than into the fill.** A `BoxShadow` is painted outside
+  /// the decoration's rect — it is impossible for it to darken the card's own
+  /// interior, which is where every caption in the app is drawn.
+  ///
+  /// By contrast, a gradient across the card fill was measured and rejected: at
+  /// just 4% the light mode worst case falls to 4.15:1, and AA is 4.5. Depth in
+  /// this style is a shadow property, not a fill property, and the measurement is
+  /// the reason that is a design rule here rather than a preference.
+  ///
+  /// **The light-mode alphas were raised once more after a pixel measurement,
+  /// and the measurement is the argument.** At `0x4D` / `0x33` the dark half was
+  /// only reaching a luminance of 219 against a 229.5 page — a 4.6% drop, which
+  /// the blur spreads so thin that the light half was doing nearly all the work
+  /// and the card read as *lit* rather than as standing off the surface. The
+  /// dark half is now `0x66` / `0x40`. Dark mode needed no equivalent change and
+  /// was left alone: it already measured 17.6 against a 31.4 page, a 44% drop,
+  /// because a black shadow over an almost-black surface is still a large
+  /// relative move.
+  ///
+  /// The asymmetry is worth knowing about rather than averaging away. Light mode
+  /// is the harder of the two for this style, because a mid-tone page is by
+  /// definition a small distance from both the white light half and the dark
+  /// half, so both have to work harder than they do on a near-black page.
   ///
   /// Dark mode inverts which half does the work, because on a dark surface it
   /// is the light shadow that defines the edge and the black one that is
   /// merely absence.
   static List<BoxShadow> raised(bool isDark) => isDark
       ? const [
+          // contact
           BoxShadow(
-            color: Color(0xCC000000),
-            blurRadius: 12,
-            offset: Offset(5, 5),
+            color: Color(0xB3000000),
+            blurRadius: 6,
+            offset: Offset(3, 3),
           ),
+          // ambient
           BoxShadow(
-            color: Color(0x1FFFFFFF),
-            blurRadius: 4,
-            offset: Offset(-2, -2),
+            color: Color(0x8C000000),
+            blurRadius: 22,
+            offset: Offset(9, 9),
+          ),
+          // bounce, up and to the left
+          BoxShadow(
+            color: Color(0x29FFFFFF),
+            blurRadius: 14,
+            offset: Offset(-6, -6),
           ),
         ]
       : const [
+          // contact
           BoxShadow(
-            color: Color(0x333D4A44),
-            blurRadius: 12,
-            offset: Offset(5, 5),
+            color: Color(0x663D4A44),
+            blurRadius: 6,
+            offset: Offset(3, 3),
           ),
+          // ambient
+          BoxShadow(
+            color: Color(0x403D4A44),
+            blurRadius: 22,
+            offset: Offset(9, 9),
+          ),
+          // bounce, up and to the left
           BoxShadow(
             color: Color(0xFFFFFFFF),
-            blurRadius: 8,
-            offset: Offset(-4, -4),
+            blurRadius: 14,
+            offset: Offset(-6, -6),
           ),
         ];
 
@@ -203,29 +258,134 @@ class AppElevation {
   /// Both shadows point inward, so the surface reads as cut into the page
   /// rather than sitting on it. Used for input fields and for the date chips
   /// that are not selected.
+  ///
+  /// The inset pair is scaled *down* from the raised one rather than being
+  /// independently chosen, and the relationship is the point: a well is a
+  /// smaller feature than a block standing on the page, so its contact shadow
+  /// sits closer and its ambient one barely reaches. A well with the raised
+  /// geometry reads as a block that has fallen *into* the page, which is a
+  /// different and wrong impression.
   static List<BoxShadow> inset(bool isDark) => isDark
       ? const [
           BoxShadow(
-            color: Color(0xA6000000),
-            blurRadius: 8,
-            offset: Offset(3, 3),
+            color: Color(0xB3000000),
+            blurRadius: 4,
+            offset: Offset(2, 2),
           ),
           BoxShadow(
-            color: Color(0x1AFFFFFF),
-            blurRadius: 5,
+            color: Color(0x73000000),
+            blurRadius: 10,
+            offset: Offset(5, 5),
+          ),
+          BoxShadow(
+            color: Color(0x1FFFFFFF),
+            blurRadius: 8,
+            offset: Offset(-4, -4),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x593D4A44),
+            blurRadius: 4,
+            offset: Offset(2, 2),
+          ),
+          BoxShadow(
+            color: Color(0x2E3D4A44),
+            blurRadius: 10,
+            offset: Offset(5, 5),
+          ),
+          BoxShadow(
+            color: Color(0xFFFFFFFF),
+            blurRadius: 10,
+            offset: Offset(-5, -5),
+          ),
+        ];
+
+  /// A well that is being pushed *further in*.
+  ///
+  /// This exists because "pressed" is not one state, it is two, and using one
+  /// pair for both was the mistake in the first version of the press vocabulary.
+  /// A raised block being pressed flattens — it comes up off the page. A well
+  /// being pressed goes *down*, deeper into the page, so its contact shadow
+  /// tightens and its ambient one reaches further.
+  ///
+  /// The light still comes from inside, so the sign of every offset is the
+  /// same as [inset]; only the magnitudes change. Using [pressed] here would
+  /// have inverted the offsets and turned a chip being pushed into a chip
+  /// popping out, which is the opposite of what the finger is asking for.
+  static List<BoxShadow> insetDeep(bool isDark) => isDark
+      ? const [
+          BoxShadow(
+            color: Color(0xD9000000),
+            blurRadius: 3,
+            offset: Offset(1, 1),
+          ),
+          BoxShadow(
+            color: Color(0x8C000000),
+            blurRadius: 14,
+            offset: Offset(7, 7),
+          ),
+          BoxShadow(
+            color: Color(0x14FFFFFF),
+            blurRadius: 6,
             offset: Offset(-3, -3),
           ),
         ]
       : const [
           BoxShadow(
-            color: Color(0x2E3D4A44),
-            blurRadius: 8,
-            offset: Offset(3, 3),
+            color: Color(0x733D4A44),
+            blurRadius: 3,
+            offset: Offset(1, 1),
+          ),
+          BoxShadow(
+            color: Color(0x3D3D4A44),
+            blurRadius: 14,
+            offset: Offset(7, 7),
           ),
           BoxShadow(
             color: Color(0xFFFFFFFF),
-            blurRadius: 7,
-            offset: Offset(-3, -3),
+            blurRadius: 8,
+            offset: Offset(-4, -4),
+          ),
+        ];
+
+  /// The pair a control animates *to* while it is held down.
+  ///
+  /// Not [inset] with a different radius — the opposite one. A press in this
+  /// style is the surface reversing: the block that was standing off the page
+  /// sinks into it, the light source moves from outside to inside, and the
+  /// bounce that was up-left goes down-right. Animating between the two pairs is
+  /// what makes a soft-UI button feel physical, and it is a swap rather than a
+  /// fade because a shadow pair that cross-fades halfway through reads as two
+  /// shadows at once, which is the exact artefact a light-source rule exists to
+  /// prevent.
+  ///
+  /// It is exported separately because `AppCard.pressed` had no caller anywhere
+  /// in the app, which meant the whole press vocabulary was written and never
+  /// switched on. See `pressable.dart`.
+  static List<BoxShadow> pressed(bool isDark) => isDark
+      ? const [
+          BoxShadow(
+            color: Color(0x73000000),
+            blurRadius: 3,
+            offset: Offset(1, 1),
+          ),
+          BoxShadow(
+            color: Color(0x1FFFFFFF),
+            blurRadius: 6,
+            offset: Offset(-2, -2),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x333D4A44),
+            blurRadius: 3,
+            offset: Offset(1, 1),
+          ),
+          BoxShadow(
+            color: Color(0xFFFFFFFF),
+            blurRadius: 5,
+            offset: Offset(-2, -2),
           ),
         ];
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
+import '../utils/pressable.dart';
 
 /// Destination shown in the glass bottom navigation bar.
 class NavDestination {
@@ -260,58 +261,33 @@ class _CollapsedNavItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: Center(
-          child: AnimatedSwitcher(
-            duration: AppMotion.state,
-            switchInCurve: AppMotion.enter,
-            switchOutCurve: AppMotion.exit,
-            child: _SelectedCircle(
-              key: ValueKey(selectedIndex),
-              icon: destination.selectedIcon,
-              color: primary,
-              isDark: isDark,
+          child: Pressable(
+            pressedScale: 0.90,
+            builder: (pressed) => AnimatedContainer(
+              duration: AppMotion.press,
+              curve: AppMotion.enter,
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // The accent fill, and the one place a nav item is a *coloured*
+                // surface: it is the only element in the bar that is not a
+                // neutral, and it is what tells the user where they are. The
+                // press flattens it into the bar, same as an expanded item.
+                color: primary,
+                boxShadow: pressed
+                    ? AppElevation.pressed(isDark)
+                    : AppElevation.raised(isDark),
+              ),
+              child: Icon(
+                destination.selectedIcon,
+                size: 22,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-/// The selected destination's circle, in whichever bar state is showing.
-///
-/// 48dp, not 44. The Material floor is 48 and 44 was four under it, which is
-/// not a rounding difference but a genuinely smaller target — and a soft-UI
-/// control with no inner padding reads smaller than its box already, so the
-/// visible ring matters as much as the hit area. The 64dp bar leaves 8dp of air
-/// either side, so nothing had to move to make room.
-class _SelectedCircle extends StatelessWidget {
-  const _SelectedCircle({
-    super.key,
-    required this.icon,
-    required this.color,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        // The app's raised pair, not a coloured glow in the fill's own hue.
-        // The glow was a second shadow vocabulary: warm, tight and pointing at
-        // the light shadow, on a control whose every neighbour is lit from the
-        // top left. It is also invisible on a light page, where a saturated
-        // accent's glow has nothing darker than itself to sit against.
-        boxShadow: AppElevation.raised(isDark),
-      ),
-      child: Icon(icon, size: 22, color: Colors.white),
     );
   }
 }
@@ -376,25 +352,96 @@ class _NavItem extends StatelessWidget {
         child: SizedBox(
           height: 52,
           child: Center(
-              child: AnimatedSwitcher(
-                duration: AppMotion.state,
-                switchInCurve: AppMotion.enter,
-                switchOutCurve: AppMotion.exit,
-                child: selected
-                    ? _SelectedCircle(
-                        key: ValueKey('sel_$index'),
-                        icon: destination.selectedIcon,
-                        color: primary,
-                        isDark: isDark,
-                      )
-                    : Icon(
-                        key: ValueKey('unsel_$index'),
-                        destination.icon,
-                        size: 22,
-                        color: tint,
-                      ),
+            // The `AnimatedSwitcher` is gone and this is the interesting part
+            // of that. It existed to cross-fade the selected circle and the bare
+            // icon, which is right for a *selection change* — but it also
+            // re-ran on every press, because selecting is a press. So tapping
+            // the tab you are already on started a 200ms cross-fade between
+            // two copies of the same circle, and the old shadow list did not
+            // match the new one, so the circle flickered through an
+            // interpolated pair on the way.
+            //
+            // The icon is now always the same widget and only its colour and
+            // glyph change, which is an `AnimatedDefaultTextStyle`-sized
+            // problem rather than a subtree swap. Selection still animates --
+            // through the shadow pair, which is the thing that actually carries
+            // the difference.
+            child: _NavDestination(
+              selected: selected,
+              primary: primary,
+              tint: tint,
+              isDark: isDark,
+              selectedIcon: destination.selectedIcon,
+              icon: destination.icon,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The pressed state of a nav destination.
+///
+/// **The bar had a ripple and nothing else, and on this surface a ripple is
+/// close to invisible** — the icon is a flat 22dp glyph on a flat chrome fill,
+/// the splash is a low-alpha wash of the same hue, and both sit inside a
+/// transparent `Material` over an opaque fill. A pressed tab looked like the app
+/// had dropped a frame.
+///
+/// What it needed was a *geometric* change, not a colour one, and it is the same
+/// distinction the date chips make: the selected circle is a raised block, so
+/// pressing it flattens it into the bar, while an unselected icon has nothing to
+/// flatten, so pressing it cuts a well around itself. Using one pair for both
+/// would mean either a block that sinks or a well that pops out, and only one of
+/// those is what the finger asked for.
+class _NavDestination extends StatelessWidget {
+  const _NavDestination({
+    required this.selected,
+    required this.primary,
+    required this.tint,
+    required this.isDark,
+    required this.selectedIcon,
+    required this.icon,
+  });
+
+  final bool selected;
+  final Color primary;
+  final Color tint;
+  final bool isDark;
+  final IconData selectedIcon;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      // 0.90 rather than the 0.985 default: this is the smallest tap target in
+      // the app's chrome and it is already flush inside a 52dp pill, so it has
+      // to give noticeably for the press to register at all.
+      pressedScale: 0.90,
+      builder: (pressed) => AnimatedContainer(
+        duration: AppMotion.press,
+        curve: AppMotion.enter,
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // Transparent rather than the chrome fill: the bar's own fill is
+          // already painted behind this, and filling it again would put an
+          // opaque disc over the pill's shadow where the two meet.
+          color: Colors.transparent,
+          boxShadow: !pressed
+              ? null
+              : (selected
+                  // A block coming up off the page flattens into it.
+                  ? AppElevation.pressed(isDark)
+                  // An icon with no block of its own gains one that is cut in.
+                  : AppElevation.insetDeep(isDark)),
+        ),
+        child: Icon(
+          selected ? selectedIcon : icon,
+          size: 22,
+          color: selected ? primary : tint,
         ),
       ),
     );

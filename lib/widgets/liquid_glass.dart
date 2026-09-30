@@ -1,5 +1,6 @@
 import '../screens/dashboard/utils/color_helpers.dart';
 import '../screens/dashboard/utils/design_tokens.dart';
+import '../screens/dashboard/utils/pressable.dart';
 
 import 'package:flutter/material.dart';
 
@@ -84,8 +85,14 @@ class AppCard extends StatelessWidget {
   /// fields and for a chip that is not selected.
   final bool inset;
 
-  /// The pressed state of a control. An inset surface with the shadow pair
-  /// collapsed, which is what makes a soft-UI button feel pressed.
+  /// The pressed state of a control.
+  ///
+  /// This used to *add* a small extra shadow on top of the raised pair, which
+  /// made a pressed card slightly darker rather than pressed. In this style a
+  /// press is the light source moving from outside the object to inside it, so
+  /// it is now [AppElevation.pressed] — the bounce arriving from the other side
+  /// — rather than a fourth shadow. Nothing in the app passed this flag before;
+  /// it is wired up through `Pressable` now.
   final bool pressed;
 
   @override
@@ -94,16 +101,12 @@ class AppCard extends StatelessWidget {
     final resolvedAccent = accent ?? Theme.of(context).colorScheme.primary;
 
     final shadows = <BoxShadow>[
-      if (!inset)
+      if (pressed)
+        ...AppElevation.pressed(dark)
+      else if (!inset)
         ...AppElevation.raised(dark)
       else
         ...AppElevation.inset(dark),
-      if (pressed)
-        BoxShadow(
-          color: Colors.black.withValues(alpha: dark ? 0.24 : 0.10),
-          blurRadius: 4,
-          offset: const Offset(1, 1),
-        ),
     ];
 
     final decoration = BoxDecoration(
@@ -128,7 +131,18 @@ class AppCard extends StatelessWidget {
     //
     // `MaterialType.transparency` because the fill is already painted by the
     // Container; this one exists only to own the ink.
-    final content = Container(
+    // `AnimatedContainer` rather than `Container`, and only because `pressed`
+    // is a flag on a stateless widget: without it the shadow pair swaps on the
+    // frame the finger lands, which reads as a flicker rather than a press.
+    //
+    // The cost when idle is a controller that is not ticking, so this is not the
+    // kind of implicit animation worth avoiding. It does mean the decoration is
+    // rebuilt and compared on every card build, which is why the eight cards on
+    // a dashboard page are each behind a `RepaintBoundary` below — the animation
+    // is a paint concern, and that is the thing that actually costs.
+    final content = AnimatedContainer(
+      duration: AppMotion.press,
+      curve: AppMotion.enter,
       width: width,
       height: height,
       decoration: decoration,
@@ -320,21 +334,38 @@ class DateStripChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final onAccent = isDark ? const Color(0xFF14201A) : Colors.white;
 
-    final decoration = isSelected
-        ? BoxDecoration(
-            color: accentColor,
-            borderRadius: BorderRadius.circular(AppRadius.tile),
-            border: Border.all(
-              color: AppElevation.controlEdge(accent: accentColor, isDark: isDark),
-            ),
-            boxShadow: AppElevation.raised(isDark),
-          )
-        : BoxDecoration(
-            color: AppSurfaces.page(isDark),
-            borderRadius: BorderRadius.circular(AppRadius.tile),
-            border: Border.all(color: appDivider(isDark: isDark)),
-            boxShadow: AppElevation.inset(isDark),
-          );
+    // An unselected chip is a well and a selected one is a block, so the two
+    // states differ in more than colour and the press state has to be a third
+    // geometry again — it is neither "in" nor "out", it is "being pushed". A
+    // pressed well deepens and a pressed block flattens, which is what a chip
+    // between two states should do.
+    BoxDecoration decorationFor({required bool pressed}) {
+      if (isSelected) {
+        return BoxDecoration(
+          color: accentColor,
+          borderRadius: BorderRadius.circular(AppRadius.tile),
+          border: Border.all(
+            color: AppElevation.controlEdge(accent: accentColor, isDark: isDark),
+          ),
+          boxShadow: pressed
+              ? AppElevation.pressed(isDark)
+              : AppElevation.raised(isDark),
+        );
+      }
+      return BoxDecoration(
+        color: AppSurfaces.page(isDark),
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+        border: Border.all(color: appDivider(isDark: isDark)),
+        boxShadow: pressed
+            // A well that is being pressed is deeper than a well at rest, so it
+            // takes the raised pair's scale of offset and blur but stays a well:
+            // the light still comes from inside, so this is [AppElevation.inset]
+            // with a wider spread rather than the pressed pair, which is the
+            // inverse of a raised block and would point the wrong way.
+            ? AppElevation.insetDeep(isDark)
+            : AppElevation.inset(isDark),
+      );
+    }
 
     return RepaintBoundary(
       child: MergeSemantics(
@@ -342,15 +373,16 @@ class DateStripChip extends StatelessWidget {
           button: true,
           selected: isSelected,
           label: '$dayName $dayNumber',
-          child: GestureDetector(
+          child: Pressable(
             onTap: onTap,
-            child: AnimatedContainer(
-              duration: AppMotion.state,
+            pressedScale: 0.94,
+            builder: (pressed) => AnimatedContainer(
+              duration: AppMotion.press,
               curve: AppMotion.enter,
               width: width,
               height: 68,
               padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
-              decoration: decoration,
+              decoration: decorationFor(pressed: pressed),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
