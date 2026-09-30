@@ -357,16 +357,64 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         : alarm.severity == AlarmSeverity.critical
         ? 'Critical'
         : 'Warning';
-    // `statusOk` and `statusAlert` replace the raw `Colors.green` and
-    // `Colors.blue` that were here. Those are tuned for large fills; as 10dp
-    // text they measured roughly 2.3:1 and 3.0:1. `statusOk` is the measured
-    // green, and "Acknowledged" — seen but not fixed — is neither good nor bad,
-    // which is what `statusAlert` is for.
-    final color = alarm.resolved
-        ? statusOk(isDark)
-        : alarm.acknowledged
-        ? statusAlert(isDark)
-        : severityColor;
+    // **A resolved alarm is a record, and that is what the treatment is
+    // derived from.** The badge used to take `statusOk`, on the reading that a
+    // problem being absent is good news. Two rules in AGENTS.md say otherwise
+    // and the second is the one that settles it. `statusOk` is a *status*
+    // colour, so on this screen it reads in the present tense — "there is no
+    // problem right now" — while the row is a statement about the past: an
+    // event in a list ordered by when the alarm fired, printed one line away
+    // from a live unresolved alarm that legitimately is red or amber. So the
+    // green that means "healthy" everywhere else is sitting beside a real
+    // warning, and one hue is doing two opposite jobs on one screen. That is
+    // the same defect as the single-series chart, and
+    // `system_status_strip.dart` already resolved it from the other direction
+    // by taking `appPrimaryText` for a healthy reading.
+    //
+    // Dropping the green is not sufficient on its own, which is the part a
+    // colour-only fix would miss. **The wash is what makes a badge a badge**: a
+    // tinted pill is an attention shape, it says "this has a status, look at
+    // it", and a resolved record is the one state in this list the user can
+    // neither act on nor is unaware of. So the resolved case gives up the pill
+    // too and is printed as a plain caption in the same slot at the same size,
+    // so the row does not change shape between states.
+    //
+    // This is where the live-condition and the historical-record cases part
+    // company, and it is a difference of *shape*, not of hue. A live condition
+    // is the case the "say nothing when nothing is wrong" rule was written
+    // for: `system_status_strip` can drop the green outright because the
+    // reader only ever looks at the current value. A record cannot, because a
+    // list of the last thirty alarms is a table and the column has to hold its
+    // shape as the rows scroll past. So the resolved state keeps a label in
+    // every case — it is never silent — and what it gives up is the thing that
+    // was making a *historical* row look like a *live* one.
+    //
+    // Nothing is lost. The word "Resolved" is still in the same position, in
+    // ordinary text, and a word is a better carrier of this than a hue anyway:
+    // the reader who cannot resolve the green could not have read it before.
+    if (alarm.resolved) {
+      return Padding(
+        // `AppBadge`'s own padding, kept so a row does not change width as it
+        // is acknowledged and resolved. No fill: that padding is the pill's
+        // geometry, not an assertion of a status.
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: appPrimaryText(isDark),
+          ),
+        ),
+      );
+    }
+    // `statusAlert` for "Acknowledged" is deliberate and stays. Acknowledged is
+    // not the resolved case: the condition is still open, the user has seen it
+    // and not fixed it, and that is a live verdict — hence the neither-good-
+    // nor-bad slot rather than ordinary text. Both replaced raw `Colors.green`
+    // and `Colors.blue` here; those are tuned for large fills and measured about
+    // 2.3:1 and 3.0:1 as 10dp text.
+    final color = alarm.acknowledged ? statusAlert(isDark) : severityColor;
     return AppBadge(
       isDark: isDark,
       color: color,

@@ -61,10 +61,29 @@ class ChartSeriesSpec {
 
 /// A single chart: a title and the series that share its Y axis.
 class ChartGroup {
-  const ChartGroup(this.title, this.series);
+  const ChartGroup(this.title, this.series, {this.zeroAnchored = true});
 
   final String title;
   final List<ChartSeriesSpec> series;
+
+  /// Whether the bottom of the Y axis is pinned to zero.
+  ///
+  /// True is correct for a **magnitude** — lux, watts, amperes, per cent, ppm —
+  /// where zero is a real condition and the distance from zero *is* the reading.
+  /// A lux series that never drops below 900 has not been near zero, and an axis
+  /// from 0 makes that visible.
+  ///
+  /// False is correct for a **bounded dimensionless index**, where zero is
+  /// arbitrary rather than meaningful. pH runs 0-14, and the fish device's data
+  /// lives between 6.37 and 7.75, so a zero baseline squeezed the whole drop --
+  /// which is the news on that page -- into roughly the top fifth of the plot.
+  ///
+  /// Declared here rather than derived inside `chart_data.dart` because this file
+  /// is the one place that says what a page charts. A hardcoded key list over in
+  /// the bounds code is the exact shape of the bug this file was written to
+  /// kill: a key in one place and a label in another, agreeing only by
+  /// coincidence of ordering.
+  final bool zeroAnchored;
 
   /// Every telemetry key this group needs, flattened for the history request.
   List<String> get keys => [for (final s in series) s.key];
@@ -165,17 +184,25 @@ List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
   // un-monitored everywhere else in the app, with no configured limit and no
   // `metric`, and a chart here would present it as a first-class trend it has
   // never been treated as.
+  // The pH group is the one that asks not to be anchored at zero: 0-14 is an
+  // arbitrary scale, not a magnitude, and the readings sit at 6.37-7.75.
+  //
+  // Turbidity is deliberately left zero-anchored, and that is a decision rather
+  // than an oversight. `settings_validation_test.dart` records the reason: the
+  // sensor on the test device reads 2396 NTU, which is why its `maxAllowed` is
+  // `null` and uncapped. NTU is a magnitude with a real zero -- perfectly clear
+  // water reads 0 -- and the readings are hundreds or thousands of units away
+  // from it, so zero costs this chart nothing and is the honest baseline. pH's
+  // zero is a number on a ruler; turbidity's is a state of the water.
   'fish' => const [
-    ChartGroup('pH', [ChartSeriesSpec(key: 'ph', label: 'pH', unit: '')]),
+    ChartGroup('pH', [
+      ChartSeriesSpec(key: 'ph', label: 'pH', unit: ''),
+    ], zeroAnchored: false),
     ChartGroup('Temperature', [
       ChartSeriesSpec(key: 'suhu', label: 'Water', unit: '°C'),
     ]),
     ChartGroup('Turbidity', [
-      ChartSeriesSpec(
-        key: 'turbidity_ntu',
-        label: 'Turbidity',
-        unit: 'NTU',
-      ),
+      ChartSeriesSpec(key: 'turbidity_ntu', label: 'Turbidity', unit: 'NTU'),
     ]),
   ],
 

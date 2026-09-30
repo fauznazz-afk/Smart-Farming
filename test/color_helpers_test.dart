@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
+import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
 /// The surfaces these colours are actually rendered on.
 ///
@@ -51,6 +52,42 @@ final List<Color> _darkSurfaces = [
   AppSurfaces.tooltipDark,
 ];
 
+/// The fill `AppTile` actually paints, read out of the widget rather than
+/// written down here.
+///
+/// **Why this needed its own accessor at all.** The tile and the progress bar
+/// share one token, `AppSurfaces.track`, and they need opposite answers. The
+/// exclusion below is correct for the bar and was silently wrong for the tile:
+/// a bar is a 6–8dp strip with nothing drawn on it, while `AppTile` is a ~190dp
+/// box carrying a caption and a delta. On the light track `#CFD6D2` those five
+/// colours measured 3.85–3.87:1, five AA failures at 10–11dp, and this file was
+/// green throughout because the track was excluded.
+///
+/// A single surface list cannot say "this consumer is text, that one is not",
+/// so the distinction moved out of the list and into the widget: `AppTile` now
+/// paints `AppSurfaces.input` and carries `AppElevation.inset` for the depth it
+/// previously took from a darker fill. Dark mode is unchanged by that.
+///
+/// Reading the colour off the built widget rather than off `AppSurfaces` is the
+/// third drift avoided. The two lists above were wrong three times because they
+/// were copies; this one is the real `BoxDecoration`, so pointing `AppTile` back
+/// at `track` fails here without anyone touching this file.
+/// Renders an `AppTile` and returns the `BoxDecoration` it built.
+///
+/// A widget test rather than a constant, deliberately: `AppTile` builds a plain
+/// `Container` with no key, so the only honest way to read the fill is to render
+/// one and inspect the tree. `find.byType(Container)` would also match containers
+/// the tile does not own, so this takes the *first*, which is the tile itself
+/// because nothing inside it can precede it — and the optional accent
+/// `ClipRRect`/`ColoredBox` wrap the tile rather than being wrapped by it.
+Future<BoxDecoration> _tileDecoration(WidgetTester tester, bool isDark) async {
+  await tester.pumpWidget(
+    MaterialApp(home: AppTile(isDark: isDark, child: const SizedBox.shrink())),
+  );
+  final container = tester.widget<Container>(find.byType(Container).first);
+  return container.decoration! as BoxDecoration;
+}
+
 /// The progress tracks (`AppSurfaces.trackLight` / `trackDark`) are deliberately
 /// in neither list. A track is a 6 to 8dp bar and no text is ever drawn on one,
 /// so including it measures a requirement that does not apply. It was in the
@@ -60,6 +97,12 @@ final List<Color> _darkSurfaces = [
 /// option and it is the wrong one: it moves `faintColor` and four status colours
 /// to satisfy a measurement of text on a bar that has none. If a caption ever
 /// does get drawn over a track, add the track back here and reopen that call.
+///
+/// **This exclusion is now scoped to the bars alone, and it is no longer a
+/// statement about the token.** It used to read as "nothing anywhere draws on
+/// `AppSurfaces.track`", and `AppTile` drew on it at 190dp. The tile's fill moved
+/// off `track` to `input`; the bars did not, because they still have no text on
+/// them and still should not be darkened to satisfy a caption that is not there.
 ///
 /// It is worth being explicit that the tracks are *not* exempt from the depth
 /// work: they got a second, inset shadow pair rather than a lighter fill, for
@@ -187,6 +230,51 @@ void main() {
       expectClearsAa('statusBad light', statusBad(false), _lightSurfaces);
       expectClearsAa('statusAlert dark', statusAlert(true), _darkSurfaces);
       expectClearsAa('statusAlert light', statusAlert(false), _lightSurfaces);
+    });
+
+    testWidgets('AppTile draws text, so its own fill is a text surface', (
+      tester,
+    ) async {
+      // The regression this guards: the tile fill used to be
+      // `AppSurfaces.trackLight` `#CFD6D2`, the same token as the 6–8dp progress
+      // bars, and the track was excluded from the surface lists above because
+      // nothing draws on a bar. That exclusion was written for one consumer and
+      // applied to two. Measured on `#CFD6D2` those five colours were 3.85,
+      // 3.85, 3.87, 3.86 and 3.86 — every one of them under AA.
+      for (final isDark in [false, true]) {
+        final decoration = await _tileDecoration(tester, isDark);
+        final fill = decoration.color!;
+
+        expectClearsAa('faintColor on the tile fill, isDark=$isDark',
+            faintColor(isDark), [fill]);
+        expectClearsAa('statusOk on the tile fill, isDark=$isDark',
+            statusOk(isDark), [fill]);
+        expectClearsAa('statusWarn on the tile fill, isDark=$isDark',
+            statusWarn(isDark), [fill]);
+        expectClearsAa('statusBad on the tile fill, isDark=$isDark',
+            statusBad(isDark), [fill]);
+        expectClearsAa('statusAlert on the tile fill, isDark=$isDark',
+            statusAlert(isDark), [fill]);
+      }
+    });
+
+    testWidgets('the tile fill is not the progress-bar track', (tester) async {
+      // Stated separately because the two lists above *do* still exclude the
+      // track, and this is the assertion that keeps that exclusion honest: it is
+      // scoped to the bars, not to the token.
+      final light = await _tileDecoration(tester, false);
+      expect(
+        light.color,
+        isNot(AppSurfaces.trackLight),
+        reason: 'the light track is the darkest light surface in the app and '
+            'fails AA with text on it; the tile needs input, the bars keep track',
+      );
+      expect(
+        light.boxShadow,
+        isNotNull,
+        reason: 'a lighter fill cannot carry the inset read on its own — a '
+            'BoxShadow paints outside the rect, so the depth has to be explicit',
+      );
     });
 
     test('the surfaces this file measures against are the ones the app paints', () {

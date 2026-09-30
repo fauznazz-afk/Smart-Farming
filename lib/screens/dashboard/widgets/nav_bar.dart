@@ -73,11 +73,23 @@ class GlassNavBar extends StatelessWidget {
         );
         return SafeArea(
           top: false,
-          // 10, not 16. Six tabs split the width with Expanded, so every point of
-          // margin is a point taken from an already narrow slot. The bar used to
-          // have five tabs and 16 dp of air; both had to give when the Hydroponics
-          // and Fish tabs arrived.
-          minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          // 24, not 14, and not 10.
+          //
+          // This has to equal the page's horizontal margin
+          // (`_pageHorizontalMargin` in `dashboard_screen.dart`) or the pill sits
+          // proud of the content column and every page shows a 10dp step at the
+          // bottom. It was 14 against a 16dp page, which was a 2dp step nobody
+          // could see, and became a 10dp one when the page went to 24 to make
+          // room for the ambient shadow.
+          //
+          // It was not raised when the page margin was, because the two look
+          // independent and are not. The nav bar suffers the identical clipped
+          // ambient at 14dp that the cards suffered at 16, so this fixes its
+          // own shadow at the same time.
+          //
+          // The 10 bottom is the gesture inset and is unrelated to the
+          // horizontal question.
+          minimum: const EdgeInsets.fromLTRB(24, 0, 24, 10),
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,

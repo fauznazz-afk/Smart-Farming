@@ -47,6 +47,34 @@ import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
+/// Horizontal margin of a dashboard page: how far every card sits from the left
+/// and right edge of the display.
+///
+/// It is a local constant and not a token in `design_tokens.dart` only because
+/// the shadow arithmetic below is a property of `AppElevation.raised`, and that
+/// file belongs to the surface work rather than to this screen. If the numbers
+/// there change, this one has to be re-derived rather than nudged.
+///
+/// 16dp fitted the *contact* shadow and clipped the ambient half of the same
+/// shadow against the screen edge. `AppElevation.raised` is a contact shadow at
+/// offset 3 / blur 6 and an ambient one at offset 9 / blur 22, and Flutter paints
+/// a box shadow as a mask blur of sigma = blurRadius / 2 translated by the
+/// offset. So the ambient reaches:
+///
+///  * `9 + 11 = 20dp` at one sigma, still about 60% of its 0x40 peak — this is
+///    the part that actually draws the edge, and 16dp cut it in half.
+///  * `9 + 22 = 31dp` at two sigma, about 13% of peak, which is a couple of
+///    levels of alpha over the page and cannot be seen.
+///
+/// 24dp shows the whole visible core with 4dp to spare and still clips only the
+/// invisible tail. 32dp would show the tail too and costs 16dp of chart plot on a
+/// 381dp-wide viewport, which is a bad trade for 3% alpha.
+///
+/// The cost is 16dp of width per side: on this device a card goes from 349dp to
+/// 333dp, so every two-column metric cell loses 8dp. That is the one thing here
+/// that cannot be checked without the device.
+const double _pageHorizontalMargin = 24;
+
 /// Main monitoring dashboard: overview, PV, AC, battery, and CCTV tabs.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -1093,6 +1121,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     _reloadHistoryForCurrentPage();
   }
 
+  /// Says what the app bar's range control is currently set to.
+  ///
+  /// The same [describeHistoryRange] the chart headers use, so the tooltip and
+  /// the header cannot disagree about which window the charts hold — a second
+  /// formatter here would be exactly the drift `history_range.dart` exists to
+  /// prevent. `setState` in [_pickDateFromCalendar] and [_selectDate] rebuilds
+  /// the app bar, so this follows both ways of changing the selection.
+  String _dateRangeTooltip() {
+    final label = describeHistoryRange(
+      selectedDate: _selectedDate,
+      rangeStart: _selectedRangeStart,
+      rangeEnd: _selectedRangeEnd,
+    );
+    return 'Telemetry range: $label. Tap to change';
+  }
+
   Future<void> _pickDateFromCalendar() async {
     final now = DateTime.now();
     final today = startOfDay(now);
@@ -1266,6 +1310,31 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
       actions: [
+        // The only route to a custom date range, and it lives here because the
+        // per-card button was removed -- correctly, since six of them were about
+        // to exist on the greenhouse and fish pages alone.
+        //
+        // The app bar is the right home for it: the chart header already names
+        // the range the user is looking at, so the control is never ambiguous,
+        // and it is the one place that is on screen on all four tabs. The strip
+        // on Overview reaches the same dialog, but that strip exists only on
+        // Overview -- so on Power, Hydroponics and Fish the date could not be
+        // changed at all, and changing it meant going back to Overview, picking
+        // a range and coming forward again.
+        //
+        // Two calendar glyphs rather than a badge or a coloured dot: a range is
+        // a different *kind* of selection from a day, and the accent is already
+        // spoken for by the strip's 'Range' / 'Pick a day' label on the one page
+        // that shows both.
+        IconButton(
+          tooltip: _dateRangeTooltip(),
+          icon: Icon(
+            _selectedRangeStart != null && _selectedRangeEnd != null
+                ? Icons.date_range_outlined
+                : Icons.calendar_month_outlined,
+          ),
+          onPressed: _pickDateFromCalendar,
+        ),
         IconButton(
           tooltip: 'Alarm History',
           icon: const Icon(Icons.history_outlined),
@@ -1358,9 +1427,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
-              16,
+              _pageHorizontalMargin,
               MediaQuery.paddingOf(context).top + kToolbarHeight - 6,
-              16,
+              _pageHorizontalMargin,
               MediaQuery.paddingOf(context).bottom + 76,
             ),
             itemCount: items.length,

@@ -201,14 +201,46 @@ class AppTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // An inset tile is a *well*, and a well is carried by a shadow rather than
+    // by a darker fill. That is the same principle as `inputLight` and the same
+    // code as `AppCard`'s inset branch: fill with `AppSurfaces.input`, add
+    // `AppElevation.inset`.
+    //
+    // **This was `AppSurfaces.track` and it failed WCAG AA, measured.** A tile is
+    // not a bar — it is a ~190dp box with a caption ("PV production") and a
+    // delta ("+2% vs previous") drawn on it, and the light track `#CFD6D2` is the
+    // darkest light-mode surface in the app. On it: `faintColor` 3.85:1,
+    // `statusOk` 3.85:1, `statusWarn` 3.87:1, `statusBad` 3.86:1, `statusAlert`
+    // 3.86:1. Five failures against 4.5, on 10–11dp text.
+    //
+    // It passed for the same reason the track does: `test/color_helpers_test.dart`
+    // deliberately kept `AppSurfaces.track` out of its surface lists, because a
+    // 6–8dp progress bar has no text on it. That exclusion was written for the
+    // bars and then applied to the tile as well, and the tile is the one consumer
+    // where it was false. The test now measures the tile fill as its own
+    // surface; the track exclusion stays, and says why.
+    //
+    // `inputLight` `#EDF1EF` measures 4.99 / 5.00 / 5.02 / 5.01 / 5.01 on those
+    // same five, so it clears AA with real margin rather than by hundredths.
+    //
+    // Dark mode does change surface (`trackDark` `#131A18` to `inputDark`
+    // `#1E2623`) because the two modes have to agree — a light-mode well that is
+    // lighter than the page and a dark-mode well that is darker than it is the
+    // right instinct in both, and `AppSurfaces.input` is the token that already
+    // encodes "lighter than the page, shadow carries the inset". Both clear AA
+    // comfortably and the gap is small: `faintColor` is 8.17:1 on the old dark
+    // track and 7.16:1 on the new one, against 4.5.
     final tile = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: inset
-            ? AppSurfaces.track(isDark)
-            : AppSurfaces.card(isDark),
+        color: inset ? AppSurfaces.input(isDark) : AppSurfaces.card(isDark),
         borderRadius: BorderRadius.circular(AppRadius.tile),
         border: Border.all(color: appDivider(isDark: isDark, opacity: 0.5)),
+        // Without this the lighter fill simply flattens the tile. It was carrying
+        // the whole inset read on its own, because a `BoxShadow` paints *outside*
+        // the decoration rect and so cannot darken a tile's own interior — the
+        // interior is the fill's job, the depth around it is the shadow's.
+        boxShadow: inset ? AppElevation.inset(isDark) : null,
       ),
       child: child,
     );
@@ -237,6 +269,25 @@ class AppTile extends StatelessWidget {
     // 0.14 rather than the 0.12 the two call sites used, and lighter in dark
     // mode: the wash is a data-series colour, and it has to stay weak enough
     // that `faintColor` on top of it keeps at least 4.5:1.
+    //
+    // **That constraint is not currently satisfied by anything, because this
+    // wash is invisible.** `ColoredBox` is the *parent* here, and the tile's own
+    // `BoxDecoration` carries an opaque `color`, so the fill paints straight over
+    // the wash. `ClipRRect` clips the wash to the tile radius and the Container
+    // fills that same radius, so no sliver of it survives either. The two accent
+    // tiles in the energy summary have therefore been rendering with no wash at
+    // all since this was extracted from two call sites.
+    //
+    // It is left exactly as it is, deliberately. Making it visible means either
+    // compositing it *over* the fill at 0.14 — which measures `faintColor` at
+    // 4.42:1 on the solar accent and 4.10:1 on the darker AC accent, i.e. two
+    // fresh AA failures on the delta caption — or inventing a translucent tile
+    // fill so the wash can show through, which is the fill-contrast bug this
+    // widget was just fixed for. Neither is a change to make while fixing a
+    // contrast failure elsewhere in the same widget. The wash staying dead is
+    // also why it does not move the numbers in `color_helpers_test.dart`: the
+    // rendered surface is the fill, and the fill is opaque. If the wash is ever
+    // revived it has to be measured, not eyeballed.
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.tile),
       child: ColoredBox(

@@ -17,7 +17,13 @@ class MetricDef {
   /// "State of Charge 45.00 %". A count and a percentage do not have hundredths.
   final int decimals;
 
-  const MetricDef(this.key, this.label, this.unit, this.icon, {this.decimals = 2});
+  const MetricDef(
+    this.key,
+    this.label,
+    this.unit,
+    this.icon, {
+    this.decimals = 2,
+  });
 }
 
 /// Statistics for a series of telemetry points.
@@ -92,7 +98,10 @@ class ChartBounds {
   bool get spansMultipleDays =>
       (maxX - minX) > const Duration(days: 1).inMilliseconds;
 
-  factory ChartBounds.fromSeries(List<ChartSeries> series) {
+  factory ChartBounds.fromSeries(
+    List<ChartSeries> series, {
+    bool zeroAnchored = true,
+  }) {
     final points = series.expand((item) => item.points).toList();
     if (points.isEmpty) {
       return const ChartBounds(
@@ -123,9 +132,23 @@ class ChartBounds {
     minX = (minX / timeInterval).floorToDouble() * timeInterval;
     maxX = (maxX / timeInterval).ceilToDouble() * timeInterval;
 
-    final minY = minimum < 0 ? minimum * 1.1 : 0.0;
+    var minY = chartLowerBound(minimum, maximum, zeroAnchored: zeroAnchored);
     final rawMaxY = maximum <= 0 ? 1.0 : maximum * 1.1;
     final interval = niceStep(rawMaxY - minY, divisions: _targetTicks);
+
+    // A derived bottom is snapped down to a whole interval, so the axis is a
+    // count of intervals tall and every gridline fl_chart draws -- which
+    // includes `minY` itself -- is a round pH value rather than a leftover like
+    // 6.025.
+    //
+    // Only for a derived bottom. A zero-anchored axis is snapped for free,
+    // because zero is a multiple of any interval; the one zero-anchored case
+    // that is not free is the padded negative minimum, where -22 under a step of
+    // 10 would have to become -30. That padding is deliberately tight and a
+    // test pins it, so it is left alone.
+    if (!zeroAnchored && interval > 0) {
+      minY = (minY / interval).floorToDouble() * interval;
+    }
 
     // Snap the top of the y axis to a whole number of intervals.
     //
@@ -157,6 +180,61 @@ class ChartBounds {
 
   /// Number of intervals we aim to fit along each axis.
   static const _targetTicks = 4;
+}
+
+/// The bottom of the Y axis, before the interval is known.
+///
+/// Top-level and public, next to [niceStep] and for the same reason: this is
+/// pure arithmetic, and the interesting part -- the proportionality of the
+/// headroom to the data range -- is invisible once the result has been quantised
+/// onto a gridline. A private static could only be tested through the finished
+/// axis, and a finished axis rounds twice, so the property could not be stated
+/// at all.
+///
+/// **Zero-anchored** (the default, and every group that plots a magnitude):
+/// zero, or a 10% pad below the data when the data goes negative, because
+/// battery power and current are negative while the pack discharges and an
+/// axis that clipped them would hide the sign.
+///
+/// **Index-anchored**, for a bounded dimensionless scale where zero is an
+/// arbitrary number rather than a state. pH runs 0-14 and the device data lives
+/// between 6.37 and 7.75, so a zero baseline squeezed the entire drop -- the
+/// news on the fish page -- into about the top fifth of the plot. An axis from 0
+/// to 8.5 is technically correct and reads as a flat line.
+///
+/// The arithmetic is one term:
+///
+///   pad  = 0.25 * (maximum - minimum)   the observed range
+///   minY = minimum - pad
+///
+/// The range term is what makes it work: it scales the headroom to the data, so
+/// a 1.38-wide pH swing gets 0.345 of headroom while a wide excursion gets more,
+/// and neither is padded into the same visual margin. 0.25 rather than something
+/// larger because the top of the axis already adds its own 10% of the value, and
+/// this is the bottom's half of the same job.
+///
+/// A range-only pad looks like it would close a series that never moves -- zero
+/// range, zero pad, `minY == minimum`. It does not, and the reason is worth
+/// keeping: the existing `maximum * 1.1` at the top opens that case on its own,
+/// so a flat 7.0 pH still plots 7.0..7.8. Adding a 2%-of-value floor to the
+/// bottom "for safety" was tried and removed, because it is a second magic
+/// number and the `maxY` snap swallowed it whole: a 2.6-wide pH swing produced a
+/// byte-identical axis with and without it. A term that changes nothing on any
+/// real reading is a term that only has to be explained.
+///
+/// Rejected instead of these: a fixed 10%-of-value pad, which is the same
+/// mistake in a different place (a flat 7.0 pH would open to 6.3-7.7, wider
+/// than a real 1.38 swing and so wider than the interesting case); and the
+/// scale's own minimum, which would need the 0-14 range restated here, and a
+/// second copy of a number that already lives in Settings is a number that will
+/// drift.
+double chartLowerBound(
+  double minimum,
+  double maximum, {
+  bool zeroAnchored = true,
+}) {
+  if (zeroAnchored) return minimum < 0 ? minimum * 1.1 : 0.0;
+  return minimum - 0.25 * (maximum - minimum);
 }
 
 /// Rounds a raw axis step up to the next 1 / 2 / 2.5 / 5 x 10^n value.
@@ -223,10 +301,7 @@ List<FlSpot> processSpots(List<TelemetryPoint> points) {
   if (points.length <= 180) {
     return points
         .map(
-          (p) => FlSpot(
-            p.timestamp.millisecondsSinceEpoch.toDouble(),
-            p.value,
-          ),
+          (p) => FlSpot(p.timestamp.millisecondsSinceEpoch.toDouble(), p.value),
         )
         .toList(growable: false);
   }

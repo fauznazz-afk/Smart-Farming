@@ -44,7 +44,7 @@ export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
 export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
 flutter analyze          # harus: No issues found
-flutter test             # harus: 351/351 (25 file) — jalankan PER-FILE, mesin 7 GB OOM kalau sekali jalan
+flutter test             # harus: 363/363 (25 file) — jalankan PER-FILE, mesin 7 GB OOM kalau sekali jalan
 cd android && ./gradlew :app:testDebugUnitTest   # harus: 11
 git log --oneline -5     # lihat commit terakhir
 ```
@@ -324,7 +324,7 @@ lib/                                    62 file, 11.445 baris
     alarm_history_screen.dart           402 baris, belum di-refactor
     login_screen.dart
   widgets/                              primitif permukaan (AppCard/AppTile/AppBadge — nama file `liquid_glass` tidak akurat)
-  test/                                 25 file, 351 test, ~5.700 baris
+  test/                                 25 file, 363 test, ~5.900 baris
 ```
 
 ### Konvensi yang perlu dijaga
@@ -968,7 +968,7 @@ adalah **fish**, bukan bash.
 
 ```bash
 flutter analyze                    # harus: No issues found
-flutter test                       # harus: 351/351 (PER-FILE)
+flutter test                       # harus: 363/363 (PER-FILE)
 flutter build apk --release        # warm ~2-3 menit
 
 # Perangkat (HP Xiaomi 24090RA29G, Android 16)

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/models/telemetry_model.dart';
 import 'package:plts_monitoring/screens/dashboard/charts/chart_data.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/date_helpers.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/chart_groups.dart';
 
 ChartSeries seriesOf(List<TelemetryPoint> points) => ChartSeries(
   'Power',
@@ -12,6 +13,76 @@ ChartSeries seriesOf(List<TelemetryPoint> points) => ChartSeries(
   const Color(0xFF1E88E5),
   SeriesStats.fromPoints(points),
 );
+
+/// One series of [values], an hour apart, starting 10 March 2026 at 00:00.
+List<TelemetryPoint> ramp(List<double> values) => [
+  for (var i = 0; i < values.length; i++)
+    TelemetryPoint(
+      timestamp: DateTime(2026, 3, 10).add(Duration(hours: i)),
+      value: values[i],
+    ),
+];
+
+/// Representative data per prefix: group, then series, then readings.
+///
+/// Written out rather than generated, because the interesting cases are the ones
+/// the hardware actually produces: a discharging battery is negative, a pH
+/// sensor drifts in a narrow band, and a lux sensor crosses zero at dusk.
+Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
+  'pv': [
+    [
+      [12.4, 13.1, 12.9, 0.0], // V
+      [0.0, 1.8, 1.6, -0.4], // A
+      [0.0, 23.6, 21.0, -5.2], // W
+    ],
+  ],
+  'ac': [
+    [
+      [228.0, 231.0, 0.0, 229.0],
+      [0.0, 1.2, -0.6, 0.9],
+      [0.0, 277.0, -138.0, 206.0],
+    ],
+  ],
+  'battery': [
+    [
+      [13.2, 12.6, 12.1],
+      [-0.97, -1.4, 0.0], // discharging
+      [-12.92, -17.6, 0.0],
+    ],
+  ],
+  'env': [
+    [
+      [22.7, 25.1, 23.4],
+      [23.9, 27.8, 25.1],
+    ], // degC, air and panel
+    [
+      [78.0, 61.0, 84.0],
+    ], // %
+    [
+      [0.0, 18400.0, 91000.0],
+    ], // lx
+    [
+      [820.0, 1240.0, 1500.0],
+    ], // ppm
+  ],
+  'fish': [
+    [
+      [6.42, 7.05, 7.75, 6.37],
+    ], // pH
+    [
+      [27.4, 28.1, 26.9],
+    ], // degC
+    [
+      [4.0, 118.0, 2396.0],
+    ], // NTU
+  ],
+};
+
+/// The Y axis for one group's series, using the group's declared anchoring.
+ChartBounds boundsFor(ChartGroup group, List<List<double>> seriesData) =>
+    ChartBounds.fromSeries([
+      for (final values in seriesData) seriesOf(ramp(values)),
+    ], zeroAnchored: group.zeroAnchored);
 
 void main() {
   group('niceStep', () {
@@ -47,10 +118,7 @@ void main() {
       // 4h rounds up to the next listed step, 6h.
       expect(niceTimeStep(4 * 3600 * 1000), closeTo(6 * 3600 * 1000, 1e-9));
       // A 12-day range wants 3-day ticks (12 / 4 = 3).
-      expect(
-        niceTimeStep(3 * 24 * 3600 * 1000),
-        closeTo(3 * 86400000, 1e-6),
-      );
+      expect(niceTimeStep(3 * 24 * 3600 * 1000), closeTo(3 * 86400000, 1e-6));
       // A 90-day range wants ~22-day ticks, widened to the 30-day step.
       expect(
         niceTimeStep(22.5 * 24 * 3600 * 1000),
@@ -130,8 +198,16 @@ void main() {
         at(DateTime(2026, 3, 10, 18, 41), 2),
       ];
       final bounds = ChartBounds.fromSeries([seriesOf(points)]);
-      expect(bounds.minX, lessThanOrEqualTo(DateTime(2026, 3, 10, 6, 7).millisecondsSinceEpoch));
-      expect(bounds.maxX, greaterThanOrEqualTo(DateTime(2026, 3, 10, 18, 41).millisecondsSinceEpoch));
+      expect(
+        bounds.minX,
+        lessThanOrEqualTo(DateTime(2026, 3, 10, 6, 7).millisecondsSinceEpoch),
+      );
+      expect(
+        bounds.maxX,
+        greaterThanOrEqualTo(
+          DateTime(2026, 3, 10, 18, 41).millisecondsSinceEpoch,
+        ),
+      );
     });
 
     test('uses a friendly y interval instead of an arbitrary one', () {
@@ -214,7 +290,8 @@ void main() {
         expect(
           bounds.maxY,
           greaterThan(bounds.minY),
-          reason: 'maxY ${bounds.maxY} is not above minY ${bounds.minY} '
+          reason:
+              'maxY ${bounds.maxY} is not above minY ${bounds.minY} '
               'for a series peaking at $peak',
         );
         expect(
@@ -226,21 +303,30 @@ void main() {
     });
 
     test('detects a multi-day range', () {
-      final week = [
-        at(DateTime(2026, 3, 1), 1),
-        at(DateTime(2026, 3, 8), 2),
-      ];
+      final week = [at(DateTime(2026, 3, 1), 1), at(DateTime(2026, 3, 8), 2)];
       final day = [
         at(DateTime(2026, 3, 10, 1), 1),
         at(DateTime(2026, 3, 10, 20), 2),
       ];
-      expect(ChartBounds.fromSeries([seriesOf(week)]).spansMultipleDays, isTrue);
-      expect(ChartBounds.fromSeries([seriesOf(day)]).spansMultipleDays, isFalse);
+      expect(
+        ChartBounds.fromSeries([seriesOf(week)]).spansMultipleDays,
+        isTrue,
+      );
+      expect(
+        ChartBounds.fromSeries([seriesOf(day)]).spansMultipleDays,
+        isFalse,
+      );
     });
   });
 
   group('formatAxisTick', () {
-    final value = DateTime(2026, 3, 10, 14, 5).millisecondsSinceEpoch.toDouble();
+    final value = DateTime(
+      2026,
+      3,
+      10,
+      14,
+      5,
+    ).millisecondsSinceEpoch.toDouble();
 
     test('shows a clock time for a single-day range', () {
       expect(formatAxisTick(value, spansMultipleDays: false), '14:05');
@@ -248,6 +334,249 @@ void main() {
 
     test('shows a date for a multi-day range', () {
       expect(formatAxisTick(value, spansMultipleDays: true), '10/03');
+    });
+  });
+
+  // Zero is the bottom of the axis because zero is a *state*, not because it is
+  // a convenient number. A lux reading of 0 is dark and a wattage of 0 is idle,
+  // so the distance from the baseline is the reading. pH has no such state: 0 is
+  // an arbitrary point on a 0-14 ruler, and anchoring there squeezed a
+  // 7.75 -> 6.37 drop -- the whole point of the page -- into the top fifth of
+  // the plot.
+  group('zero-anchored axes', () {
+    test('a group opts out of zero exactly when it is dimensionless', () {
+      // Derived rather than listed, so a future dimensionless group has to make
+      // this decision instead of inheriting a zero baseline that flattens it,
+      // and a future unit-bearing group cannot quietly opt out of a baseline it
+      // needs. An empty unit is the app's existing spelling of "no unit": pH is
+      // the only one, and it is the only one that opts out.
+      for (final prefix in ['pv', 'ac', 'battery', 'env', 'fish']) {
+        for (final group in chartGroupsForPrefix(prefix)) {
+          final dimensionless = group.series.every((s) => s.unit.isEmpty);
+          expect(
+            group.zeroAnchored,
+            !dimensionless,
+            reason:
+                "'${group.title}' on '$prefix' has unit "
+                "'${group.series.map((s) => s.unit).join('/')}' so it "
+                '${dimensionless ? 'must' : 'must not'} anchor at zero',
+          );
+        }
+      }
+    });
+
+    test('leaves every magnitude group bit-for-bit unchanged', () {
+      // The strongest form of "unchanged": the flag is a no-op for a group that
+      // does not set it, so the two calls have to agree on every field rather
+      // than on an expectation somebody typed. If a future edit makes
+      // `_lowerBound` consult the flag for a zero-anchored group, this fails.
+      final data = sampleDataByPrefix();
+      var checked = 0;
+      for (final entry in data.entries) {
+        final groups = chartGroupsForPrefix(entry.key);
+        // The sample lists are positional, so a group added or reordered without
+        // its data would otherwise plot the neighbouring series and pass.
+        expect(
+          entry.value.length,
+          groups.length,
+          reason: 'sample data for ${entry.key} is out of step with its groups',
+        );
+        for (var i = 0; i < groups.length; i++) {
+          final group = groups[i];
+          final seriesData = entry.value[i];
+          expect(
+            seriesData.length,
+            group.series.length,
+            reason:
+                'sample data for ${entry.key}/${group.title} is out of '
+                'step with its series',
+          );
+          if (!group.zeroAnchored) continue;
+          final withFlag = boundsFor(group, seriesData);
+          final withoutFlag = ChartBounds.fromSeries([
+            for (final values in seriesData) seriesOf(ramp(values)),
+          ]);
+          checked++;
+          expect(
+            withFlag.minY,
+            withoutFlag.minY,
+            reason: "'${group.title}' on '${entry.key}' changed minY",
+          );
+          expect(
+            withFlag.maxY,
+            withoutFlag.maxY,
+            reason: "'${group.title}' on '${entry.key}' changed maxY",
+          );
+          expect(
+            withFlag.chartInterval,
+            withoutFlag.chartInterval,
+            reason: "'${group.title}' on '${entry.key}' changed the interval",
+          );
+        }
+      }
+      // Derived from the same declaration the sweep walks, so this catches an
+      // empty or partial sweep without hard-coding a group count that a future
+      // group would invalidate for no reason.
+      expect(
+        checked,
+        [
+          for (final prefix in ['pv', 'ac', 'battery', 'env', 'fish'])
+            for (final g in chartGroupsForPrefix(prefix))
+              if (g.zeroAnchored) 1,
+        ].length,
+        reason: 'every zero-anchored group has to be swept',
+      );
+    });
+
+    test('an index group keeps the zero baseline when it does not opt out', () {
+      // The counterfactual, and the reason the flag is a flag: the same pH data
+      // through a zero-anchored axis puts the data in the top slice.
+      final ph = chartGroupsForPrefix('fish')
+          .firstWhere((g) => !g.zeroAnchored);
+      final values = [
+        [6.42, 7.05, 7.75, 6.37],
+      ];
+      final zeroAnchored = ChartBounds.fromSeries([seriesOf(ramp(values[0]))]);
+      final index = boundsFor(ph, values);
+      expect(zeroAnchored.minY, 0);
+      expect(index.minY, isNot(0));
+    });
+  });
+
+  group('index-anchored axes', () {
+    /// The pH group, which is the one group in the app that opts out.
+    ChartGroup ph() =>
+        chartGroupsForPrefix('fish').firstWhere((g) => !g.zeroAnchored);
+
+    /// The share of the plot height the data actually occupies.
+    double filled(ChartBounds b, List<double> values) {
+      final min = values.reduce((a, b) => a < b ? a : b);
+      final max = values.reduce((a, b) => a > b ? a : b);
+      return (max - min) / (b.maxY - b.minY);
+    }
+
+    test('opens headroom below the data instead of pinning to zero', () {
+      final values = [6.42, 7.05, 7.75, 6.37];
+      final b = boundsFor(ph(), [values]);
+      final min = values.reduce((a, b) => a < b ? a : b);
+      expect(
+        b.minY,
+        lessThan(min),
+        reason: 'the axis has to start below the data, not at it',
+      );
+      expect(b.minY, greaterThan(0), reason: 'pH never went negative');
+    });
+
+    test('spends the axis on the data rather than on the empty zero', () {
+      // The property the whole change exists for, stated without a literal: the
+      // same readings must occupy strictly more of the plot height once the
+      // baseline stops being an arbitrary point on the scale. Any threshold here
+      // would be a magic number; "more than it did before" is the claim.
+      for (final values in <List<double>>[
+        [6.42, 7.05, 7.75, 6.37],
+        [7.0, 7.05, 6.98, 7.02], // a nearly flat tank
+        [5.8, 6.1, 8.4], // a wide excursion
+      ]) {
+        final zero = ChartBounds.fromSeries([seriesOf(ramp(values))]);
+        final index = boundsFor(ph(), [values]);
+        expect(
+          filled(index, values),
+          greaterThan(filled(zero, values)),
+          reason: '$values plotted no taller anchored away from zero',
+        );
+      }
+    });
+
+    test('keeps every gridline a round pH value', () {
+      // The axis is a count of intervals tall, so fl_chart -- which labels every
+      // multiple of the interval *and* both bounds -- cannot draw a leftover like
+      // 6.025 as a gridline. Same reasoning as the maxY snap that already
+      // existed, applied to the bottom of the axis.
+      for (final values in <List<double>>[
+        [6.42, 7.05, 7.75, 6.37],
+        [7.0, 7.05, 6.98, 7.02],
+        [5.8, 6.1, 8.4],
+        [7.0, 7.0, 7.0], // never moves
+      ]) {
+        final b = boundsFor(ph(), [values]);
+        final intervals = (b.maxY - b.minY) / b.chartInterval;
+        expect(
+          intervals,
+          closeTo(intervals.roundToDouble(), 1e-6),
+          reason: '$values gave a span of $intervals intervals',
+        );
+        final steps = b.maxY / b.chartInterval;
+        expect(
+          steps,
+          closeTo(steps.roundToDouble(), 1e-6),
+          reason:
+              '$values gave maxY ${b.maxY} on a step of '
+              '${b.chartInterval}',
+        );
+      }
+    });
+
+    test('scales its headroom to the range, not to the value', () {
+      // The bottom is derived from the *range*, so headroom per unit of range
+      // is the same number for every input. A pad proportional to the value --
+      // which is what the top of a zero-anchored axis does, and the obvious
+      // thing to copy -- would give a different ratio for each of these, and so
+      // would no pad at all. Stated as a ratio because the coefficient itself is
+      // not the contract; how it scales is.
+      for (final high in [7.2, 7.75, 8.4, 9.1, 11.0, 13.9]) {
+        for (final low in [4.2, 6.37, 6.9]) {
+          final range = high - low;
+          final headroom =
+              low - chartLowerBound(low, high, zeroAnchored: false);
+          final reference =
+              (low - chartLowerBound(low, 7.75, zeroAnchored: false)) /
+              (7.75 - low);
+          expect(
+            headroom / range,
+            closeTo(reference, 1e-9),
+            reason:
+                'a $range-wide pH swing from $low padded at a different '
+                'rate than a 1.38-wide one did',
+          );
+        }
+      }
+    });
+
+    test('never plots a zero-height axis', () {
+      // A flat series is the case the 2%-of-value term exists for: a range-only
+      // pad would give minY == rawMaxY and fl_chart would have a line with
+      // nowhere to be. Swept over both anchoring modes and both signs, because
+      // this is the failure a hand-written expectation misses.
+      for (final values in <List<double>>[
+        [7.0, 7.0, 7.0],
+        [7.0, 7.0000001],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.1],
+        [-5.0, -5.0],
+        [-5.0, -1.0, -3.0],
+        [1e6, 1e6],
+        [0.0, 0.0, 5.0],
+      ]) {
+        for (final zeroAnchored in [true, false]) {
+          final b = ChartBounds.fromSeries([
+            seriesOf(ramp(values)),
+          ], zeroAnchored: zeroAnchored);
+          expect(
+            b.maxY,
+            greaterThan(b.minY),
+            reason:
+                '$values at zeroAnchored=$zeroAnchored plotted '
+                '${b.minY}..${b.maxY}',
+          );
+          expect(
+            b.chartInterval,
+            greaterThan(0),
+            reason:
+                '$values at zeroAnchored=$zeroAnchored gave a '
+                'non-positive interval',
+          );
+        }
+      }
     });
   });
 }

@@ -4,9 +4,35 @@ import 'package:flutter/foundation.dart';
 enum ConnectionTransport { rest, webSocket, polling }
 
 /// Current state of a connection transport.
+///
+/// There is deliberately no `connecting` state. It existed, with a setter
+/// (`markConnecting`) and two label branches, and a repo-wide search found it
+/// unreachable from every direction:
+///
+///  * the only writer was `markConnecting`, which had **zero** callers in `lib/`,
+///    `test/` and `android/`. The one call site that ever used it,
+///    `dashboard_screen._fetchAll`, had its call removed on purpose — the comment
+///    there records that it fired a real `notifyListeners()` on *every* poll,
+///    because `connecting != connected` meant the following `markSuccess`
+///    produced no notification of its own, and that no banner branch renders a
+///    connecting state anyway. That call site models its in-flight state with
+///    `_telemetryRequestInFlight`, not with this enum.
+///  * the only readers were `ConnectionTransportHealth.statusMessage` and
+///    `ConnectionHealth.statusMessage`. The second is itself recorded as
+///    unreachable in `FEATURE.md` §18.2 (the banner is only rendered on the
+///    `failed` and `stale` branches, both of which override the label).
+///  * the socket path cannot reach it either: `_handleRealtimeConnection` is a
+///    `bool` callback, so the WebSocket's dialing window is never observable to
+///    the app. `markConnected` / `markDisconnected` are the only two states it
+///    can report.
+///
+/// Removing it is safe, and leaving it would have been the more dangerous
+/// option: a "connecting" branch in a label that nothing renders is an
+/// invitation for the next person to wire it up and get a rebuilt status strip
+/// per poll back. If a genuinely visible in-flight state is ever wanted, it
+/// needs a real transition to hang it on, and this enum is not it.
 enum ConnectionTransportStatus {
   idle,
-  connecting,
   connected,
   disconnected,
   degraded,
@@ -41,7 +67,6 @@ class ConnectionTransportHealth {
     };
     return switch (status) {
       ConnectionTransportStatus.idle => '$transportLabel idle',
-      ConnectionTransportStatus.connecting => 'Connecting to $transportLabel',
       ConnectionTransportStatus.connected => '$transportLabel connected',
       ConnectionTransportStatus.disconnected => '$transportLabel disconnected',
       ConnectionTransportStatus.degraded => '$transportLabel degraded',
@@ -53,7 +78,8 @@ class ConnectionTransportHealth {
     Duration? latency,
     DateTime? lastSuccessfulUpdate,
     int? reconnectCount,
-  }) {    return ConnectionTransportHealth(
+  }) {
+    return ConnectionTransportHealth(
       transport: transport,
       status: status ?? this.status,
       latency: latency ?? this.latency,
@@ -132,11 +158,6 @@ class ConnectionHealth {
     if (rest.status == ConnectionTransportStatus.connected) {
       return 'REST connected';
     }
-    if (transports.any(
-      (health) => health.status == ConnectionTransportStatus.connecting,
-    )) {
-      return 'Connecting…';
-    }
     if (isHealthy) return 'Connection degraded';
     if (transports.every(
       (health) => health.status == ConnectionTransportStatus.idle,
@@ -183,10 +204,10 @@ class ConnectionHealthService extends ChangeNotifier {
         ConnectionTransport.polling => _polling,
       };
 
-  void markConnecting(ConnectionTransport transport) {
-    _update(transport, status: ConnectionTransportStatus.connecting);
-  }
-
+  // No `markConnecting`. It was removed because a repo-wide search found it
+  // unreachable, and the reasoning that made it unreachable is recorded on the
+  // `ConnectionTransportStatus` enum above rather than repeated here. Keep it
+  // that way: do not reintroduce it as a per-poll "about to fetch" marker.
   void markConnected(
     ConnectionTransport transport, {
     Duration? latency,

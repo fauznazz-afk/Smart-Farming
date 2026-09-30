@@ -6,8 +6,26 @@ import 'package:plts_monitoring/screens/settings_screen.dart';
 import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Whether [ancestor] sits above [descendant] in the element tree.
+///
+/// Read from the tree rather than from `find.ancestor`, whose result order is
+/// not part of its contract — and the whole ink guard is about *which* of two
+/// ancestors comes first, so an unspecified order would make the assertion
+/// meaningless rather than merely fragile.
+bool _isAncestorOf(Element ancestor, Element descendant) {
+  var found = false;
+  descendant.visitAncestorElements((candidate) {
+    if (identical(candidate, ancestor)) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
 Future<void> _pumpSettings(WidgetTester tester) async {
-  // A tall surface keeps all ten category tiles laid out at once, so the
+  // A tall surface keeps all nine category tiles laid out at once, so the
   // lazily built ListView does not need scrolling in these assertions.
   tester.view.physicalSize = const Size(900, 1600);
   tester.view.devicePixelRatio = 1.0;
@@ -89,6 +107,98 @@ void main() {
     expect(
       find.text('Is the alarm check running, and can Android delay it?'),
       findsOneWidget,
+    );
+  });
+
+  // ── The ink guard ────────────────────────────────────────────────────────────
+  //
+  // AGENTS.md claimed this file already catches "AppCard loses its transparent
+  // Material between the decorated box and the content". It did not, and it
+  // could not have: every other assertion in this file is a `find.text`, a tile
+  // count or a tap, and a missing ink layer changes none of those. The
+  // regression is invisible to exactly the kind of assertion the file was made
+  // of. It is only visible as paint order, so this asserts paint order.
+  //
+  // The defect it guards, from `AppCard`'s own comment: a `Container` with a
+  // `BoxDecoration` paints its background on the same layer as everything inside
+  // it, so a `Material` placed *outside* the decorated box is still underneath.
+  // The card fill covers the ink layer, and every `ListTile`, `SwitchListTile`
+  // and `InkWell` inside loses its splash and its hover state. The fix is the
+  // `Material` being between the decorated box and the content.
+  //
+  // The invariant is checked by walking the element tree rather than by
+  // rendering, so it is deterministic and does not depend on a splash being
+  // mid-animation.
+  testWidgets('keeps a Material between the card fill and its ink', (
+    tester,
+  ) async {
+    await _pumpSettings(tester);
+
+    await tester.tap(find.text('Monitoring'));
+    await tester.pumpAndSettle();
+
+    // MonitoringSection's `SwitchListTile` is the control that loses its ink.
+    // It is the only one on that page, so this cannot pass by finding the wrong
+    // tile.
+    final switchTile = find.byType(SwitchListTile);
+    expect(switchTile, findsOneWidget);
+    final switchElement = switchTile.evaluate().single;
+
+    // The decorated box that paints the card fill. `AppCard` builds it as an
+    // `AnimatedContainer`, and it is the nearest one above the switch — the
+    // page has no other.
+    Element? cardBox;
+    switchElement.visitAncestorElements((element) {
+      if (element.widget is AnimatedContainer) {
+        cardBox = element;
+        return false;
+      }
+      return true;
+    });
+    expect(
+      cardBox,
+      isNotNull,
+      reason: 'the switch must be inside an AppCard for this guard to mean '
+          'anything; if SectionCard stopped using AppCard, the ink ownership '
+          'moved somewhere else and this test is asserting the wrong tree',
+    );
+
+    // The nearest `Material` above the switch — the one that would own its
+    // splash. Found by walking outward and stopping at the first one.
+    Element? nearestMaterial;
+    switchElement.visitAncestorElements((element) {
+      if (element.widget is Material) {
+        nearestMaterial = element;
+        return false;
+      }
+      return true;
+    });
+    expect(
+      nearestMaterial,
+      isNotNull,
+      reason: 'a Material must exist above the switch or it has no ink at all',
+    );
+
+    expect(
+      cardBox!.widget,
+      isA<AnimatedContainer>(),
+      reason: 'AppCard must keep building its decoration in an AnimatedContainer',
+    );
+
+    // The assertion that would actually fail on the regression: the card box
+    // must sit *above* the ink-owning Material, i.e. the Material is nested
+    // inside the decorated box and paints over the fill.
+    //
+    // The inverted arrangement — Material wrapping the box — is what a
+    // `Material` outside the `Container` looks like, and it is exactly the
+    // regression. Both are "a Material is an ancestor of the switch", so the
+    // naive check passes either way; the ordering is the whole content.
+    expect(
+      _isAncestorOf(cardBox!, nearestMaterial!),
+      isTrue,
+      reason: 'the Material must be a DESCENDANT of the decorated box, not an '
+          'ancestor of it. Outside it, the opaque card fill paints over the ink '
+          'layer and every switch on this screen loses its splash.',
     );
   });
 

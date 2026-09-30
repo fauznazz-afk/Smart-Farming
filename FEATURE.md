@@ -21,7 +21,7 @@ AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
 **Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**351 lulus** di 25 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
+**363 lulus** di 25 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
 Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
 kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
 yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
@@ -968,31 +968,99 @@ diverifikasi di perangkat ada di §18.5.
 
 ### 18.0 Celah yang dibuat oleh 1.7.0 dan masih terbuka
 
+> **Yang ditutup 30 September malam (enam agent paralel, file terpisah):**
+> butir 1 (sumbu Y pH), butir 2 (range picker), butir 3 (`FilledButton` — tetap),
+> butir 5 (test kontras), plus **dua bug baru yang ditemukan di sesi ini** dan
+> satu yang Found oleh agent: badge "Resolved" hijau, `AppTile` di bawah AA, dan
+> margin halaman yang memotong bayangan. Detail di bawah.
+
 > **Yang sudah tertutup sejak ditulis:** butir 5 (test kontras mengukur
 > permukaan basi) dan butir 6 (`Bound` tanpa test) sudah diperbaiki. Butir 5
-> adalah bug aksesibilitas yang Compounds: ia bertahan dua commit karena
+> adalah bug aksesibilitas yang menumpuk: ia bertahan dua commit karena
 > daftar surface di test lebih terang dari yang dirender, jadi suite hijau
 > sementara tiga warna di bawah AA. Butir 6 sudah tertutup di `0678be4`.
 
-1. **Sumbu Y pH terpatok ke nol.** Datanya 6,37–7,75 dalam rentang 0–10, jadi
-   penurunan 7,75 → 6,37 terjekan di seperlima plot. `minY = min<0 ? min*1.1 : 0`
-   benar untuk lux dan watt, di mana nol berarti sesuatu, dan salah untuk indeks
-   tanpa dimensi. Belum diputuskan.
-2. **Range picker kustom tidak terjangkau.** Ikon kalender di header chart
-   adalah satu-satunya jalan ke `showDateRangePicker`, dan semuanya dihapus.
-   Date strip hanya bisa memilih satu hari.
+1. ~~**Sumbu Y pH terpatok ke nol.**~~ **Diperbaiki.** `minY` sekarang dihitung
+   oleh `chartLowerBound`, dan grup yang indeks memakai flag `zeroAnchored: false`
+   di `chart_groups.dart` — satu tempat yang sudah mendeklarasikan apa yang tiap
+   halaman gambar. Batas bawahnya `minimum − 0,25 × rentang`, lalu di-*snap* ke
+   kelipatan interval. Untuk jendela pH asli (6,37–7,75) hasilnya **sumbu 6,0–8,5**
+   dengan gridline 6,0/6,5/7,0/7,5/8,0/8,5 — semua nilai pH nyata. Data mengisi
+   55 % plot, sebelumnya 14 %.
+   **Turbidity tidak dapat flag**, dan itu atas bukti bukan tebakan:
+   `settings_validation_test.dart` merekam sensornya membaca 2396 NTU, dan itu
+   justru alasan `maxAllowed`-nya `null`. NTU adalah besaran dengan nol nyata
+   (air jernih), dan pembacanya ratusan–ribuan unit dari nol, jadi nol tidak
+   memakan apa pun. Nol pH adalah angka di penggaris; nol turbidity adalah
+   keadaan airnya.
+2. ~~**Range picker kustom tidak terjangkau.**~~ **Diperbaiki, dan diagnosed
+   ulang.** Klaim lamanya separuh benar: `DateStrip` masih punya tombol kalender
+   28dp yang memanggil `_pickDateFromCalendar`, **tapi `DateStrip` hanya ada di
+   Overview** — jadi di Power, Hydroponics dan Fish tidak ada cara sama sekali
+   mengubah tanggal kecuali kembali ke Overview, memilih range, lalu swipe lagi.
+   Sekarang ada kontrol di **app bar**, tersedia di keempat tab. Ikon berganti
+   `calendar_month_outlined` ↔ `date_range_outlined` menurut apakah rentang
+   aktif, dan tooltip dibangun dari `describeHistoryRange` yang sama dengan
+   header chart, jadi tooltip dan header tidak bisa berbeda.
 3. **`FilledButton` masih blok accent rata.** Bentuk dan kontrasnya sudah benar,
-   tapi neumorphism yang ketat akan membuatnya raised atau inset.
+   tapi neumorphism yang ketat akan membuatnya raised atau inset. **Sengaja tidak
+   diubah** — ia satu-satunya kontrol yang fill-nya adalah accent, dan
+   membalikinya membuat accent berhenti terbaca sebagai aksi.
 4. **Kotak hitam CCTV di light mode** masih menusuk di halaman neumorphic terang.
    `0xFF080D0A` adalah permukaan di belakang video, bukan permukaan bertema, dan
    belum diputuskan apa yang benar di sana.
-5. **Bayangan kanan kartu terpotong tepi layar.** Kartu melebar sampai tepi kanan
-   di halaman Power dan Overview, jadi separuh pekerjaan kedalaman — ambient
-   yang jatuh ke kanan dan bawah — tidak terlihat di sisi itu. Ini layout,
-   bukan shadow, dan sudah begitu sebelum 1.7.0; sengaja tidak disentuh karena
-   mengubahnya berarti mengubah margin halaman, bukan visual. Diperbaiki berarti
-   mengurangi lebar kartu atau menambah margin, dan keduanya keputusan layout
-   yang bukan milik bab ini.
+5. ~~**Bayangan kanan kartu terpotong tepi layar.**~~ **Diperbaiki: margin
+   halaman 16 → 24 dp.** Aritmetikanya: `BoxShadow` digambar sebagai mask blur
+   `sigma = blurRadius / 2`, jadi contact (offset 3, blur 6) menjangkau 9 dp dan
+   ambient (offset 9, blur 22) menjangkau **20 dp pada 1σ** — bagian yang benar-benar
+   menggambar edge — dan 31 dp pada 2σ. Margin lama 16 dp, jadi ambient terpotong
+   **tepat di tengah bagian yang penting**. 24 dp menampilkan seluruh 1σ dengan
+   sisa 4 dp. 32 dp juga akan menampilkan ekor 2σ, tetapi memakan 16 dp dari plot
+   chart di viewport 381 dp — tradeoff buruk untuk 3 % alpha.
+   **Tidak** diperbaiki dengan mengecilkan `AppElevation.raised`: contact sudah
+   muat dan Ambient-lah yang butuh ruang, dan kebalikannya mengubah ambient
+   kembali menjadi contact kedua — persis "bevel CSS neumorphism 1990s" yang
+   komentar file token sendiri ada untuk cegah. Margin navbar dinaikkan 14 → 24 dp
+   pada saat yang sama; kalau tidak, pil akan menonjol 10 dp dari kolom konten
+   dan setiap halaman akan memperlihatkan langkah di bawah.
+6. **`energy_report_screen.dart` punya `_pickPeriod()` dengan nol call site.**
+   Found oleh agent, di luar file yang dia miliki jadi tidak disentuh. Laporan
+   energinya terkunci ke tanggal `_selectedDate` diinisialisasi, dengan **tidak
+   ada cara mengubahnya** — dead code plus kontrol yang hilang, bukan sekadar
+   pemindahan tempat. Lebih buruk daripada gap range picker di dashboard.
+
+### 18.0b Dua bug yang ditemukan sesi ini, keduanya kelas yang sama
+
+**`AppTile` di bawah WCAG AA, dan test yang mengukurnya salah mengecualikannya.**
+`AppTile` mengisi dengan `AppSurfaces.track` = `#CFD6D2`, dan teks digambar di
+atasnya. Terukur di light mode: `faintColor` 3,85 · `statusOk` 3,85 ·
+`statusWarn` 3,87 · `statusBad` 3,86 · `statusAlert` 3,86 — semuanya di bawah
+4,5. Yang besar (11,09:1) aman; yang gagal adalah **caption**-nya, persis yang
+kecil dan abu-abu.
+
+Yang membuatnya membingungkan adalah test-nya **sengaja mengecualikannya**, dengan
+alasan tertulis: *"no text is ever drawn on one"*. Alasan itu **benar untuk progress bar
+6–8 dp dan salah untuk `AppTile`**, kotak ~190 dp yang isinya teks.
+`AppSurfaces.track` punya dua konsumen, dan pengecualian yang ditulis untuk satu
+diterapkan ke keduanya. Pola yang sama persis dengan bug daftar surface kemarin.
+
+Perbaikannya dua bagian, bukan satu: fill → `AppSurfaces.input` (4,99–5,02:1) **dan**
+`AppElevation.inset` — karena tile sebelumnya **tidak punya inner shadow sama
+sekali**, dan kesan inset-nya datang 100 % dari fill yang lebih gelap. Mengganti
+fill tanpa shadow akan meratakan tile. Guard-nya diuji dengan membalik tiap
+bagian secara terpisah: fill saja → 2 test gagal, shadow saja → 1 test gagal.
+
+**Badge "Resolved" hijau melanggar aturan warna app sendiri.** Agent menemukan
+argumen yang lebih kuat dari yang saya tulis di `AGENTS.md`: ini bukan soal hue,
+tapi soal **tense**. `statusOk` adalah warna *status*, dan di layar itu hanya
+berarti satu hal — kondisi yang ada **sekarang**. `Critical` / `Warning` /
+`Acknowledged` memang kondisi hidup. `Resolved` adalah fakta tentang sebuah
+baris di riwayat, dan menghijaukannya berarti mengatakan "tidak ada masalah
+sekarang" satu baris di sebelah alarm merah yang masih hidup. Satu warna
+melakukan dua pekerjaan yang berlawanan di satu layar.
+Perbaikannya: hijau dihapus **dan pilnya**, karena wash `AppBadge` adalah bentuk
+"ini punya status, lihat ini" — resolved adalah satu-satunya state di daftar itu
+yang tidak bisa ditindaklanjuti user. Kata "Resolved" tetap ada, teks biasa.
 
 ### 18.1 Celah fungsional
 
@@ -1244,7 +1312,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 351 test, jalankan PER-FILE (OOM)
+flutter test                                    # 363 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 

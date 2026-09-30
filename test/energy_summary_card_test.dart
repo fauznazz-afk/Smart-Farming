@@ -8,8 +8,10 @@
 // nobody noticed until a device was in hand.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/services/energy_forecast_service.dart';
 import 'package:plts_monitoring/widgets/energy_summary_card.dart';
+import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
 void main() {
   const seedColor = Color(0xFF35A968);
@@ -432,6 +434,75 @@ void main() {
   });
 
   group('EnergySummaryCard theming', () {
+    // The tiles pass an `accent`, and it does not reach the screen.
+    //
+    // `AppTile` delivers the wash as a `ColoredBox` *parent* of the tile's own
+    // `Container`, and that `Container`'s `BoxDecoration` carries an opaque
+    // `color` — so the fill paints straight over the wash. `ClipRRect` clips the
+    // wash to the tile radius and the Container fills that same radius, so no
+    // sliver survives either. Both tiles have therefore rendered with no wash
+    // since the widget was extracted from two call sites.
+    //
+    // It is left that way on purpose: `AppTile` records that reviving it costs
+    // two AA failures on the delta caption, or the fill-contrast bug the widget
+    // was just fixed for. So this asserts the **current, invisible** behaviour
+    // instead of leaving it unstated. If the wash is ever revived this test is
+    // expected to fail, and that failure is the point: it also moves the
+    // surfaces in `color_helpers_test.dart`, so it is not a one-line edit here.
+    testWidgets('the tile accent wash is not painted, over an opaque fill', (
+      tester,
+    ) async {
+      useTallSurface(tester);
+      await tester.pumpWidget(wrap(card(seed: Color(0xFF00838F))));
+
+      final tiles = find.byType(AppTile);
+      expect(tiles, findsNWidgets(2));
+
+      for (final tile in tiles.evaluate()) {
+        // The wash is a `ColoredBox` *above* the tile's own `Container` — which
+        // is why `find.descendant` finds it here and not below.
+        final washes = find.descendant(
+          of: find.byWidget(tile.widget),
+          matching: find.byType(ColoredBox),
+        );
+        expect(washes, findsOneWidget);
+
+        // The fill that paints over it.
+        final containers = find.descendant(
+          of: find.byWidget(tile.widget),
+          matching: find.byType(Container),
+        );
+        expect(containers, findsOneWidget);
+        final decoration = tester.widget<Container>(containers).decoration;
+        expect(decoration, isA<BoxDecoration>());
+        final fill = (decoration! as BoxDecoration).color!;
+
+        // Opaque. This one assertion is what makes the wash invisible.
+        // `a` is the 0..1 double, so 255 is 1.0.
+        expect(
+          fill.a,
+          1.0,
+          reason: 'the tile fill must stay opaque, or the accent wash behind '
+              'it becomes visible and the delta caption needs remeasuring',
+        );
+        expect(
+          fill,
+          AppSurfaces.input(false),
+          reason: 'the rendered tile surface is the input fill — the same one '
+              'color_helpers_test.dart measures faintColor against',
+        );
+
+        // And the wash really is behind rather than in front, so the opacity
+        // above is the reason and not a coincidence of tree shape.
+        expect(
+          find.descendant(of: containers, matching: find.byType(ColoredBox)),
+          findsNothing,
+          reason: 'if the wash became a child of the filled Container it would '
+              'be visible, and this test would be asserting the wrong thing',
+        );
+      }
+    });
+
     testWidgets('keeps both tile colours inside the chosen accent hue',
         (tester) async {
       useTallSurface(tester);

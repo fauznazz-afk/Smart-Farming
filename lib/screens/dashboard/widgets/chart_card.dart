@@ -289,7 +289,10 @@ class TelemetryChartCard extends StatelessWidget {
     // a humidity axis from 0 to 90.
     final bounds = boundsCache.putIfAbsent(
       '$prefix/${group.title}',
-      () => ChartBounds.fromSeries(scaled.map((s) => s.series).toList()),
+      () => ChartBounds.fromSeries(
+        scaled.map((s) => s.series).toList(),
+        zeroAnchored: group.zeroAnchored,
+      ),
     );
     final hasData = scaled.any((item) => item.series.points.isNotEmpty);
     final title = group.title;

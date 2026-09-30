@@ -2,6 +2,74 @@
 
 ### Fixed
 
+- **`AppTile` was below WCAG AA and the test measuring it deliberately excluded
+  it.** Tiles fill with `AppSurfaces.track` and text is drawn on them: measured in
+  light mode, `faintColor` 3.85:1, `statusOk` 3.85, `statusWarn` 3.87, `statusBad`
+  3.86, `statusAlert` 3.86, all under 4.5. The large value is fine at 11.09:1;
+  what failed is the caption, which is exactly the small grey text. The
+  exclusion's own comment says "no text is ever drawn on one" — true of the 6–8dp
+  progress bar that also uses that token, false of a ~190dp text box. Two
+  consumers, one exclusion written for the first and applied to both, which is the
+  same shape as the surface-list drift below. Fixed in two parts, because a tile
+  with no inner shadow at all gets its inset read purely from a darker fill:
+  fill to `AppSurfaces.input` (4.99–5.02:1) *and* `AppElevation.inset`. Each half
+  is guarded separately — reverting the fill alone fails two tests, dropping the
+  shadow alone fails one.
+- **The "Resolved" alarm badge was green, which the app's own colour rule
+  forbids.** The stronger argument is tense rather than hue. `statusOk` is a
+  status colour, and on this screen a status colour can only mean a condition
+  that exists *now*; `Resolved` is a fact about a row in a list, sitting one line
+  from a live red alarm. One colour doing two opposite jobs on one screen. The
+  pill went too, not just the green — the tinted wash is the shape that says
+  "this has a status, look at it", and a resolved record is the only row the user
+  cannot act on. The word "Resolved" remains, in ordinary text.
+- **The right-hand ambient shadow was clipped by the screen edge.** `BoxShadow`
+  paints a mask blur of `sigma = blurRadius / 2`, so the ambient (offset 9, blur
+  22) reaches 20dp at 1σ — the part that actually draws the edge — against a 16dp
+  page margin, so it was cut halfway through the part that matters. Page margin
+  16 → 24dp. Shrinking the shadow instead was rejected: the contact already fits,
+  the ambient is the point of the three-shadow change, and shrinking it turns the
+  ambient back into a second contact shadow, which is the 1990s bevel the token
+  file's own comment exists to prevent. The nav bar margin moved 14 → 24dp in the
+  same change, or the pill would sit 10dp proud of the content column.
+- **A pH chart whose whole story was squeezed into the top fifth of the plot.**
+  Zero is the honest baseline for a magnitude and wrong for a bounded
+  dimensionless index. `ChartGroup.zeroAnchored` now says which is which, in the
+  one place that already declares what each page charts; pH gets
+  `minimum − 0.25 × range` snapped to an interval, giving an axis of 6.0–8.5 with
+  gridlines that are all real pH values, and the data filling 55% of the plot
+  against 14% before. Turbidity deliberately does **not** get it: the sensor
+  reads 2396 NTU, which is why its limit is uncapped, and NTU has a real zero.
+- **The custom date range was unreachable on three of the four tabs.** The old
+  diagnosis was half right — the `DateStrip` calendar button still worked, but
+  `DateStrip` only exists on Overview, so on Power, Hydroponics and Fish there was
+  no way to change the date at all short of navigating back. There is now an
+  app-bar control on all four tabs, whose icon switches between a single day and a
+  range and whose tooltip is built from the same `describeHistoryRange` the chart
+  headers use, so the two cannot disagree.
+- **Removed `ConnectionTransportStatus.connecting` and `markConnecting`.** Both
+  were verified unreachable before removal, per the standing rule that a dead-code
+  claim gets a search: `markConnecting` had zero callers in `lib/`, `test/` and
+  `android/`, the WebSocket path could only ever report two states, and the one
+  caller that had been removed was removed because `connecting != connected` would
+  have made the health indicator re-render on every poll. The two now-dead
+  `statusMessage` branches went with it — leaving a `connecting` branch in a label
+  nothing renders is an invitation to re-wire it and get the per-poll rebuild
+  back.
+
+### Known gaps found, not fixed
+
+- **`energy_report_screen.dart` has `_pickPeriod()` with zero call sites.** The
+  report's date is pinned to whatever `_selectedDate` initialised to, with no way
+  to change it — dead code *and* a missing control, which is worse than the
+  dashboard gap that was just fixed. Different screen, deliberately untouched.
+- **The icon ring on a resolved alarm row is still a red `severityColor` wash.**
+  The same tense argument applies, but that ring carries "this was a critical
+  alarm", which is a historical fact stated nowhere else on the row. Recolouring
+  it would drop information, so it needs the severity to survive somewhere first.
+
+### Fixed (earlier in this release)
+
 - **The contrast test had been measuring surfaces the app stopped using, and
   three colours were under WCAG AA the whole time.** All six hex values in
   `test/color_helpers_test.dart`'s surface list were stale — not one matched a
