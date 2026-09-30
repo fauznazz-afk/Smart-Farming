@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
 import '../widgets/liquid_glass.dart';
+import 'dashboard/utils/design_tokens.dart';
 
 class AlarmHistoryScreen extends StatefulWidget {
   const AlarmHistoryScreen({super.key});
@@ -85,12 +86,10 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     AlarmType.deviceOffline => Icons.cloud_off_outlined,
   };
 
-  Color _colorForSeverity(AlarmSeverity severity, bool isDark) {
-    if (severity == AlarmSeverity.critical) {
-      return isDark ? const Color(0xFFEF5350) : const Color(0xFFD32F2F);
-    }
-    return isDark ? const Color(0xFFFFB74D) : const Color(0xFFF57C00);
-  }
+  Color _colorForSeverity(AlarmSeverity severity, bool isDark) =>
+      severity == AlarmSeverity.critical
+          ? alarmCritical(isDark)
+          : alarmWarning(isDark);
 
   String _formatTimestamp(DateTime dt) {
     const months = [
@@ -133,7 +132,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             ),
         ],
       ),
-      body: AmbientBackground(
+      body: AppBackground(
         isDark: isDark,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -157,7 +156,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
           Icon(
             Icons.notifications_off_outlined,
             size: 56,
-            color: isDark ? Colors.white38 : Colors.black26,
+            color: faintColor(isDark),
           ),
           const SizedBox(height: 16),
           Text(
@@ -196,13 +195,17 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         final alarm = alarms[index];
         final isExpanded = _expandedIds.contains(alarm.id);
         final severityColor = _colorForSeverity(alarm.severity, isDark);
-        return LiquidGlassCard(
+        return AppCard(
           isDark: isDark,
           padding: EdgeInsets.zero,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(19),
+              // Was 19: `LiquidGlassCard`'s old radius of 20 minus one, so the
+              // splash would not poke past the card's own corner. It was never
+              // written down and it is now 3dp out from a 16dp card, so the
+              // splash visibly clips inside the corner. Token instead.
+              borderRadius: BorderRadius.circular(AppRadius.card),
               onTap: () {
                 setState(() {
                   if (isExpanded) {
@@ -226,6 +229,12 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: severityColor.withValues(alpha: 0.15),
+                        // The wash alone left the circle with no edge of its
+                        // own; against the now-opaque card it read as a
+                        // floating smudge rather than a badge.
+                        border: Border.all(
+                          color: severityColor.withValues(alpha: 0.28),
+                        ),
                       ),
                       child: Icon(
                         _iconForType(alarm.type),
@@ -244,7 +253,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
+                              color: appPrimaryText(isDark),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -261,7 +270,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                               'Value: ${alarm.value!.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.white70 : Colors.black54,
+                                color: faintColor(isDark),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -282,7 +291,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _statusBadge(alarm, severityColor),
+                        _statusBadge(alarm, severityColor, isDark),
                         PopupMenuButton<_AlarmAction>(
                           tooltip: 'Alarm actions',
                           onSelected: (action) => _applyAction(action, alarm),
@@ -340,7 +349,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  Widget _statusBadge(AlarmRecord alarm, Color severityColor) {
+  Widget _statusBadge(AlarmRecord alarm, Color severityColor, bool isDark) {
     final label = alarm.resolved
         ? 'Resolved'
         : alarm.acknowledged
@@ -348,17 +357,19 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         : alarm.severity == AlarmSeverity.critical
         ? 'Critical'
         : 'Warning';
+    // `statusOk` and `statusAlert` replace the raw `Colors.green` and
+    // `Colors.blue` that were here. Those are tuned for large fills; as 10dp
+    // text they measured roughly 2.3:1 and 3.0:1. `statusOk` is the measured
+    // green, and "Acknowledged" — seen but not fixed — is neither good nor bad,
+    // which is what `statusAlert` is for.
     final color = alarm.resolved
-        ? Colors.green
+        ? statusOk(isDark)
         : alarm.acknowledged
-        ? Colors.blue
+        ? statusAlert(isDark)
         : severityColor;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(8),
-      ),
+    return AppBadge(
+      isDark: isDark,
+      color: color,
       child: Text(
         label,
         style: TextStyle(

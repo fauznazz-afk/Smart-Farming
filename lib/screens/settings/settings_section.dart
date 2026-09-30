@@ -67,12 +67,6 @@ List<SettingsSection> buildSettingsSections({
         builder: (_, settings) => CctvSection(settings: settings),
       ),
       SettingsSection(
-        title: 'Performance',
-        subtitle: 'Tune glass effects for smoother scrolling.',
-        icon: Icons.speed_outlined,
-        builder: (_, settings) => PerformanceSection(settings: settings),
-      ),
-      SettingsSection(
         title: 'Background checks',
         subtitle: 'Is the alarm check running, and can Android delay it?',
         icon: Icons.schedule_send_outlined,

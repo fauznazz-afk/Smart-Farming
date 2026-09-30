@@ -1,8 +1,59 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../services/alarm_bridge.dart';
+import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
+
+/// WCAG AA for text this size. Every value in this section is a 14dp reading a
+/// user has to be able to read, and one of them used to be a fixed green that
+/// measured 2.70:1 on the light page.
+const double _minTextContrast = 4.5;
+
+double _channelLuminance(double value) => value <= 0.03928
+    ? value / 12.92
+    : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+
+double _relativeLuminance(Color color) =>
+    0.2126 * _channelLuminance(color.r) +
+    0.7152 * _channelLuminance(color.g) +
+    0.0722 * _channelLuminance(color.b);
+
+double _contrastRatio(Color a, Color b) {
+  final la = _relativeLuminance(a);
+  final lb = _relativeLuminance(b);
+  return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
+}
+
+/// The user's accent, moved along its own hue until it is readable on the page.
+///
+/// This was a hardcoded `0xFF35A968` — the EnerGrow green *seed* — so a user who
+/// picked "Solar amber" got a green "ok" sitting inside an amber theme, which
+/// is the two-palettes failure in AGENTS.md, and the same green measured
+/// 2.70:1 on the light page, so it failed AA as the 14dp text it is used as.
+///
+/// The fix is not a different green. It is the accent, with its lightness
+/// walked away from the page colour until it clears [_minTextContrast]: darker
+/// in light mode, lighter in dark. The hue never moves, so what is on screen is
+/// still the colour the user chose — only the lightness is corrected, which is
+/// exactly what `statusWarn` and friends already do by hand. The accent is
+/// already read from `colorScheme.primary`, which is the seed put through
+/// `ColorScheme.fromSeed`, so this cannot drift from the palette the user set.
+Color _readableAccent(Color accent, bool isDark) {
+  final page = AppSurfaces.page(isDark);
+  if (_contrastRatio(accent, page) >= _minTextContrast) return accent;
+  final hsl = HSLColor.fromColor(accent);
+  for (var step = 1; step <= 100; step++) {
+    final lightness = isDark
+        ? (hsl.lightness + step / 100).clamp(0.0, 1.0)
+        : (hsl.lightness - step / 100).clamp(0.0, 1.0);
+    final candidate = hsl.withLightness(lightness).toColor();
+    if (_contrastRatio(candidate, page) >= _minTextContrast) return candidate;
+  }
+  return isDark ? Colors.white : Colors.black;
+}
 
 /// Live status of the background alarm check, plus the two things that can stop
 /// it working.
@@ -133,7 +184,13 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                // `colorScheme.error` is a second severity source: it is
+                // whatever `ColorScheme.fromSeed` made of the accent seed, so it
+                // changes when the accent changes and is not the measured red
+                // the rest of the app asserts against.
+                style: TextStyle(
+                  color: statusBad(Theme.of(context).brightness == Brightness.dark),
+                ),
               ),
             ),
           const SizedBox(height: 10),
@@ -185,9 +242,15 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     required bool ok,
     bool plain = false,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // The accent when the row is fine, the measured secondary text when it is
+    // not. The old fallback was `onSurface @ 0.70`, an unmeasured alpha blend
+    // that happened to land near 5:1 and was the only colour in the app left
+    // deriving its own contrast that way. `faintColor` is the pinned pair.
     final color = ok
-        ? const Color(0xFF35A968)
-        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+        ? _readableAccent(theme.colorScheme.primary, isDark)
+        : faintColor(isDark);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -204,7 +267,7 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
           // being clipped, which is why crossAxisAlignment is start.
           SizedBox(
             width: 150,
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(label, style: theme.textTheme.bodyMedium),
           ),
           const SizedBox(width: 10),
           Expanded(

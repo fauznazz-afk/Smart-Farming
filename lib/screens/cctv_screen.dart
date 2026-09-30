@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/cctv_url.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
+import 'dashboard/utils/design_tokens.dart';
 
 /// Web view player for the go2rtc stream page.
 ///
@@ -170,7 +171,8 @@ class _CctvScreenState extends State<CctvScreen> {
           Positioned(
             top: 16,
             left: 16,
-            child: CctvStatusPill(status: _status),
+            // Over the video, so the dark set regardless of the app's theme.
+            child: CctvStatusPill(status: _status, isDark: true),
           ),
         ],
       ),
@@ -198,7 +200,7 @@ class _CctvScreenState extends State<CctvScreen> {
                     height: 42,
                     decoration: BoxDecoration(
                       color: primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.all(AppRadius.tile),
                     ),
                     child: Icon(Icons.videocam_rounded, color: primary),
                   ),
@@ -308,11 +310,25 @@ class _InfoBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B211E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-        ),
+        // Was a hand-picked `0xFF1B211E` in dark and pure `Colors.white` in
+        // light. `AppSurfaces.chrome` is the surface that has to separate from
+        // the page by fill rather than by shadow, which is what this is: a bar
+        // under the player, with a Reload button in it.
+        color: AppSurfaces.chrome(isDark),
+        borderRadius: AppRadius.all(AppRadius.card),
+        // Was `white | black @ 0.06`, which measures 1.14:1 on the fill. The bar
+        // sits under a viewport-sized video and holds a Reload button, so its
+        // edge is a component boundary, which WCAG 1.4.11 wants at 3:1.
+        //
+        // `boundaryEdge`, not `controlEdge`, and the difference is measured
+        // rather than stylistic. `controlEdge` is a tint of the accent, and the
+        // light accent `0xFF35A968` is only 2.70:1 at full opacity on the light
+        // page — so no alpha of it can reach 3:1, and this bar would have sat at
+        // 1.54:1. `boundaryEdge` is a neutral at 3.04:1, which is what WCAG
+        // 1.4.11 asks for, and it is worth a grey line on this one control: the
+        // bar is the only thing separating the video from the Reload button, and
+        // it sits over footage rather than over a themed card.
+        border: Border.all(color: AppElevation.boundaryEdge(isDark: isDark)),
       ),
       child: Row(
         children: [

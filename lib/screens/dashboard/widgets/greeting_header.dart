@@ -1,7 +1,9 @@
+import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/date_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// Time-of-day greeting with the signed-in user's name and today's date.
 class GreetingHeader extends StatelessWidget {
@@ -24,7 +26,12 @@ class GreetingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final primary = isDark ? Colors.white70 : Colors.black54;
+    // The avatar was tinted with `white70`/`black54`, which is the exact pair
+    // `color_helpers.dart` replaced: it is what fails 4.5:1 as a glyph and reads
+    // as a grey smudge at 28 px inside the circle. The glyph now takes the
+    // measured ordinary text colour, the fill is the real track surface rather
+    // than a translucent grey, and the ring is a divider at a usable alpha.
+    final glyph = appPrimaryText(isDark);
     return Row(
       children: [
         Container(
@@ -32,15 +39,15 @@ class GreetingHeader extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: primary.withValues(alpha: 0.18),
-            border: Border.all(color: primary.withValues(alpha: 0.35)),
+            color: AppSurfaces.track(isDark),
+            border: Border.all(color: appDivider(isDark: isDark, opacity: 0.28)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Image.asset(
               'assets/user_icon.png',
               fit: BoxFit.contain,
-              color: primary,
+              color: glyph,
               colorBlendMode: BlendMode.srcIn,
               semanticLabel: 'User profile',
             ),
@@ -56,7 +63,7 @@ class GreetingHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : Colors.black87,
+                  color: appPrimaryText(isDark),
                 ),
               ),
               Text(

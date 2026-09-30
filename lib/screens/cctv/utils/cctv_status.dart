@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
+
 /// Lifecycle of the CCTV stream, derived from the player flags.
 enum CctvStatus {
   /// Nothing is loading; the user must press play.
@@ -38,11 +40,38 @@ extension CctvStatusDisplay on CctvStatus {
     CctvStatus.offline => 'OFFLINE',
   };
 
-  /// Badge and dot tint.
+  /// The status hue. Used for the 7dp dot.
+  ///
+  /// The dot does not need text contrast — it sits beside a word that does, and
+  /// WCAG 1.4.11 exempts it as part of a graphic that is not the sole carrier of
+  /// the information. It keeps its distinct hue for exactly that reason.
   Color get color => switch (this) {
     CctvStatus.live => const Color(0xFF58D68D),
     CctvStatus.offline => const Color(0xFFFF765E),
     CctvStatus.standby || CctvStatus.connecting => const Color(0xFFFFC857),
+  };
+
+  /// The status colour to draw the *label* in.
+  ///
+  /// This is separate from [color] because the pill used [color] for both, and
+  /// as 9dp text those values measured 1.66:1 (live) and 1.39:1 (standby) on
+  /// the light page — far below AA and, at that size, close to invisible. They
+  /// are fills tuned to be bright, not colours tuned to be read.
+  ///
+  /// So the text moves to the measured family the rest of the app asserts
+  /// against (`statusOk` / `statusWarn` / `statusBad`, pinned by
+  /// `test/color_helpers_test.dart`) and the dot keeps its own hue, which is the
+  /// cheapest possible fix and the one that preserves the dot/text pairing.
+  ///
+  /// Note the `0xFFFFC857` above is byte-identical to the energy report's PV
+  /// series amber. A CCTV standby dot and a PV bar are already the same colour
+  /// on screen. That is reported rather than fixed here: inventing a fourth hue
+  /// to separate them would be the automatic hue variation AGENTS.md forbids,
+  /// and a deliberate alternative has to be a choice the lead makes.
+  Color textColor(bool isDark) => switch (this) {
+    CctvStatus.live => statusOk(isDark),
+    CctvStatus.offline => statusBad(isDark),
+    CctvStatus.standby || CctvStatus.connecting => statusWarn(isDark),
   };
 
   /// Whether the video surface should be mounted behind the overlays.

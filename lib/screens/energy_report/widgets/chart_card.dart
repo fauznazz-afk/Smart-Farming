@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../../dashboard/utils/design_tokens.dart';
 import '../utils/format_helpers.dart';
 import '../utils/chart_helpers.dart';
 import '../../../services/energy_report_service.dart';
@@ -53,6 +54,16 @@ class ChartCard extends StatelessWidget {
                     child: SizedBox(
                       width: chartWidth < 300 ? 300 : chartWidth,
                       child: BarChart(
+                        // The swap animation runs on *every* data change, not
+                        // just the first paint, and this chart is rebuilt
+                        // whenever a bucket is touched, when the period changes
+                        // and on the 5-minute refresh. So the rods spent 150ms
+                        // lerping between the same two numbers several times a
+                        // session. The dashboard's LineChart already opts out
+                        // with `duration: Duration.zero`
+                        // (dashboard/widgets/chart_card.dart:285) for the same
+                        // reason. fl_chart names the BarChart equivalent
+                        // `swapAnimationDuration`; its default is 150ms.
                         BarChartData(
                           maxY: maxY,
                           minY: 0,
@@ -98,6 +109,7 @@ class ChartCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        swapAnimationDuration: Duration.zero,
                       ),
                     ),
                   ),
@@ -146,13 +158,16 @@ class _SelectedBucketReadout extends StatelessWidget {
       valueListenable: touchedBucketNotifier,
       builder: (context, touchedIndex, _) {
         final bucket = buckets[clampBucketIndex(touchedIndex, buckets.length)];
+        // A readout, so it is cut into the card it sits in: the track fill, not
+        // a second raised surface. It was `white @ 0.07` / `black @ 0.045`,
+        // which over a now-opaque card is a wash of nothing, and it carried no
+        // edge at all.
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : Colors.black.withValues(alpha: 0.045),
-            borderRadius: BorderRadius.circular(10),
+            color: AppSurfaces.track(isDark),
+            borderRadius: AppRadius.all(AppRadius.badge),
+            border: Border.all(color: appDivider(isDark: isDark, opacity: 0.5)),
           ),
           child: Row(
             children: [

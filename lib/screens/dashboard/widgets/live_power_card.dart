@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/battery_sign.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// Hero card: live PV power, battery SOC gauge, and where the power is going.
 class LivePowerCard extends StatelessWidget {
@@ -16,7 +17,6 @@ class LivePowerCard extends StatelessWidget {
     required this.pzemAgeLabel,
     required this.isDark,
     required this.seedColor,
-    required this.performanceMode,
   });
 
   final double? pvPower;
@@ -30,13 +30,11 @@ class LivePowerCard extends StatelessWidget {
   final String? pzemAgeLabel;
   final bool isDark;
   final Color seedColor;
-  final bool performanceMode;
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassCard(
+    return AppCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,7 +224,7 @@ class _PowerFlow extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: AppRadius.all(AppRadius.bar),
             child: SizedBox(
               // 8, not 5. At 5 px the bar was a hairline that read as a divider
               // rather than as a proportion, so the one thing the card was
@@ -246,7 +244,7 @@ class _PowerFlow extends StatelessWidget {
                           ),
                       ],
                     )
-                  : ColoredBox(color: faint.withValues(alpha: 0.18)),
+                  : ColoredBox(color: AppSurfaces.track(isDark)),
             ),
           ),
         ),
@@ -314,13 +312,13 @@ class _SocLine extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: AppRadius.all(AppRadius.bar),
             child: SizedBox(
               height: 6,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColoredBox(color: faint.withValues(alpha: isDark ? 0.16 : 0.12)),
+                  ColoredBox(color: AppSurfaces.track(isDark)),
                   FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     widthFactor: clamped / 100,
@@ -339,7 +337,7 @@ class _SocLine extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : Colors.black87,
+              color: appPrimaryText(isDark),
             ),
           ),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/battery_sign.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 import 'shortcut.dart';
 
 /// Snapshot values shown for the battery.
@@ -45,7 +46,6 @@ class SystemStatusStrip extends StatelessWidget {
     required this.ac,
     required this.isDark,
     required this.seedColor,
-    required this.performanceMode,
     required this.onOpenBattery,
     required this.lowSocThreshold,
     required this.activeAlerts,
@@ -55,7 +55,6 @@ class SystemStatusStrip extends StatelessWidget {
   final AcStatus ac;
   final bool isDark;
   final Color seedColor;
-  final bool performanceMode;
   /// Takes the user to the battery readings.
   ///
   /// A bare callback rather than a page index, because Battery is no longer a
@@ -86,9 +85,9 @@ class SystemStatusStrip extends StatelessWidget {
 
     return DashboardShortcut(
       onTap: onOpenBattery,
-      child: LiquidGlassCard(
+      semanticLabel: 'Battery and grid status. Opens the battery readings.',
+      child: AppCard(
         isDark: isDark,
-        performanceMode: performanceMode,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
@@ -150,9 +149,7 @@ class SystemStatusStrip extends StatelessWidget {
     width: 1,
     height: 34,
     margin: const EdgeInsets.symmetric(horizontal: 12),
-    color: dark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.08),
+    color: appDivider(isDark: dark, opacity: dark ? 0.10 : 0.08),
   );
 }
 
@@ -186,9 +183,7 @@ class _Verdict extends StatelessWidget {
     // unrelated colour systems. "70%" is not a status; whether 70% is enough is
     // the user's own threshold, and the icon already says it is fine. A low
     // battery still turns the number red, which is the case that matters.
-    final color = ok
-        ? (isDark ? Colors.white : Colors.black87)
-        : statusBad(isDark);
+    final color = ok ? appPrimaryText(isDark) : statusBad(isDark);
     // Same rule for the icon: the accent when there is nothing to report, a
     // status colour when there is. A green tick beside an amber theme is the
     // clearest statement that two palettes are on screen at once, and it says

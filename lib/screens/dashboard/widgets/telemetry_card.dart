@@ -38,7 +38,7 @@ class GlassPageHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : Colors.black87,
+            color: appPrimaryText(isDark),
           ),
         ),
       ],
@@ -55,7 +55,6 @@ class TelemetryCard extends StatelessWidget {
     required this.metrics,
     required this.isDark,
     required this.seedColor,
-    required this.performanceMode,
     required this.staleMinutes,
   });
 
@@ -63,15 +62,13 @@ class TelemetryCard extends StatelessWidget {
   final List<MetricDef> metrics;
   final bool isDark;
   final Color seedColor;
-  final bool performanceMode;
   final int staleMinutes;
 
   @override
   Widget build(BuildContext context) {
     final stale = data?.isStale(minutes: staleMinutes) ?? true;
-    return LiquidGlassCard(
+    return AppCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
@@ -87,13 +84,7 @@ class TelemetryCard extends StatelessWidget {
               ),
               isDark: isDark,
             ),
-            if (index < metrics.length - 1)
-              GlassDivider(
-                color: glassDividerColor(
-                  isDark: isDark,
-                  opacity: isDark ? 0.07 : 0.05,
-                ),
-              ),
+            if (index < metrics.length - 1) AppDivider(isDark: isDark),
           ],
         ],
       ),
@@ -172,18 +163,14 @@ class _MetricRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   metric.label,
-                  style: TextStyle(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.87)
-                        : Colors.black87,
-                  ),
+                  style: TextStyle(color: appPrimaryText(isDark)),
                 ),
               ),
               Text(
                 displayValue,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : Colors.black87,
+                  color: appPrimaryText(isDark),
                 ),
               ),
             ],
@@ -191,18 +178,6 @@ class _MetricRow extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Hairline separator used between rows inside glass cards.
-class GlassDivider extends StatelessWidget {
-  const GlassDivider({super.key, required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(height: 0.5, color: color);
   }
 }
 

@@ -6,6 +6,7 @@ import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
 import '../utils/date_helpers.dart';
+import '../utils/design_tokens.dart';
 import '../utils/history_range.dart';
 
 /// Human readable name for a dashboard page prefix.
@@ -63,7 +64,13 @@ class ChartSectionHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white70 : Colors.black54,
+                    // `appPrimaryText`, not `faintColor`: this is the section
+                    // heading, and the range label beside it already carries the
+                    // secondary tone. It was `Colors.white70` / `Colors.black54`,
+                    // which is the pair `color_helpers.dart` replaced because it
+                    // measures about 3.4:1 — and 14sp is below the 18.66px
+                    // large-text floor, so AA 4.5:1 is what applies here, not 3:1.
+                    color: appPrimaryText(isDark),
                   ),
                 ),
               ),
@@ -87,14 +94,24 @@ class ChartSectionHeader extends StatelessWidget {
           label: 'Choose custom telemetry date range',
           child: IconButton(
             tooltip: 'Choose date range',
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            // 48, the Material floor, and the `visualDensity: compact` and the
+            // 32dp `constraints` are both gone. They compounded: compact density
+            // shrinks the default 48dp box, and the explicit constraint shrank it
+            // again, so the target was 32dp — a third under the minimum and a
+            // poor one to hit with the same thumb that is scrolling the chart.
+            // The icon is unchanged at 18dp, and it is centred in the larger box,
+            // so the only thing that moved is the edge of the target.
             padding: EdgeInsets.zero,
             onPressed: onPickRange,
             icon: Icon(
               Icons.calendar_month_outlined,
               size: 18,
-              color: isDark ? Colors.white70 : Colors.black54,
+              // `faintColor`, not the raw `white70` / `black54` pair that
+              // `color_helpers.dart` replaced for failing AA. This is a graphic
+              // rather than text, so 3:1 would be the bar — but the control it
+              // sits in has no other visible edge, so clearing the text bar is
+              // the safer choice.
+              color: faintColor(isDark),
             ),
           ),
         ),
@@ -217,7 +234,6 @@ class TelemetryChartCard extends StatelessWidget {
     super.key,
     required this.prefix,
     required this.isDark,
-    required this.performanceMode,
     required this.points,
     required this.spots,
     required this.stats,
@@ -235,7 +251,6 @@ class TelemetryChartCard extends StatelessWidget {
   /// The theme accent, so the plotted series follows the chosen palette.
   final Color seedColor;
   final bool isDark;
-  final bool performanceMode;
 
   final Map<String, List<TelemetryPoint>> points;
   final Map<String, List<FlSpot>> spots;
@@ -257,9 +272,8 @@ class TelemetryChartCard extends StatelessWidget {
     final hasData = scaled.any((item) => item.series.points.isNotEmpty);
     final title = prefixTitle(prefix);
 
-    return LiquidGlassCard(
+    return AppCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       // A loading spinner or an empty message does not need a full plot's worth of
       // height; reserving it pushed everything below the fold for nothing.
       height: (loading || !hasData) ? 170 : 400,
@@ -333,18 +347,28 @@ class TelemetryChartCard extends StatelessWidget {
       borderData: FlBorderData(show: false),
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
-          tooltipRoundedRadius: 14,
+          // `AppRadius.tile`, and deliberately not the card's 16. The tooltip
+          // floats above the plot rather than sitting in the card's plane, so it
+          // keeps the tighter radius and does not inherit the card's scale.
+          tooltipRoundedRadius: AppRadius.tile,
           tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           tooltipMargin: 12,
           maxContentWidth: 150,
           fitInsideHorizontally: true,
           fitInsideVertically: true,
           tooltipBorder: BorderSide(
-            color: Colors.white.withValues(alpha: 0.24),
+            // `appDivider` at 0.24, which is the strength this border had as
+            // `white @ 0.24`. The token's 0.10 default is right for a rule
+            // between two rows of a card and too faint for the outline of a
+            // floating box that has to separate from an arbitrary series
+            // crossing underneath it.
+            color: appDivider(isDark: isDark, opacity: 0.24),
             width: 1,
           ),
-          getTooltipColor: (_) =>
-              isDark ? const Color(0xCC18211D) : const Color(0xD9FFFFFF),
+          // Opaque. It was `0xCC18211D` and `0xD9FFFFFF`, so the tooltip was
+          // showing whichever line happened to pass beneath it through 20% of
+          // its own surface — over a red/green/blue crossing, at 11sp.
+          getTooltipColor: (_) => AppSurfaces.tooltip(isDark),
           getTooltipItems: (touchedSpots) {
             if (touchedSpots.isEmpty) return const [];
             final time = formatAxisTime(touchedSpots.first.x);
@@ -356,7 +380,10 @@ class TelemetryChartCard extends StatelessWidget {
             final tooltip = LineTooltipItem(
               '$time\n${values.join('  ·  ')}',
               TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF17211C),
+                // `appPrimaryText`, replacing `white` and a fourth grey. The
+                // light value was `0xFF17211C`, which was a copy of the card's
+                // text colour made for this one box and pinned nowhere.
+                color: appPrimaryText(isDark),
                 fontSize: 11,
                 height: 1.35,
                 fontWeight: FontWeight.w700,
@@ -404,15 +431,11 @@ class TelemetryChartCard extends StatelessWidget {
       horizontalInterval: bounds.chartInterval,
       verticalInterval: bounds.timeInterval,
       getDrawingHorizontalLine: (_) => FlLine(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.15)
-            : Colors.black.withValues(alpha: 0.08),
+        color: appDivider(isDark: isDark, opacity: isDark ? 0.15 : 0.08),
         strokeWidth: 1,
       ),
       getDrawingVerticalLine: (_) => FlLine(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.black.withValues(alpha: 0.06),
+        color: appDivider(isDark: isDark, opacity: isDark ? 0.10 : 0.06),
         strokeWidth: 1,
       ),
     );
@@ -421,7 +444,13 @@ class TelemetryChartCard extends StatelessWidget {
   FlTitlesData _titlesData(ChartBounds bounds) {
     final labelStyle = TextStyle(
       fontSize: 10,
-      color: isDark ? const Color(0xFFB7C4BD) : const Color(0xFF64748B),
+      // `faintColor`, for both modes. The light value was `0xFF64748B`, a
+      // Tailwind slate that measures 4.30:1 on the light page — under the 4.5:1
+      // that `test/color_helpers_test.dart` requires at this size, and a
+      // non-pinned literal is exactly how that suite gets bypassed. The dark
+      // value measured 7.5:1 and was already fine, so it is folded into the same
+      // function rather than left as a hand-picked hex next to a failing one.
+      color: faintColor(isDark),
     );
     return FlTitlesData(
       topTitles: const AxisTitles(

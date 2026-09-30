@@ -70,6 +70,22 @@ Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>
 Color glassBorderColor({required Color accent, required bool isDark}) =>
     accent.withValues(alpha: isDark ? 0.30 : 0.28);
 
+/// Alarm severity, for the alarm history list.
+///
+/// These were a second, unpinned red and amber living one file away from
+/// [statusBad] and [statusWarn], and both light values failed WCAG AA as the
+/// 11 to 13dp text they are used at: `0xFFF57C00` measured 2.44:1 and
+/// `0xFFD32F2F` measured 4.50:1. The AA work was done once, in this file, and
+/// four call sites outside it did not adopt it. Duplicating the palette is what
+/// let the two drift, so these now resolve to the pinned values instead of
+/// carrying their own.
+///
+/// The icon circle behind each row still uses a wash of the same colour, so the
+/// critical row reads red and the warning row reads amber exactly as before.
+Color alarmCritical(bool isDark) => statusBad(isDark);
+
+Color alarmWarning(bool isDark) => statusWarn(isDark);
+
 /// The color for secondary text: units, captions, timestamps.
 ///
 /// The pair this replaces, `Colors.white54` on dark and `Colors.black45` on

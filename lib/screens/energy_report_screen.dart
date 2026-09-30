@@ -120,7 +120,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
           ),
         ],
       ),
-      body: AmbientBackground(
+      body: AppBackground(
         isDark: isDark,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -132,10 +132,20 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                 strokeWidth: 2.5,
                 displacement: 48,
                 onRefresh: _load,
-                child: ListView(
+                child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                  children: [
-                    PeriodSelector(
+                  // Lazily built, in the same order and with the same content
+                  // as the `children:` list this replaced. The list is only
+                  // five deep, so the win is not the count: it is that the
+                  // BarChart — up to 31 groups of two rods, plus two axis
+                  // title builders per rod — is not constructed on the
+                  // loading, error and empty paths, and not re-laid-out when
+                  // the report is already scrolled past it. It rebuilt on every
+                  // setState, which is every 5-minute refresh plus every
+                  // period change plus every bucket touch.
+                  itemCount: buckets.isEmpty ? 2 : 6,
+                  itemBuilder: (context, index) => switch (index) {
+                    0 => PeriodSelector(
                       monthly: _monthly,
                       selectedDate: _selectedDate,
                       onMonthlyChanged: (value) {
@@ -144,38 +154,39 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                       },
                       onPickPeriod: _pickPeriod,
                     ),
-                    const SizedBox(height: 12),
-                    if (buckets.isEmpty)
-                      EmptyPeriodView(isDark: isDark, data: data!)
-                    else ...[
-                      TotalsCard(
-                        isDark: isDark,
-                        monthly: _monthly,
-                        selectedDate: _selectedDate,
-                        pvKwh: totals.pvKwh,
-                        acKwh: totals.acKwh,
-                        buckets: buckets,
-                        previousTotals: previousTotals,
-                      ),
-                      const SizedBox(height: 12),
-                      ChartCard(
-                        isDark: isDark,
-                        monthly: _monthly,
-                        buckets: buckets,
-                        touchedBucketNotifier: _touchedBucketNotifier,
-                      ),
-                      const SizedBox(height: 12),
-                      DataNote(isDark: isDark, data: data!),
-                      const SizedBox(height: 12),
-                      ExportButton(
-                        sharing: _sharing.value,
-                        buckets: buckets,
-                        selectedDate: _selectedDate,
-                        monthly: _monthly,
-                        sharingNotifier: _sharing,
-                      ),
-                    ],
-                  ],
+                    1 => const SizedBox(height: 12),
+                    2 => buckets.isEmpty
+                        ? EmptyPeriodView(isDark: isDark, data: data!)
+                        : TotalsCard(
+                            isDark: isDark,
+                            monthly: _monthly,
+                            selectedDate: _selectedDate,
+                            pvKwh: totals.pvKwh,
+                            acKwh: totals.acKwh,
+                            buckets: buckets,
+                            previousTotals: previousTotals,
+                          ),
+                    3 => buckets.isEmpty
+                        ? const SizedBox.shrink()
+                        : ChartCard(
+                            isDark: isDark,
+                            monthly: _monthly,
+                            buckets: buckets,
+                            touchedBucketNotifier: _touchedBucketNotifier,
+                          ),
+                    4 => buckets.isEmpty
+                        ? const SizedBox.shrink()
+                        : DataNote(isDark: isDark, data: data!),
+                    _ => buckets.isEmpty
+                        ? const SizedBox.shrink()
+                        : ExportButton(
+                            sharing: _sharing.value,
+                            buckets: buckets,
+                            selectedDate: _selectedDate,
+                            monthly: _monthly,
+                            sharingNotifier: _sharing,
+                          ),
+                  },
                 ),
               ),
       ),

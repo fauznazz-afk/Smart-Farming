@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
+import '../../../widgets/liquid_glass.dart';
 import '../utils/format_helpers.dart';
 import '../utils/period_buckets.dart';
 import '../../../services/energy_report_service.dart';
@@ -65,7 +67,7 @@ class TotalsCard extends StatelessWidget {
               '${totalSampleCount(buckets)} samples • ${buckets.length} ${monthly ? 'days' : 'hours'} with data',
               style: TextStyle(
                 fontSize: 12,
-                color: isDark ? Colors.white60 : Colors.black54,
+                color: faintColor(isDark),
               ),
             ),
           ],
@@ -98,12 +100,13 @@ class _TotalMetric extends StatelessWidget {
       child: MergeSemantics(
         child: Semantics(
           label: '$label: ${value.toStringAsFixed(2)} kilowatt-hours. ${comparisonLabel(value, previous)}',
-          child: Container(
+          // The same object as the dashboard's energy metric tile, so it is the
+          // same widget: two hand-written washes at two radii (16 there, 14
+          // here) for one conceptual thing.
+          child: AppTile(
+            isDark: isDark,
+            accent: color,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -125,7 +128,7 @@ class _TotalMetric extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    color: isDark ? Colors.white60 : Colors.black54,
+                    color: faintColor(isDark),
                   ),
                 ),
               ],

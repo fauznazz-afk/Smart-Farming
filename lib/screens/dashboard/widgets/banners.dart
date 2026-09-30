@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../services/connection_health_service.dart';
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 import '../utils/telemetry_helpers.dart';
 
-const Color _alertAccent = Color(0xFFE66A45);
+/// The energy alert banner's accent.
+///
+/// This is a one-off literal with no dark-mode variant, and it sits next to the
+/// banner in `banners.dart` that now uses `statusWarn`. Left alone it would be
+/// the third amber in the same file. It is a warning that is not a measurement,
+/// so it is the alert tone rather than the measured one.
+const Color _alertAccent = Color(0xFFC2603C);
 
 /// Full-screen placeholder shown when the first telemetry fetch fails.
 class TelemetryErrorView extends StatelessWidget {
@@ -48,15 +55,19 @@ class OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Colors.orange.shade700;
+    // Was `Colors.orange.shade700`, which is `0xFFF57C00` — the same value the
+    // alarm history used for a warning, and 2.44:1 on the page at 12dp. The
+    // offline banner is a warning, so it uses the measured one.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = statusWarn(isDark);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.orange.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+          color: color.withValues(alpha: isDark ? 0.14 : 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.inset),
+          border: Border.all(color: color.withValues(alpha: 0.40)),
         ),
         child: Row(
           children: [

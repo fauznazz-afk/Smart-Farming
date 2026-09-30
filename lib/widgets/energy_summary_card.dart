@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/dashboard/utils/color_helpers.dart';
+import '../screens/dashboard/utils/design_tokens.dart';
 import '../services/energy_forecast_service.dart';
 import '../utils/energy_comparison.dart';
 import 'liquid_glass.dart';
@@ -9,7 +10,6 @@ class EnergySummaryCard extends StatelessWidget {
   const EnergySummaryCard({
     super.key,
     required this.isDark,
-    required this.performanceMode,
     required this.weekly,
     required this.loading,
     required this.hasData,
@@ -26,7 +26,6 @@ class EnergySummaryCard extends StatelessWidget {
 
   final Color seedColor;
   final bool isDark;
-  final bool performanceMode;
   final bool weekly;
   final bool loading;
   final bool hasData;
@@ -95,12 +94,12 @@ class EnergySummaryCard extends StatelessWidget {
       child: MergeSemantics(
         child: Semantics(
           label: '$title: ${_formatEnergy(value)} kilowatt-hours. $label',
-          child: Container(
+          // Was a hand-written wash at radius 16 while the energy report's
+          // identical tile used 14. AppTile is that object, once.
+          child: AppTile(
+            isDark: isDark,
+            accent: color,
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -124,7 +123,7 @@ class EnergySummaryCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    color: isDark ? Colors.white60 : Colors.black54,
+                    color: faintColor(isDark),
                   ),
                 ),
               ],
@@ -156,9 +155,8 @@ class EnergySummaryCard extends StatelessWidget {
       saturation: 0.5,
     );
 
-    return LiquidGlassCard(
+    return AppCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,7 +192,7 @@ class EnergySummaryCard extends StatelessWidget {
             'Estimated from average telemetry power',
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? Colors.white54 : Colors.black54,
+              color: faintColor(isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -269,7 +267,7 @@ class EnergySummaryCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white70 : Colors.black54,
+              color: faintColor(isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -301,14 +299,14 @@ class EnergySummaryCard extends StatelessWidget {
             LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0).toDouble(),
               minHeight: 6,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.bar),
             ),
           const SizedBox(height: 5),
           Text(
             '$targetLabel · $runway',
             style: TextStyle(
               fontSize: 10,
-              color: isDark ? Colors.white60 : Colors.black54,
+              color: faintColor(isDark),
             ),
           ),
           if (result.hasProduction)
@@ -318,7 +316,7 @@ class EnergySummaryCard extends StatelessWidget {
                 'Actual today: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
                 style: TextStyle(
                   fontSize: 10,
-                  color: isDark ? Colors.white60 : Colors.black54,
+                  color: faintColor(isDark),
                 ),
               ),
             ),

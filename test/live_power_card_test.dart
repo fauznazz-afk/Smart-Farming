@@ -22,7 +22,6 @@ void main() {
             pzemAgeLabel: '5s ago',
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -45,7 +44,6 @@ void main() {
             pzemAgeLabel: '2m ago',
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -66,7 +64,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -93,7 +90,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -114,7 +110,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -135,7 +130,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -155,7 +149,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -178,7 +171,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -201,7 +193,6 @@ void main() {
             pzemAgeLabel: '5s ago',
             isDark: true,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );
@@ -221,7 +212,6 @@ void main() {
             pzemAgeLabel: null,
             isDark: false,
             seedColor: seedColor,
-            performanceMode: true,
           ),
         ),
       );

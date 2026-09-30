@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
 import '../../../services/energy_report_service.dart';
 
 class DataNote extends StatelessWidget {
@@ -34,7 +35,7 @@ class DataNote extends StatelessWidget {
               'Hourly energy is calculated from the average Power DC/AC (W) stored in the time-series database. Data refreshes automatically every 5 minutes.',
               style: TextStyle(
                 fontSize: 11,
-                color: isDark ? Colors.white60 : Colors.black54,
+                color: faintColor(isDark),
               ),
             ),
           ],

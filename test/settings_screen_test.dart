@@ -40,7 +40,14 @@ Future<void> _pumpSettings(WidgetTester tester) async {
 
 void main() {
   // Order and strings are taken from buildSettingsSections in
-  // lib/screens/settings/settings_section.dart, which returns ten sections.
+  // lib/screens/settings/settings_section.dart, which returns nine sections.
+  //
+  // There were ten. "Performance" was the tenth, holding one switch that
+  // promised frosted cards and smoother scrolling, and it went when the surface
+  // system was replaced: the `BackdropFilter` it gated had one caller in the
+  // whole app and the fills are opaque now, so there was nothing left to frost
+  // and nothing left to switch off. The count here is load-bearing — it is the
+  // only assertion that notices a section leaving the list.
   testWidgets('lists every settings category', (tester) async {
     await _pumpSettings(tester);
 
@@ -52,10 +59,9 @@ void main() {
       'Environment alerts', // settings_section.dart:52
       'Fish tank alerts', // settings_section.dart:58
       'CCTV source', // settings_section.dart:64
-      'Performance', // settings_section.dart:70
-      'Background checks', // settings_section.dart:76
-      'About', // settings_section.dart:82
-      'Account', // settings_section.dart:88
+      'Background checks', // settings_section.dart:70
+      'About', // settings_section.dart:76
+      'Account', // settings_section.dart:82
     ]) {
       expect(find.text(title), findsOneWidget, reason: 'missing $title');
     }
@@ -68,7 +74,7 @@ void main() {
     await _pumpSettings(tester);
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
-    expect(find.byType(ListTile), findsNWidgets(10));
+    expect(find.byType(ListTile), findsNWidgets(9));
   });
 
   testWidgets('opens the background checks category', (tester) async {

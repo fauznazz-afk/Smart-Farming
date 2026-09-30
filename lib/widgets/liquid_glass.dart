@@ -1,12 +1,25 @@
 import '../screens/dashboard/utils/color_helpers.dart';
-import 'dart:ui';
+import '../screens/dashboard/utils/design_tokens.dart';
 
 import 'package:flutter/material.dart';
 
-// ── AmbientBackground ────────────────────────────────────────────────────────
+// ── AppBackground ────────────────────────────────────────────────────────────
 
-class AmbientBackground extends StatelessWidget {
-  const AmbientBackground({
+/// The page backdrop.
+///
+/// This replaces `AmbientBackground` and its three-gradient orb painter. The
+/// orbs existed for exactly one reason: the card fills were translucent, so
+/// there had to be something behind them for the translucency to reveal. The
+/// fills are opaque now — a soft-UI surface carries its depth in a dual shadow
+/// pair, not in what shows through — so the orbs had nothing left to do.
+///
+/// They were also the most expensive paint in the app: three circles each with a
+/// diameter wider than the screen, drawn as radial gradients over roughly ten
+/// megapixels, and not gated by the Performance setting whose own subtitle
+/// promised "flat cards, smoother scrolling". Removing them removes about ten
+/// megapixels of shaded fill per repaint and makes that setting honest.
+class AppBackground extends StatelessWidget {
+  const AppBackground({
     super.key,
     required this.child,
     required this.isDark,
@@ -17,248 +30,119 @@ class AmbientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RepaintBoundary(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ColoredBox(
-                color: isDark
-                    ? const Color(0xFF0D1410)
-                    : const Color(0xFFF2F5F3),
-              ),
-              CustomPaint(painter: _AmbientOrbsPainter.of(isDark)),
-            ],
-          ),
-        ),
-        child,
-      ],
+    return ColoredBox(
+      color: AppSurfaces.page(isDark),
+      child: child,
     );
   }
 }
 
-class _AmbientOrbsPainter extends CustomPainter {
-  const _AmbientOrbsPainter({required this.isDark});
+// ── AppCard ──────────────────────────────────────────────────────────────────
 
-  final bool isDark;
-
-  // One instance per brightness, reused for the lifetime of the app.
-  //
-  // This cannot be a `const` at the call site: `isDark` is a runtime field, and
-  // a const constructor invocation requires compile-time constant arguments.
-  // Caching the two instances instead means a dashboard rebuild — of which
-  // there are seven distinct `setState` sites — stops allocating a painter it
-  // will immediately discard. `shouldRepaint` compares `isDark` only, so
-  // handing back the same instance for the same brightness is correct.
-  static const _dark = _AmbientOrbsPainter(isDark: true);
-  static const _light = _AmbientOrbsPainter(isDark: false);
-
-  static _AmbientOrbsPainter of(bool isDark) => isDark ? _dark : _light;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (isDark) {
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.12, size.height * 0.10),
-        radius: size.width * 0.60,
-        color: const Color(0xFF66706B),
-        centerAlpha: 0.70,
-      );
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.88, size.height * 0.28),
-        radius: size.width * 0.50,
-        color: const Color(0xFF7A827E),
-        centerAlpha: 0.60,
-      );
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.55, size.height * 0.78),
-        radius: size.width * 0.55,
-        color: const Color(0xFF4F5954),
-        centerAlpha: 0.50,
-      );
-    } else {
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.08, size.height * 0.08),
-        radius: size.width * 0.65,
-        color: const Color(0xFFCBD2CE),
-        centerAlpha: 0.65,
-      );
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.92, size.height * 0.22),
-        radius: size.width * 0.52,
-        color: const Color(0xFFDDE2DF),
-        centerAlpha: 0.55,
-      );
-      _drawOrb(
-        canvas,
-        size,
-        center: Offset(size.width * 0.45, size.height * 0.82),
-        radius: size.width * 0.58,
-        color: const Color(0xFFB8C1BC),
-        centerAlpha: 0.50,
-      );
-    }
-  }
-
-  void _drawOrb(
-    Canvas canvas,
-    Size size, {
-    required Offset center,
-    required double radius,
-    required Color color,
-    required double centerAlpha,
-  }) {
-    final gradient = RadialGradient(
-      colors: [
-        color.withValues(alpha: centerAlpha),
-        color.withValues(alpha: 0.0),
-      ],
-    );
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final paint = Paint()..shader = gradient.createShader(rect);
-    canvas.drawCircle(center, radius, paint);
-  }
-
-  @override
-  bool shouldRepaint(_AmbientOrbsPainter oldDelegate) =>
-      oldDelegate.isDark != isDark;
-}
-
-// ── LiquidGlassCard ──────────────────────────────────────────────────────────
-
-class LiquidGlassCard extends StatelessWidget {
-  const LiquidGlassCard({
+/// The card every screen is built from.
+///
+/// The fill is the page colour, which is what makes the shadow pair read as a
+/// shadow. A card one step off the page would read as flat Material instead,
+/// which is the look this moved away from.
+///
+/// `borderRadius` defaults to [AppRadius.card] and the call sites stopped
+/// passing it, because the app had a default plus exceptions rather than a
+/// scale: twelve values from 3 to 28, with the card at 20 and the navigation
+/// pill at 28 as the two outliers above everything else.
+class AppCard extends StatelessWidget {
+  const AppCard({
     super.key,
     required this.child,
     this.padding,
-    this.borderRadius = 20.0,
-    required this.isDark,
-    this.performanceMode = true,
-    this.tintColor,
-    this.borderColor,
+    this.isDark,
     this.width,
     this.height,
     this.semanticLabel,
+    this.accent,
+    this.inset = false,
+    this.pressed = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
-  final double borderRadius;
-  final bool isDark;
-  final bool performanceMode;
-  final Color? tintColor;
 
-  /// Overrides the hairline border, used to outline a card that has crossed a
-  /// limit. Null keeps the neutral border.
-  final Color? borderColor;
+  /// Null reads the brightness from the context, which is right for a widget
+  /// that is always built under a `MaterialApp`. It is a parameter because the
+  /// dashboard passes it down from a single place to keep every card in one
+  /// frame agreeing on which mode it is in.
+  final bool? isDark;
+
   final double? width;
   final double? height;
   final String? semanticLabel;
 
+  /// The theme accent, used for the hairline. Read from the theme when null, so
+  /// no call site can pass a colour that disagrees with the one in use.
+  final Color? accent;
+
+  /// Cut the surface into the page instead of raising it off it. For input
+  /// fields and for a chip that is not selected.
+  final bool inset;
+
+  /// The pressed state of a control. An inset surface with the shadow pair
+  /// collapsed, which is what makes a soft-UI button feel pressed.
+  final bool pressed;
+
   @override
   Widget build(BuildContext context) {
-    final surface =
-        tintColor ?? (isDark ? const Color(0xFF202020) : Colors.white);
+    final dark = isDark ?? Theme.of(context).brightness == Brightness.dark;
+    final resolvedAccent = accent ?? Theme.of(context).colorScheme.primary;
 
-    // The hairline follows the theme accent. It used to be a neutral white or
-    // black, which meant a card in an amber theme had amber contents inside a
-    // cold grey frame. `colorScheme.primary` is the tonal colour
-    // `ColorScheme.fromSeed` derived from the user's pick, so it is guaranteed
-    // to be legible on this surface — and reading it from the theme means no
-    // call site has to pass a colour that could disagree with the one in use.
-    final border = Border.all(
-      width: 1.2,
-      color:
-          borderColor ??
-          glassBorderColor(
-            accent: Theme.of(context).colorScheme.primary,
-            isDark: isDark,
-          ),
-    );
-
-    final shadows = [
-      BoxShadow(
-        color: isDark
-            ? Colors.black.withValues(alpha: 0.38)
-            : Colors.black.withValues(alpha: 0.07),
-        blurRadius: 24,
-        spreadRadius: -2,
-        offset: const Offset(0, 8),
-      ),
-      BoxShadow(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : Colors.white.withValues(alpha: 0.70),
-        blurRadius: 1,
-        offset: const Offset(0, -0.5),
-      ),
+    final shadows = <BoxShadow>[
+      if (!inset)
+        ...AppElevation.raised(dark)
+      else
+        ...AppElevation.inset(dark),
+      if (pressed)
+        BoxShadow(
+          color: Colors.black.withValues(alpha: dark ? 0.24 : 0.10),
+          blurRadius: 4,
+          offset: const Offset(1, 1),
+        ),
     ];
 
-    final radius = BorderRadius.circular(borderRadius);
+    final decoration = BoxDecoration(
+      color: inset ? AppSurfaces.input(dark) : AppSurfaces.card(dark),
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      border: Border.all(
+        color: AppElevation.hairline(accent: resolvedAccent, isDark: dark),
+      ),
+      boxShadow: shadows,
+    );
 
-    Widget result;
-
-    if (performanceMode) {
-      result = Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    surface.withValues(alpha: 0.66),
-                    surface.withValues(alpha: 0.46),
-                  ]
-                : [
-                    surface.withValues(alpha: 0.64),
-                    surface.withValues(alpha: 0.44),
-                  ],
-          ),
-          borderRadius: radius,
-          border: border,
-          boxShadow: shadows,
-        ),
-        padding: padding,
+    // The `Material` goes *between* the decorated box and the content, not
+    // around the decorated box.
+    //
+    // A `Container` with a `BoxDecoration` paints its background on the same
+    // layer as everything inside it, so a `Material` placed outside it is still
+    // underneath: the card fill covers the ink layer, and anything inside with
+    // its own ink — a `ListTile`, a `SwitchListTile`, an `InkWell` — loses its
+    // splash and its hover state. Putting the Material inside the Container
+    // makes the card fill paint first and the ink paint over it, which is the
+    // order that works.
+    //
+    // `MaterialType.transparency` because the fill is already painted by the
+    // Container; this one exists only to own the ink.
+    final content = Container(
+      width: width,
+      height: height,
+      decoration: decoration,
+      padding: padding,
+      child: Material(
+        type: MaterialType.transparency,
         child: child,
-      );
-    } else {
-      result = ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.white.withValues(alpha: 0.42),
-              borderRadius: radius,
-              border: border,
-              boxShadow: shadows,
-            ),
-            padding: padding,
-            child: child,
-          ),
-        ),
-      );
-    }
+      ),
+    );
 
-    final card = RepaintBoundary(child: result);
+    // The boundary is what keeps a card from re-rasterising when something
+    // above it moves, and the eight cards on a dashboard page are all inside
+    // one scrolling list.
+    final card = RepaintBoundary(child: content);
 
     if (semanticLabel != null) {
       return Semantics(label: semanticLabel, container: true, child: card);
@@ -267,53 +151,175 @@ class LiquidGlassCard extends StatelessWidget {
   }
 }
 
-// ── GlassDateChip ────────────────────────────────────────────────────────────
+// ── AppTile ──────────────────────────────────────────────────────────────────
 
-class GlassDateChip extends StatelessWidget {
-  const GlassDateChip({
+/// A small block inside a card: a metric value, a legend entry, a legend dot.
+///
+/// It used to be a hand-written `BoxDecoration` with a low-alpha colour wash at
+/// one of three different radii — 16 in the energy card, 14 in the energy report
+/// totals, for the same conceptual object. This is that object, once.
+class AppTile extends StatelessWidget {
+  const AppTile({
+    super.key,
+    required this.child,
+    required this.isDark,
+    this.accent,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    this.inset = true,
+  });
+
+  final Widget child;
+  final bool isDark;
+
+  /// A low-alpha wash of this colour under the tile.
+  ///
+  /// This is what makes a PV tile read differently from an AC one. The energy
+  /// report used `0xFFFFC857` at 0.12 and the dashboard's energy card used the
+  /// accent at 0.08 or 0.12, at two different radii, for the same object — so
+  /// the wash belongs to the token now rather than to each call site.
+  ///
+  /// The value is a data-series colour, not a status colour: it says which
+  /// quantity this tile is, not whether anything is wrong.
+  final Color? accent;
+
+  final EdgeInsetsGeometry padding;
+  final bool inset;
+
+  @override
+  Widget build(BuildContext context) {
+    final tile = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: inset
+            ? AppSurfaces.track(isDark)
+            : AppSurfaces.card(isDark),
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+        border: Border.all(color: appDivider(isDark: isDark, opacity: 0.5)),
+      ),
+      child: child,
+    );
+
+    if (accent == null) return tile;
+
+    // The wash is clipped to the same radius, because the Container's
+    // `borderRadius` does not clip its children — an unclipped square-cornered
+    // wash paints over the rounded corner and the tile reads as a rectangle
+    // sitting on a rounded card.
+    //
+    // 0.14 rather than the 0.12 the two call sites used, and lighter in dark
+    // mode: the wash is a data-series colour, and it has to stay weak enough
+    // that `faintColor` on top of it keeps at least 4.5:1.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.tile),
+      child: ColoredBox(
+        color: accent!.withValues(alpha: isDark ? 0.20 : 0.14),
+        child: tile,
+      ),
+    );
+  }
+}
+
+// ── AppBadge ─────────────────────────────────────────────────────────────────
+
+/// A small status pill. Narrow, so it gets the tight radius rather than the
+/// card's.
+class AppBadge extends StatelessWidget {
+  const AppBadge({
+    super.key,
+    required this.child,
+    required this.isDark,
+    required this.color,
+  });
+
+  final Widget child;
+  final bool isDark;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // 0.08 in light mode, not 0.12, and the reason is arithmetic rather than
+    // taste: the wash is the *same colour* as the label sitting on it, so every
+    // point of alpha is a point of contrast. Measured on the light page,
+    // `statusOk` is 5.14:1 on the card and 4.39:1 on a 0.12 wash of itself —
+    // under AA. The ramp is 0.08 -> 4.63, 0.10 -> 4.50, 0.12 -> 4.39. The
+    // status colours are already at 4.5 on the surface with almost no margin,
+    // so the wash has to be the shallowest one that still reads as a tint.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.18 : 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.badge),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── AppDivider ───────────────────────────────────────────────────────────────
+
+/// A one physical pixel rule. It was 0.5dp, which is the thinnest line in the
+/// app and renders as a grey smear on a 3x screen.
+class AppDivider extends StatelessWidget {
+  const AppDivider({super.key, required this.isDark, this.opacity = 0.10});
+
+  final bool isDark;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1,
+      color: appDivider(isDark: isDark, opacity: opacity),
+    );
+  }
+}
+
+// ── DateStripChip ────────────────────────────────────────────────────────────
+
+/// One day in the date strip.
+///
+/// A selected chip is raised off the page and filled with the accent; an
+/// unselected one is cut into it. That is the whole soft-UI vocabulary in one
+/// control, and it is why the chip needed its own widget rather than sharing
+/// `AppCard`: the two states are inverses of each other, not two shades of one.
+class DateStripChip extends StatelessWidget {
+  const DateStripChip({
     super.key,
     required this.dayName,
     required this.dayNumber,
     required this.isSelected,
     required this.isDark,
     required this.onTap,
-    this.accentColor = const Color(0xFF35A968),
-    this.performanceMode = true,
+    required this.accentColor,
     this.width = 48,
   });
 
   final String dayName;
   final int dayNumber;
-  final bool isSelected, isDark, performanceMode;
-  final Color accentColor;
+  final bool isSelected;
+  final bool isDark;
   final VoidCallback onTap;
+  final Color accentColor;
   final double width;
 
   @override
   Widget build(BuildContext context) {
+    final onAccent = isDark ? const Color(0xFF14201A) : Colors.white;
+
     final decoration = isSelected
         ? BoxDecoration(
             color: accentColor,
-            border: Border.all(color: accentColor.withValues(alpha: 0.75)),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.28),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.tile),
+            border: Border.all(
+              color: AppElevation.controlEdge(accent: accentColor, isDark: isDark),
+            ),
+            boxShadow: AppElevation.raised(isDark),
           )
         : BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.09)
-                : Colors.white.withValues(alpha: 0.62),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.black.withValues(alpha: 0.06),
-            ),
-            borderRadius: BorderRadius.circular(14),
+            color: AppSurfaces.page(isDark),
+            borderRadius: BorderRadius.circular(AppRadius.tile),
+            border: Border.all(color: appDivider(isDark: isDark)),
+            boxShadow: AppElevation.inset(isDark),
           );
 
     return RepaintBoundary(
@@ -325,15 +331,15 @@ class GlassDateChip extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
+              duration: AppMotion.state,
+              curve: AppMotion.enter,
               width: width,
               height: 68,
               padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
               decoration: decoration,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
                     height: 13,
@@ -344,9 +350,7 @@ class GlassDateChip extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? Colors.white
-                              : (faintColor(isDark)),
+                          color: isSelected ? onAccent : faintColor(isDark),
                         ),
                       ),
                     ),
@@ -357,9 +361,7 @@ class GlassDateChip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? Colors.white : Colors.black87),
+                      color: isSelected ? onAccent : appPrimaryText(isDark),
                     ),
                   ),
                 ],
@@ -371,3 +373,11 @@ class GlassDateChip extends StatelessWidget {
     );
   }
 }
+
+/// The ordinary text colour on a card.
+///
+/// It was `Colors.white` or `Colors.black87` chosen at each of a dozen call
+/// sites. Both are fine; having twelve of them is not, because one of them
+/// would eventually be `black54` and that is the failure the AA work was about.
+Color appPrimaryText(bool isDark) =>
+    isDark ? const Color(0xFFF2F5F3) : const Color(0xFF1A211E);

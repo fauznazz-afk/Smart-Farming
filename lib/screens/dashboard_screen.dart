@@ -27,6 +27,7 @@ import 'dashboard/charts/chart_data.dart';
 import 'dashboard/utils/bound.dart';
 import 'dashboard/utils/chart_gesture_lock.dart';
 import 'dashboard/utils/color_helpers.dart';
+import 'dashboard/utils/design_tokens.dart';
 import 'dashboard/utils/energy_helpers.dart';
 import 'dashboard/utils/history_range.dart';
 import 'dashboard/utils/telemetry_helpers.dart';
@@ -205,8 +206,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ValueNotifier<int> _chartRevision = ValueNotifier(0);
   final ValueNotifier<bool> _chartPointerActiveNotifier = ValueNotifier(false);
 
-  bool get _performanceMode => widget.themeController.performanceMode;
-
+  // The Performance setting used to be threaded through every card here and was
+  // part of `_visualToken`. It gated a `BackdropFilter` that no longer exists:
+  // surfaces are opaque, so a card has nothing to frost. The preference key and
+  // the controller field are still there, because the Appearance section still
+  // offers the switch and a stored value should not be silently discarded; the
+  // switch itself is being relabelled to match what it now does, which is
+  // nothing on this screen.
   Color get _seedColor => widget.themeController.seedColor;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -1171,7 +1177,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: _buildAppBar(isDark),
-      body: AmbientBackground(
+      body: AppBackground(
         isDark: isDark,
         child: _buildBody(isDark),
       ),
@@ -1200,9 +1206,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         valueListenable: _appBarBlurProgress,
         builder: (context, progress, _) {
           if (progress == 0) return const SizedBox.expand();
-          final baseColor = isDark
-              ? const Color(0xFF101412)
-              : const Color(0xFFF6F8F7);
+          // The scrim has to match the page it fades in over, or the app bar
+          // shows as a slightly different shade of the same colour once you
+          // scroll. These were the old scaffold hexes; the page moved.
+          final baseColor = AppSurfaces.page(isDark);
           return DecoratedBox(
             decoration: BoxDecoration(
               color: baseColor.withValues(alpha: 0.86 * progress),
@@ -1351,7 +1358,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Banners ──────────────────────────────────────────────────────────────────
   Object get _visualToken => Object.hash(
     _seedColor,
-    _performanceMode,
     _selectedDate,
     _displayName,
     // The thresholds belong here. Bound only rebuilds when the listenable fires or
@@ -1502,7 +1508,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         index: 0,
         isDark: isDark,
       ),
-      performanceMode: _performanceMode,
       onSelectDate: _selectDate,
       onPickRange: _pickDateFromCalendar,
     );
@@ -1536,7 +1541,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       pzemAgeLabel: _pzem?.ageLabel,
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
     );
   }
 
@@ -1544,7 +1548,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     return EnergySummaryCard(
       seedColor: _seedColor,
       isDark: isDark,
-      performanceMode: _performanceMode,
       weekly: _weeklyEnergySummary,
       loading: _energyLoading,
       hasData:
@@ -1586,7 +1589,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
       onOpenBattery: _openBatteryFromStrip,
     );
   }
@@ -1598,7 +1600,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       values: _sensor?.latestValues,
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
       // The grid grades each reading against the same thresholds the alarms use,
       // so a number on screen always has something to be read against.
       thresholds: _thresholds,
@@ -1619,7 +1620,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       values: _fish?.latestValues,
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
       // Fish thresholds now exist (pH, water temperature, turbidity), so the
       // grid grades these readings against them exactly as the environment grid
       // does — the background alarm and the page the reading lives on must not
@@ -1902,7 +1902,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       metrics: metrics,
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
       staleMinutes: _staleTelemetryMinutes,
     );
   }
@@ -1931,7 +1930,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       prefix: prefix,
       isDark: isDark,
       seedColor: _seedColor,
-      performanceMode: _performanceMode,
       points: _history,
       spots: _chartSpots,
       stats: _chartStats,

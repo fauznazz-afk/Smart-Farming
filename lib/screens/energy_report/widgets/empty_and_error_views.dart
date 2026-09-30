@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
 import '../utils/format_helpers.dart';
 import '../../../services/energy_report_service.dart';
 
@@ -30,7 +31,7 @@ class EmptyPeriodView extends StatelessWidget {
             Text(
               'ThingsBoard data covers ${formatDateLabel(data.firstSample)} to ${formatDateLabel(data.lastSample)}.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+              style: TextStyle(color: faintColor(isDark)),
             ),
           ],
         ),
@@ -74,7 +75,7 @@ class ErrorView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: isDark ? Colors.white60 : Colors.black54,
+                color: faintColor(isDark),
               ),
             ),
           ],

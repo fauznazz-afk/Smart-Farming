@@ -76,7 +76,9 @@ void main() {
     testWidgets('exposes the status as a live region', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(body: CctvStatusPill(status: CctvStatus.live)),
+          home: Scaffold(
+            body: CctvStatusPill(status: CctvStatus.live, isDark: false),
+          ),
         ),
       );
 
@@ -101,7 +103,9 @@ void main() {
       for (final status in CctvStatus.values) {
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(body: CctvStatusPill(status: status)),
+            home: Scaffold(
+              body: CctvStatusPill(status: status, isDark: false),
+            ),
           ),
         );
         expect(find.text(status.label), findsOneWidget);

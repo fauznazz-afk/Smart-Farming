@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/design_tokens.dart';
+import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
 
 /// Rounded surface with an icon badge, title, subtitle, and body.
@@ -20,56 +22,72 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  SettingsIconBadge(icon: icon),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title, style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+    final isDark = theme.brightness == Brightness.dark;
+    // Was a `Material` in `surfaceContainerLow` with a 16dp radius and no
+    // border at all. `AppCard` is the page colour with the dual-shadow pair and
+    // the accent hairline, which is how every other card in the app is drawn.
+    // It also brings its own `RepaintBoundary`, so a section that repaints
+    // (a dropdown opening, a value changing) no longer repaints the list
+    // behind it.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        isDark: isDark,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SettingsIconBadge(icon: icon),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 44, top: 8),
-                child: Divider(
-                  height: 1,
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
                 ),
-              ),
-              const SizedBox(height: 4),
-              child,
-            ],
-          ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 44, top: 8),
+              child: AppDivider(isDark: isDark, opacity: 0.12),
+            ),
+            const SizedBox(height: 4),
+            child,
+          ],
         ),
       ),
     );
   }
 }
 
-/// Circular primary-coloured icon container used as a section/list leading.
+/// Circular accent icon container used as a section/list leading.
+///
+/// It was a solid `primary` circle, which put a saturated block of the accent
+/// immediately left of neutral grey text in every row. That is the "two
+/// palettes on screen at once" failure described in AGENTS.md: a user who
+/// picked "Ocean cyan" got a cyan badge that no other icon badge in the app
+/// draws that way. It is now the same wash-and-edge treatment every other
+/// leading icon uses, at the same 34dp.
+///
+/// 34dp is deliberate and below the 48dp target size, which is fine: this is a
+/// `ListTile.leading` beside a whole-row tap target, not a control in its own
+/// right. A screen reader never focuses it separately.
+///
+/// The `controlEdge` border measures 1.54:1 on the light page, not the 3:1
+/// WCAG 1.4.11 wants, because an alpha tint of a light accent cannot reach it
+/// on a light background. It is the strongest edge the token layer has. Raised
+/// in the report as a token-level decision.
 class SettingsIconBadge extends StatelessWidget {
   const SettingsIconBadge({super.key, required this.icon});
 
@@ -78,14 +96,19 @@ class SettingsIconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = theme.colorScheme.primary;
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary,
+        color: accent.withValues(alpha: isDark ? 0.20 : 0.12),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: AppElevation.controlEdge(accent: accent, isDark: isDark),
+        ),
       ),
-      child: Icon(icon, color: theme.colorScheme.onPrimary, size: 19),
+      child: Icon(icon, color: accent, size: 19),
     );
   }
 }

@@ -12,6 +12,7 @@ import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
 import 'screens/dashboard/utils/color_helpers.dart';
 import 'widgets/liquid_glass.dart';
+import 'screens/dashboard/utils/design_tokens.dart';
 import 'services/alarm_notification_service.dart';
 
 void main() {
@@ -53,7 +54,11 @@ SegmentedButtonThemeData _segmentedTheme(Color seed, Brightness brightness) {
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? accent
-            : (isDark ? Colors.white70 : Colors.black54),
+            // `faintColor`, not `Colors.white70` / `Colors.black54`. That pair
+            // is the one `color_helpers.dart` replaced because it measures
+            // about 3.4:1, and an unselected segment's label is 14sp — under
+            // the 18.66px large-text floor, so 4.5:1 is the requirement.
+            : faintColor(isDark),
       ),
       side: WidgetStatePropertyAll(
         BorderSide(
@@ -62,6 +67,38 @@ SegmentedButtonThemeData _segmentedTheme(Color seed, Brightness brightness) {
               : Colors.black.withValues(alpha: 0.10),
         ),
       ),
+    ),
+  );
+}
+
+/// The app's input fields.
+///
+/// The fill is *lighter* than the page in light mode and a step up in dark mode,
+/// which is the opposite of the conventional inset treatment. That is
+/// deliberate. The old light `fillColor` was `0xFFEBEFEA`, and it was the
+/// binding surface for all five colour assertions in
+/// `test/color_helpers_test.dart` — every pinned colour cleared 4.5:1 by less
+/// than 0.43. Darkening it, which is what an inset field normally does, would
+/// have dropped `faintColor` and four status colours below AA at the same time.
+/// The deboss now comes from the border being an accent-tinted line rather than
+/// a grey one, which is the same information carried by the hairline everywhere
+/// else in the app.
+InputDecorationTheme _inputTheme(Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  return InputDecorationTheme(
+    filled: true,
+    fillColor: AppSurfaces.input(isDark),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.inset),
+      borderSide: BorderSide(color: appDivider(isDark: isDark, opacity: 0.22)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.inset),
+      borderSide: BorderSide(color: appDivider(isDark: isDark, opacity: 0.22)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.inset),
+      borderSide: const BorderSide(color: Colors.white, width: 1.6),
     ),
   );
 }
@@ -121,17 +158,29 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
             seedColor: _themeController.seedColor,
             brightness: Brightness.light,
           ),
-          scaffoldBackgroundColor: const Color(0xFFF6F8F7),
-          cardTheme: const CardThemeData(color: Colors.white, elevation: 0),
+          scaffoldBackgroundColor: AppSurfaces.pageLight,
+          // Cards are the page colour, so a Material `Card` on this surface is
+          // invisible without a shadow. `elevation` is what supplies one, and
+          // the four energy-report cards set no `shape` of their own, so their
+          // radius was the framework's default until this.
+          cardTheme: CardThemeData(
+            color: AppSurfaces.pageLight,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              side: BorderSide(
+                color: AppElevation.hairline(
+                  accent: _themeController.seedColor,
+                  isDark: false,
+                ),
+              ),
+            ),
+          ),
           segmentedButtonTheme: _segmentedTheme(
             _themeController.seedColor,
             Brightness.light,
           ),
-          inputDecorationTheme: const InputDecorationTheme(
-            filled: true,
-            fillColor: Color(0xFFEBEFEA),
-            border: OutlineInputBorder(),
-          ),
+          inputDecorationTheme: _inputTheme(Brightness.light),
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
@@ -140,26 +189,32 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
             seedColor: _themeController.seedColor,
             brightness: Brightness.dark,
           ),
-          scaffoldBackgroundColor: const Color(0xFF101412),
-          cardTheme: const CardThemeData(
-            color: Color(0xFF1B211E),
+          scaffoldBackgroundColor: AppSurfaces.pageDark,
+          cardTheme: CardThemeData(
+            color: AppSurfaces.pageDark,
             elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              side: BorderSide(
+                color: AppElevation.hairline(
+                  accent: _themeController.seedColor,
+                  isDark: true,
+                ),
+              ),
+            ),
           ),
           segmentedButtonTheme: _segmentedTheme(
             _themeController.seedColor,
             Brightness.dark,
           ),
-          inputDecorationTheme: const InputDecorationTheme(
-            filled: true,
-            fillColor: Color(0xFF1B211E),
-            border: OutlineInputBorder(),
-          ),
+          inputDecorationTheme: _inputTheme(Brightness.dark),
         ),
         builder: (context, child) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
-          final navColor = isDark
-              ? const Color(0xFF101412)
-              : const Color(0xFFF6F8F7);
+          // The system navigation bar is opaque, and it sits over the app's
+          // bottom edge. It has to match the page or there is a visible seam
+          // where the two meet.
+          final navColor = AppSurfaces.page(isDark);
           return AnnotatedRegion<SystemUiOverlayStyle>(
             value: SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
@@ -287,7 +342,7 @@ class _SplashRouterState extends State<_SplashRouter> {
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: AmbientBackground(
+        body: AppBackground(
           isDark: isDark,
           child: SafeArea(
             child: Center(
@@ -314,7 +369,7 @@ class _SplashRouterState extends State<_SplashRouter> {
                       'Use your fingerprint or face recognition to unlock the app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: isDark ? Colors.white60 : Colors.black54,
+                        color: faintColor(isDark),
                       ),
                     ),
                     if (_authError != null) ...[
@@ -322,7 +377,7 @@ class _SplashRouterState extends State<_SplashRouter> {
                       Text(
                         _authError!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.redAccent),
+                        style: TextStyle(color: statusBad(isDark)),
                       ),
                     ],
                     const SizedBox(height: 20),

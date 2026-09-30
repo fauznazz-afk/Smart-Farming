@@ -81,31 +81,24 @@ class AppearanceSection extends StatelessWidget {
   }
 }
 
-/// Toggle for the reduced glass-effect rendering mode.
-class PerformanceSection extends StatelessWidget {
-  const PerformanceSection({super.key, required this.settings});
-
-  final SettingsController settings;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = settings.themeController.performanceMode;
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      // Named for what it does. It used to be called "Smooth Glass Mode", so
-      // switching it *on* turned the blur *off*, which is the opposite of what
-      // the name promises.
-      title: const Text('Liquid glass blur'),
-      subtitle: Text(
-        enabled
-            ? 'Off — flat cards, smoother scrolling'
-            : 'On — frosted cards, may drop frames on low-end devices',
-      ),
-      value: enabled,
-      onChanged: (value) {
-        settings.themeController.setPerformanceMode(value);
-        settings.update(() {});
-      },
-    );
-  }
-}
+/// The Performance section, and why it no longer exists.
+///
+/// It held a single switch called "Liquid glass blur", promising "frosted
+/// cards, may drop frames on low-end devices", backed by a `BackdropFilter`
+/// and a `performanceMode` flag threaded through eight widgets. Every part of
+/// that became false when the surface system was replaced: the blur is gone,
+/// the card fills are opaque so there is nothing behind them to frost, and the
+/// three full-screen ambient orb gradients — the most expensive paint in the
+/// app, and the only thing the flag ever meaningfully gated — were deleted. The
+/// blur branch had exactly one caller in the entire app, the login screen.
+///
+/// The section and the switch are removed rather than relabelled. A switch
+/// that says it does nothing is still a switch: it occupies a row the user
+/// reads as meaningful, it is one more thing to understand, and the next
+/// person to read the code has to work out whether the flag is honoured. The
+/// stored `performance_mode` preference is left in SharedPreferences
+/// untouched — a key nobody reads is harmless, and removing it would mean
+/// reasoning about a migration for no user-visible gain.
+// Nothing follows this comment. The class that used to be here was removed, and
+// this line is the marker so the next reader finds the reasoning above rather
+// than an unexplained gap in the section list.

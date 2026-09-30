@@ -22,7 +22,6 @@ void main() {
   Widget card({
     Color seed = seedColor,
     bool isDark = false,
-    bool performanceMode = true,
     bool weekly = false,
     bool loading = false,
     bool hasData = true,
@@ -37,7 +36,6 @@ void main() {
   }) {
     return EnergySummaryCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       weekly: weekly,
       loading: loading,
       hasData: hasData,

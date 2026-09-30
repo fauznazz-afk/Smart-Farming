@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../services/alarm_notification_service.dart';
 import '../services/thingsboard_api.dart';
 import '../theme/app_theme_controller.dart';
+import 'dashboard/utils/color_helpers.dart';
+import 'dashboard/utils/design_tokens.dart';
 import 'dashboard_screen.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/liquid_glass.dart';
@@ -89,9 +91,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // `Colors.red` measured 3.33:1 as the 13dp text it is used for here, which
+    // is a fail, and the wash behind it was a fixed `red @ 0.12` with no
+    // relationship to the theme. `statusBad` is the measured value, pinned by
+    // `test/color_helpers_test.dart` against the real card surface.
+    final errorColor = statusBad(isDark);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AmbientBackground(
+      body: AppBackground(
         isDark: isDark,
         child: SafeArea(
           child: Center(
@@ -106,11 +113,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const BrandLogo(size: 100, showName: false),
                   ),
                   const SizedBox(height: 12),
-                  LiquidGlassCard(
+                  // Was the only call site that passed `performanceMode: false`
+                  // — the only place the blur ever actually ran — and it also
+                  // restated `borderRadius: 20` on top of the same default. Both
+                  // go: the fill is opaque and there is no `BackdropFilter` left
+                  // to run, and `AppCard` owns its radius.
+                  AppCard(
                     isDark: isDark,
-                    performanceMode: false,
                     padding: const EdgeInsets.all(24),
-                    borderRadius: 20,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -130,10 +140,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           'PLTS & Smart Farming Monitoring',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.6),
+                            // Was `onSurface @ 0.60`, an unmeasured alpha
+                            // blend — the same shape as the `black54` literals
+                            // this pass removed elsewhere.
+                            color: faintColor(isDark),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -152,9 +162,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 semanticLabel: 'User',
                               ),
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            // No local `OutlineInputBorder`: the theme's
+                            // `inputDecorationTheme` (main.dart:82) already
+                            // supplies an outlined border at `AppRadius.inset`
+                            // with a `0x22` divider edge. This override also
+                            // only set `border`, so it *removed* the theme's
+                            // `enabledBorder` and `focusedBorder` for the
+                            // focused state.
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -166,9 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
@@ -187,36 +198,50 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (_errorMsg != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: Colors.red.withValues(alpha: 0.12),
-                                border: Border.all(
-                                  color: Colors.red.withValues(alpha: 0.3),
+                            // `liveRegion` because this is the only way a
+                            // failed login is reported. The error text appears
+                            // without any focus change and without a SnackBar,
+                            // so a screen-reader user pressing Login heard
+                            // nothing and had no way to know why the form did
+                            // not advance.
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    size: 16,
-                                    color: Colors.red,
+                                decoration: BoxDecoration(
+                                  borderRadius: AppRadius.all(AppRadius.badge),
+                                  // 0.08, not the 0.12 it used to be. The
+                                  // wash is the same colour as the text sitting
+                                  // on it, so every point of alpha is a point
+                                  // of contrast: 0.12 measured 4.23:1 and 0.08
+                                  // measures 4.51:1, which is the line.
+                                  color: errorColor.withValues(alpha: 0.08),
+                                  border: Border.all(
+                                    color: errorColor.withValues(alpha: 0.3),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _errorMsg!,
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 13,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 16,
+                                      color: errorColor,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMsg!,
+                                        style: TextStyle(
+                                          color: errorColor,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -227,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: _loading ? null : _handleLogin,
                             style: FilledButton.styleFrom(
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: AppRadius.all(AppRadius.tile),
                               ),
                             ),
                             child: _loading

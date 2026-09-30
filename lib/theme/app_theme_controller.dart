@@ -14,8 +14,16 @@ class AppThemeController extends ChangeNotifier {
 
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
-  bool _performanceMode = true;
-  bool get performanceMode => _performanceMode;
+  // The Performance setting is gone, and this is the note explaining why the
+  // `performance_mode` key is still in SharedPreferences but nothing reads it.
+  //
+  // It gated a `BackdropFilter` behind a `BackdropFilter(sigma 20)` branch of
+  // the card, which had exactly one caller in the whole app — the login screen
+  // — and the three ambient orb gradients, which were the most expensive paint
+  // in the app and the only thing it meaningfully affected. Surfaces are opaque
+  // now, so there is no backdrop left to frost and no orb layer to skip. The
+  // key is left in place deliberately: an unread key costs nothing, and
+  // removing it would be a migration for no user-visible gain.
 
   Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -42,7 +50,6 @@ class AppThemeController extends ChangeNotifier {
       _themeMode = ThemeMode.dark;
     }
 
-    _performanceMode = preferences.getBool('performance_mode') ?? true;
     notifyListeners();
   }
 
@@ -67,12 +74,5 @@ class AppThemeController extends ChangeNotifier {
 
   Future<void> toggleDarkMode(bool isDark) async {
     await setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
-  }
-
-  Future<void> setPerformanceMode(bool value) async {
-    _performanceMode = value;
-    notifyListeners();
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool('performance_mode', value);
   }
 }

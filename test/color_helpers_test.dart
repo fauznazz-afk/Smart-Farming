@@ -4,24 +4,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 
-/// The surfaces these colours are actually rendered on, taken from
-/// `main.dart` and `liquid_glass.dart` rather than assumed.
+/// The surfaces these colours are actually rendered on.
 ///
-/// The glass cards are translucent, so the effective backdrop moves between
-/// these. The worst case for dark text is the *lightest* surface it can land on
-/// and the worst case for light text is the *darkest*, so each colour is checked
-/// against every surface in its own mode.
+/// This list used to hold the *backdrop base* colours, `0xFFF2F5F3` and
+/// `0xFF0D1410`, while its own comments called them the LiquidGlassCard fill.
+/// They were not. Card fills were a gradient at alpha 0.44 to 0.66, composited
+/// over a background painted with three large radial-gradient orbs, so the
+/// rendered fill varied continuously with the pixel and no single constant
+/// described it. In light mode that accident was harmless, because the real
+/// card was lighter than the backdrop and dark text did better than the
+/// assertion claimed. In dark mode it was not: the real fill ranged `0x161A17`
+/// to `0x2F3230`, and measuring against the backdrop overstated `statusBad` by
+/// 1.49, from 5.68:1 to 7.17:1.
+///
+/// The fills are now opaque and equal to the page colour, which is what a
+/// soft-UI surface is: the depth comes from a dual shadow pair, not from
+/// translucency. Every hex below is a fill that really exists. The worst case
+/// for dark text is the lightest surface it can land on and the worst case for
+/// light text is the darkest, so each colour is checked against all of them.
+///
+/// The progress tracks (`AppSurfaces.trackLight` / `trackDark`) are deliberately
+/// in neither list. A track is a 6 to 8dp bar and no text is ever drawn on one,
+/// so including it measures a requirement that does not apply. It was in the
+/// list while this was being written, and it failed all five colours at between
+/// 4.31:1 and 4.39:1, because the light track is the darkest light-mode surface
+/// in the app. Darkening every colour until it cleared the track was the other
+/// option and it is the wrong one: it moves `faintColor` and four status colours
+/// to satisfy a measurement of text on a bar that has none. If a caption ever
+/// does get drawn over a track, add the track back here and reopen that call.
 const List<int> _lightSurfaces = [
-  0xFFF2F5F3, // LiquidGlassCard fill
-  0xFFF6F8F7, // scaffoldBackgroundColor, light
-  0xFFEBEFEA, // settings card fill
-  0xFFFFFFFF, // Material surfaces
+  0xFFF1F4F2, // page + card, which are the same colour
+  0xFFFAFBFA, // chrome, inputs, tooltip
+  0xFFFFFFFF, // Material surfaces, e.g. a dialog
 ];
 
 const List<int> _darkSurfaces = [
-  0xFF0D1410, // LiquidGlassCard fill
-  0xFF101412, // scaffoldBackgroundColor, dark
-  0xFF1B211E, // settings card fill
+  0xFF161B19, // page + card, which are the same colour
+  0xFF1E2422, // chrome
+  0xFF1B211F, // inputs
+  0xFF222A27, // chart tooltip
 ];
 
 /// The user picked "Ocean cyan" in Settings, so every surface derived from that

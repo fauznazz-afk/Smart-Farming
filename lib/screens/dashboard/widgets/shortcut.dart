@@ -16,17 +16,31 @@ class DashboardShortcut extends StatelessWidget {
     super.key,
     required this.onTap,
     required this.child,
+    this.semanticLabel,
   });
 
   final VoidCallback onTap;
   final Widget child;
 
+  /// What the shortcut does, for a screen reader.
+  ///
+  /// There was no `Semantics` here at all, which is worse than a missing label:
+  /// a `GestureDetector` with an `onTap` is not a button to TalkBack, so the
+  /// shortcut to the Battery page was invisible to it and the strip it wraps
+  /// read as three unrelated static texts. `button: true` is what makes the
+  /// platform treat it as one activatable target.
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: child,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: child,
+      ),
     );
   }
 }

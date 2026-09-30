@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
 import '../../../services/energy_report_service.dart';
 
 /// Calculates the maximum Y value for the chart with 25% padding.
@@ -37,17 +39,22 @@ List<BarChartGroupData> createBarChartGroups({
         x: i,
         barsSpace: 2,
         barRods: [
+          // The amber and blue are the documented device-series exception in
+          // AGENTS.md, not the app accent, so they are left as literals. Only
+          // the radius moves onto the scale: a 3dp radius on a 6dp-wide rod is
+          // effectively square, which is why the same object was written with
+          // five different values elsewhere in the app.
           BarChartRodData(
             toY: buckets[i].pvKwh,
             color: const Color(0xFFFFC857),
             width: monthly ? 6 : 8,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(AppRadius.bar),
           ),
           BarChartRodData(
             toY: buckets[i].acKwh,
             color: const Color(0xFF69B7FF),
             width: monthly ? 6 : 8,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(AppRadius.bar),
           ),
         ],
       ),
@@ -68,7 +75,7 @@ AxisTitles createLeftTitles({
         value.toStringAsFixed(2),
         style: TextStyle(
           fontSize: 9,
-          color: isDark ? Colors.white54 : Colors.black54,
+          color: faintColor(isDark),
         ),
       ),
     ),
@@ -101,7 +108,7 @@ AxisTitles createBottomTitles({
             text,
             style: TextStyle(
               fontSize: 9,
-              color: isDark ? Colors.white54 : Colors.black54,
+              color: faintColor(isDark),
             ),
           ),
         );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/color_helpers.dart';
+import '../utils/design_tokens.dart';
 
 /// Destination shown in the glass bottom navigation bar.
 class NavDestination {
@@ -62,7 +63,6 @@ class GlassNavBar extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: collapsed,
       builder: (context, isCollapsed, _) {
-        final page = selectedIndex.toDouble();
         final primary = strongMetricColor(
           seedColor: seedColor,
           index: selectedIndex,
@@ -83,35 +83,72 @@ class GlassNavBar extends StatelessWidget {
                 alignment: Alignment.bottomLeft,
                 child: LayoutBuilder(
                   builder: (context, constraints) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 380),
-                    curve: Curves.easeInOutCubic,
+                    duration: AppMotion.container,
+                    curve: AppMotion.both,
+                    // The width animation stays. It is a layout animation, so a
+                    // collapse re-lays out this subtree once per frame, and a
+                    // transform-only replacement was evaluated and rejected:
+                    //
+                    //  * `Transform.scale` on the bar squashes the row, the
+                    //    labels and the pill's own radius, so the pill stops
+                    //    being a circle and "Hydroponics" deforms with it.
+                    //  * Scaling only the shadow layer leaves the fill running
+                    //    the full width underneath it.
+                    //  * Clipping to the 64dp window with an opaque mask drawn
+                    //    over the right-hand side cuts the bar's own drop shadow
+                    //    off mid-blur. A hard shadow edge is visible in a way the
+                    //    layout cost is not, and no test in the suite would have
+                    //    caught it.
+                    //
+                    // What is true is that this is the only layout animation in
+                    // the bar, that the whole bar sits inside the `RepaintBoundary`
+                    // above, and that the shadows are interpolated per frame
+                    // rather than rebuilt: `AnimatedContainer` lerps a
+                    // `Decoration`, and `BoxDecoration.lerp` lerps `BoxShadow`.
                     alignment: Alignment.centerLeft,
                     width: isCollapsed ? 64 : constraints.maxWidth,
                     height: 64,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.40)
-                              : Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      // The same dual-shadow pair every card in the app uses, so
+                      // the bar is lit from the same place as the content above
+                      // it. It had one `black @ 0.40` drop shadow and nothing
+                      // catching light on the other side, which is the old
+                      // glass model rather than the current one.
+                      boxShadow: AppElevation.raised(isDark),
                     ),
+                    // A `Material` here, before the `InkWell`s below, and not
+                    // only at the Scaffold.
+                    //
+                    // The bar's own fill is opaque, and the nearest Material
+                    // above it belongs to the Scaffold, whose ink layer paints
+                    // *below* this Container. So the tap ripple on a nav item
+                    // was drawn and then immediately covered: pressing a tab
+                    // gave no feedback at all. It used to leak a trace because
+                    // the fill was `0xEE101412` at 92% alpha, which is not a
+                    // reason to keep a translucent bar.
+                    //
+                    // `MaterialType.transparency` rather than a real Material
+                    // because the fill is already painted by the Container
+                    // below; this one exists only to own the ink.
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: Container(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: Container(
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xEE101412)
-                              : Colors.white.withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(28),
+                          // Opaque, like every other surface. It was
+                          // `0xEE101412` and `white @ 0.92`, and the only thing
+                          // those alphas revealed was the page — which
+                          // `AppSurfaces.chrome` already steps away from by one
+                          // value, so the translucency bought nothing.
+                          color: AppSurfaces.chrome(isDark),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.14)
-                                : Colors.black.withValues(alpha: 0.07),
+                            color: AppElevation.hairline(
+                              accent: primary,
+                              isDark: isDark,
+                            ),
                           ),
                         ),
                         child: Stack(
@@ -121,8 +158,8 @@ class GlassNavBar extends StatelessWidget {
                               ignoring: isCollapsed,
                               child: AnimatedOpacity(
                                 opacity: isCollapsed ? 0 : 1,
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeInOutCubic,
+                                duration: AppMotion.state,
+                                curve: AppMotion.both,
                                 child: Row(
                                   children: [
                                     for (var i = 0;
@@ -131,7 +168,7 @@ class GlassNavBar extends StatelessWidget {
                                       _NavItem(
                                         index: i,
                                         destination: kNavDestinations[i],
-                                        page: page,
+                                        selectedIndex: selectedIndex,
                                         isDark: isDark,
                                         seedColor: seedColor,
                                         primary: primary,
@@ -145,8 +182,8 @@ class GlassNavBar extends StatelessWidget {
                               ignoring: !isCollapsed,
                               child: AnimatedOpacity(
                                 opacity: isCollapsed ? 1 : 0,
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeInOutCubic,
+                                duration: AppMotion.state,
+                                curve: AppMotion.both,
                                 child: _CollapsedNavItem(
                                   selectedIndex: selectedIndex,
                                   isDark: isDark,
@@ -164,6 +201,7 @@ class GlassNavBar extends StatelessWidget {
               ),
             ),
           ),
+        ),
         );
       },
     );
@@ -192,26 +230,17 @@ class _CollapsedNavItem extends StatelessWidget {
       label: destination.label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         child: Center(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Container(
+            duration: AppMotion.state,
+            switchInCurve: AppMotion.enter,
+            switchOutCurve: AppMotion.exit,
+            child: _SelectedCircle(
               key: ValueKey(selectedIndex),
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: primary,
-                boxShadow: [
-                  BoxShadow(
-                    color: primary.withValues(alpha: 0.45),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Icon(destination.selectedIcon, size: 22, color: Colors.white),
+              icon: destination.selectedIcon,
+              color: primary,
+              isDark: isDark,
             ),
           ),
         ),
@@ -220,11 +249,50 @@ class _CollapsedNavItem extends StatelessWidget {
   }
 }
 
+/// The selected destination's circle, in whichever bar state is showing.
+///
+/// 48dp, not 44. The Material floor is 48 and 44 was four under it, which is
+/// not a rounding difference but a genuinely smaller target — and a soft-UI
+/// control with no inner padding reads smaller than its box already, so the
+/// visible ring matters as much as the hit area. The 64dp bar leaves 8dp of air
+/// either side, so nothing had to move to make room.
+class _SelectedCircle extends StatelessWidget {
+  const _SelectedCircle({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        // The app's raised pair, not a coloured glow in the fill's own hue.
+        // The glow was a second shadow vocabulary: warm, tight and pointing at
+        // the light shadow, on a control whose every neighbour is lit from the
+        // top left. It is also invisible on a light page, where a saturated
+        // accent's glow has nothing darker than itself to sit against.
+        boxShadow: AppElevation.raised(isDark),
+      ),
+      child: Icon(icon, size: 22, color: Colors.white),
+    );
+  }
+}
+
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.index,
     required this.destination,
-    required this.page,
+    required this.selectedIndex,
     required this.isDark,
     required this.seedColor,
     required this.primary,
@@ -233,7 +301,17 @@ class _NavItem extends StatelessWidget {
 
   final int index;
   final NavDestination destination;
-  final double page;
+
+  /// The bar's selected tab, as the `int` it always was.
+  ///
+  /// This used to arrive as a `double page` and be compared with
+  /// `page.round() == index`, which is a value converted to a double and
+  /// rounded straight back to the integer it was created from. The round trip
+  /// was for a sliding indicator that was never built, and it cost nothing to
+  /// read and something to trust: any future non-integral value would have
+  /// silently selected the nearest tab instead of none.
+  final int selectedIndex;
+
   final bool isDark;
   final Color seedColor;
   final Color primary;
@@ -241,12 +319,18 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = page.round() == index;
+    final selected = selectedIndex == index;
+    // This colour is used for the icon AND the 11sp w600 label, so it is text,
+    // not decoration. It was the accent at alpha 0.72, which composites the
+    // saturated accent over the chrome surface and lands near 3:1 in light mode
+    // — under the 4.5:1 that applies below the 18.66px large-text floor.
+    // `metricColor` is the measured accent at full strength; the alpha existed
+    // to soften the icon, and softening is what cost the contrast.
     final tint = metricColor(
       seedColor: seedColor,
       index: index,
       isDark: isDark,
-    ).withValues(alpha: 0.72);
+    );
     return Expanded(
       child: Semantics(
         button: true,
@@ -254,17 +338,23 @@ class _NavItem extends StatelessWidget {
         label: destination.label,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          // The bar's own pill radius, so a ripple on one item follows the
+          // shape of the container it sits in rather than a bare 20 that
+          // happened to match the old card radius.
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           child: SizedBox(
             height: 64,
             child: Center(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
+                duration: AppMotion.state,
+                switchInCurve: AppMotion.enter,
+                switchOutCurve: AppMotion.exit,
                 child: selected
-                    ? _SelectedPill(
+                    ? _SelectedCircle(
                         key: ValueKey('sel_$index'),
                         icon: destination.selectedIcon,
                         color: primary,
+                        isDark: isDark,
                       )
                     : Column(
                         key: ValueKey('unsel_$index'),
@@ -310,29 +400,3 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _SelectedPill extends StatelessWidget {
-  const _SelectedPill({super.key, required this.icon, required this.color});
-
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.45),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Icon(icon, size: 22, color: Colors.white),
-    );
-  }
-}

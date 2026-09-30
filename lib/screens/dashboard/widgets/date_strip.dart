@@ -14,7 +14,6 @@ class DateStrip extends StatelessWidget {
     required this.rangeEnd,
     required this.isDark,
     required this.accentColor,
-    required this.performanceMode,
     required this.onSelectDate,
     required this.onPickRange,
   });
@@ -25,7 +24,6 @@ class DateStrip extends StatelessWidget {
   final DateTime? rangeEnd;
   final bool isDark;
   final Color accentColor;
-  final bool performanceMode;
   final ValueChanged<DateTime> onSelectDate;
   final VoidCallback onPickRange;
 
@@ -53,7 +51,7 @@ class DateStrip extends StatelessWidget {
                 icon: Icon(
                   Icons.calendar_month_outlined,
                   size: 16,
-                  color: isDark ? Colors.white60 : Colors.black54,
+                  color: faintColor(isDark),
                 ),
               ),
               const SizedBox(width: 4),
@@ -65,7 +63,7 @@ class DateStrip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white70 : Colors.black54,
+                    color: faintColor(isDark),
                   ),
                 ),
               ),
@@ -89,7 +87,7 @@ class DateStrip extends StatelessWidget {
                   if (i > 0) const SizedBox(width: gap),
                   SizedBox(
                     width: chipWidth,
-                    child: GlassDateChip(
+                    child: DateStripChip(
                       width: chipWidth,
                       dayName: dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
@@ -97,7 +95,6 @@ class DateStrip extends StatelessWidget {
                       isDark: isDark,
                       accentColor: accentColor,
                       onTap: () => onSelectDate(days[i]),
-                      performanceMode: performanceMode,
                     ),
                   ),
                 ],

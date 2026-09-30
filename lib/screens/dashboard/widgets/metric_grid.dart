@@ -65,7 +65,6 @@ class MetricGrid extends StatelessWidget {
     required this.values,
     required this.isDark,
     required this.seedColor,
-    required this.performanceMode,
     this.columns = 3,
     this.thresholds,
     this.limitLabelFor,
@@ -79,7 +78,6 @@ class MetricGrid extends StatelessWidget {
   final Map<String, double>? values;
   final bool isDark;
   final Color seedColor;
-  final bool performanceMode;
 
   /// Cards per row. Three suits the five greenhouse readings as 3 + 2; the fish
   /// page passes two so four readings land as a clean 2 + 2 rather than 3 + 1 with
@@ -96,9 +94,9 @@ class MetricGrid extends StatelessWidget {
 
   final LimitLabelBuilder? limitLabelFor;
 
-  /// Whether to show colored borders and status colors for out-of-range readings.
-  /// When false, the grid shows only the accent-tinted outline and ordinary text,
-  /// but alarms are still evaluated normally.
+  /// Whether to show status colors for out-of-range readings. When false, the
+  /// grid shows only the accent-tinted hairline and ordinary text, but alarms are
+  /// still evaluated normally.
   final bool showGridColors;
 
   @override
@@ -132,7 +130,7 @@ class MetricGrid extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
-                color: isDark ? Colors.white70 : Colors.black54,
+                color: faintColor(isDark),
               ),
             ),
             const Spacer(),
@@ -178,7 +176,6 @@ class MetricGrid extends StatelessWidget {
                     limit: limitLabelFor?.call(rows[rowIndex][i]),
                     isDark: isDark,
                     seedColor: seedColor,
-                    performanceMode: performanceMode,
                     showGridColors: showGridColors,
                   ),
                 ),
@@ -264,7 +261,6 @@ class _MetricCard extends StatelessWidget {
     required this.limit,
     required this.isDark,
     required this.seedColor,
-    required this.performanceMode,
     required this.showGridColors,
   });
 
@@ -279,7 +275,6 @@ class _MetricCard extends StatelessWidget {
 
   final bool isDark;
   final Color seedColor;
-  final bool performanceMode;
   final bool showGridColors;
 
   @override
@@ -299,11 +294,17 @@ class _MetricCard extends StatelessWidget {
     final breached = verdict == false;
     final status = (breached && showGridColors) ? statusBad(isDark) : null;
 
-    return LiquidGlassCard(
+    return AppCard(
       isDark: isDark,
-      performanceMode: performanceMode,
       padding: const EdgeInsets.all(8),
-      borderColor: status?.withValues(alpha: isDark ? 0.45 : 0.35),
+      // The breach outline is gone, and deliberately. It was the third signal on
+      // one card — the coloured caption below and the grid's "N out of range" tag
+      // were already saying the same thing — and AGENTS.md is explicit that
+      // signalling one state three ways reads as a checklist rather than a
+      // reading. Soft UI carries depth in a shadow pair, and a surface that needs
+      // a red edge to explain itself is not the design language this file
+      // migrated to. `AppCard` has no border override, and inventing one to keep
+      // the third channel would have been the wrong repair.
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -314,9 +315,10 @@ class _MetricCard extends StatelessWidget {
               const SizedBox(width: 4),
               // No tick or warning glyph. Out-of-range used to be signalled three
               // ways on one card — a tick, a warning triangle, and a red border —
-              // which turned a reading into a checklist item. The coloured border
-              // and the range caption below are enough, and they stay visible in
-              // peripheral vision the way an icon did not.
+              // which turned a reading into a checklist item. Two channels are
+              // the right number, and they are the coloured range caption below
+              // and the grid's own "N out of range" verdict; the caption stays
+              // visible in peripheral vision the way an icon did not.
               Expanded(
                 child: Text(
                   spec.label,
@@ -340,7 +342,7 @@ class _MetricCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : Colors.black87,
+                    color: appPrimaryText(isDark),
                   ),
                 )
               else
@@ -352,7 +354,7 @@ class _MetricCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : Colors.black87,
+                      color: appPrimaryText(isDark),
                     ),
                   ),
                 ),

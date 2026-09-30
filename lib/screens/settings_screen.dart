@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme_controller.dart';
+import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
 import 'settings/widgets/settings_fields.dart';
@@ -94,45 +95,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _settings,
-      builder: (context, _) {
-        final detail = _selectedSection;
-        final openSection = detail == null ? null : _sections[detail];
-        return PopScope(
-          canPop: detail == null,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && detail != null) _closeSection();
-          },
-          child: Scaffold(
-            appBar: AppBar(
-              leading: detail == null
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: _closeSection,
-                    ),
-              title: Text(openSection?.title ?? 'Settings'),
-            ),
-            bottomNavigationBar: detail != null
-                ? null
-                : SafeArea(
-                    minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: SaveSettingsButton(
-                      saving: _settings.saving,
-                      onPressed: _save,
-                    ),
-                  ),
-            body: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: switch (openSection) {
-                final section? => _buildDetailPage(context, section),
-                _ => _buildCategoryList(context),
-              },
-            ),
-          ),
-        );
+    // `AppBar` and `bottomNavigationBar` sit outside the listening scope on
+    // purpose.
+    //
+    // The builder used to wrap the whole `Scaffold`, so every toggle, dropdown
+    // and colour chip rebuilt the app bar and the save button with it — and
+    // `_settings.saving` is only ever true between the press and the write
+    // completing, so those two rebuilds were pure cost.
+    //
+    // The save button is the one thing that genuinely has to listen, because it
+    // reads `_settings.saving` and nothing else: `SettingsController.save`
+    // sets `saving = true` and calls `notifyListeners()`
+    // (settings_controller.dart:248), so moving the button out of the scope
+    // without giving it its own listener would have left the label reading
+    // "Save settings" for the whole write. It gets a `ListenableBuilder` of its
+    // own, below, which narrows the rebuild to that one button.
+    final detail = _selectedSection;
+    final openSection = detail == null ? null : _sections[detail];
+    return PopScope(
+      canPop: detail == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && detail != null) _closeSection();
       },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: detail == null
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _closeSection,
+                ),
+          title: Text(openSection?.title ?? 'Settings'),
+        ),
+        bottomNavigationBar: detail != null
+            ? null
+            : SafeArea(
+                minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: ListenableBuilder(
+                  listenable: _settings,
+                  builder: (context, _) => SaveSettingsButton(
+                    saving: _settings.saving,
+                    onPressed: _save,
+                  ),
+                ),
+              ),
+        // The section body is the part that has to follow every setting change.
+        body: ListenableBuilder(
+          listenable: _settings,
+          builder: (context, _) => AnimatedSwitcher(
+            // 200ms, unchanged. Named rather than literal because
+            // AppMotion.state is that value; this is a value changing, not a
+            // container.
+            duration: AppMotion.state,
+            // The library default centres the incoming and outgoing children on
+            // top of each other, so a section arrived as a cross-fade in the
+            // middle of the screen rather than from the edge it was drilled into
+            // from. Aligning to the top keeps the header where the user's eye
+            // already is.
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              alignment: Alignment.topCenter,
+              children: <Widget>[...previousChildren, ?currentChild],
+            ),
+            child: switch (openSection) {
+              final section? => _buildDetailPage(context, section),
+              _ => _buildCategoryList(context),
+            },
+          ),
+        ),
+      ),
     );
   }
 
