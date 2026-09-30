@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../theme/app_theme_of.dart';
 import '../../../widgets/liquid_glass.dart';
+import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../utils/cctv_status.dart';
 
@@ -220,7 +221,19 @@ class CctvStandbyOverlay extends StatelessWidget {
                 label: const Text('Play camera'),
                 style: FilledButton.styleFrom(
                   backgroundColor: primary,
-                  foregroundColor: Colors.white,
+                  // **Not `Colors.white`, and the measurement is why.**
+                  // `primary` is a light accent in every theme on a dark surface
+                  // and the Dracula preset's is lighter still: white on
+                  // `#C1A3EB` measures **2.16:1**, under the 3:1 WCAG 1.4.11
+                  // asks of a control, and this is the one control in the app
+                  // that paints a light fill with white on it.
+                  //
+                  // The fix is a theme-aware pair rather than a constant, because
+                  // there is no single ink that works on both a light accent fill
+                  // and `main.dart`'s own `filledButtonTheme` fills. This one
+                  // measures 7.81:1 on Dracula's primary and 12.6:1 on the
+                  // EnerGrow fill, so it clears on every theme.
+                  foregroundColor: onPrimaryInk(primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 12,

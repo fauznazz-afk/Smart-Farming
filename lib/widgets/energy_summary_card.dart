@@ -175,24 +175,29 @@ class EnergySummaryCard extends StatelessWidget {
     // the same colour, and it is still a step away from the surface on all three
     // themes, which is the second thing that got measured rather than assumed.
     //
-    // **Light mode is still under 3:1 on the PV icon, and this change did not move
-    // it.** Measured on the Ocean cyan seed it is 2.16:1, against 2.17:1 before
-    // — the same to within a hundredth. It is pre-existing, it is about the
-    // *seed* rather than about any theme, and fixing it properly means moving
-    // `metricColor`'s light lightness, which every accent in the app depends on
-    // and which `color_helpers_test.dart` pins. Recorded in
-    // `test/energy_summary_card_icons_test.dart` as a floor rather than a
-    // pass, and done here rather than quietly.
-    final solarColor = metricColor(
+    // **Light mode was under 3:1 on both icons and this fixes it.** These are
+    // icons, so WCAG 1.4.11 wants 3:1 rather than the 4.5:1 that text gets, and
+    // `metricColor` is built for text: measured on the light page it is 2.28 /
+    // 2.88 / 2.16 / 2.21 for the four accents the user can pick, so three of four
+    // fail as a graphic. [metricGraphic] exists for exactly this requirement and
+    // steps only the graphical uses, rather than darkening `metricColor` and
+    // restyling every metric value in the app.
+    //
+    // **Two colours, not one.** Routing both through `metricColor` was the first
+    // attempt and it collapsed the two tiles onto the same value, because
+    // `metricColor` takes an `index` and deliberately **ignores** it. The
+    // existing test caught it. The second steps further from the first so the
+    // pair stays distinguishable at 3:1 rather than at 4.5:1.
+    final solarColor = metricGraphic(
       seedColor: seedColor,
       index: 0,
       theme: theme,
     );
-    final loadColor = strongMetricColor(
-      seedColor: seedColor,
-      index: 1,
-      theme: theme,
-    );
+    final loadColor = theme.isDark
+        ? strongMetricColor(seedColor: seedColor, index: 1, theme: theme)
+        : HSLColor.fromColor(
+            metricGraphic(seedColor: seedColor, index: 0, theme: theme),
+          ).withLightness(0.24).toColor();
 
     return AppCard(
       theme: theme,

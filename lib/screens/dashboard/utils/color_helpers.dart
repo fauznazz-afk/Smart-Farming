@@ -81,6 +81,69 @@ Color themeColor({
       .toColor();
 }
 
+/// The accent for a **graphical object** — an icon, a dot, a bar, an indicator —
+/// as opposed to text or a value.
+///
+/// **This exists because 1.4.11 and 1.4.3 ask for different things.** Text needs
+/// 4.5:1; a graphical object that carries meaning needs 3:1. [metricColor] is
+/// built for text, and measured against the light page it does not reach 3:1 for
+/// three of the four accents the user can pick:
+///
+/// | accent | `metricColor` on the light card | first lightness that clears 3:1 |
+/// |---|---|---|
+/// | EnerGrow green | 2.28:1 | 0.34 |
+/// | Solar amber | 2.88:1 | 0.39 |
+/// | Ocean cyan | 2.16:1 | 0.33 |
+/// | Forest teal | 2.21:1 | 0.33 |
+///
+/// **Why not just darken `metricColor`.** Two reasons, and the second is the
+/// one that decides it. First, a fixed HSL lightness cannot serve all hues —
+/// amber needs 0.39 and cyan needs 0.33, so any single value that clears one
+/// overshoots the other, which is the same non-perceptual-lightness trap
+/// [metricColor] already documents for Dracula. Second, and more decisively:
+/// darkening `metricColor` would change every metric *value* in the app, which
+/// is a visible restyle of the whole product dressed up as a contrast fix. The
+/// defect is in the graphical uses; the surgical fix is in the graphical uses.
+///
+/// Dark and Dracula reuse their existing steps, measured: light-dark `metricColor`
+/// is 10.3:1 to 10.7:1 and Dracula's is 5.45:1, so both clear 3:1 with room and
+/// re-stepping them would be changing values that are already correct.
+const double _graphicLightness = 0.32;
+
+Color metricGraphic({
+  required Color seedColor,
+  required int index,
+  required AppTheme theme,
+}) {
+  if (!theme.isDark) {
+    return HSLColor.fromColor(seedColor)
+        .withSaturation(0.72)
+        .withLightness(_graphicLightness)
+        .toColor();
+  }
+  return metricColor(seedColor: seedColor, index: index, theme: theme);
+}
+
+/// The ink to put **on top of** an accent fill, chosen so it clears WCAG AA.
+///
+/// **Why this is a function and not a constant.** The app's accent fills are
+/// light in every dark theme and the Dracula preset's is lighter still, so
+/// `Colors.white` — the obvious choice and the one this button used — measures
+/// 2.16:1 on Dracula's `#C1A3EB` and is under the 3:1 that WCAG 1.4.11 asks of
+/// a control. A dark ink measures 7.81:1 on the same fill. But a constant dark
+/// ink is wrong too: `main.dart`'s `filledButtonTheme` derives its own label
+/// colour from the fill's lightness for exactly this reason, and a second,
+/// independent rule in a different file is how the two drift.
+///
+/// So this picks by luminance rather than by theme, which means it stays correct
+/// if a fourth accent or a fourth theme lands. The 0.5 pivot is the point where
+/// white and this ink give the same ratio, so either choice is at least as good
+/// as the other at the crossover.
+const Color _darkInkOnAccent = Color(0xFF10201A);
+
+Color onPrimaryInk(Color fill) =>
+    fill.computeLuminance() > 0.18 ? _darkInkOnAccent : Colors.white;
+
 /// Creates the accent color for a metric, in the same hue as the theme.
 ///
 /// [index] is accepted and deliberately ignored. It used to rotate the hue by

@@ -139,35 +139,34 @@ void main() {
       }
     });
 
-    testWidgets('light mode is a recorded shortfall, not a silent pass', (tester) async {
-      // **Light mode is under 3:1 on the PV icon, and this change did not move
-      // it.** It measures 2.16:1, and the old fixed HSL step measured 2.17:1 --
-      // the same to within a hundredth. An earlier draft of this file claimed
-      // 2.78:1 with a 2.7 floor, which was a number measured against *Dracula's*
-      // cyan rather than the Ocean cyan the user actually selected. This
-      // assertion is what caught that, and it is the reason the value is read off
-      // the painted card rather than computed here.
+    testWidgets('light mode clears 3:1 too, which it did not for a long time', (tester) async {
+      // **This was a recorded shortfall and now is not.** The icon measured
+      // 2.16:1 here, against 2.17:1 before the Dracula work -- the same to within
+      // a hundredth -- and this test used to assert a floor at 2.1 plus a
+      // reminder to retire itself once light mode was fixed.
       //
-      // Fixing light mode properly means moving `metricColor`'s light lightness,
-      // which every accent in the app derives from and which
-      // `color_helpers_test.dart` pins. The floor below is set at where it
-      // actually is, so a future change that drags it lower fails here instead
-      // of passing quietly; the day it is properly fixed, both the floor and this
-      // comment go, replaced by a 3:0 assertion.
+      // It is fixed, by `metricGraphic`, which is the point of that function: 3:1
+      // is what 1.4.11 asks of a graphical object and 4.5:1 is what it asks of
+      // text, `metricColor` was built for the second, and the fix belongs on the
+      // graphical uses rather than on every metric value in the app.
+      //
+      // The earlier draft of this file also claimed 2.78:1 with a 2.7 floor, which
+      // was a number measured against *Dracula's* cyan rather than the Ocean cyan
+      // the user actually selects. The assertion is what caught that, and it is
+      // why the value is read off the painted card rather than computed here.
       final colours = await painted(tester, AppTheme.light);
-      final measured = _contrast(colours.first, AppSurfaces.card(AppTheme.light));
-      expect(
-        measured,
-        greaterThanOrEqualTo(2.1),
-        reason: 'light-mode PV icon #${_hex(colours.first)} fell to $measured:1; '
-            'the pre-Dracula value was 2.17:1 on the same seed',
-      );
-      expect(
-        measured,
-        lessThan(3.0),
-        reason: 'light mode now clears 3:1, so this file\'s known-shortfall '
-            'comment and its 2.1 floor should both be retired',
-      );
+      for (final entry in {0: 'PV', 1: 'AC'}.entries) {
+        final measured = _contrast(
+          colours[entry.key],
+          AppSurfaces.card(AppTheme.light),
+        );
+        expect(
+          measured,
+          greaterThanOrEqualTo(3.0),
+          reason: 'light-mode ${entry.value} icon #${_hex(colours[entry.key])} '
+              'fell to $measured:1; it was 2.17:1 before any of this work',
+        );
+      }
     });
   });
 }
