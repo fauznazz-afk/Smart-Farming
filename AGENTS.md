@@ -93,6 +93,44 @@ units make the comparison real — which is why `temp_dht` and `temp_ds18b20` sh
 one and lux does not share with anything. A chart whose shape is an artefact of
 the units is worse than no chart, because it looks like a reading.
 
+**Depth belongs in the shadow, never in the fill.** This is measured, not
+preferred. A `BoxShadow` is painted *outside* the decoration's rect, so it is
+incapable of darkening a card's own interior — which is where every caption in
+this app is drawn. A gradient across the fill can, and the numbers are why it was
+rejected: at 4% the light-mode worst case is already 4.15:1, at 10% it is 3.69,
+at 15% it is 3.34, and AA is 4.5. So when a surface needs to feel thicker, raise
+the shadow alphas. They are free.
+
+**A raised surface has three shadows, not two.** Two equal shadows read as a
+*float*: one dark halo and one light halo with no surface between them. Real
+extruded objects have a contact shadow — the tight dark line where the object
+meets what it sits on — and only then the ambient one spreading away from it. The
+dark half is two shadows at different scales for that reason, and the light half
+is one broad bounce, because a light source makes a small hard highlight and a
+wide soft one. Mirroring the dark pair exactly is what makes CSS neumorphism look
+like a 1990s bevel.
+
+**Light mode is the harder mode for this style, and the two are not
+interchangeable.** A mid-tone page is by definition a short distance from both
+the white half and the dark half, so both have to work harder than on a
+near-black page. Concretely: the light dark-half reached only a 4.6% luminance
+drop at `0x4D`/`0x33` and had to go to `0x66`/`0x40`, while dark mode already
+measured a 44% drop and was left alone. When you deepen one mode, measure the
+other before assuming it followed.
+
+**"Pressed" is two states, not one.** A raised block being pushed flattens into
+the page; a well being pushed goes *deeper* into it. `AppElevation.pressed` and
+`AppElevation.insetDeep` are the two, and they differ in which way the offsets
+point, not only in size — inverting `insetDeep` produces a chip that pops *out*
+of the bar when the finger pushes it in. There is a test for exactly that.
+
+**Measure the screen, not the code.** A shadow can be in the token file, reach
+`flutter analyze` and pass every test, and still be invisible on the device. The
+check is a scanline of pixel brightness across a card edge, and the numbers to
+compare are the card fill against the page and against the shadow's darkest
+point. `FEATURE.md` §18.5 has asked for this since it was written and it had
+never been done.
+
 ### Soft-UI surfaces, and why they are opaque
 
 The surface system is opaque soft-UI: a card is the **same colour as the page**,
@@ -167,6 +205,28 @@ on the glass card fill. `test/color_helpers_test.dart` now measures each one
 against the real surfaces from `main.dart` and `liquid_glass.dart`, not against
 white, and 8-bit quantisation is why the hue tolerances there are 0.5° rather
 than exact.
+
+**That test then failed in the opposite direction, and the failure is the lesson.**
+Its surface list was six hand-written hex values, copied in when the glass fills
+were replaced. The soft-UI work changed those fills a third time without touching
+the test, and because the stale light values were *lighter* than the real ones it
+measured against a more forgiving surface than the one rendering: `faintColor` sat
+at 4.47:1, `statusBad` 4.48, `statusAlert` 4.47, three under AA, with the suite
+green and a comment insisting every hex was a real fill. It survived two commits.
+
+**So the surface list is read out of `AppSurfaces` rather than written down, and
+it must stay that way.** A literal in a test whose job is to describe the app's
+own tokens is a copy, and copies drift — twice here, silently, in opposite
+directions. The same reasoning applies to any other "the test knows what the app
+paints" list in this repo: if it can be derived, derive it.
+
+**When you change a surface, change the colours measured against it in the same
+commit.** The values here have almost no margin by design — 4.55 to 4.59 against
+4.5 — so a surface tweak is a text-contrast change even when nothing about the
+text changed. Adjust them by **scaling every channel by one factor**, which
+preserves hue and saturation exactly, not by stepping HSL lightness: HSL moved
+`faintColor` from 150.00° to 146.67° at a 0.6% darkening, and a caption colour that
+shifts hue when you darken it reads warm beside a green theme.
 
 **Green means a problem is absent, and the user did not choose it.** Status
 colours are for warnings. A healthy reading takes the accent and ordinary text;
@@ -629,7 +689,7 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-flutter test                                             # 338 tests, jalankan per-file
+flutter test                                             # 351 tests, jalankan per-file
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 

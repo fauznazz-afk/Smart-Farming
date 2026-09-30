@@ -5,13 +5,29 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 30 September 2026 (sesi ketujuh)
-- **Status**: rilis **1.6.1 (build 13)** di `origin/main`. Setelah itu, **empat
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 30 September 2026 (sesi kedelapan)
+- **Status**: rilis **1.6.1 (build 13)** di `origin/main`. Setelah itu, **enam
   commit tanpa tag rilis** yang mengubah sistem secara mendasar — `pubspec.yaml`
   masih `1.6.1+13`. Rilis berikutnya harus memotong seluruh `[Unreleased]` di
   `CHANGELOG.md` sebagai **1.7.0**, bukan 1.6.2: surface system, navigasi, dan
   set chart berubah, yang tidak memenuhi syarat patch. Rilis
   sebelumnya: 1.5.0 (27 September 2026, commit `24189a0`).
+
+- **Sesi kedelapan (30 Sep 2026 sore)** menutup dua hal besar:
+  1. **Bug kontras yang sudah dua commit tertidur.** `test/color_helpers_test.dart`
+     mengukur AA terhadap **enam dari enam hex basi** — nilai pre-restyle, yang
+     *lebih terang* dari yang sebenarnya, jadi suite hijau sementara
+     `faintColor` 4,47 · `statusBad` 4,48 · `statusAlert` 4,47 di bawah AA.
+     List-nya sekarang dibaca dari `AppSurfaces`.
+  2. **Neumorphism diperdalam** (`ce7a7a9`): raised jadi **tiga** shadow
+     (contact + ambient + bounce), light mode naikkan alpha gelap dua kali
+     setelah pengukuran piksel, dan `Pressable` yang baru — karena
+     `AppCard.pressed` **tidak pernah dipakai satu pun call site** sejak
+     migrasi soft-UI.
+
+  Kedalaman sengaja ditaruh di shadow, bukan fill, karena `BoxShadow` hanya
+  digambar di luar rect dan jadi tidak bisa menyentuh teks. Gradien fill sudah
+  diukur dan ditolak: 4% sudah 4,15:1.
 
 ---
 
@@ -28,7 +44,7 @@ export PATH="/home/fzn/dev/flutter/bin:$HOME/Android/Sdk/platform-tools:$PATH"
 export ANDROID_HOME=/home/fzn/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
 flutter analyze          # harus: No issues found
-flutter test             # harus: 338/338 (24 file) — jalankan PER-FILE, mesin 7 GB OOM kalau sekali jalan
+flutter test             # harus: 351/351 (25 file) — jalankan PER-FILE, mesin 7 GB OOM kalau sekali jalan
 cd android && ./gradlew :app:testDebugUnitTest   # harus: 11
 git log --oneline -5     # lihat commit terakhir
 ```
@@ -308,7 +324,7 @@ lib/                                    62 file, 11.445 baris
     alarm_history_screen.dart           402 baris, belum di-refactor
     login_screen.dart
   widgets/                              primitif permukaan (AppCard/AppTile/AppBadge — nama file `liquid_glass` tidak akurat)
-  test/                                 24 file, 338 test, ~5.400 baris
+  test/                                 25 file, 351 test, ~5.700 baris
 ```
 
 ### Konvensi yang perlu dijaga
@@ -952,7 +968,7 @@ adalah **fish**, bukan bash.
 
 ```bash
 flutter analyze                    # harus: No issues found
-flutter test                       # harus: 338/338 (PER-FILE)
+flutter test                       # harus: 351/351 (PER-FILE)
 flutter build apk --release        # warm ~2-3 menit
 
 # Perangkat (HP Xiaomi 24090RA29G, Android 16)

@@ -19,14 +19,25 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 30 September 2026, pada `b61eef5` (di atas rilis 1.6.1).
-Flutter 3.47.5 / Dart 3.13.4, target Android (API 36). `flutter analyze` bersih,
-`flutter test` **338 lulus** di 24 file, `./gradlew :app:testDebugUnitTest` 11
-lulus. Suite dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB
-ini OOM kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan
-file yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap
-baseline yang di-`git stash`: suite yang sama gagal dengan cara yang sama tanpa
-perubahan kode apa pun.
+**Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
+Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
+**351 lulus** di 25 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
+Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
+kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
+yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
+yang di-`git stash`: suite yang sama gagal dengan cara yang sama tanpa perubahan
+kode apa pun.
+
+**Temuan 30 September sore yang menutup §18.2 butir 3.** `test/color_helpers_test.dart`
+mengukur AA terhadap daftar hex yang **semuanya basi** — enam dari enam tidak
+cocok dengan permukaan yang benar-benar dirender. Nilai basi itu *lebih terang*
+dari yang sebenarnya, jadi test menghitung terhadap permukaan yang lebih memaafkan
+dan tetap hijau sementara `faintColor` 4,47 · `statusBad` 4,48 · `statusAlert`
+4,47 — **tiga di bawah AA**. Margennya berubah negatif tepat pada commit yang
+tujuannya membuat bayangan terbaca. Sekarang list-nya dibaca dari `AppSurfaces`,
+dan satu test baru memverifikasi lima guard `design_tokens_test.dart` dengan
+**mematahkan tiap bug-nya satu per satu** — karena guard yang tidak bisa gagal
+bukan guard.
 
 **Yang sudah dilihat di perangkat pada 30 September 2026** (Xiaomi 24090RA29G,
 `malachite`, 1220×2712 @ density 520/513, lewat USB, mode light **dan** dark):
@@ -774,6 +785,8 @@ keputusannya ada di `AGENTS.md` §"Soft-UI surfaces" dan di `CHANGELOG.md`
 | Token layer | `dashboard/utils/design_tokens.dart`: `AppSurfaces`, `AppRadius`, `AppElevation`, `appDivider`, `AppMotion`. Satu-satunya tempat fill, radius, pasangan bayangan, dan durasi ditulis |
 | Primitif | `AppCard` (+`inset` / `pressed`), `AppTile`, `AppBadge`, `AppDivider`, `DateStripChip`, `AppBackground` — semuanya di `widgets/liquid_glass.dart` (nama file tidak lagi akurat) |
 | Fill | **Opaque.** Kartu = warna halaman. Kelembaman dibawa pasangan bayangan, bukan transparansi |
+| Bayangan raised | **Tiga**, bukan dua: `contact` (offset 3, blur 6) + `ambient` (offset 9, blur 22) + `bounce` putih (offset −6, blur 14) |
+| Tekan | **Dua state, bukan satu.** `pressed` = blok yang meng-*flatten*; `insetDeep` = teluk yang masuk lebih dalam. `AppCard.pressed` sudah ada sejak migrasi soft-UI dan **tidak ada pun call site yang memakainya** sampai 1.7.0 |
 | Halaman light | **Mid-tone `#E1E7E4`**, bukan putih. Hampir putih membuat separuh bayangan tidak punya tempat untuk menjadi lebih terang, dan hasilnya terbaca Material, bukan soft-UI |
 | Arah cahaya | Dari kiri-atas, seluruh aplikasi. `AppElevation.raised` / `.inset` |
 | Radius | Satu skala: `card 16` · `pill 22` · `tile 14` · `inset 12` · `badge 10` · `bar 4`. Sebelumnya 12 nilai dari 3 sampai 28 |
@@ -794,6 +807,37 @@ keputusannya ada di `AGENTS.md` §"Soft-UI surfaces" dan di `CHANGELOG.md`
    dibedakan — dan warna merah di sana akan punya dua arti dalam satu app.
 4. **Triad dipakai ulang, bukan diperluas.** Menambah hue baru untuk
    accommodate chip baru adalah kesalahan yang sama dengan rotasi hue, terbalik.
+
+### Mengapa kedalaman ada di bayangan, bukan di fill
+
+Ini aturan, bukan selera, dan angka-angkanya diukur.
+
+`BoxShadow` hanya digambar **di luar** rect dekorasi, jadi mustahil ia
+menggelapkan interior kartu — tempat semua caption di aplikasi digambar. Gradien
+melintasi fill berbeda sifatnya dan sudah diukur lalu **ditolak**:
+
+| Gradien fill | Light mode worst case |
+|---|---|
+| 0 % (kondisi sekarang) | 4.56:1 |
+| 4 % | 4.15:1 |
+| 10 % | 3.69:1 |
+| 15 % | 3.34:1 |
+
+AA 4.5. Maka deepen = properti bayangan.
+
+**Light mode butuh dua putaran, dan pengukuran pikselnya yang jadi argumen.** Pada
+`0x4D`/`0x33` separuh gelap hanya mencapai luminansi 219 terhadap halaman 229.5 —
+turun 4,6 %, yang blur buat setipis itu sehingga separuh kerja dibawa bounce
+dan kartu terbaca *terang*, bukan berdiri di permukaan. Sekarang `0x66`/`0x40`.
+Dark mode tidak perlu padanan dan tidak diubah: sudah 17,6 terhadap 31,4, karena
+bayangan hitam di permukaan hampir-hitam tetap gerakan relatif yang besar.
+
+Terukur di perangkat (Xiaomi, kedua mode, via scanline brightness):
+
+```
+dark  : kartu 31.4 → contact 17.6, pulih ~35px   (turun 44 %)
+light : halaman 229.5 → contact 213              (turun 7,2 %)
+```
 
 ### Yang dihapus dan tidak ada lagi
 
@@ -924,6 +968,12 @@ diverifikasi di perangkat ada di §18.5.
 
 ### 18.0 Celah yang dibuat oleh 1.7.0 dan masih terbuka
 
+> **Yang sudah tertutup sejak ditulis:** butir 5 (test kontras mengukur
+> permukaan basi) dan butir 6 (`Bound` tanpa test) sudah diperbaiki. Butir 5
+> adalah bug aksesibilitas yang Compounds: ia bertahan dua commit karena
+> daftar surface di test lebih terang dari yang dirender, jadi suite hijau
+> sementara tiga warna di bawah AA. Butir 6 sudah tertutup di `0678be4`.
+
 1. **Sumbu Y pH terpatok ke nol.** Datanya 6,37–7,75 dalam rentang 0–10, jadi
    penurunan 7,75 → 6,37 terjekan di seperlima plot. `minY = min<0 ? min*1.1 : 0`
    benar untuk lux dan watt, di mana nol berarti sesuatu, dan salah untuk indeks
@@ -936,6 +986,13 @@ diverifikasi di perangkat ada di §18.5.
 4. **Kotak hitam CCTV di light mode** masih menusuk di halaman neumorphic terang.
    `0xFF080D0A` adalah permukaan di belakang video, bukan permukaan bertema, dan
    belum diputuskan apa yang benar di sana.
+5. **Bayangan kanan kartu terpotong tepi layar.** Kartu melebar sampai tepi kanan
+   di halaman Power dan Overview, jadi separuh pekerjaan kedalaman — ambient
+   yang jatuh ke kanan dan bawah — tidak terlihat di sisi itu. Ini layout,
+   bukan shadow, dan sudah begitu sebelum 1.7.0; sengaja tidak disentuh karena
+   mengubahnya berarti mengubah margin halaman, bukan visual. Diperbaiki berarti
+   mengurangi lebar kartu atau menambah margin, dan keduanya keputusan layout
+   yang bukan milik bab ini.
 
 ### 18.1 Celah fungsional
 
@@ -1025,6 +1082,16 @@ Bukan bug, tapi mudah disalahpahami:
 - `AlarmParityTest.kt` tidak punya kasus `lastUpdate == null` (hanya
   `readings: []`).
 - `ChartBounds.maxY` tidak punya test untuk cabang `maximum <= 0`.
+- ~~`test/color_helpers_test.dart` mengukur permukaan yang sudah tidak dipakai.~~
+  Diperbaiki. Enam dari enam hex di list-nya basi, dan list basi itu lebih terang
+  dari yang sebenarnya, jadi tiga warna di bawah AA lolos. Guard sekarang
+  membacanya dari `AppSurfaces`.
+- ~~Token bayangan belum punya test.~~ Diperbaiki:
+  `test/design_tokens_test.dart`, 12 kasus, tiap guard diverifikasi dengan
+  **mematahkan bug-nya di file token lalu memastikan test gagal** — one-axis
+  shadow, single blur radius, pressed yang membesar, `insetDeep` yang dangkal,
+  fill yang beda dari page. Kelimanya tertangkap. Guard yang tidak bisa gagal
+  bukan guard.
 
 ### 18.5 Yang belum diverifikasi di perangkat
 
@@ -1034,6 +1101,15 @@ Bukan bug, tapi mudah disalahpahami:
 - **Layout di ukuran layar selain 1220×2712 @ density 520.** Tiga tempat paling
   mungkin pecah: bar tiga item power flow, legenda chart tiga seri, dua tile
   Energy analytics.
+- **~~Tekan pada kontrol.~~ Terverifikasi 30 September 2026** untuk date strip
+  chip dan navbar; `Pressable` belum dipasang di tombol `FilledButton` (lihat
+  §18.0 butir 3) atau di kartu mana pun yang bisa ditekan. Yang benar-benar
+  belum dilihat: **state `insetDeep`** pada well, karena butuh jari yang menahan
+  di atas screenshot, dan `AppMotion.press` yang diukur — 150 ms turun, 120 ms
+  naik, asimetri itu disengaja tapi belum pernah terasa di tangan.
+- **~~State tekan navbar.~~ Terverifikasi** secara geometri, bukan visual: pair
+  `pressed` dan `insetDeep` ada dan keduanya dipakai, tapi animasi itu sendiri
+  baru satu siklus dan belum dinilai apakah terasa fisik atau hanya bergerak.
 - **Stream CCTV end-to-end** di URL produksi, dan stream kedua `?src=cam2`.
 - ~~**Halaman Fish dan Hydroponics belum pernah dibuka di perangkat.**~~
   **Terverifikasi 29 September 2026.** Keduanya dirender di Xiaomi 24090RA29G:
@@ -1168,7 +1244,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 338 test, jalankan PER-FILE (OOM)
+flutter test                                    # 351 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 

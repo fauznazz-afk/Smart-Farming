@@ -1,11 +1,105 @@
 ## [Unreleased]
 
+### Fixed
+
+- **The contrast test had been measuring surfaces the app stopped using, and
+  three colours were under WCAG AA the whole time.** All six hex values in
+  `test/color_helpers_test.dart`'s surface list were stale — not one matched a
+  fill the app paints. They were the pre-restyle values, and the soft-UI work
+  then made a third change to those fills without updating the test. The stale
+  light values were *lighter* than the real ones, so the suite measured against
+  a more forgiving surface than the one rendering and stayed green: on the page
+  that actually paints, `faintColor` measured 4.47:1, `statusBad` 4.48 and
+  `statusAlert` 4.47 against a requirement of 4.5. The margin went negative on
+  exactly the commit whose purpose was to make the shadows readable. The list is
+  now read from `AppSurfaces`, so it cannot drift again.
+
+### Added
+
+- **The app can be pressed.** `AppCard.pressed` existed since the soft-UI
+  migration and nothing in the app ever passed it, so the press vocabulary was
+  written and never switched on — it added a small extra shadow, which makes a
+  card slightly darker rather than pressed. `Pressable` now inverts the surface
+  properly, and it turned out "pressed" is *two* states: a raised block being
+  pushed flattens into the page, a well being pushed goes deeper into it. One
+  pair for both means either a block that sinks or a well that pops out.
+- **Raised surfaces have three shadows, not two.** Two equal shadows read as a
+  float — one dark halo and one light halo with no surface between them. Real
+  extruded objects have a tight contact shadow where they meet what they sit on
+  and only then a soft ambient one spreading away. Two distinct distances is
+  what gives a card measurable thickness.
+- `test/design_tokens_test.dart`, 12 cases pinning the shadow *geometry* rather
+  than its values: every offset diagonal, the dark half at two distinct blur
+  radii, the fill still exactly the page colour, the press pairs inverse to the
+  resting ones. Each was verified by breaking the bug on purpose and confirming
+  the test fails.
+
+### Changed
+
+- **Depth moved into the shadows, and the measurement is why that is a rule
+  rather than a preference.** A `BoxShadow` paints outside the decoration's
+  rect, so it cannot darken a card's interior where every caption is drawn. A
+  gradient across the fill can, and was measured and rejected: at 4% the
+  light-mode worst case is already 4.15:1, at 15% it is 3.34.
+- The light-mode dark shadow was raised from `0x4D`/`0x33` to `0x66`/`0x40` after
+  a pixel measurement showed it only reaching a 4.6% luminance drop against the
+  page — thin enough that the light half was doing all the work and cards read as
+  lit rather than standing off the surface. Dark mode needed no change and was
+  left alone; it already measured a 44% drop.
+- The nav bar's press now changes geometry rather than colour. On an opaque
+  surface with an opaque fill behind it, the ripple was close to invisible and a
+  pressed tab looked like a dropped frame. Its `AnimatedSwitcher` is also gone:
+  it re-ran on every press, because selecting *is* a press, so tapping the tab
+  you were already on cross-faded two copies of the same circle through an
+  interpolated shadow pair.
+- Three light-mode colours darkened by 1.1–1.3%, the smallest change that clears
+  AA with margin. They are channel-scaled rather than lightness-stepped, because
+  HSL moved `faintColor`'s hue from 150.00° to 146.67° — a caption colour that
+  shifts hue when you darkened reads warm beside a green theme.
+
+### Verification
+
+`flutter analyze` clean. `flutter test` **351 passing** in 25 files, run
+per-file. `./gradlew :app:testDebugUnitTest` 11 passing. Release build installed
+on the Xiaomi 24090RA29G, and the depth measured from the screenshot in both
+colour modes by scanline pixel brightness — the check `FEATURE.md` §18.5 has
+been asking for and that had never been made:
+
+```
+dark  card 31.4 -> contact 17.6, recovering over ~35px
+light page 229.5 -> contact 213
+```
+
+Never seen on a device: the `insetDeep` well state, which needs a finger held
+down mid-screenshot; and whether the 150 ms down / 120 ms up asymmetry actually
+feels physical rather than merely moving.
+
+### Known gaps introduced here
+
+- **The right-hand shadow is clipped by the screen edge.** Cards run to the right
+  edge on the Power and Overview pages, so the ambient half of the depth is not
+  visible on that side. This is a layout property and predates this work; left
+  alone deliberately, since fixing it means changing page margins.
+- `FilledButton` is still a flat accent block. Its contrast is right; a strict
+  neumorphic treatment would raise or inset it. Not done because it is the one
+  control whose fill is the accent, and inverting it would make the accent stop
+  reading as an action.
+
+### Also unreleased (the rest of 1.7.0)
+
+Everything below shipped after the `v1.6.1` tag and belongs to the same release.
+One `[Unreleased]` header on purpose: this file had three of them at 1.4.0, from
+an unclean merge, and the rule that came out of that is keep exactly one and map
+it to a version at release time. **Cut this as 1.7.0, not 1.6.2** — the surface
+system, the navigation and the chart set all changed, which is not a patch.
+
 ### Added
 
 - **The greenhouse and the fish tank have charts.** Seven in total, all drawing
-  real data: Hydroponics gets Temperature (the two sensors on one axis), Humidity,
-  Light and TDS; Fish gets pH, Temperature and Turbidity. Both pages had none at
-  all, and the reason was structural rather than missing work — see Fixed below.
+  real data: Hydroponics gets Temperature (the two sensors on one axis),
+  Humidity, Light and TDS; Fish gets pH, Temperature and Turbidity. Both pages
+  had none at all, and the reason was structural rather than missing work —
+  see Fixed below.
 - `test/bound_test.dart`, the first coverage `Bound` has ever had. Thirteen cases
   pinning the caching, the token comparison, the listener swap, and the
   reused-`State` splice that PV/AC/Battery depend on. Its token contract has

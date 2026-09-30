@@ -46,7 +46,7 @@ Kalau ada yang belum bisa Anda jawab, **Anda belum cukup membaca**.
 | File Dart di `lib/` | 68 |
 | Baris Dart | ~13 200 |
 | File Kotlin | 15 (13 di modul alarm) |
-| File test | 24, melaporkan **338 test** |
+| File test | 25, melaporkan **351 test** |
 | File terbesar | `lib/screens/dashboard_screen.dart` — 1 745 baris |
 
 Lima file yang paling sering jadi sumber bug, karena isinya besar dan dipakai
@@ -59,6 +59,7 @@ semua halaman:
 | `lib/widgets/liquid_glass.dart` | Primitif permukaan: `AppCard`, `AppTile`, `AppBadge`, `AppDivider`, `AppBackground`, `DateStripChip`. Dipakai semua kartu. **Nama file tidak lagi akurat.** Perubahan di sini terlihat di mana-mana. |
 | `lib/screens/dashboard/utils/design_tokens.dart` | **Satu-satunya tempat** fill, radius, pasangan bayangan, atau durasi ditulis. Kalau sebuah warna permukaan atau radius muncul di file lain, itu bug. |
 | `lib/screens/dashboard/widgets/chart_groups.dart` | Apa yang tiap halaman gambar. Kunci request, legenda, statistik, dan sumbu semua membacanya — tidak boleh ada daftar telemetry kedua di tempat lain. |
+| `lib/screens/dashboard/utils/pressable.dart` | State tekan. Pakai `builder`, bukan `child`, karena dekorasi juga harus berubah — dan `pressed` vs `insetDeep` bukan hal yang sama. |
 | `lib/services/thingsboard_api.dart` | Client REST, lifecycle token, cache offline. |
 | `lib/screens/dashboard/widgets/chart_card.dart` | Chart 3 seri, sumbu, tooltip, statistik. |
 
@@ -240,7 +241,7 @@ flutter analyze; flutter test
 ```
 
 Dijalankan terpisah, `flutter analyze` tulis "No issues found!" dan
-`flutter test` tulis "All tests passed!" 338. Tidak ada kode yang berubah di
+`flutter test` tulis "All tests passed!" 351. Tidak ada kode yang berubah di
 antara keduanya.
 
 Penyebabnya bukan `concurrency: 1` yang salah — itu sudah benar. Penyebabnya
@@ -590,6 +591,21 @@ Aturan tambahan:
 
   Kalau sebuah file gagal **tiga kali berturut-turut**, barulah itu test yang
   benar-benar rusak.
+- **Semua tiga gate harus hijau, atau yang gagal disebut.** Gate Kotlin sempat
+  ter-interrupt sekali dan tidak dilaporkan sampai diminta. Kalau sebuah gate
+  dibatalkan, katakan di laporan commit — diamkan gate yang tidak jalan berarti
+  menyamakan "tidak diuji" dengan "lulus".
+- **Guard baru harus diuji dengan cara gagal.** Setelah menulis test untuk aturan
+  baru, **patahkan aturan itu di file token, pastikan test-nya gagal, lalu
+  kembalikan.** Dikerlolankan pada 30 September 2026: lima guard
+  `design_tokens_test.dart` diuji dengan mematikan tiap bug-nya satu per satu
+  (one-axis shadow, single blur radius, pressed yang membesar, `insetDeep` yang
+  dangkal, fill yang beda dari page) dan kelimanya tertangkap. Guard yang tidak
+  pernah gagal belum tentu guard.
+- **Verifikasi visual pakai angka, bukan mata.** Untuk perubahan surface, pakai
+  scanline brightness piksel di tepi kartu. Bandingkan fill kartu, page, dan
+  titik tergelap dari shadow. Nilai acuan yang dipakai 30 Sep 2026: dark card
+  31.4 → contact 17.6; light page 229.5 → contact 213.
 - Gradle hanya wajib kalau alarm, rule, atau `AlarmMessageFormat.kt` berubah.
 - Kalau Anda menambahkan test, hitung ulang angka yang Anda sebut di dokumen dan
   di commit message. Angka basi lebih merusak daripada tidak menyebutnya.
