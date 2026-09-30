@@ -94,11 +94,24 @@ Color alarmWarning(bool isDark) => statusWarn(isDark);
 ///
 /// The light value was `0xFF6B7671` and was still wrong: measured against the
 /// glass card fill `#F2F5F3` it is 4.29:1, and these captions really are 9 to
-/// 11dp. `0xFF606A65` measures 5.11:1 on the same surface. The dark value clears
-/// 7.5:1 and was already fine. `test/color_helpers_test.dart` checks all four
-/// against the real surfaces, so this cannot silently regress again.
+/// 11dp. The dark value clears 6.4:1 and was already fine.
+///
+/// **The light value moved a second time, and the reason is worth recording
+/// because the test that should have caught it did not.** `0xFF606A65` was
+/// measured against `0xFFF1F4F2`, which is the *pre-restyle* page colour. The
+/// soft-UI work darkened the page to `0xFFE1E7E4` so the light half of every
+/// shadow pair would have somewhere to be lighter to, and this value was not
+/// re-measured against the new one. On the page that actually renders it is
+/// **4.47:1** — under AA for the 9 to 11dp text it is used at. It is now
+/// `0xFF5F6964`, which is 4.56:1 on the real page.
+///
+/// The change is 1.3% darker and was found by scaling every channel by 0.987,
+/// not by moving HSL lightness. HSL is the obvious tool here and it is the
+/// wrong one: stepping lightness on this desaturated green moved its hue from
+/// 150.00° to 146.67°, and a caption colour that shifts hue when you darken it
+/// is a caption colour that will read warm next to a green theme.
 const Color _faintDark = Color(0xFFA8B3AC);
-const Color _faintLight = Color(0xFF606A65);
+const Color _faintLight = Color(0xFF5F6964);
 
 Color faintColor(bool isDark) => isDark ? _faintDark : _faintLight;
 
@@ -110,8 +123,21 @@ Color faintColor(bool isDark) => isDark ? _faintDark : _faintLight;
 /// The light values were originally `0xFF2E7D32` and `0xFFB26500`, and the amber
 /// one was the worst thing in this file: 4.02:1 on the glass card fill, well
 /// under the 4.5:1 that WCAG AA requires for text this small. `0xFF9A5500`
-/// measures 5.21:1 and still reads as amber rather than brown. Green was raised
-/// to `0xFF2A7530` for margin, from 4.67:1 to 5.19:1.
+/// still reads as amber rather than brown. Green was raised to `0xFF2A7530` for
+/// margin.
+///
+/// **Red and orange were re-measured for the same reason as [faintColor] and
+/// moved for the same reason.** They were tuned against `0xFFF1F4F2`; the page
+/// is now `0xFFE1E7E4`, and on it they measured 4.48:1 and 4.47:1. Both are now
+/// channel-scaled rather than lightness-stepped — see the note on
+/// [_faintLight] for why that distinction is not pedantic — which is a 1.1% and
+/// 1.3% darkening and lands them at 4.56:1. Green and amber already cleared on
+/// the real page (4.55 and 4.56) and are untouched.
+///
+/// These are measured, and a value tuned against a surface the app no longer
+/// paints is not tuned at all. `test/color_helpers_test.dart` now reads its
+/// surface list out of `AppSurfaces`, so that mistake cannot be made a third
+/// time.
 Color statusOk(bool isDark) =>
     isDark ? const Color(0xFF6DD58C) : const Color(0xFF2A7530);
 
@@ -119,8 +145,8 @@ Color statusWarn(bool isDark) =>
     isDark ? const Color(0xFFFFCA6B) : const Color(0xFF9A5500);
 
 Color statusBad(bool isDark) =>
-    isDark ? const Color(0xFFFF8A80) : const Color(0xFFC62828);
+    isDark ? const Color(0xFFFF8A80) : const Color(0xFFC42828);
 
 /// A status color for an alert accent that is neither clearly good nor bad.
 Color statusAlert(bool isDark) =>
-    isDark ? const Color(0xFFFFAB80) : const Color(0xFFBF360C);
+    isDark ? const Color(0xFFFFAB80) : const Color(0xFFBD350C);

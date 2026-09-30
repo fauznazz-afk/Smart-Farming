@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
 /// The surfaces these colours are actually rendered on.
 ///
@@ -17,12 +18,39 @@ import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 /// to `0x2F3230`, and measuring against the backdrop overstated `statusBad` by
 /// 1.49, from 5.68:1 to 7.17:1.
 ///
-/// The fills are now opaque and equal to the page colour, which is what a
-/// soft-UI surface is: the depth comes from a dual shadow pair, not from
-/// translucency. Every hex below is a fill that really exists. The worst case
-/// for dark text is the lightest surface it can land on and the worst case for
-/// light text is the darkest, so each colour is checked against all of them.
+/// **It then held a second, newer set of wrong values, and that set is the one
+/// that mattered.** The list was `0xFFF1F4F2` / `0xFFFAFBFA` / `0xFF161B19` /
+/// `0xFF1E2422` / `0xFF1B211F` / `0xFF222A27`, hand-copied to describe the
+/// opaque fills that had just replaced the glass. The soft-UI work then made a
+/// third change to those fills — the light page went to `0xFFE1E7E4`, because
+/// near-white left the light half of every shadow pair nowhere to be lighter
+/// *to* — and this file was not updated with it. Every entry was stale.
 ///
+/// The test kept passing, because the stale light values were *lighter* than the
+/// real ones, so it was measuring against a more forgiving surface than the one
+/// rendering. On the page that actually paints, `faintColor` was 4.47:1,
+/// `statusBad` 4.48:1 and `statusAlert` 4.47:1 against a 4.5 requirement — all
+/// three under AA, with the test green. Its own comment claimed "every hex
+/// below is a fill that really exists", which was false for two commits.
+///
+/// So the list is read out of [AppSurfaces] rather than written here. A literal
+/// in a test that is supposed to describe the app's own tokens is a copy that
+/// can drift, and this one drifted twice, silently, in opposite directions.
+final List<Color> _lightSurfaces = [
+  AppSurfaces.pageLight, // page + card, which are the same colour
+  AppSurfaces.chromeLight, // nav pill, app bar scrim
+  AppSurfaces.inputLight, // input fields
+  AppSurfaces.tooltipLight, // chart tooltip
+  const Color(0xFFFFFFFF), // Material surfaces, e.g. a dialog
+];
+
+final List<Color> _darkSurfaces = [
+  AppSurfaces.pageDark,
+  AppSurfaces.chromeDark,
+  AppSurfaces.inputDark,
+  AppSurfaces.tooltipDark,
+];
+
 /// The progress tracks (`AppSurfaces.trackLight` / `trackDark`) are deliberately
 /// in neither list. A track is a 6 to 8dp bar and no text is ever drawn on one,
 /// so including it measures a requirement that does not apply. It was in the
@@ -32,18 +60,11 @@ import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 /// option and it is the wrong one: it moves `faintColor` and four status colours
 /// to satisfy a measurement of text on a bar that has none. If a caption ever
 /// does get drawn over a track, add the track back here and reopen that call.
-const List<int> _lightSurfaces = [
-  0xFFF1F4F2, // page + card, which are the same colour
-  0xFFFAFBFA, // chrome, inputs, tooltip
-  0xFFFFFFFF, // Material surfaces, e.g. a dialog
-];
-
-const List<int> _darkSurfaces = [
-  0xFF161B19, // page + card, which are the same colour
-  0xFF1E2422, // chrome
-  0xFF1B211F, // inputs
-  0xFF222A27, // chart tooltip
-];
+///
+/// It is worth being explicit that the tracks are *not* exempt from the depth
+/// work: they got a second, inset shadow pair rather than a lighter fill, for
+/// the same reason the input fill is lighter than the page. Nothing about this
+/// decision is about depth.
 
 /// The user picked "Ocean cyan" in Settings, so every surface derived from that
 /// seed has to stay that colour.
@@ -139,13 +160,16 @@ void main() {
     // text would get.
     const aa = 4.5;
 
-    void expectClearsAa(String name, Color color, List<int> surfaces) {
-      final worst = surfaces.map((s) => _contrast(color, Color(s))).reduce(math.min);
+    void expectClearsAa(String name, Color color, List<Color> surfaces) {
+      final ratios = surfaces.map((s) => _contrast(color, s)).toList();
+      final worst = ratios.reduce(math.min);
+      final worstSurface = surfaces[ratios.indexOf(worst)];
       expect(
         worst,
         greaterThanOrEqualTo(aa),
         reason: '$name measures ${worst.toStringAsFixed(2)}:1 on its worst '
-            'surface ${(surfaces.map((s) => _contrast(color, Color(s)).toStringAsFixed(2))).join('/')}',
+            'surface #${worstSurface.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()} '
+            '(${surfaces.map((s) => _contrast(color, s).toStringAsFixed(2)).join('/')})',
       );
     }
 
@@ -163,6 +187,37 @@ void main() {
       expectClearsAa('statusBad light', statusBad(false), _lightSurfaces);
       expectClearsAa('statusAlert dark', statusAlert(true), _darkSurfaces);
       expectClearsAa('statusAlert light', statusAlert(false), _lightSurfaces);
+    });
+
+    test('the surfaces this file measures against are the ones the app paints', () {
+      // The guard against the second drift, which is the one that actually bit.
+      //
+      // It cannot be written as a comparison against a literal — a literal here
+      // is the same copy that went stale twice — so what is asserted is the
+      // *property* that made the old list wrong: the binding light surface is
+      // the page, because it is the darkest light fill in the app, and the light
+      // page is a mid-tone rather than anything near white.
+      //
+      // The near-white half matters for the shadows rather than for this test,
+      // but it is the reason the page is mid-tone at all, so it is pinned here
+      // rather than only in a comment.
+      expect(
+        AppSurfaces.pageLight,
+        isNot(const Color(0xFFF1F4F2)),
+        reason: 'the pre-restyle page colour, which this file measured against '
+            'for two commits while the app painted something else',
+      );
+      expect(
+        AppSurfaces.pageLight.computeLuminance(),
+        lessThan(0.80),
+        reason: 'a near-white page leaves the light half of every shadow pair '
+            'nowhere to be lighter to, so cards read as flat Material',
+      );
+      expect(
+        AppSurfaces.pageLight.computeLuminance(),
+        greaterThan(0.60),
+        reason: 'and a very dark page stops being the light theme',
+      );
     });
 
     test('the status colours stay distinguishable from each other', () {
