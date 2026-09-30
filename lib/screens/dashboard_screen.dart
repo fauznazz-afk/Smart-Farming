@@ -1212,7 +1212,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           final baseColor = AppSurfaces.page(isDark);
           return DecoratedBox(
             decoration: BoxDecoration(
-              color: baseColor.withValues(alpha: 0.86 * progress),
+              // Opaque, and that is a fix. This was `0.86 * progress`, so 14% of
+              // whatever was scrolled under the app bar showed through, and on
+              // the device the greeting -- 17sp bold -- stayed plainly legible
+              // through the title. A 17sp bold glyph is not a texture to be
+              // ghosted; it is text, and text behind a title is text nobody can
+              // read. The ramp still fades in over the first 48px, it just
+              // arrives at fully opaque rather than at 86%.
+              color: baseColor.withValues(alpha: progress),
               border: Border(
                 bottom: BorderSide(
                   color: (isDark ? Colors.white : Colors.black).withValues(

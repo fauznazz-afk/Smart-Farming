@@ -11,7 +11,7 @@ import '../utils/telemetry_helpers.dart';
 /// banner in `banners.dart` that now uses `statusWarn`. Left alone it would be
 /// the third amber in the same file. It is a warning that is not a measurement,
 /// so it is the alert tone rather than the measured one.
-const Color _alertAccent = Color(0xFFC2603C);
+const Color _alertAccent = Color(0xFFD2542B);
 
 /// Full-screen placeholder shown when the first telemetry fetch fails.
 class TelemetryErrorView extends StatelessWidget {

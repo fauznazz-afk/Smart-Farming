@@ -33,18 +33,28 @@ class AppSurfaces {
   ///
   /// A neumorphic surface is the *same colour* as what it sits on; that is what
   /// makes the shadow pair legible as a shadow rather than as a border. A card
-  /// that was a step lighter than the page would read as flat Material, which is
-  /// the look this is moving away from.
-  static const Color pageLight = Color(0xFFF1F4F2);
-  static const Color pageDark = Color(0xFF161B19);
+  /// that was a step lighter than the page would read as flat Material.
+  ///
+  /// **Light mode is a mid-tone on purpose, and this is the most consequential
+  /// value in the file.** The first version was `#F1F4F2`, close enough to
+  /// white that the result on the device was not neumorphism at all. The light
+  /// half of every shadow pair is white, so on a near-white page it had nowhere
+  /// to be lighter *to*; only the dark half showed, and every card read as flat
+  /// Material with a grey edge. A mid-tone is what gives both halves somewhere
+  /// to go.
+  ///
+  /// A darker surface also means *more* contrast for dark text on it, so this
+  /// helps the AA numbers rather than hurting them.
+  static const Color pageLight = Color(0xFFE1E7E4);
+  static const Color pageDark = Color(0xFF1A211F);
 
   /// Chrome that sits above the page and must separate from it by fill rather
   /// than by shadow: the bottom navigation pill, the app bar scrim.
   ///
   /// One step off the page colour. These are the two surfaces where a
   /// dual-shadow pair would fight the scrim behind them.
-  static const Color chromeLight = Color(0xFFFAFBFA);
-  static const Color chromeDark = Color(0xFF1E2422);
+  static const Color chromeLight = Color(0xFFE9EEEB);
+  static const Color chromeDark = Color(0xFF232B28);
 
   /// Input fills, and the reason the deboss is carried by an inner shadow
   /// rather than by a darker fill.
@@ -55,20 +65,20 @@ class AppSurfaces {
   /// colour assertions in `test/color_helpers_test.dart`, and every one of them
   /// cleared 4.5:1 by less than 0.43. Darkening it would have dropped
   /// `faintColor`, `statusOk`, `statusWarn` and `statusAlert` below AA together.
-  /// The field is therefore *lighter* than the page in light mode, which keeps
-  /// the text contrast and still reads as inset once the inner shadow is added.
-  static const Color inputLight = Color(0xFFFAFBFA);
-  static const Color inputDark = Color(0xFF1B211F);
+  /// The field is therefore *lighter* than the page, which keeps the text
+  /// contrast and still reads as inset once the inner shadow is added.
+  static const Color inputLight = Color(0xFFEDF1EF);
+  static const Color inputDark = Color(0xFF1E2623);
 
   /// Bars that show a quantity rather than a container: the power-flow split
   /// bar, the state-of-charge track, the energy forecast progress bar.
-  static const Color trackLight = Color(0xFFDDE3E0);
-  static const Color trackDark = Color(0xFF0F1412);
+  static const Color trackLight = Color(0xFFCFD6D2);
+  static const Color trackDark = Color(0xFF131A18);
 
   /// The chart tooltip, which is opaque because it must stay readable over an
   /// arbitrary series crossing underneath it.
-  static const Color tooltipLight = Color(0xFFFAFBFA);
-  static const Color tooltipDark = Color(0xFF222A27);
+  static const Color tooltipLight = Color(0xFFEDF1EF);
+  static const Color tooltipDark = Color(0xFF262E2B);
 
   /// The page fill for the surfaces the chart is drawn on. Deliberately the page
   /// colour and nothing else, so grid lines are the only thing between the
@@ -149,33 +159,42 @@ class AppElevation {
 
   /// A raised card: casts down-right, catches light up-left.
   ///
-  /// Light mode's dark shadow is deliberately weak. On a light surface a strong
-  /// drop shadow stops reading as depth and starts reading as dirt around the
-  /// card; the light shadow is what does the work there. Dark mode inverts that,
-  /// because on a dark surface it is the light shadow that defines the edge.
+  /// Both halves have to be visible or this is not a soft-UI surface at all,
+  /// it is a card with a drop shadow. The first version of this file had the
+  /// light half at `blurRadius: 10, offset: (-3, -3)` on a near-white page,
+  /// where it was invisible, and the dark half carrying everything — which is
+  /// why the first device pass read as flat Material with grey edges rather
+  /// than as a raised block. The pair is now tuned for the mid-tone page: a
+  /// slightly stronger dark half and a tighter, brighter light half, so the
+  /// highlight is a defined lip along the top and left rather than a diffuse
+  /// glow.
+  ///
+  /// Dark mode inverts which half does the work, because on a dark surface it
+  /// is the light shadow that defines the edge and the black one that is
+  /// merely absence.
   static List<BoxShadow> raised(bool isDark) => isDark
       ? const [
           BoxShadow(
-            color: Color(0xFF000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0xCC000000),
+            blurRadius: 12,
+            offset: Offset(5, 5),
           ),
           BoxShadow(
-            color: Color(0x14FFFFFF),
-            blurRadius: 2,
-            offset: Offset(0, -1),
+            color: Color(0x1FFFFFFF),
+            blurRadius: 4,
+            offset: Offset(-2, -2),
           ),
         ]
       : const [
           BoxShadow(
-            color: Color(0x1A3D4A44),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0x333D4A44),
+            blurRadius: 12,
+            offset: Offset(5, 5),
           ),
           BoxShadow(
             color: Color(0xFFFFFFFF),
-            blurRadius: 10,
-            offset: Offset(-3, -3),
+            blurRadius: 8,
+            offset: Offset(-4, -4),
           ),
         ];
 
@@ -187,41 +206,51 @@ class AppElevation {
   static List<BoxShadow> inset(bool isDark) => isDark
       ? const [
           BoxShadow(
-            color: Color(0xB3000000),
-            blurRadius: 6,
-            offset: Offset(2, 2),
+            color: Color(0xA6000000),
+            blurRadius: 8,
+            offset: Offset(3, 3),
           ),
           BoxShadow(
-            color: Color(0x0DFFFFFF),
-            blurRadius: 4,
-            offset: Offset(-2, -2),
+            color: Color(0x1AFFFFFF),
+            blurRadius: 5,
+            offset: Offset(-3, -3),
           ),
         ]
       : const [
           BoxShadow(
-            color: Color(0x1F3D4A44),
-            blurRadius: 6,
-            offset: Offset(2, 2),
+            color: Color(0x2E3D4A44),
+            blurRadius: 8,
+            offset: Offset(3, 3),
           ),
           BoxShadow(
             color: Color(0xFFFFFFFF),
-            blurRadius: 6,
-            offset: Offset(-2, -2),
+            blurRadius: 7,
+            offset: Offset(-3, -3),
           ),
         ];
 
-  /// A hairline, for the boundaries that shadow cannot carry.
+  /// The hairline on a card, and the reason it is **neutral**.
   ///
   /// Soft UI expresses a container's edge through its shadow pair and drops the
-  /// outline. That is mostly right, and it is also where the accessibility
-  /// cost lands: WCAG 1.4.11 wants 3:1 for a UI component boundary and nothing
-  /// in the suite measures it. The borders that already existed were at
-  /// `alpha 0.06` to `0.28` of their own accent, which is far under 3:1, so
-  /// "remove the hairline" would have removed the only edge cue a low-vision
-  /// user had and left nothing measurable behind. The hairline therefore stays,
-  /// and on interactive controls it is stronger than it was.
+  /// outline. This file kept one, for an accessibility reason that still holds:
+  /// WCAG 1.4.11 wants 3:1 for a UI component boundary and no test measures it,
+  /// so removing the only edge cue a low-vision user had would have left
+  /// nothing measurable behind.
+  ///
+  /// What was wrong was the *colour*, not the existence. It was tinted with the
+  /// theme accent, so every card in the app wore a green outline, and that is
+  /// the one thing that stops a surface reading as soft UI: a coloured border
+  /// is a drawn edge, and a drawn edge is what this style exists to replace.
+  /// On the device it was unmistakable — five green-outlined cards reading as
+  /// Material, which is the exact look this migration was for.
+  ///
+  /// So the hairline is now a very light neutral, aligned with the light source:
+  /// it reinforces the top-left lip rather than framing the card. It is a
+  /// whisper, not an outline. [accent] is kept in the signature so a call site
+  /// that genuinely needs a themed edge can still ask for one via
+  /// [controlEdge] — but no card does.
   static Color hairline({required Color accent, required bool isDark}) =>
-      accent.withValues(alpha: isDark ? 0.22 : 0.20);
+      isDark ? const Color(0x14FFFFFF) : const Color(0x99FFFFFF);
 
   /// The outline on a control the user can press, where 3:1 is a real
   /// requirement rather than a nicety.

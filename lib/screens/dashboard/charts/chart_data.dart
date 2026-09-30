@@ -124,13 +124,33 @@ class ChartBounds {
     maxX = (maxX / timeInterval).ceilToDouble() * timeInterval;
 
     final minY = minimum < 0 ? minimum * 1.1 : 0.0;
-    final maxY = maximum <= 0 ? 1.0 : maximum * 1.1;
+    final rawMaxY = maximum <= 0 ? 1.0 : maximum * 1.1;
+    final interval = niceStep(rawMaxY - minY, divisions: _targetTicks);
+
+    // Snap the top of the y axis to a whole number of intervals.
+    //
+    // Without this the axis drew two labels on top of each other. fl_chart
+    // labels every gridline at a multiple of the interval *and* the top bound,
+    // so a peak of 383.51 W gave `maxY = 421.86` with an interval of 100: the
+    // labels 0/100/200/300/400 plus a final `421.86` twenty-two units above
+    // 400, which on a phone is the same line. It was visible on the PV page and
+    // it is the kind of defect no test catches, because both numbers are
+    // individually correct.
+    //
+    // Only when there is real data. `rawMaxY = 1.0` on a flat or all-negative
+    // series is a synthetic floor, not a measurement, and rounding it up to a
+    // multiple of an interval derived from the *negatives* stretched the axis
+    // to 10.0 -- an empty chart with a 10-unit ceiling. `chart_bounds_test`
+    // caught exactly that, which is the argument for keeping that test.
+    final maxY = maximum <= 0 || interval <= 0
+        ? rawMaxY
+        : (rawMaxY / interval).ceilToDouble() * interval;
     return ChartBounds(
       minX: minX,
       maxX: maxX,
       minY: minY,
       maxY: maxY,
-      chartInterval: niceStep(maxY - minY, divisions: _targetTicks),
+      chartInterval: interval,
       timeInterval: timeInterval,
     );
   }

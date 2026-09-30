@@ -199,6 +199,20 @@ class AppTile extends StatelessWidget {
       child: child,
     );
 
+    // No wash by default, and that is a correction rather than an omission.
+    //
+    // The metric grid passes the theme accent here, and with the wash applied all
+    // five cards wore a green tint. On the device it read as a slightly ill set
+    // of tiles rather than as a monochrome soft-UI surface: colour is the one
+    // thing this style cannot be generous with, because a card's depth is
+    // supposed to come from its shadow pair and nothing else. So the wash is
+    // reserved for a tile whose colour carries *meaning* — the energy report's
+    // PV and AC series, which is the documented data-series exception.
+    //
+    // The energy summary card's two tiles and the report's totals tiles keep
+    // theirs. The environment and fish grids do not, and they do not pass an
+    // accent; this is the default rather than a call-site decision so the next
+    // person adding a grid cannot reintroduce it by accident.
     if (accent == null) return tile;
 
     // The wash is clipped to the same radius, because the Container's

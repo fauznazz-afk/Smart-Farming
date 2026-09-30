@@ -71,6 +71,67 @@ SegmentedButtonThemeData _segmentedTheme(Color seed, Brightness brightness) {
   );
 }
 
+/// The app's buttons, which until now had no theme at all.
+///
+/// `filledButtonTheme` was simply absent, so every `FilledButton` in the app --
+/// "Sign in", "Unlock with biometrics", "Save settings", "Play camera" -- was a
+/// raw Material `colorScheme.primary` block with a default elevation and the
+/// framework's own corner radius. Two things were wrong with that on a device,
+/// and only one of them was cosmetic:
+///
+/// The shape was flat. A flat saturated block sitting on an opaque page is the
+/// exact opposite of a soft-UI surface, and it was the loudest thing in every
+/// screenshot.
+///
+/// The text failed contrast. `ColorScheme.fromSeed` maps a green seed to a
+/// *light* green in dark mode, and it paired that with a light `onPrimary`, so
+/// the label came out white on light green -- about 1.5:1. That is a hard fail,
+/// not a taste question, and it is why this cannot be fixed by styling the
+/// shape alone.
+///
+/// So the fill and the label are derived here rather than inherited, from the
+/// user's own seed at a lightness chosen per mode: dark green with white text
+/// in light mode, mid green with near-black text in dark. `themeColor` is the
+/// same function the segmented control uses, so the two agree, and the accent
+/// stays the colour the user picked.
+FilledButtonThemeData _buttonTheme(Color seed, Brightness brightness) =>
+    FilledButtonThemeData(
+      style: _buttonStyle(seed, brightness),
+    );
+
+ButtonStyle _buttonStyle(Color seed, Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  final fill = themeColor(
+    seedColor: seed,
+    // In dark mode 0.68 is too light to carry white text, which is what the
+    // framework default was doing. 0.52 keeps the hue and puts the fill in a
+    // band where a near-black label is comfortably legible.
+    lightness: isDark ? 0.52 : 0.34,
+  );
+  // 0x14 in light mode is the faintest accent that still clears 3:1 on the
+  // page, which is the WCAG 1.4.11 bar for a control boundary.
+  final outline = themeColor(
+    seedColor: seed,
+    lightness: isDark ? 0.52 : 0.34,
+  );
+  return ButtonStyle(
+    backgroundColor: WidgetStatePropertyAll(fill),
+    foregroundColor: WidgetStatePropertyAll(
+      isDark ? const Color(0xFF10201A) : Colors.white,
+    ),
+    elevation: const WidgetStatePropertyAll(0),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+        side: BorderSide(color: outline.withValues(alpha: isDark ? 0.9 : 1)),
+      ),
+    ),
+    textStyle: const WidgetStatePropertyAll(
+      TextStyle(fontWeight: FontWeight.w700),
+    ),
+  );
+}
+
 /// The app's input fields.
 ///
 /// The fill is *lighter* than the page in light mode and a step up in dark mode,
@@ -176,6 +237,7 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
               ),
             ),
           ),
+          filledButtonTheme: _buttonTheme(_themeController.seedColor, Brightness.light),
           segmentedButtonTheme: _segmentedTheme(
             _themeController.seedColor,
             Brightness.light,
@@ -203,6 +265,7 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp> {
               ),
             ),
           ),
+          filledButtonTheme: _buttonTheme(_themeController.seedColor, Brightness.dark),
           segmentedButtonTheme: _segmentedTheme(
             _themeController.seedColor,
             Brightness.dark,
