@@ -169,17 +169,68 @@ void main() {
   });
 
   group('calculateMaxY', () {
-    test('pads the largest value by 25%', () {
-      expect(calculateMaxY([bucket(DateTime(2026), pv: 4, ac: 2)]), 5);
+    // These assert the two properties the axis depends on rather than the exact
+    // numbers. The function used to return a bare maximum computed as
+    // `peak * 1.25`, and the test pinned those products -- 5 for a peak of 4, 10
+    // for a peak of 8. The axis has since been snapped to a whole number of
+    // `niceStep` intervals so the topmost label lands on the top of the plot
+    // instead of being clipped above it, which moves the numbers. Pinning the
+    // products would pin the defect.
+    void expectAxisCovers(
+      List<EnergyBucket> buckets,
+      double peak, {
+      required String reason,
+    }) {
+      final axis = calculateMaxY(buckets);
+      expect(
+        axis.maxY,
+        greaterThanOrEqualTo(peak * 1.25),
+        reason: '$reason: the maximum must leave the 25% headroom, or the '
+            'tallest bar is clipped',
+      );
+      expect(
+        axis.maxY / axis.interval,
+        closeTo((axis.maxY / axis.interval).roundToDouble(), 1e-9),
+        reason: '$reason: the maximum must be a whole number of intervals, or '
+            'the top label is drawn at a height the plot has no room for',
+      );
+      expect(axis.interval, greaterThan(0), reason: reason);
+    }
+
+    test('pads the largest value by 25% and snaps to an interval', () {
+      expectAxisCovers(
+        [bucket(DateTime(2026), pv: 4, ac: 2)],
+        4,
+        reason: 'peak 4',
+      );
     });
 
     test('uses the AC value when it is the largest', () {
-      expect(calculateMaxY([bucket(DateTime(2026), pv: 1, ac: 8)]), 10);
+      expectAxisCovers(
+        [bucket(DateTime(2026), pv: 1, ac: 8)],
+        8,
+        reason: 'peak 8',
+      );
+    });
+
+    test('produces a label a reader would write', () {
+      // The defect this replaced: a peak of 0.369 gave labels of
+      // 0.12 / 0.23 / 0.35 / 0.46. Each was correct to two decimals and none
+      // was a number anyone would write. The interval has to land on the
+      // 1 / 2 / 2.5 / 5 family.
+      final axis = calculateMaxY([
+        bucket(DateTime(2026), pv: 0.369, ac: 0.0),
+      ]);
+      expect(
+        axis.interval,
+        anyOf(0.1, 0.2, 0.25, 0.5),
+        reason: 'interval ${axis.interval} is not a round step',
+      );
     });
 
     test('falls back to 1.0 for empty or all-zero data', () {
-      expect(calculateMaxY(const []), 1.0);
-      expect(calculateMaxY([bucket(DateTime(2026))]), 1.0);
+      expect(calculateMaxY(const []).maxY, 1.0);
+      expect(calculateMaxY([bucket(DateTime(2026))]).maxY, 1.0);
     });
   });
 

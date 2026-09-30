@@ -23,7 +23,7 @@ class ChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chartWidth = calculateChartWidth(buckets, monthly);
-    final maxY = calculateMaxY(buckets);
+    final axis = calculateMaxY(buckets);
     final barGroups = createBarChartGroups(buckets: buckets, monthly: monthly);
 
     return Semantics(
@@ -65,7 +65,7 @@ class ChartCard extends StatelessWidget {
                         // reason. fl_chart names the BarChart equivalent
                         // `swapAnimationDuration`; its default is 150ms.
                         BarChartData(
-                          maxY: maxY,
+                          maxY: axis.maxY,
                           minY: 0,
                           barGroups: barGroups,
                           gridData: const FlGridData(
@@ -99,7 +99,8 @@ class ChartCard extends StatelessWidget {
                               sideTitles: SideTitles(showTitles: false),
                             ),
                             leftTitles: createLeftTitles(
-                              maxY: maxY,
+                              maxY: axis.maxY,
+                              interval: axis.interval,
                               isDark: isDark,
                             ),
                             bottomTitles: createBottomTitles(

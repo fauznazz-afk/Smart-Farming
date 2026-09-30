@@ -111,7 +111,11 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Energi Analytics'),
+        // English, like the rest of the app. It said "Energi Analytics", which
+        // was a half-translation left in from 1.3.1 -- the screen around it reads
+        // "Summary", "Energy per interval", "samples", "hours with data", and
+        // the app's own acceptance criteria ask for an entirely English UI.
+        title: const Text('Energy Analytics'),
         actions: [
           IconButton(
             tooltip: 'Refresh report',
