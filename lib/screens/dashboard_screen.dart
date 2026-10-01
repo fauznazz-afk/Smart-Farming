@@ -1662,7 +1662,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _heroCard(AppTheme theme) {
     return LivePowerCard(
       pvPower: _pzem?.latestValues['power_dc'],
-      acPower: _pzem?.latestValues['power_ac'] ?? 0.0,
+      acPower: _pzem?.latestValues['power_ac'],
       // Read from the BMS's own `power` key, not multiplied out from voltage and
       // current. The device reports all three, and deriving it produced two
       // separate wrong answers: the product collapses to 0 whenever current reads
@@ -1681,8 +1681,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       // `lib/utils/battery_sign.dart`. `energy_forecast_service.dart` documents the
       // same vendor disagreement behind a warning to use `.abs()` where only the
       // magnitude matters.
-      batteryPower: _battery?.latestValues['power'] ?? 0.0,
-      soc: _battery?.latestValues['soc'] ?? 0.0,
+      batteryPower: _battery?.latestValues['power'],
+      soc: _battery?.latestValues['soc'],
       pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
       pzemAgeLabel: _pzem?.ageLabel,
       theme: theme,
@@ -1719,19 +1719,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     return SystemStatusStrip(
       lowSocThreshold: _thresholds.lowSoc,
       activeAlerts: _activeAlertIds.length,
+      // **No `?? 0.0` anywhere in here, and that is the fix.** These records used
+      // to be `double` and an absent device was filled in with a zero, so a
+      // never-reporting BMS rendered as a red `0%` beside `min 20%` and a meter
+      // that had not spoken rendered as a red `Unstable 0 V - 0 Hz`. Both
+      // verdicts fail on zero, so absence became a fault. `SystemStatusStrip`
+      // renders a null as `--` and `not reporting` in ordinary text, which is
+      // the same answer `LivePowerCard` and `MetricGrid` already give on this
+      // page. The record's own doc comment carries the longer version.
       battery: (
-        soc: _battery?.latestValues['soc'] ?? 0.0,
-        voltage: _battery?.latestValues['voltage'] ?? 0.0,
-        current: _battery?.latestValues['current'] ?? 0.0,
+        soc: _battery?.latestValues['soc'],
+        voltage: _battery?.latestValues['voltage'],
+        current: _battery?.latestValues['current'],
         // The same key the hero card reads, so the two cannot disagree about
         // which way the pack is moving.
-        power: _battery?.latestValues['power'] ?? 0.0,
+        power: _battery?.latestValues['power'],
       ),
       ac: (
-        voltage: _pzem?.latestValues['voltage_ac'] ?? 0.0,
-        current: _pzem?.latestValues['current_ac'] ?? 0.0,
-        power: _pzem?.latestValues['power_ac'] ?? 0.0,
-        frequency: _pzem?.latestValues['frequency_ac'] ?? 0.0,
+        voltage: _pzem?.latestValues['voltage_ac'],
+        current: _pzem?.latestValues['current_ac'],
+        power: _pzem?.latestValues['power_ac'],
+        frequency: _pzem?.latestValues['frequency_ac'],
       ),
       theme: theme,
       seedColor: _accent,

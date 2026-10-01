@@ -14,19 +14,39 @@ import 'shortcut.dart';
 /// using a different telemetry key: the hero card said one thing and this strip
 /// said the opposite, on the same screen, from the same pack. Two readings of one
 /// measurement is worse than either being alone.
+///
+/// **Every field is nullable, and that is the whole point of this record.** They
+/// were `double` with `?? 0.0` at the call site, so a BMS that had never
+/// reported -- a fresh install, or a pack that dropped off the Bluetooth link --
+/// rendered as a red **0%** beside `min 20%` and a `battery_alert` glyph. That
+/// is a critical claim about the pack, manufactured out of an absence, and it
+/// contradicted the two widgets above and below it on the same screen:
+/// `LivePowerCard` prints `Power flow unavailable until the inverter reports`
+/// when its reading is missing, and `MetricGrid` prints `--` with a `Stale data`
+/// tag. Three widgets, one page, two different answers to "what does absence
+/// mean", and the most alarming of them belonged to the one that had been handed
+/// a non-nullable field.
+///
+/// A missing reading is not a zero. `0%` says the pack is empty; `--` says the
+/// pack is not talking to us, and only the second of those is something a user
+/// can act on.
 typedef BatteryStatus = ({
-  double soc,
-  double voltage,
-  double current,
-  double power,
+  double? soc,
+  double? voltage,
+  double? current,
+  double? power,
 });
 
 /// Snapshot values shown for the AC side.
+///
+/// Nullable for the same reason as [BatteryStatus]. `voltage` and `frequency`
+/// are the two that decide the grid verdict, so those are the two where
+/// fabricating a zero turns "we cannot tell" into "unstable".
 typedef AcStatus = ({
-  double voltage,
-  double current,
-  double power,
-  double frequency,
+  double? voltage,
+  double? current,
+  double? power,
+  double? frequency,
 });
 
 /// One-line verdicts for the three things a user checks on a glance.
@@ -78,17 +98,41 @@ class SystemStatusStrip extends StatelessWidget {
   /// How many alarms are currently active, or zero.
   final int activeAlerts;
 
-  @override
+@override
   Widget build(BuildContext context) {
-    final gridOk = (ac.frequency - 50).abs() < 2 &&
-        ac.voltage > 200 &&
-        ac.voltage < 240;
-    final batteryOk = battery.soc >= lowSocThreshold;
+    // **Absence is now a third state, not a zero.** Both of these used to be
+    // computed from `double` fields that the call site filled with `?? 0.0`, so a
+    // device that had never reported was indistinguishable from a device reading
+    // zero -- and both comparisons fail on zero, so an absent battery rendered as
+    // a red `0%` with `battery_alert` and an absent meter as a red `Unstable`.
+    //
+    // `ok` is therefore `bool?`, not `bool`: `null` is "no reading", and it is
+    // deliberately neither of the other two. It is not coloured as good (green
+    // means a problem is absent, and the user did not choose that colour) and it
+    // is not coloured as bad (nothing is wrong with the pack; it is not talking).
+    // Ordinary text and a faint glyph, which is what `MetricGrid` does with its
+    // `--` and its `Stale data` tag.
+    final soc = battery.soc;
+    final voltage = ac.voltage;
+    final frequency = ac.frequency;
+
+    final bool? batteryOk =
+        soc == null ? null : soc >= lowSocThreshold;
+    final bool? gridOk = (voltage == null || frequency == null)
+        ? null
+        : (frequency - 50).abs() < 2 && voltage > 200 && voltage < 240;
+
     // One interpretation, shared with the hero card. The three states rather than
     // the old `current < 0` binary, because this BMS reports 0.00 A for stretches
     // while idling and a bare comparison flips the label several times a minute
     // while asserting a direction the data does not establish.
-    final chargeState = batteryChargeState(battery.power);
+    //
+    // Only consulted when the pack is actually reporting: `batteryChargeState`
+    // takes a `double` for a reason, and passing a fabricated zero in here to
+    // keep the call total would put the pack in standby when in fact we have not
+    // heard from it.
+    final chargeState =
+        battery.power == null ? null : batteryChargeState(battery.power!);
     final charging = chargeState == BatteryChargeState.charging;
 
     return DashboardShortcut(
@@ -103,35 +147,58 @@ class SystemStatusStrip extends StatelessWidget {
               // Low charge is the actionable state, so the alert glyph wins over
               // the direction glyph. Previously the icon was a full charging
               // battery whenever the SOC was healthy, which drew a battery
-              // charging on a pack that was discharging — a third signal, and the
+              // charging on a pack that was discharging - a third signal, and the
               // one most likely to be read before the label.
-              icon: !batteryOk
-                  ? Icons.battery_alert
-                  : switch (chargeState) {
-                      BatteryChargeState.charging => Icons.battery_charging_full,
-                      BatteryChargeState.discharging => Icons.battery_5_bar_rounded,
-                      BatteryChargeState.standby => Icons.battery_std_rounded,
-                    },
+              //
+              // A missing reading gets a cloud glyph rather than `battery_alert`,
+              // because that glyph means "low" and the pack is not known to be
+              // low. It was the glyph being drawn next to a fabricated 0%.
+              icon: batteryOk == null
+                  ? Icons.cloud_off_rounded
+                  : !batteryOk
+                      ? Icons.battery_alert
+                      : switch (chargeState!) {
+                          BatteryChargeState.charging =>
+                            Icons.battery_charging_full,
+                          BatteryChargeState.discharging =>
+                            Icons.battery_5_bar_rounded,
+                          BatteryChargeState.standby =>
+                            Icons.battery_std_rounded,
+                        },
               // Only charging is worth naming here. Standby and discharging both
               // read as "Battery", which says less than the hero card but never
               // contradicts it.
               label: charging ? 'Charging' : 'Battery',
-              value: '${battery.soc.toStringAsFixed(0)}%',
+              value: soc == null ? '--' : '${soc.toStringAsFixed(0)}%',
               ok: batteryOk,
               // The threshold is printed because "baterai 18%" means nothing on
-              // its own; whether that is a problem is the user's setting.
-              detail: 'min ${lowSocThreshold.toStringAsFixed(0)}%',
+              // its own; whether that is a problem is the user's setting. With no
+              // reading there is nothing to judge against, so it is not shown -
+              // printing `min 20%` under a `--` invites reading it as a verdict.
+              detail: soc == null
+                  ? 'not reporting'
+                  : 'min ${lowSocThreshold.toStringAsFixed(0)}%',
               isDark: theme.isDark,
               seedColor: seedColor,
             ),
             _divider(theme),
             _Verdict(
-              icon: gridOk ? Icons.check_circle_outline : Icons.error_outline,
+              icon: switch (gridOk) {
+                null => Icons.cloud_off_rounded,
+                true => Icons.check_circle_outline,
+                false => Icons.error_outline,
+              },
               label: 'AC grid',
-              value: gridOk ? 'Stable' : 'Unstable',
+              value: switch (gridOk) {
+                null => '--',
+                true => 'Stable',
+                false => 'Unstable',
+              },
               ok: gridOk,
-              detail: '${ac.voltage.toStringAsFixed(0)} V · '
-                  '${ac.frequency.toStringAsFixed(0)} Hz',
+              detail: (voltage == null || frequency == null)
+                  ? 'not reporting'
+                  : '${voltage.toStringAsFixed(0)} V \u00b7 '
+                      '${frequency.toStringAsFixed(0)} Hz',
               isDark: theme.isDark,
               seedColor: seedColor,
             ),
@@ -168,6 +235,13 @@ class SystemStatusStrip extends StatelessWidget {
 }
 
 /// An icon, a headline verdict, and one line of supporting detail.
+///
+/// `ok` is tri-state and the third state is the interesting one. `null` means
+/// "nothing is reporting", and it renders as ordinary text with a faint glyph:
+/// not the status colour, because nothing has gone wrong, and not the accent,
+/// because the accent here means "this verdict is good" and we do not know that.
+/// Treating an absence as `false` is what produced a red `0%` and a red
+/// `Unstable` for a device that had simply not spoken yet.
 class _Verdict extends StatelessWidget {
   const _Verdict({
     required this.icon,
@@ -182,7 +256,8 @@ class _Verdict extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final bool ok;
+  /// `null` for "no reading". See the class doc.
+  final bool? ok;
   final String detail;
   final bool isDark;
   final Color seedColor;
@@ -197,14 +272,26 @@ class _Verdict extends StatelessWidget {
     // unrelated colour systems. "70%" is not a status; whether 70% is enough is
     // the user's own threshold, and the icon already says it is fine. A low
     // battery still turns the number red, which is the case that matters.
-    final color = ok ? appPrimaryText(isDark) : statusBad(isDark);
-    // Same rule for the icon: the accent when there is nothing to report, a
-    // status colour when there is. A green tick beside an amber theme is the
-    // clearest statement that two palettes are on screen at once, and it says
-    // nothing the icon shape does not already say.
-    final iconColor = ok
-        ? themeColor(seedColor: seedColor, lightness: isDark ? 0.68 : 0.38)
-        : statusBad(isDark);
+    // **Three cases, not two, and the third one is the point of `bool?`.**
+    //
+    // `false` is the only one that gets a status colour, and `false` now means
+    // "we measured it and it is wrong" rather than "we did not get a number".
+    // `null` gets ordinary text: nothing is wrong with the pack, it is simply not
+    // answering, and colouring that would be a false alarm about the hardware.
+    final color = switch (ok) {
+      null => appPrimaryText(isDark),
+      true => appPrimaryText(isDark),
+      false => statusBad(isDark),
+    };
+    // Same rule for the icon: the accent when the verdict is good, a status
+    // colour when it is bad, and faint when there is nothing to judge. A green
+    // tick beside an amber theme is the clearest statement that two palettes are
+    // on screen at once, and it says nothing the icon shape does not already say.
+    final iconColor = switch (ok) {
+      null => faintColor(isDark),
+      true => themeColor(seedColor: seedColor, lightness: isDark ? 0.68 : 0.38),
+      false => statusBad(isDark),
+    };
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -264,4 +264,181 @@ void main() {
       });
     }
   });
+
+  group('LivePowerCard with nothing reporting', () {
+    // **Absence is not zero, and this group is the regression guard for that.**
+    //
+    // `acPower`, `batteryPower` and `soc` were `double` with `?? 0.0` at the call
+    // site, so a device that had never sent a value printed `House 0 W` and
+    // `Charge 0%` and then went on to state "The array covers the house load" --
+    // a comparison of a real solar figure against a fabricated zero. Three widgets
+    // on the Overview page disagreed about what absence means, and the one with
+    // the non-nullable field was the one that made a claim.
+    //
+    // `LivePowerCard` already handled the solar side correctly
+    // ("Power flow unavailable until the inverter reports"), which is why this is
+    // a nullability change and not a new idea: the card already had the right
+    // answer for one of its three terms.
+
+    LivePowerCard card({
+      double? pvPower = 500,
+      double? acPower,
+      double? batteryPower,
+      double? soc,
+    }) =>
+        LivePowerCard(
+          pvPower: pvPower,
+          acPower: acPower,
+          batteryPower: batteryPower,
+          soc: soc,
+          pzemStale: false,
+          pzemAgeLabel: '5s ago',
+          theme: AppTheme.light,
+          seedColor: seedColor,
+        );
+
+    testWidgets('prints -- for every missing figure', (tester) async {
+      await tester.pumpWidget(wrap(card()));
+
+      expect(find.text('--'), findsNWidgets(3));
+      // The three term labels survive, so the row does not collapse or shift.
+      expect(find.text('Solar'), findsOneWidget);
+      expect(find.text('House'), findsOneWidget);
+    });
+
+    testWidgets('does not claim the array covers the house load',
+        (tester) async {
+      await tester.pumpWidget(wrap(card()));
+
+      expect(
+        find.text('The array is just covering the house load'),
+        findsNothing,
+      );
+      expect(
+        find.text('The array covers the house, 300 W spare'),
+        findsNothing,
+      );
+      expect(
+        find.text('The array is not covering the house load right now'),
+        findsNothing,
+      );
+      expect(
+        find.text('House draw unavailable until the meter reports'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('names the pack Battery rather than inventing a direction',
+        (tester) async {
+      await tester.pumpWidget(wrap(card()));
+
+      // `batteryChargeState` calls a zero reading "standby". An absent reading is
+      // not standby, and the label must not claim a direction.
+      expect(find.text('Standby'), findsNothing);
+      expect(find.text('Battery'), findsOneWidget);
+    });
+
+    testWidgets('still draws solar when only the meter is silent',
+        (tester) async {
+      await tester.pumpWidget(wrap(card(acPower: 200, batteryPower: -100)));
+
+      expect(find.text('500'), findsOneWidget);
+      expect(find.text('200'), findsOneWidget);
+      expect(
+        find.text('The array covers the house, 300 W spare'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tells a screen reader the real charge', (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(wrap(card(soc: 64)));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'State of charge: 64 percent')),
+        findsOneWidget,
+      );
+      expect(find.text('64%'), findsOneWidget);
+
+      handle.dispose();
+    });
+
+    testWidgets('tells a screen reader the charge is unknown', (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(wrap(card()));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'State of charge: not reporting')),
+        findsOneWidget,
+      );
+      // And not the old sentence, which asserted a measurement.
+      expect(
+        find.bySemanticsLabel(RegExp(r'State of charge: 0 percent')),
+        findsNothing,
+      );
+
+      handle.dispose();
+    });
+  });
+
+  group('LivePowerCard figure sizing', () {
+    // The three flow terms share the card's content width, which is about 89 dp
+    // each at the documented 381 dp viewport. A battery figure of `-1250` needs
+    // roughly that much for the sign, four digits, icon, gaps and unit at 24 sp,
+    // so any system font scale above 1.0 used to overflow the slot and draw the
+    // stripe across the number.
+    //
+    // `Flexible` plus `FittedBox.scaleDown` rather than `TextOverflow.ellipsis`,
+    // because this project has shipped a truncated figure twice -- `109....` and
+    // `239...` -- and both times the toolchain was green.
+
+    const viewports = <String, double>{
+      '381 dp': 381,
+      '320 dp': 320,
+    };
+
+    viewports.forEach((label, width) {
+      for (final scale in [1.0, 1.5, 2.0]) {
+        testWidgets('a four-digit negative figure fits at $label, scale $scale',
+            (tester) async {
+          tester.view.physicalSize = Size(width, 800);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.reset);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: MediaQuery(
+                data: MediaQueryData(size: Size(width, 800))
+                    .copyWith(textScaler: TextScaler.linear(scale)),
+                child: Scaffold(
+                  body: SingleChildScrollView(
+                    child: LivePowerCard(
+                      pvPower: 1250,
+                      acPower: 1250,
+                      batteryPower: -1250,
+                      soc: 75,
+                      pzemStale: false,
+                      pzemAgeLabel: '5s ago',
+                      theme: AppTheme.light,
+                      seedColor: seedColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          // And the figure is not abbreviated away, which is the whole reason
+          // this is a FittedBox and not an ellipsis.
+          expect(find.text('-1250'), findsOneWidget);
+        });
+      }
+    });
+  });
 }

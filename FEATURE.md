@@ -21,7 +21,7 @@ AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
 **Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**479 lulus** di 33 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
+**491 lulus** di 33 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
 Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
 kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
 yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
@@ -1437,7 +1437,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 479 test, jalankan PER-FILE (OOM)
+flutter test                                    # 491 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 
