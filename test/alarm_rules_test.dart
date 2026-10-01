@@ -296,6 +296,68 @@ void main() {
         'No fresh data from PZEM',
       );
     });
+
+    group('the range message has no dangling whitespace', () {
+      // **pH is the only rule built with an empty unit**, and the template used
+      // to emit the unit with surrounding spaces unconditionally, so every pH
+      // alarm read `pH too high: 9.10  (limit 8.5 )`. It reached the in-app
+      // banner, the stored record and the background notification, and both
+      // language suites were green because `alarm_parity_vectors.json` is
+      // *generated from* this function. A golden fixture produced by the thing
+      // under test cannot catch a defect in it.
+      //
+      // These assert the shape rather than one golden string, so a future
+      // template change fails on the whitespace rule instead of needing somebody
+      // to notice a doubled space in a notification.
+
+      AlarmRule ruleFor(String id) =>
+          buildAlarmRules(_fish).firstWhere((r) => r.id == id);
+
+      const rangeIds = [
+        'fish_ph_high',
+        'fish_ph_low',
+        'fish_water_temp_high',
+        'fish_turbidity_high',
+      ];
+
+      test('a rule with no unit leaves single spaces', () {
+        final message = formatAlarmMessage(
+          ruleFor('fish_ph_high'),
+          value: 9.1,
+        );
+        expect(message, 'pH too high: 9.10 (limit 8.5)');
+      });
+
+      test('a rule with a unit still reads naturally', () {
+        final message = formatAlarmMessage(
+          ruleFor('fish_turbidity_high'),
+          value: 150,
+        );
+        expect(message, 'Turbidity too high: 150.0 NTU (limit 100.0 NTU)');
+      });
+
+      test('no range message ends in a space', () {
+        for (final id in rangeIds) {
+          final message = formatAlarmMessage(ruleFor(id), value: 9.1);
+          expect(
+            message.endsWith(' '),
+            isFalse,
+            reason: '$id produced "$message"',
+          );
+        }
+      });
+
+      test('no range message contains a doubled space', () {
+        for (final id in rangeIds) {
+          final message = formatAlarmMessage(ruleFor(id), value: 9.1);
+          expect(
+            message.contains('  '),
+            isFalse,
+            reason: '$id produced "$message"',
+          );
+        }
+      });
+    });
   });
 
   group('rule serialisation', () {
@@ -415,6 +477,27 @@ void main() {
     });
   });
 }
+
+/// Fish alerts armed with every limit the pH/temperature/turbidity messages need.
+///
+/// Mirrors the generator's `fishWithThresholds` so this file and
+/// `tool/generate_alarm_parity_fixture.dart` are not the only places those numbers
+/// are written down -- they still are, which is recorded in the parity fixture's
+/// own header, but a third copy in a test that only asserts whitespace is a cost
+/// with no return.
+const _fish = AlarmThresholds(
+  energyAlerts: true,
+  environmentAlerts: false,
+  lowSoc: 20,
+  staleMinutes: 10,
+  offlineMinutes: 60,
+  fishAlerts: true,
+  fishPhMin: 6.5,
+  fishPhMax: 8.5,
+  fishTempMin: 20,
+  fishTempMax: 30,
+  fishTurbidityMax: 100,
+);
 
 const _energy = AlarmThresholds(
   energyAlerts: true,

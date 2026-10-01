@@ -80,8 +80,6 @@
   10% band to a 40% band, which is a real loss of precision bought on purpose
   and recorded as such in the test.
 
-### Fixed
-
 - **The hairline was the brightest thing on the card edge on both dark themes,
   and on Dracula it outshone the bounce shadow.** 1.7.0's Dracula cards read as
   outlined rather than embossed, and this is why: the one-pixel hairline was
@@ -114,6 +112,61 @@
   the same defect the accent-tinted hairline caused in 1.7.0, one step further
   down the alpha scale.
 
+- **Every pH alarm read `pH too high: 9.10  (limit 8.5 )`** — two spaces before
+  the parenthesis and one before the closing paren. pH is the only rule built
+  with an empty unit, and the message template interpolated the unit with
+  surrounding spaces unconditionally. The malformed string reached the user three
+  ways: the in-app banner, the persisted alarm record, and the background
+  notification, because all three call the same formatter.
+
+  It survived with both language test suites green, and the reason is worth
+  stating because it is general: **`alarm_parity_vectors.json` is generated from
+  the Dart formatter.** A golden fixture produced by the thing under test cannot
+  catch a defect in it. The fixture pins the two languages to each other, which
+  is what it is for; it was never a claim that the shared text is correct.
+
+  Fixed on both sides. `formatAlarmMessage` in Dart and `AlarmMessageFormat.kt`
+  in Kotlin now route the unit through a helper that collapses the padding when
+  there is nothing to pad. The fixture was regenerated **after** updating the pin
+  in `tool/generate_alarm_parity_fixture.dart`, deliberately, because refusing to
+  bless a wording change silently is that tool's entire purpose. Its diff is two
+  lines and both are pH messages, which is the check that nothing carrying a
+  unit was disturbed.
+
+  New tests assert the shape rather than one golden string: no range message ends
+  in a space, and none contains a doubled space. A future template change now
+  fails on the whitespace rule instead of needing somebody to notice a doubled
+  space in a notification.
+
+- **The energy report readout overflowed at a large font scale.** Measured on the
+  widget, not predicted:
+
+  | viewport | text scale | overflow before the fix |
+  |---|---|---|
+  | 381 dp | 1.0 | none |
+  | 320 dp | 1.0 | none |
+  | 381 dp | 2.0 | **19 px on the right** |
+  | 320 dp | 2.0 | **80 px on the right** |
+
+  The readout row held two `MainAxisSize.min` values with no `Flexible` around
+  them, so at 2x they had nowhere to go. On a phone that is the overflow stripe,
+  and 2x is a normal accessibility setting.
+
+  The fix is a `Wrap`, and specifically **not** `Flexible` plus
+  `TextOverflow.ellipsis`. That is the regression this project already shipped on
+  27 September 2026 — a unit truncated to `109....`, alongside two other label
+  defects in one session that `flutter analyze`, a release build and every
+  existing test all passed. A truncated energy figure is worse than a wrapped
+  one, because the reader cannot tell a rounded value from a cut-off one. The
+  values wrap to a second line instead, and nothing is ever abbreviated. Six
+  viewport and scale combinations are now permanent tests, plus an assertion
+  that the value's `TextOverflow` is not `ellipsis`.
+
+  `PRD_PLTS_Monitoring_App.md` §7.2 item 4 lists this layout among three that
+  "`flutter test` cannot catch". For this one that is wrong: the overflow was a
+  plain `RenderFlex` in a `Row`, and a widget test sets the viewport width
+  through `MediaQueryData.size` and the scale through `textScaler`.
+
 ### Added
 
 - `design_tokens_test.dart` now asserts the hairline lifts each dark page less
@@ -129,6 +182,8 @@
   for the hairline. What it also did was invalidate the arithmetic guard in
   `design_tokens_test.dart` that had been standing in for it, which is the
   argument for doing the measurement.
+- Test count corrected from 452 to 479, and the file count from 32 to 33, in
+  the five places that claimed it. Counted per file rather than taken on trust.
 
 ### Still unverified
 

@@ -130,7 +130,7 @@ void main() {
         'environment_ambient_temp_high',
         'fish_ph_high',
       ]);
-      expect(signals.last.message, 'pH too high: 9.10  (limit 8.2 )');
+      expect(signals.last.message, 'pH too high: 9.10 (limit 8.2)');
       expect(signals.last.severity, AlarmSeverity.warning);
     });
 

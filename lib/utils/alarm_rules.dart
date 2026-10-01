@@ -723,8 +723,28 @@ List<AlarmSignal> newlyActiveSignals({
 ///
 /// The wording is duplicated in the native formatter
 /// (`AlarmMessageFormat.kt`) because the notification is built while Dart is
-/// not running. `test/fixtures/alarm_parity_vectors.json` pins both sides to
-/// the same expected strings; if one drifts, its test fails.
+/// not running. `android/app/src/test/resources/alarm_parity_vectors.json` pins
+/// both sides to the same expected strings; if one drifts, its test fails.
+///
+/// **The unit is optional, and the template used to make that visible as broken
+/// whitespace.** pH is the one rule built with an empty `unit`, and the old
+/// template emitted `' $unit '` unconditionally, so a pH alarm read
+/// `pH too high: 9.10  (limit 8.5 )` -- two spaces before the parenthesis and one
+/// before the closing paren. That string reached the user three ways: the in-app
+/// banner, the persisted `AlarmRecord.message`, and the background notification,
+/// because all three call this function.
+///
+/// It survived because the parity fixture is *generated from* these strings, so
+/// `flutter test` and `:app:testDebugUnitTest` were both green with the malformed
+/// text pinned as expected output on both language sides. A golden fixture
+/// generated from the thing under test cannot catch a defect in it. That is the
+/// general lesson, and it is narrower than it looks: the fixture pins the two
+/// languages to each other, and it was never a claim that the shared text is
+/// correct.
+///
+/// The unit now goes through a helper that collapses the padding when there is
+/// nothing to pad. Only the pH vectors change, which is what makes the fixture
+/// diff worth reading.
 String formatAlarmMessage(AlarmRule rule, {required double? value}) {
   return switch (rule.message) {
     AlarmMessageKind.lowSoc =>
@@ -732,15 +752,21 @@ String formatAlarmMessage(AlarmRule rule, {required double? value}) {
     AlarmMessageKind.stale => 'No fresh data from ${rule.label}',
     AlarmMessageKind.offline => '${rule.label} has stopped reporting',
     AlarmMessageKind.rangeLow =>
-      '${rule.label} too low: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
-          '(limit ${rule.limit} ${rule.unit})',
+      '${rule.label} too low: ${_fixed(value ?? 0, rule.decimals)}${_unit(rule)} '
+          '(limit ${rule.limit}${_unit(rule)})',
     AlarmMessageKind.rangeHigh =>
-      '${rule.label} too high: ${_fixed(value ?? 0, rule.decimals)} ${rule.unit} '
-          '(limit ${rule.limit} ${rule.unit})',
+      '${rule.label} too high: ${_fixed(value ?? 0, rule.decimals)}${_unit(rule)} '
+          '(limit ${rule.limit}${_unit(rule)})',
   };
 }
 
 String _fixed(double value, int decimals) => value.toStringAsFixed(decimals);
+
+/// ` ppm` for a rule that carries a unit, and the empty string for one that does
+/// not, so an absent unit leaves no gap behind. Leading space only: the space
+/// that separates `5.80` from `(limit` is a literal in the template, which is why
+/// adding one here as well would double it on every rule that *does* have a unit.
+String _unit(AlarmRule rule) => rule.unit.isEmpty ? '' : ' ${rule.unit}';
 
 /// Serialises [rules] for the native evaluator.
 ///

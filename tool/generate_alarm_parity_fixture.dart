@@ -428,7 +428,7 @@ void main() {
       [
         {
           'id': 'fish_ph_high',
-          'message': 'pH too high: 9.10  (limit 8.5 )',
+          'message': 'pH too high: 9.10 (limit 8.5)',
         },
       ],
     ),
@@ -445,7 +445,7 @@ void main() {
       [
         {
           'id': 'fish_ph_low',
-          'message': 'pH too low: 5.80  (limit 6.5 )',
+          'message': 'pH too low: 5.80 (limit 6.5)',
         },
       ],
     ),

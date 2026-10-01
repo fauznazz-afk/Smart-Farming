@@ -24,12 +24,33 @@ object AlarmMessageFormat {
         AlarmMessageKind.OFFLINE ->
             "${rule.label} has stopped reporting"
         AlarmMessageKind.RANGE_LOW ->
-            "${rule.label} too low: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
-                "(limit ${plain(rule.limit)} ${rule.unit})"
+            "${rule.label} too low: ${fixed(value ?: 0.0, rule.decimals)}${unit(rule)} " +
+                "(limit ${plain(rule.limit)}${unit(rule)})"
         AlarmMessageKind.RANGE_HIGH ->
-            "${rule.label} too high: ${fixed(value ?: 0.0, rule.decimals)} ${rule.unit} " +
-                "(limit ${plain(rule.limit)} ${rule.unit})"
+            "${rule.label} too high: ${fixed(value ?: 0.0, rule.decimals)}${unit(rule)} " +
+                "(limit ${plain(rule.limit)}${unit(rule)})"
     }
+
+    /**
+     * ` ppm` for a rule that carries a unit, empty for one that does not.
+     *
+     * The mirror of Dart's `_unit` in `alarm_rules.dart`, and for the same
+     * reason: pH is built with an empty unit, and interpolating `' $unit '`
+     * unconditionally produced `pH too high: 9.10  (limit 8.5 )` -- a doubled
+     * space and a trailing one, in the in-app banner, the stored record and the
+     * background notification alike.
+     *
+     * Both sides had it and both sides' tests were green, because
+     * `alarm_parity_vectors.json` is generated from the Dart formatter. A golden
+     * fixture produced by the thing under test cannot catch a defect in it: it
+     * pins the two languages to each other and says nothing about whether the
+     * shared string is right.
+     *
+     * Leading space only. The space before `(limit` is a literal above, so
+     * adding one here as well would double it for every rule that has a unit.
+     */
+    private fun unit(rule: AlarmRule): String =
+        if (rule.unit.isEmpty()) "" else " ${rule.unit}"
 
     /**
      * Equivalent of Dart's `toStringAsFixed`.
