@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../utils/battery_sign.dart';
@@ -205,6 +207,15 @@ class _PowerFlow extends StatelessWidget {
       saturation: 0.46,
     );
 
+    // The three slot labels, so the label block can be given one height for all of
+    // them. See [_labelBlockHeight] for why that is needed, and for why the slot
+    // width comes from a `LayoutBuilder` rather than from arithmetic on the screen
+    // width: the card sits in a page whose padding, and this card's own, are two
+    // more numbers that would have to be right.
+    final solarLabel = 'Solar';
+    final houseLabel = 'House';
+    final batteryLabel = chargeState?.label ?? 'Battery';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -217,13 +228,23 @@ class _PowerFlow extends StatelessWidget {
         // widest term set the width for all three, which is why "Discharging"
         // used to squeeze its neighbours and why a longer label would have pushed
         // the row past the card rather than reflowing it.
-        Row(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Two arrow glyphs, each 15 wide with 2 dp of padding either side.
+            final slot = (constraints.maxWidth - 2 * (15 + 4)) / 3;
+            final labels = <String, int>{
+              for (final label in [solarLabel, houseLabel, batteryLabel])
+                label: _labelLineCount(context, label, slotWidth: slot),
+            };
+            final labelHeight = _labelBlockHeight(context, labels.values);
+            return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: _Term(
                 icon: Icons.wb_sunny_rounded,
-                label: 'Solar',
+                label: solarLabel,
+                labelHeight: labelHeight,
                 watts: solarForBar,
                 color: accent,
                 isDark: theme.isDark,
@@ -236,7 +257,8 @@ class _PowerFlow extends StatelessWidget {
             Expanded(
               child: _Term(
                 icon: Icons.home_rounded,
-                label: 'House',
+                label: houseLabel,
+                labelHeight: labelHeight,
                 watts: acPower,
                 color: loadColor,
                 isDark: theme.isDark,
@@ -259,7 +281,8 @@ class _PowerFlow extends StatelessWidget {
                     : discharging
                     ? Icons.battery_5_bar_rounded
                     : Icons.battery_std_rounded,
-                label: chargeState?.label ?? 'Battery',
+                label: batteryLabel,
+                labelHeight: labelHeight,
                 // Not `.abs()`. The Battery page prints the same figure with the
                 // same sign, and two screens reporting different numbers for one
                 // measurement is worse than an odd-looking minus. No explicit "+"
@@ -270,6 +293,8 @@ class _PowerFlow extends StatelessWidget {
               ),
             ),
           ],
+            );
+          },
         ),
         const SizedBox(height: 12),
         // The house's share of the array's output. A proportion of something on
@@ -439,6 +464,55 @@ class _SocLine extends StatelessWidget {
   }
 }
 
+/// How many lines one flow-row label takes at the width its slot actually gets.
+///
+/// Measured rather than assumed, and **without a `maxLines` cap**, which is the
+/// part that took two attempts. The first attempt laid the painter out with
+/// `maxLines: 2` and read `computeLineMetrics().length`, then gave every label a
+/// two-line block. The widget test caught it immediately, and the reason string
+/// said why: at 2x on a 381 dp viewport "Discharging" was still drawn as `Dis…`,
+/// because it needs three lines in a 89 dp slot, not two. A cap inside the
+/// *measuring* code silently clamps the answer, which is the one place a cap must
+/// not exist — and capping the widget to the same number would then have hidden it
+/// again.
+TextStyle get _termLabelStyle => const TextStyle(fontSize: 11);
+
+int _labelLineCount(BuildContext context, String label, {required double slotWidth}) {
+  final painter = TextPainter(
+    text: TextSpan(text: label, style: _termLabelStyle),
+    textDirection: TextDirection.ltr,
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout(maxWidth: slotWidth);
+  final lines = painter.computeLineMetrics().length;
+  painter.dispose();
+  return math.max(1, lines);
+}
+
+/// The height every flow-row label block gets, so the three figures share a row.
+///
+/// The tallest label's line count, times one measured line's height at the same
+/// scale. At 1.0 that is one line and the card is laid out exactly as it was
+/// before; at 2.0 "Discharging" needs three, so all three blocks become three
+/// lines tall and the figures below them stay on one line.
+///
+/// The line *height* is measured rather than taken as `fontSize * lines`, because
+/// line height and font size differ by the font's own metrics. At 2.0 that
+/// difference is 22% of the answer, and it goes the wrong way: under-reserving
+/// makes the label overflow the box it was given, which is the overflow stripe
+/// this whole change exists to remove.
+double _labelBlockHeight(BuildContext context, Iterable<int> lineCounts) {
+  final scaler = MediaQuery.textScalerOf(context);
+  final probe = TextPainter(
+    text: const TextSpan(text: 'Solar', style: TextStyle(fontSize: 11)),
+    textDirection: TextDirection.ltr,
+    textScaler: scaler,
+  )..layout();
+  final lineHeight = probe.height;
+  probe.dispose();
+
+  return lineHeight * lineCounts.fold(1, math.max);
+}
+
 /// One labelled figure with a unit, sized to sit in a row of three.
 class _Term extends StatelessWidget {
   const _Term({
@@ -447,10 +521,18 @@ class _Term extends StatelessWidget {
     required this.watts,
     required this.color,
     required this.isDark,
+    this.labelHeight,
   });
 
   final IconData icon;
   final String label;
+
+  /// A shared height for the label block, or `null` for the label's natural size.
+  ///
+  /// Set to the tallest of the three flow-row labels, so the figures underneath
+  /// them share a baseline. See [_labelBlockHeight].
+  final double? labelHeight;
+
   /// This term's figure in watts, or `null` when there is no reading to print.
   final double? watts;
   final Color color;
@@ -459,6 +541,41 @@ class _Term extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final faint = faintColor(isDark);
+    final labelText = Text(
+      label,
+      // **Two lines, and it is measured rather than assumed.** This was
+      // `maxLines: 1` with `ellipsis`, and a comment that accepted the
+      // consequence: "the label gets the full slot and ellipsises on its own if a
+      // future one is longer still." On an emulator at a 2x system font scale it
+      // produced `Dischar…` on the third term.
+      //
+      // A truncated state name is the one string on this card that cannot be
+      // recovered by the reader, and it is the one the app is *least* allowed to
+      // get wrong: `AGENTS.md` is explicit that the direction of the battery has
+      // to be carried by the label, because a minus sign alone is not a
+      // direction and the two are deliberately not interchangeable. A half-word
+      // for a direction is the failure mode this whole module is built to avoid.
+      //
+      // Wrapping alone would have been worse, though, and that is why
+      // [labelHeight] exists. The row is `CrossAxisAlignment.start`, so a
+      // two-line third label would drop the *Discharging* figure one line below
+      // the Solar and House figures and read as a rendering fault. The figures are
+      // the content; the labels are the annotation, and the annotation is not
+      // allowed to misalign the content.
+      // **Unbounded, and that is the point.**
+      //
+      // The `maxLines` a label may use is decided once, by [_labelLineCount], from
+      // the width its slot actually got and the user's actual text scale. Capping
+      // it here as well would be a second, different answer to the same question:
+      // the first attempt capped both, the measurement silently clamped to 2, and
+      // the widget test reported the label drawn as `Dis…` at 2x. Two places
+      // answering "how many lines" is one too many.
+      //
+      // The block is a `SizedBox` of the tallest label's height, so a label that
+      // wrapped further than the measurement predicted would overflow visibly --
+      // which is the correct failure. It is better than a silent one.
+      style: _termLabelStyle.copyWith(color: faint),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -466,13 +583,11 @@ class _Term extends StatelessWidget {
         // The label sits above the number, not beside it. "Discharging" is eleven
         // characters and the slot is a third of the card, so beside-the-number it
         // forced the row wide enough to overflow; above it, the label gets the
-        // full slot and ellipsises on its own if a future one is longer still.
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11, color: faint),
-        ),
+        // full slot.
+        if (labelHeight == null)
+          labelText
+        else
+          SizedBox(height: labelHeight, child: labelText),
         const SizedBox(height: 2),
         Row(
           mainAxisSize: MainAxisSize.min,

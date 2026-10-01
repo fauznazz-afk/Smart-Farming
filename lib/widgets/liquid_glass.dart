@@ -561,10 +561,26 @@ class DateStripChip extends StatelessWidget {
                   // control and grows with the setting the user chose; a taller
                   // strip at 2x is what being asked for.
                   //
-                  // `maxLines: 1` with `ellipsis` remains, because at a large
-                  // scale a three-letter abbreviation can still exceed a 42 dp
-                  // chip -- and a day name that reads "Mo" instead of "Mon" is
-                  // still a day name, unlike a truncated reading.
+                  // `maxLines: 1` with `ellipsis` remains as a last-resort guard,
+                  // but **it is not the answer to a large font scale, and the
+                  // comment that used to say otherwise was wrong.**
+                  //
+                  // The reasoning it replaced was: "at a large scale a
+                  // three-letter abbreviation can still exceed a 42 dp chip --
+                  // and a day name that reads 'Mo' instead of 'Mon' is still a
+                  // day name, unlike a truncated reading." Checked on an emulator
+                  // at 2x, it did not read 'Mo'. It read `S`, `M`, `W`, `T`,
+                  // `T`, `F`, `S` -- one letter each, because at 2x not even two
+                  // letters fit in 42 dp. `S` is not a day name, and it is
+                  // ambiguous besides: Saturday and Sunday share it, so do Tuesday
+                  // and Thursday.
+                  //
+                  // The width a chip takes is now measured from the text and the
+                  // user's text scale in `DateStrip`, and the strip scrolls
+                  // horizontally rather than amputating. This `ellipsis` is now
+                  // unreachable at any ordinary scale; it is kept because a chip
+                  // width is a `LayoutBuilder` decision and a `maxLines` with no
+                  // overflow has its own overflow.
                   Text(
                     dayName,
                     maxLines: 1,

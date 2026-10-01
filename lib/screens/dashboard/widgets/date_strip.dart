@@ -40,6 +40,34 @@ class DateStrip extends StatelessWidget {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  /// The width the widest day abbreviation needs at the current text scale.
+  ///
+  /// Measured with a real [TextPainter] rather than guessed, because the two
+  /// inputs move independently: the abbreviation length is ours and fixed, and
+  /// the scale is the user's and can be anything. A constant is therefore wrong
+  /// on one of the two axes by construction.
+  ///
+  /// The style must match the one in [DateStripChip] or the answer is not the
+  /// width the chip will actually take. If that style ever changes, this is the
+  /// second place to change it — which is why the measurement lives next to the
+  /// reasoning rather than as a bare number in the layout.
+  double _widestDayNameWidth(BuildContext context) {
+    const style = TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
+    final scaler = MediaQuery.textScalerOf(context);
+    var widest = 0.0;
+    for (final day in days) {
+      final painter = TextPainter(
+        text: TextSpan(text: dayNameShort(day.weekday), style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      if (painter.width > widest) widest = painter.width;
+      painter.dispose();
+    }
+    return widest;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -115,9 +143,33 @@ class DateStrip extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             const gap = 6.0;
-            final chipWidth =
+            final fairShare =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
-            return Row(
+
+            // **Chips get the width their text needs, and the strip scrolls when
+            // that is more than a fair share.**
+            //
+            // This was measured on an emulator at a 2x system font scale, and the
+            // result was worse than an overflow stripe: every day name was
+            // ellipsised to a single letter, so the strip read
+            // `S... M... W... T... T... F... S...`. The previous fix for this same
+            // font-scale defect claimed in a comment that "a day name that reads
+            // 'Mo' instead of 'Mon' is still a day name, unlike a truncated
+            // reading" -- and that claim was wrong. `S` is not a day name, and it is
+            // ambiguous on top of that: Sunday and Saturday are the same letter,
+            // and so are Tuesday and Thursday. A row of single letters is a
+            // calendar that cannot answer "which day is this".
+            //
+            // So the width is *derived* rather than guessed, and the strip degrades
+            // by scrolling instead of by amputating text. Measuring is possible
+            // because the abbreviation is ours, not the platform's locale: a
+            // hard-coded 42 dp would be another number that is right on the phone
+            // this was measured on and wrong on a narrower one.
+            final needed = _widestDayNameWidth(context) + 10 + 2;
+            final chipWidth = needed > fairShare ? needed : fairShare;
+            final scrolls = chipWidth > fairShare + 0.5;
+
+            final chips = Row(
               // **`crossAxisAlignment: start`, because the chips now grow with
               // the user's font scale** and `Row` centres its children by default.
               // At 1.0 every chip is the same height so this is a no-op; at 2.0 the
@@ -141,6 +193,30 @@ class DateStrip extends StatelessWidget {
                   ),
                 ],
               ],
+            );
+
+            if (!scrolls) return chips;
+
+            // A scrollbar is deliberately not requested. This is a gesture-only
+            // affordance on a control the user reaches by tapping a known position,
+            // and a permanently visible track would sit inside the card's shadow
+            // and read as part of the design. The cost is that the affordance is
+            // invisible -- see the trade recorded below.
+            //
+            // The trade, stated: the strip starts scrolled to the oldest day, so a
+            // user at 2x whose selection is *today* has to scroll to reach it. Today
+            // is the last chip, and it is also the default, which is exactly the
+            // wrong way round. Fixing that properly needs a `ScrollController` and
+            // a `Scrollable.ensureVisible` after first layout, which cannot run from
+            // a `LayoutBuilder` without a second frame -- so this is left as a
+            // recorded gap rather than a guess, and the calendar button beside the
+            // strip is the way to reach a specific day regardless of text size.
+            return ClipRect(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: chips,
+              ),
             );
           },
         ),

@@ -1,7 +1,74 @@
 import 'package:flutter/material.dart';
+// `RenderParagraph`, for `didExceedMaxLines`. Not exported by `material.dart` --
+// and not by `flutter_test.dart` either, which is why the import is explicit
+// rather than free.
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
+
+/// Every label the card's painter had to truncate, mapped to what it drew.
+///
+/// Read off [RenderParagraph.didExceedMaxLines] rather than inferred from the
+/// widget tree, because the widget tree still reports the full string after the
+/// engine has clipped it. That distinction is the whole point: an assertion built
+/// on `find.text` passes with the truncation present.
+Map<String, String> clippedLabels(WidgetTester tester) {
+  final clipped = <String, String>{};
+  for (final element in find.byType(RichText).evaluate()) {
+    final box = element.renderObject;
+    if (box is! RenderParagraph) continue;
+    if (!box.didExceedMaxLines) continue;
+    final span = box.text;
+    if (span is! TextSpan) continue;
+    if (span.toPlainText().isEmpty) continue;
+    clipped[span.toPlainText()] = ellipsised(
+      source: span.toPlainText(),
+      style: span.style,
+      // Read off the render object rather than the span. The paragraph is what
+      // resolved the direction and the scale for this particular layout, so it is
+      // the authority -- a `TextSpan` carries a `TextStyle`, and a style knows
+      // nothing about the user's font-scale setting.
+      direction: box.textDirection,
+      scaler: box.textScaler,
+      maxWidth: box.size.width,
+    );
+  }
+  return clipped;
+}
+
+/// The string the engine would have drawn: the longest prefix that still fits once
+/// the ellipsis itself is accounted for.
+///
+/// Not a prettification. A test's job when it fails is to *report* what the user
+/// saw, and "the label was truncated" without saying to what is a much weaker
+/// thing to act on from a log.
+String ellipsised({
+  required String source,
+  required TextStyle? style,
+  required TextDirection direction,
+  required TextScaler scaler,
+  required double maxWidth,
+}) {
+  var lo = 0;
+  var hi = source.length;
+  while (lo < hi) {
+    final mid = (lo + hi + 1) ~/ 2;
+    final probe = TextPainter(
+      text: TextSpan(text: '${source.substring(0, mid)}…', style: style),
+      textDirection: direction,
+      textScaler: scaler,
+    )..layout();
+    final fits = probe.width <= maxWidth;
+    probe.dispose();
+    if (fits) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return '${source.substring(0, lo)}…';
+}
 
 void main() {
   const seedColor = Color(0xFF35A968);
@@ -438,6 +505,160 @@ void main() {
           // this is a FittedBox and not an ellipsis.
           expect(find.text('-1250'), findsOneWidget);
         });
+      }
+    });
+  });
+
+  group('the battery state label is never amputated', () {
+    // **Found on an emulator at a 2x system font scale, not by reasoning.**
+    //
+    // The label was `maxLines: 1, overflow: ellipsis`, with a comment accepting
+    // the consequence: "the label gets the full slot and ellipsises on its own if a
+    // future one is longer still." At 2x in a ~89 dp slot, "Discharging" rendered as
+    // `Dischar…`.
+    //
+    // This string is the one the app is least allowed to get wrong. `AGENTS.md` is
+    // explicit that the direction of the pack has to be carried by the label,
+    // because a minus sign is not a direction and the two are deliberately not
+    // interchangeable -- a previous BMS swap inverted every battery display without
+    // one red indicator. A half-word for a direction is the exact failure that
+    // section exists to prevent.
+    //
+    // Wrapping alone was rejected: the row is `CrossAxisAlignment.start`, so a
+    // two-line third label would drop the *Discharging* figure a line below the
+    // Solar and House figures. So all three label blocks are given one height.
+
+    Future<void> pumpAtScale(
+      WidgetTester tester, {
+      required double width,
+      required double scale,
+      required double batteryPower,
+    }) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(size: Size(width, 900))
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: LivePowerCard(
+                  pvPower: 0,
+                  acPower: 18,
+                  batteryPower: batteryPower,
+                  soc: 81,
+                  pzemStale: false,
+                  pzemAgeLabel: 'Just now',
+                  theme: AppTheme.light,
+                  seedColor: seedColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    // **Every clipping assertion in this group reads the laid-out paragraph, not
+    // `find.text`.**
+    //
+    // `find.text('Discharging')` matches a `Text` widget by its *data*, which is
+    // still the full string after the layout engine has clipped it. So the obvious
+    // assertion passes with the bug present -- and it did: with
+    // `maxLines: 1, ellipsis` restored, all 32 tests in this file still passed.
+    // `RenderParagraph.didExceedMaxLines` is the flag the painter itself sets when
+    // it has dropped content, and it is the only thing here that describes what
+    // the user sees.
+
+    Future<void> expectNotClipped(WidgetTester tester, String label) async {
+      final clipped = clippedLabels(tester);
+      expect(
+        clipped,
+        isNot(contains(label)),
+        reason: 'the label "$label" was drawn as "${clipped[label]}" -- a '
+            'direction the reader cannot recover',
+      );
+    }
+
+    /// The y of each figure's box, so "aligned" is measured rather than assumed.
+    ///
+    /// The three figures are `-34` for the battery and, with `acPower: 18` and
+    /// `pvPower: 0`, the literal strings `0` and `18` for the other two.
+    Future<List<double>> figureTops(WidgetTester tester) async {
+      final tops = <double>[];
+      for (final label in const ['0', '18', '-34']) {
+        final finder = find.text(label);
+        if (finder.evaluate().isEmpty) continue;
+        tops.add(tester.getTopLeft(finder.first).dy);
+      }
+      return tops;
+    }
+
+    for (final scale in [1.0, 1.5, 2.0, 3.0]) {
+      testWidgets('"Discharging" is whole at scale $scale', (tester) async {
+        await pumpAtScale(tester, width: 381, scale: scale, batteryPower: -34);
+
+        expect(tester.takeException(), isNull);
+        await expectNotClipped(tester, 'Discharging');
+      });
+    }
+
+    testWidgets('the three figures share a line at every scale', (tester) async {
+      // The point of the shared label block: the figures are the content and they
+      // must not drift apart because one annotation wrapped.
+      for (final scale in [1.0, 1.5, 2.0, 3.0]) {
+        await pumpAtScale(tester, width: 381, scale: scale, batteryPower: -34);
+        final tops = await figureTops(tester);
+        expect(tops.length, 3, reason: 'scale $scale did not find three figures');
+        // Tolerance is one device pixel: the figures are baseline-aligned inside
+        // each slot, and a slot's own rounding can differ by a fraction.
+        expect(
+          tops.reduce((a, b) => a > b ? a : b) -
+              tops.reduce((a, b) => a < b ? a : b),
+          lessThan(1.5),
+          reason: 'the figures are misaligned by '
+              '${(tops.reduce((a, b) => a > b ? a : b) - tops.reduce((a, b) => a < b ? a : b)).toStringAsFixed(1)} '
+              'px at scale $scale',
+        );
+      }
+    });
+
+    testWidgets('a narrow viewport also keeps the label whole', (tester) async {
+      // 320 dp is a real small phone, and the slot there is about 74 dp, so
+      // "Discharging" wraps even closer to 1.0.
+      await pumpAtScale(tester, width: 320, scale: 1.3, batteryPower: -34);
+      await expectNotClipped(tester, 'Discharging');
+    });
+
+    testWidgets('every charge state keeps its label', (tester) async {
+      // `batteryChargeState` has three states and the third is the one that gets
+      // skipped -- `AGENTS.md` calls out standby specifically, because any UI that
+      // picks one of two labels flips several times a minute while the pack sits
+      // at 0.00 A.
+      // A list rather than a map: a `double` key cannot be `const` in Dart, and
+      // 0.0 as a map key is the kind of thing that reads as a mistake.
+      const cases = <(double, String)>[
+        (-34, 'Discharging'),
+        (34, 'Charging'),
+        (0, 'Standby'),
+      ];
+      for (final (watts, label) in cases) {
+        await pumpAtScale(
+          tester,
+          width: 381,
+          scale: 2.0,
+          batteryPower: watts,
+        );
+        expect(
+          find.text(label),
+          findsOneWidget,
+          reason: '$watts W must carry a "$label" label at all',
+        );
+        await expectNotClipped(tester, label);
       }
     });
   });
