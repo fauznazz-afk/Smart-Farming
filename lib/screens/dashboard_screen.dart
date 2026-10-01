@@ -1628,6 +1628,34 @@ Future<void> _refreshCurrentPage() async {
     _accent,
     _selectedDate,
     _displayName,
+    // **The connection flag, and this was the gap that froze the Live/Polling
+    // indicator on two tabs.**
+    //
+    // `ChartSectionHeader` reads `_realtimeConnected` and paints a wifi glyph
+    // with the word "Live" or "Polling" from it. That flag changes only via
+    // `setState` in `_handleRealtimeConnection` -- it is not a notifier, and
+    // `_chartRevision` is not bumped by it. So on any tab whose charts were bound
+    // with a token that omitted it, a connection change rebuilt the page and
+    // `Bound` kept its cached child: same listenable, same token, closure never
+    // re-invoked.
+    //
+    // Hydroponics and Fish were the two that omitted it, because they declared
+    // their own `Bound(listenable: _chartRevision, token: theme)` instead of
+    // going through `_bindRevision` like PV, AC and Battery did. Eight chart
+    // headers were frozen at whatever they last showed, and only corrected on a
+    // page switch, a date change or a pull-to-refresh. The other three tabs were
+    // correct, so the same field behaved differently either side of a page
+    // boundary -- which is the worst shape a bug of this kind can have, because
+    // it looks like the pages are just different.
+    //
+    // Both halves are fixed: the flag is in the token, and the two tabs use
+    // `_bindRevision` so there is no third way to declare a bound subtree.
+    //
+    // `AGENTS.md` records this as the `Bound` failure mode to expect, and it is
+    // worth being precise about the shape: a token is unenforced by the compiler,
+    // so a builder that reads a new piece of state and does not also add it to the
+    // token fails *silently*. Nothing here throws.
+    _realtimeConnected,
     // The thresholds belong here. Bound only rebuilds when the listenable fires or
     // this token changes, and _loadPreferences changes the thresholds with a plain
     // setState — so without this, saving a new limit left the environment grid
@@ -2167,10 +2195,15 @@ Future<void> _refreshCurrentPage() async {
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries
       // would let three cards rebuild for a bounds change on the fourth.
-      () => Bound(
-        listenable: _chartRevision,
-        token: theme,
-        builder: () => Column(
+      //
+      // Through `_bindRevision`, like PV, AC and Battery. A bare
+      // `Bound(listenable: _chartRevision, token: theme)` is what left the
+      // Live/Polling indicator frozen on this page -- see the note on
+      // `_visualToken`. There is deliberately no third way to declare one of these.
+      () => _bindRevision(
+        _chartRevision,
+        theme,
+        () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: _chartSections('env', theme),
         ),
@@ -2208,10 +2241,11 @@ Future<void> _refreshCurrentPage() async {
       ),
       () => const SizedBox(height: 8),
       () => _bindRevision(_fishRevision, theme, () => _fishGrid(theme)),
-      () => Bound(
-        listenable: _chartRevision,
-        token: theme,
-        builder: () => Column(
+      // Same reason as the greenhouse charts above.
+      () => _bindRevision(
+        _chartRevision,
+        theme,
+        () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: _chartSections('fish', theme),
         ),
