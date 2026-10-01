@@ -186,17 +186,42 @@ class _SelectedBucketReadout extends StatelessWidget {
             borderRadius: AppRadius.all(AppRadius.badge),
             border: Border.all(color: appDivider(theme: theme, opacity: 0.5)),
           ),
-          child: Row(
+          child: Wrap(
+            // **A `Wrap`, not a `Row`, and this is the second time this repo has
+            // had to learn it.** It was a `Row` holding an `Expanded` date label
+            // and two `_LegendValue`s that are `MainAxisSize.min` with no
+            // `Flexible` around them, so at a 2x system font scale the values had
+            // nowhere to go. Measured, not predicted:
+            //
+            // | viewport | text scale | overflow |
+            // |---|---|---|
+            // | 381 dp | 1.0 | none |
+            // | 320 dp | 1.0 | none |
+            // | 381 dp | 2.0 | **19 px on the right** |
+            // | 320 dp | 2.0 | **80 px on the right** |
+            //
+            // The obvious fix is `Flexible` plus `TextOverflow.ellipsis`, and
+            // that is exactly the regression this project already shipped once:
+            // a unit truncated to `109....`, on 27 September 2026, alongside two
+            // other label defects in the same session that `flutter analyze`, a
+            // release build and every existing test all passed. A truncated
+            // energy figure is worse than a wrapped one, because the reader
+            // cannot tell a rounded value from a cut-off one.
+            //
+            // So the values wrap to a second line instead of shrinking. Nothing
+            // is ever abbreviated, and the date label gives up its width first
+            // because it is the one item that can afford to.
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Text(
-                  monthly
-                      ? formatDateLabel(bucket.hour)
-                      : formatHourLabel(bucket.hour),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                monthly
+                    ? formatDateLabel(bucket.hour)
+                    : formatHourLabel(bucket.hour),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               _LegendValue(
@@ -204,7 +229,6 @@ class _SelectedBucketReadout extends StatelessWidget {
                 value: bucket.pvKwh,
                 color: const Color(0xFFFFC857),
               ),
-              const SizedBox(width: 12),
               _LegendValue(
                 label: 'AC',
                 value: bucket.acKwh,
