@@ -598,13 +598,75 @@ void main() {
       return tops;
     }
 
+    /// Every flow-row label, with the height it needs at the width it was given
+    /// and the height it was actually allotted.
+    ///
+    /// **This is the assertion that caught the third attempt's bug, and it is not
+    /// `didExceedMaxLines`.** That flag only goes true when a paragraph has a
+    /// `maxLines`, and the label deliberately has none -- so a label that wraps
+    /// into a box one line too short is *silently cut*: no flag, no stripe, no
+    /// exception. On the emulator it rendered `Dischargir`. The text needed two
+    /// lines at the width the row actually handed it, the block reserved one, and
+    /// the second line was simply not painted.
+    ///
+    /// So the check is arithmetic against a `TextPainter` at the laid-out width,
+    /// which is the only place both numbers are knowable.
+    Future<void> expectNoLabelIsCut(WidgetTester tester) async {
+      for (final label in const ['Solar', 'House', 'Discharging']) {
+        final finder = find.text(label);
+        if (finder.evaluate().isEmpty) continue;
+        final box = tester.renderObject<RenderParagraph>(finder.first);
+        final allotted = box.size.height;
+        final granted = box.size.width;
+        final span = box.text;
+        if (span is! TextSpan) continue;
+
+        final probe = TextPainter(
+          text: span,
+          textDirection: box.textDirection,
+          textScaler: box.textScaler,
+        )..layout(maxWidth: granted);
+        final needed = probe.height;
+        probe.dispose();
+
+        expect(
+          needed,
+          lessThanOrEqualTo(allotted + 0.5),
+          reason: '"$label" needs ${needed.toStringAsFixed(1)} px at the '
+              '${granted.toStringAsFixed(1)} px it was given, but the block '
+              'allotted ${allotted.toStringAsFixed(1)} px -- the rest is not '
+              'painted and nothing reports it',
+        );
+      }
+    }
+
     for (final scale in [1.0, 1.5, 2.0, 3.0]) {
       testWidgets('"Discharging" is whole at scale $scale', (tester) async {
         await pumpAtScale(tester, width: 381, scale: scale, batteryPower: -34);
 
         expect(tester.takeException(), isNull);
         await expectNotClipped(tester, 'Discharging');
+        await expectNoLabelIsCut(tester);
       });
+    }
+
+    // The emulator is 411 dp, the Xiaomi 381, and the label needed 170 dp of it.
+    // A fix verified only at 381 would have been verified at a width the defect
+    // did not reproduce at.
+    for (final width in [411.0, 381.0, 360.0, 320.0]) {
+      for (final scale in [1.0, 1.3, 1.5, 2.0, 2.5, 3.0]) {
+        testWidgets('no label is cut at ${width.toInt()} dp, scale $scale',
+            (tester) async {
+          await pumpAtScale(
+            tester,
+            width: width,
+            scale: scale,
+            batteryPower: -34,
+          );
+          expect(tester.takeException(), isNull);
+          await expectNoLabelIsCut(tester);
+        });
+      }
     }
 
     testWidgets('the three figures share a line at every scale', (tester) async {

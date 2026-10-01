@@ -224,24 +224,94 @@ class _PowerFlow extends StatelessWidget {
         // the card was the least informative number on it — one reading, printed
         // twice, with the relationship between three readings shrunk underneath.
         //
-        // Expanded on all three so the slots are equal. `mainAxisSize.min` let the
-        // widest term set the width for all three, which is why "Discharging"
-        // used to squeeze its neighbours and why a longer label would have pushed
-        // the row past the card rather than reflowing it.
+        // **Equal slots until the labels say otherwise, then slots in proportion to
+        // the labels.**
+        //
+        // Three `Expanded` children is the design: the flow reads as three equal
+        // stations, and `mainAxisSize.min` used to let the widest term set the
+        // width for all three. It also cannot hold "Discharging" on one line at
+        // 2x -- 11 characters at 22 sp needs about 100 dp and a third of a 381 dp
+        // card is 89 -- so the label had to wrap, and a single word wrapping breaks
+        // mid-word. On the emulator it read `Dischargi / ng`.
+        //
+        // Three alternatives were rejected:
+        //
+        //  * Ellipsis, which is where this started. `Dis...` is not a direction.
+        //  * Proportional slots *always*, which would double the battery slot at 1.0
+        //    and quietly redesign the card at the scale almost everyone uses.
+        //  * A soft hyphen in the string, which gives correct typography
+        //    (`Dis-charging`) but changes the string a screen reader announces and
+        //    the one `find.text` in the battery tests matches on.
+        //
+        // So the split is on whether the labels fit, which is measured rather than
+        // assumed: at 1.0 the answer is yes and the card is laid out exactly as it
+        // was, and at 2.0 the answer is no and the battery station gets the room
+        // its own word needs. `Flexible` rather than `Expanded` in that branch,
+        // because the whole point is that the three are no longer equal.
         LayoutBuilder(
           builder: (context, constraints) {
             // Two arrow glyphs, each 15 wide with 2 dp of padding either side.
-            final slot = (constraints.maxWidth - 2 * (15 + 4)) / 3;
-            final labels = <String, int>{
-              for (final label in [solarLabel, houseLabel, batteryLabel])
-                label: _labelLineCount(context, label, slotWidth: slot),
-            };
-            final labelHeight = _labelBlockHeight(context, labels.values);
+            const arrow = 15 + 4;
+            final fairShare = (constraints.maxWidth - 2 * arrow) / 3;
+            final needed = _labelNaturalWidths(
+              context,
+              [solarLabel, houseLabel, batteryLabel],
+            );
+            final allLabelsFitOnOneLine = needed.every((w) => w <= fairShare);
+            final total = needed.fold(0.0, (a, b) => a + b);
+            final available = constraints.maxWidth - 2 * arrow;
+
+            // **The width a slot will actually get, which is not the width it
+            // asked for.**
+            //
+            // This is the second wrong attempt at this, and the emulator showed it.
+            // `Flexible(flex:)` distributes the row in proportion to the flex
+            // values, so when the labels together want more room than the row has,
+            // *every* slot is shrunk proportionally -- including the longest one,
+            // which is still the one that does not fit. Sizing the label block
+            // against `needed[i] + 1` therefore reserved one line while the
+            // paragraph got less than it needed, wrapped to a second line, and the
+            // one-line block clipped it. The screen read `Dischargir`.
+            //
+            // The number that matters is `available * need / total`, which is the
+            // share the row will hand this slot, and a line count measured against
+            // anything else is a line count about a layout that does not exist.
+            double slotWidthAt(int index) => allLabelsFitOnOneLine
+                ? fairShare
+                : available * needed[index] / total;
+
+            final labelHeight = _labelBlockHeight(
+              context,
+              [
+                for (var i = 0; i < needed.length; i++)
+                  _labelLineCount(
+                    context,
+                    i == 2 ? batteryLabel : (i == 0 ? solarLabel : houseLabel),
+                    // Half a pixel of slack, for the same rounding reason the
+                    // date strip carries: a paragraph one rounding step wider than
+                    // its box wraps, and a wrapped word breaks where it hurts most.
+                    slotWidth: slotWidthAt(i) + 0.5,
+                  ),
+              ],
+            );
+
+            // A slot widget that is a third of the row at 1.0 and proportional to
+            // the text at 2.0. `flex` is an int, so the widths are rounded -- at
+            // these magnitudes a half-unit of flex is well under a pixel, and
+            // `Flexible` distributes the remainder anyway.
+            Widget slot(Widget child, int index) {
+              if (allLabelsFitOnOneLine) return Expanded(child: child);
+              return Flexible(
+                flex: (needed[index] / total * 1000).round().clamp(1, 1000),
+                child: child,
+              );
+            }
+
             return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _Term(
+            slot(
+              _Term(
                 icon: Icons.wb_sunny_rounded,
                 label: solarLabel,
                 labelHeight: labelHeight,
@@ -249,13 +319,14 @@ class _PowerFlow extends StatelessWidget {
                 color: accent,
                 isDark: theme.isDark,
               ),
+              0,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
               child: Icon(Icons.arrow_right_alt_rounded, size: 15, color: faint),
             ),
-            Expanded(
-              child: _Term(
+            slot(
+              _Term(
                 icon: Icons.home_rounded,
                 label: houseLabel,
                 labelHeight: labelHeight,
@@ -263,6 +334,7 @@ class _PowerFlow extends StatelessWidget {
                 color: loadColor,
                 isDark: theme.isDark,
               ),
+              1,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
@@ -274,8 +346,8 @@ class _PowerFlow extends StatelessWidget {
                 color: faint,
               ),
             ),
-            Expanded(
-              child: _Term(
+            slot(
+              _Term(
                 icon: charging
                     ? Icons.battery_charging_full
                     : discharging
@@ -291,6 +363,7 @@ class _PowerFlow extends StatelessWidget {
                 color: accent,
                 isDark: theme.isDark,
               ),
+              2,
             ),
           ],
             );
@@ -416,11 +489,25 @@ class _SocLine extends StatelessWidget {
       seedColor: seedColor,
       lightness: theme.isDark ? 0.68 : 0.38,
     );
+    // **Both labels are `Flexible`, and neither may be cut.**
+    //
+    // They were plain `Text` children, so each got unbounded main-axis width and
+    // the pair could claim more than the row had. Measured on a 320 dp viewport at
+    // a 3.0 scale, `Charge` and `80%` overflowed by 38 px and `RenderFlex` drew
+    // the stripe. A percentage is not a word that can be shortened, and a stripe
+    // across a charge figure is the same failure as a stripe across the power
+    // figure -- so `Flexible` on both, and no `maxLines`, means they wrap instead
+    // of being amputated.
+    //
+    // The bar stays `Expanded` and therefore takes what is left. A bar that gets
+    // narrow is still a bar; a percentage that gets cut is a wrong number.
     return Row(
       children: [
-        Text(
-          'Charge',
-          style: TextStyle(fontSize: 11, color: faint),
+        Flexible(
+          child: Text(
+            'Charge',
+            style: TextStyle(fontSize: 11, color: faint),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -446,16 +533,19 @@ class _SocLine extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Semantics(
-          label: clamped == null
-              ? 'State of charge: not reporting'
-              : 'State of charge: ${clamped.toStringAsFixed(0)} percent',
-          child: Text(
-            clamped == null ? '--' : '${clamped.toStringAsFixed(0)}%',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: appPrimaryText(theme.isDark),
+        Flexible(
+          child: Semantics(
+            label: clamped == null
+                ? 'State of charge: not reporting'
+                : 'State of charge: ${clamped.toStringAsFixed(0)} percent',
+            child: Text(
+              clamped == null ? '--' : '${clamped.toStringAsFixed(0)}%',
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: appPrimaryText(theme.isDark),
+              ),
             ),
           ),
         ),
@@ -475,12 +565,63 @@ class _SocLine extends StatelessWidget {
 /// *measuring* code silently clamps the answer, which is the one place a cap must
 /// not exist — and capping the widget to the same number would then have hidden it
 /// again.
-TextStyle get _termLabelStyle => const TextStyle(fontSize: 11);
+/// The style a flow-row label is actually painted with.
+///
+/// Resolved from the ambient `DefaultTextStyle` rather than written out, for the
+/// same reason `DateStrip` resolves its own: the theme supplies `family: Roboto`
+/// and `letterSpacing: 0.3`, and a hand-written `TextStyle(fontSize: 11)` is
+/// missing both. The `DateStrip` version of this mistake shipped first and the
+/// test caught it -- the strip measured every day name 0.9 px narrow and went on
+/// clipping `Mon` and `Wed` at 2x. There is no reason to repeat it in a second
+/// file, and copying the number would have been the mistake.
+TextStyle _termLabelStyle(BuildContext context) => DefaultTextStyle.of(context)
+    .style
+    .copyWith(fontSize: 11)
+    // The label is an annotation, not a heading, so the weight is left as the
+    // theme has it. Setting one here would be a guess about which weight an
+    // annotation wants, and it would be a fourth number to keep in step.
+    ;
 
-int _labelLineCount(BuildContext context, String label, {required double slotWidth}) {
+/// Each label's width on one line, at the current text scale.
+List<double> _labelNaturalWidths(BuildContext context, List<String> labels) {
+  final style = _termLabelStyle(context);
+  final scaler = MediaQuery.textScalerOf(context);
+  final direction = Directionality.of(context);
+  return [
+    for (final label in labels)
+      () {
+        final painter = TextPainter(
+          text: TextSpan(text: label, style: style),
+          textDirection: direction,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        final width = painter.width;
+        painter.dispose();
+        return width;
+      }(),
+  ];
+}
+
+/// How many lines one flow-row label takes at the width its slot actually gets.
+///
+/// Measured rather than assumed, and **without a `maxLines` cap**, which is the
+/// part that took two attempts. The first attempt laid the painter out with
+/// `maxLines: 2` and read `computeLineMetrics().length`, then gave every label a
+/// two-line block. The widget test caught it immediately, and the reason string
+/// said why: at 2x on a 381 dp viewport "Discharging" was still drawn as `Dis…`,
+/// because it needs three lines in a 89 dp slot, not two. A cap inside the
+/// *measuring* code silently clamps the answer, which is the one place a cap must
+/// not exist -- and capping the widget to the same number would then have hidden
+/// it again.
+int _labelLineCount(
+  BuildContext context,
+  String label, {
+  required double slotWidth,
+}) {
   final painter = TextPainter(
-    text: TextSpan(text: label, style: _termLabelStyle),
-    textDirection: TextDirection.ltr,
+    text: TextSpan(text: label, style: _termLabelStyle(context)),
+    textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
   )..layout(maxWidth: slotWidth);
   final lines = painter.computeLineMetrics().length;
@@ -492,20 +633,26 @@ int _labelLineCount(BuildContext context, String label, {required double slotWid
 ///
 /// The tallest label's line count, times one measured line's height at the same
 /// scale. At 1.0 that is one line and the card is laid out exactly as it was
-/// before; at 2.0 "Discharging" needs three, so all three blocks become three
-/// lines tall and the figures below them stay on one line.
+/// before; at 2.0 the battery label needs more, so all three blocks grow and the
+/// figures below them stay on one line.
 ///
-/// The line *height* is measured rather than taken as `fontSize * lines`, because
-/// line height and font size differ by the font's own metrics. At 2.0 that
-/// difference is 22% of the answer, and it goes the wrong way: under-reserving
-/// makes the label overflow the box it was given, which is the overflow stripe
-/// this whole change exists to remove.
+/// **The line height is measured with the resolved style, and getting that wrong
+/// was the fourth bug in this one widget.** The probe used a hand-written
+/// `const TextStyle(fontSize: 11)`, which has no `height` multiplier and no
+/// family, so it answered 11 px where the paragraph the chip actually paints
+/// needs 16 -- the theme sets `height: 1.4`. The block was therefore short by 45%
+/// at *every* font scale, and a `SizedBox` that is too short does not overflow: it
+/// silently fails to paint the rest of the text, with no stripe and no exception.
+///
+/// That is the same mistake four times over in three files now -- a measurement
+/// that hand-writes the style it is measuring is a copy, and this repo has been
+/// bitten by a stale copy three separate ways. The width measurement and the line
+/// count both resolve the style; so does this.
 double _labelBlockHeight(BuildContext context, Iterable<int> lineCounts) {
-  final scaler = MediaQuery.textScalerOf(context);
   final probe = TextPainter(
-    text: const TextSpan(text: 'Solar', style: TextStyle(fontSize: 11)),
-    textDirection: TextDirection.ltr,
-    textScaler: scaler,
+    text: TextSpan(text: 'Solar', style: _termLabelStyle(context)),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
   )..layout();
   final lineHeight = probe.height;
   probe.dispose();
@@ -574,7 +721,7 @@ class _Term extends StatelessWidget {
       // The block is a `SizedBox` of the tallest label's height, so a label that
       // wrapped further than the measurement predicted would overflow visibly --
       // which is the correct failure. It is better than a silent one.
-      style: _termLabelStyle.copyWith(color: faint),
+      style: _termLabelStyle(context).copyWith(color: faint),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

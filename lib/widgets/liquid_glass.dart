@@ -459,6 +459,20 @@ class DateStripChip extends StatelessWidget {
     this.width = 48,
   });
 
+  /// The chip's horizontal padding and its border width, in logical pixels.
+  ///
+  /// **Exposed because `DateStrip` measures the day name to decide how wide a
+  /// chip has to be, and a measurement that ignores either of these is wrong by
+  /// exactly that much.**
+  ///
+  /// This is not hypothetical: the first attempt at that measurement carried its
+  /// own `10 + 2` guess, and the strip still shipped clipping `Mon` and `Wed` at
+  /// 2x -- a 0.75 px shortfall, invisible to `flutter analyze`, invisible to a
+  /// release build, and only visible as `M…` on a screen. Two numbers written down
+  /// twice in two files is a copy, and this one had already drifted once.
+  static const double horizontalPadding = 5;
+  static const double borderWidth = 1;
+
   final String dayName;
   final int dayNumber;
   final bool isSelected;
@@ -539,7 +553,10 @@ class DateStripChip extends StatelessWidget {
               // `height` is what makes that a floor instead of a clamp; the strip
               // gets taller at 2x, which is the whole point of the setting.
               constraints: const BoxConstraints(minHeight: 68),
-              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
+              padding: EdgeInsets.symmetric(
+                vertical: 7,
+                horizontal: DateStripChip.horizontalPadding,
+              ),
               decoration: decorationFor(pressed: pressed),
               child: Column(
                 mainAxisSize: MainAxisSize.min,

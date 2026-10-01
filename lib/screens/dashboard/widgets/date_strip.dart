@@ -47,18 +47,30 @@ class DateStrip extends StatelessWidget {
   /// the scale is the user's and can be anything. A constant is therefore wrong
   /// on one of the two axes by construction.
   ///
-  /// The style must match the one in [DateStripChip] or the answer is not the
-  /// width the chip will actually take. If that style ever changes, this is the
-  /// second place to change it — which is why the measurement lives next to the
-  /// reasoning rather than as a bare number in the layout.
+  /// **The style is resolved from the ambient `DefaultTextStyle`, not written out
+  /// here**, and that is the part that took a second attempt. The first version
+  /// used `const TextStyle(fontSize: 10, fontWeight: w600)`, which is missing two
+  /// things the theme supplies: `family: Roboto` and `letterSpacing: 0.3`. The
+  /// letter spacing is 0.3 per character, so a three-letter name was under-
+  /// measured by 0.9 px, and the strip went on clipping `Mon` and `Wed` at 2x
+  /// after a "fix" that the test suite and a release build both accepted.
+  ///
+  /// A measurement that hand-writes the style it is measuring is a copy of the
+  /// chip's own style, and copies drift — the same lesson `FEATURE.md` records
+  /// about the surface list in `color_helpers_test.dart`, arriving from the
+  /// opposite direction. Resolving it means there is nothing left to keep in
+  /// sync except the two numbers in [DateStripChip] that describe the chip's
+  /// box rather than its text.
   double _widestDayNameWidth(BuildContext context) {
-    const style = TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
+    final style = DefaultTextStyle.of(context).style.merge(
+      const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+    );
     final scaler = MediaQuery.textScalerOf(context);
     var widest = 0.0;
     for (final day in days) {
       final painter = TextPainter(
         text: TextSpan(text: dayNameShort(day.weekday), style: style),
-        textDirection: TextDirection.ltr,
+        textDirection: Directionality.of(context),
         textScaler: scaler,
         maxLines: 1,
       )..layout();
@@ -119,22 +131,49 @@ class DateStrip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
+              // **A `Wrap`, and the row overflowed before this.**
+              //
+              // The trailing hint ("Pick a day") was a plain `Text` in the `Row`, so
+              // it was a non-flex child and got unbounded main-axis width. At a 2x
+              // system font scale on a 360 dp viewport it claimed 16 px more than
+              // the row had and `RenderFlex` drew the stripe across it; at 3.0 it
+              // was 37 px. Nothing caught it because at 1.0 there is roughly 150 px
+              // of slack, and the two layouts that overflow are exactly the ones
+              // nobody opens.
+              //
+              // `Wrap` rather than a second `Flexible` because the question is
+              // genuinely "do these two fit on one line", and a `Wrap` answers that
+              // by flowing the hint onto the next line instead of by letting both
+              // halves become unreadable. Two flex children competing for one line
+              // is a negotiation with no right answer; a second line is a right
+              // answer.
+              //
+              // The label gets no `maxLines` for the same reason. It was `maxLines:
+              // 2, ellipsis`, and at 2.5 on 381 dp the `Expanded` was left with so
+              // little width by the greedy hint that it rendered as a bare `…`.
               Expanded(
-                child: Text(
-                  _rangeLabel(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: faintColor(theme.isDark),
-                  ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      _rangeLabel(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: faintColor(theme.isDark),
+                      ),
+                    ),
+                    Text(
+                      rangeStart != null ? 'Range' : 'Pick a day',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: faintColor(theme.isDark),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                rangeStart != null ? 'Range' : 'Pick a day',
-                style: TextStyle(fontSize: 11, color: faintColor(theme.isDark)),
               ),
             ],
           ),
@@ -165,7 +204,17 @@ class DateStrip extends StatelessWidget {
             // because the abbreviation is ours, not the platform's locale: a
             // hard-coded 42 dp would be another number that is right on the phone
             // this was measured on and wrong on a narrower one.
-            final needed = _widestDayNameWidth(context) + 10 + 2;
+            // The text's own width, plus the box the chip puts around it, plus one
+            // logical pixel. The last term is not fudge: the measured width and
+            // the laid-out width can differ by a fraction of a pixel through
+            // rounding, and a chip that is 0.4 px too narrow clips — which is
+            // exactly the failure the first attempt at this shipped.
+            final needed =
+                _widestDayNameWidth(context) +
+                2 *
+                    (DateStripChip.horizontalPadding +
+                        DateStripChip.borderWidth) +
+                1;
             final chipWidth = needed > fairShare ? needed : fairShare;
             final scrolls = chipWidth > fairShare + 0.5;
 
