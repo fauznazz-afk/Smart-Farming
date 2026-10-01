@@ -46,7 +46,7 @@ Kalau ada yang belum bisa Anda jawab, **Anda belum cukup membaca**.
 | File Dart di `lib/` | 68 |
 | Baris Dart | ~13 200 |
 | File Kotlin | 15 (13 di modul alarm) |
-| File test | 33, melaporkan **491 test** |
+| File test | 34, melaporkan **496 test** |
 | File terbesar | `lib/screens/dashboard_screen.dart` — 1 745 baris |
 
 Lima file yang paling sering jadi sumber bug, karena isinya besar dan dipakai

@@ -170,6 +170,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Per-prefix counterpart to [_telemetryInFlight].
   final _historyInFlight = <String, Completer<void>>{};
 
+  /// Prefixes whose last history request ended in an exception.
+  ///
+  /// The chart needs this to tell a failed request apart from a quiet day.
+  /// _fetchHistoryFor catches every error and substitutes an empty map, so
+  /// without a separate record both arrive as the same empty list and the user is
+  /// told the greenhouse produced nothing.
+  final _historyLoadFailed = <String>{};
+
   /// Bumped when a history request starts or finishes, so the chart header can
   /// show that it is updating. The set itself changing is not observable.
   final ValueNotifier<int> _historyBusyNotifier = ValueNotifier(0);
@@ -1043,8 +1051,13 @@ Future<void> _refreshCurrentPage() async {
         intervalMs: window.intervalMs,
       );
     } catch (_) {
+      // An exception is not an empty range. Record it so the chart can say
+      // so, and clear it on the next attempt so a recovered prefix does not
+      // keep warning.
+      _historyLoadFailed.add(prefix);
       histories = const {};
     }
+    _historyLoadFailed.remove(prefix);
 
     // Drop the result if the user changed the selection while it was loading.
     final currentKey = historySelectionKey(
@@ -2196,6 +2209,7 @@ Future<void> _refreshCurrentPage() async {
       stats: _chartStats,
       boundsCache: _chartBounds,
       loading: _chartLoading,
+      loadFailed: !_chartLoading && _historyLoadFailed.contains(prefix),
       selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,

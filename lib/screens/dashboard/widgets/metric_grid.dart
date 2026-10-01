@@ -366,15 +366,35 @@ class _MetricCard extends StatelessWidget {
                   ),
                 )
               else
+                // **`scaleDown`, not `ellipsis`, and this is the third place in
+                // this repo that has had to learn it.**
+                //
+                // A three-column card is about 89 dp of content width at the
+                // documented 381 dp viewport. `2396` at 22 sp fits at scale 1.0,
+                // and at scale 2.0 the figure alone is wider than the slot -- which
+                // is the turbidity reading `settings_validation_test.dart` records
+                // as real. `TextOverflow.ellipsis` then turned it into `239...`,
+                // which is the same failure the app shipped twice before: a unit
+                // truncated to `109....` on 27 September 2026, and the energy
+                // report's `max 300...`. Both times `flutter analyze`, a release
+                // build and every existing test passed, because none of them could
+                // see a pixel.
+                //
+                // A number scaled down is still a number. A cut-off one cannot be
+                // told from a rounded one, and a turbidity reading is the kind of
+                // value somebody will act on.
                 Flexible(
-                  child: Text(
-                    value == null ? '--' : value!.toStringAsFixed(spec.decimals),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: appPrimaryText(theme.isDark),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value == null ? '--' : value!.toStringAsFixed(spec.decimals),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: appPrimaryText(theme.isDark),
+                      ),
                     ),
                   ),
                 ),

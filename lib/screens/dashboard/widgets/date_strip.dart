@@ -118,6 +118,12 @@ class DateStrip extends StatelessWidget {
             final chipWidth =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
             return Row(
+              // **`crossAxisAlignment: start`, because the chips now grow with
+              // the user's font scale** and `Row` centres its children by default.
+              // At 1.0 every chip is the same height so this is a no-op; at 2.0 the
+              // taller ones would otherwise be vertically centred against shorter
+              // ones and the row would be taller than the content needs.
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < days.length; i++) ...[
                   if (i > 0) const SizedBox(width: gap),

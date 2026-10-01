@@ -528,25 +528,52 @@ class DateStripChip extends StatelessWidget {
               duration: AppMotion.press,
               curve: AppMotion.enter,
               width: width,
-              height: 68,
+              // **68 is a floor, not a height.** It was a fixed `height: 68`,
+              // which is the other half of the font-scale defect: with the day
+              // name free to grow, a fixed height either clipped it or made the
+              // `Column` overflow. Measured, at 2x scale on a 42 dp chip, the
+              // fixed height overflowed by 40 px.
+              //
+              // So the chip keeps its designed height at 1.0 and grows above it
+              // when the user has asked for larger text. `minHeight` rather than
+              // `height` is what makes that a floor instead of a clamp; the strip
+              // gets taller at 2x, which is the whole point of the setting.
+              constraints: const BoxConstraints(minHeight: 68),
               padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 5),
               decoration: decorationFor(pressed: pressed),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
-                    height: 13,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        dayName,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? onAccent : faintColor(theme.isDark),
-                        ),
-                      ),
+                  // **No `SizedBox(height: 13)` and no `FittedBox`.**
+                  //
+                  // There was a fixed 13 dp box with a `scaleDown` inside it, so at
+                  // a 2x system font scale the day name was laid out at 20 sp and
+                  // then scaled straight back down to 13 dp. It rendered at
+                  // effectively its 1.0 size whatever the user had asked for --
+                  // the one place in the app that silently inverted an
+                  // accessibility setting, and it did it invisibly, which is why
+                  // it is worth a comment rather than a silent removal.
+                  //
+                  // The fixed height existed to keep the strip compact, so the
+                  // honest fix is to let the chip grow instead of shrinking the
+                  // text inside a box that cannot. The strip is a fixed-height
+                  // control and grows with the setting the user chose; a taller
+                  // strip at 2x is what being asked for.
+                  //
+                  // `maxLines: 1` with `ellipsis` remains, because at a large
+                  // scale a three-letter abbreviation can still exceed a 42 dp
+                  // chip -- and a day name that reads "Mo" instead of "Mon" is
+                  // still a day name, unlike a truncated reading.
+                  Text(
+                    dayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? onAccent : faintColor(theme.isDark),
                     ),
                   ),
                   const SizedBox(height: 3),

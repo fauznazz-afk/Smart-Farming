@@ -265,6 +265,7 @@ class TelemetryChartCard extends StatelessWidget {
     required this.stats,
     required this.boundsCache,
     required this.loading,
+    required this.loadFailed,
     required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
@@ -301,6 +302,24 @@ class TelemetryChartCard extends StatelessWidget {
   final Map<String, SeriesStats?> stats;
   final Map<String, ChartBounds> boundsCache;
   final bool loading;
+
+  /// True when the history request for this prefix ended in an exception rather
+  /// than in an empty list.
+  ///
+  /// **`_fetchHistoryFor` caught every error and assigned `const {}`,** so a
+  /// dropped connection and a genuinely quiet day were the same value by the time
+  /// it reached here, and both rendered `No data for this range`.
+  ///
+  /// That sentence is not neutral. "No data" tells the user the greenhouse
+  /// produced nothing, which sends them out to look at the plants -- for what is
+  /// overwhelmingly a network problem, which they cannot do anything about in the
+  /// field. `EnergySummaryCard` already distinguishes the two, and the
+  /// energy-history fetch already sets a specific message on its error path; the
+  /// chart was the one that did not.
+  ///
+  /// `bool` rather than a `String` because there is exactly one sentence for it
+  /// and the caller has nothing useful to add.
+  final bool loadFailed;
   final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
@@ -350,7 +369,17 @@ class TelemetryChartCard extends StatelessWidget {
       child: loading
           ? const Center(child: CircularProgressIndicator())
           : !hasData
-          ? const Center(child: Text('No data for this range'))
+          ? Center(
+              child: Text(
+                loadFailed
+                    // A failure is not a property of the range, and saying so is the
+                    // difference between the user checking the plants and the user
+                    // checking their connection.
+                    ? 'Could not load this range'
+                    : 'No data for this range',
+                style: TextStyle(color: faintColor(theme.isDark)),
+              ),
+            )
           : Column(
               children: [
                 _SeriesLegend(series: scaled, isDark: theme.isDark, accent: accent),

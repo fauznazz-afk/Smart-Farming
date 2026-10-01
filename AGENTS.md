@@ -717,7 +717,7 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-flutter test                                             # 491 tests, jalankan per-file
+flutter test                                             # 496 tests, jalankan per-file
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 
