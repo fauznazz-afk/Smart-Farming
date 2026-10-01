@@ -138,6 +138,10 @@ class SettingsController extends ChangeNotifier {
     final p = await SharedPreferences.getInstance();
     final savedCctvUrl = await loadCctvUrl();
     final savedFishCctvUrl = await loadFishCctvUrl();
+    // Every one of the writes below touches a TextEditingController this class
+    // owns and disposes, so continuing after dispose is a use-after-dispose on
+    // all of them at once. See [_abandoned].
+    if (_abandoned) return;
     autoRefresh = p.getBool(SettingsKeys.autoRefresh) ?? true;
     refreshSeconds = p.getInt(SettingsKeys.refreshSeconds) ?? 10;
     // One reader for the alert defaults. This used to repeat the same five
@@ -186,6 +190,9 @@ class SettingsController extends ChangeNotifier {
 
   Future<void> loadAppVersion() async {
     final info = await PackageInfo.fromPlatform();
+    // Same reason as [load]: launched unawaited from initState, and
+    // notifying a disposed ChangeNotifier asserts in debug.
+    if (_abandoned) return;
     appVersion = '${info.version}+${info.buildNumber}';
     notifyListeners();
   }
@@ -316,8 +323,35 @@ class SettingsController extends ChangeNotifier {
     }
   }
 
+  /// True once [dispose] has run, so an in-flight [load] or [save] can stop.
+  ///
+  /// **This exists because those two methods are launched unawaited and both
+  /// contain real I/O.** `SettingsScreen` calls `_settings..load()..loadAppVersion()`
+  /// in `initState` and disposes the controller in its own `dispose`, and the back
+  /// gesture is the first thing on screen. `load()` awaits
+  /// `SharedPreferences.getInstance()` and two reads through `flutter_secure_storage`
+  /// — platform channels, tens of milliseconds — so backing out inside that window
+  /// is ordinary, not a race anyone has to try hard to reach.
+  ///
+  /// Without the guard the continuations write `.text` on disposed
+  /// `TextEditingController`s and call `notifyListeners()` on a disposed
+  /// `ChangeNotifier`. Because the future is unawaited that surfaces as an
+  /// unhandled async error and a red screen in debug, and as silent mutation of
+  /// disposed controllers in release.
+  ///
+  /// `mounted` was not an option: `SettingsController` is a `ChangeNotifier`, not a
+  /// `State`, so it has no `mounted` of its own.
+  bool _disposed = false;
+
+  /// Stops an in-flight continuation from touching a disposed controller.
+  ///
+  /// Called after every `await` in [load], [loadAppVersion] and [save]. Returns
+  /// true when the caller should bail out.
+  bool get _abandoned => _disposed;
+
   @override
   void dispose() {
+    _disposed = true;
     cctvUrl.dispose();
     fishCctvUrl.dispose();
     dailyTarget.dispose();

@@ -85,6 +85,12 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     _touchedBucketNotifier.dispose();
+    // `_sharing` is the third resource here and it was missing. It is a
+    // `ValueNotifier`, so `ExportButton`'s `ValueListenableBuilder` registers
+    // against it and `shareEnergyReport` is handed it by reference -- neither of
+    // which makes the owner responsible for disposing it. Flutter disposes a
+    // controller it created, never one it was given.
+    _sharing.dispose();
     super.dispose();
   }
 

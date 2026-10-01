@@ -28,12 +28,49 @@ class AlarmHistoryService {
   static final AlarmHistoryService _instance = AlarmHistoryService._();
   factory AlarmHistoryService() => _instance;
 
+/// Serialises every write, so two of them cannot interleave.
+  ///
+  /// `addAlarm` is a read-modify-write: read the list, append, write the list
+  /// back. `dashboard_screen._persistAlarm` calls it with `unawaited`, once per
+  /// newly-active signal, from a single synchronous loop -- so four simultaneous
+  /// alarms launched four overlapping cycles against the same
+  /// `SharedPreferences` key, all reading the *same* snapshot, and only the last
+  /// `setStringList` survived. Three of four records were silently discarded.
+  ///
+  /// This is not a rare interleaving. The realistic trigger is the obvious one:
+  /// the MQTT socket drops, so `stale_pzem`, `stale_sensor`, `stale_battery` and
+  /// `stale_fish` all go active in the same evaluation. The dashboard banner shows
+  /// all four, and the history the user goes to read to find out what happened
+  /// shows one.
+  ///
+  /// It is also the same shape as a bug this repo has already fixed twice -- the
+  /// telemetry cache lost three of four device buckets to concurrent writes, and
+  /// the CCTV URL store nearly lost an edit -- so this is the third site of a
+  /// defect class that has now recurred twice. That is why the guard is here and
+  /// not in the caller: the caller is `unawaited` by design, so it cannot
+  /// serialise anything.
+  ///
+  /// A tail-chaining future rather than a lock, because every call site is
+  /// already async and this composes with them: `_writeChain` completes with the
+  /// next write rather than with this one, so the writes queue instead of piling
+  /// up behind an `await` that nobody performs.
+  Future<void> _writeChain = Future<void>.value();
+
   /// Adds an alarm record to persistent storage.
   /// Trims the list to [_maxEntries] entries, removing the oldest.
   Future<void> addAlarm(
     AlarmRecord record, {
     Duration cooldown = defaultCooldown,
-  }) async {
+  }) {
+    final next = _writeChain.then((_) => _addAlarmNow(record, cooldown));
+    // The chain must not break for the writes that follow. Without this, one
+    // failed write would reject every queued one behind it, and since nobody
+    // awaits the chain the rejection would surface as an unhandled async error.
+    _writeChain = next.then<void>((_) {}, onError: (Object _) {});
+    return next;
+  }
+
+  Future<void> _addAlarmNow(AlarmRecord record, Duration cooldown) async {
     final prefs = await SharedPreferences.getInstance();
     final alarms = _decode(prefs.getStringList(_storageKey));
     final duplicate = alarms.any(

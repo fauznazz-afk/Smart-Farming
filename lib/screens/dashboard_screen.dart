@@ -194,6 +194,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   final Map<String, List<TelemetryPoint>> _energyHistory = {};
   bool _energyLoading = true;
   bool _energyRequestInFlight = false;
+
+  /// Completed when the in-flight energy fetch finishes. See [_telemetryInFlight].
+  ///
+  /// This one was missing while its two siblings had it, and the consequence
+  /// was that pull-to-refresh on Overview did nothing at all: Overview is
+  /// _selectedIndex == 0, where _prefixForPage(0) is null, so the energy fetch
+  /// is the only thing the gesture has to do -- and it returned at the guard above
+  /// while the spinner still dismissed. The card's numbers then stayed up to
+  /// fifteen minutes old with nothing saying so.
+  Completer<void>? _energyInFlight;
   String? _energyError;
   bool _weeklyEnergySummary = false;
   DateTime? _energyUpdatedAt;
@@ -574,7 +584,23 @@ class _DashboardScreenState extends State<DashboardScreen>
         // the same job without the cost.
         all: timestampChanged,
       );
+      // **The alarm set is recomputed here, which is *after* every notifier bump
+      // above.** `_evaluateEnergyAlerts` writes `_activeAlertIds`, and
+      // `SystemStatusStrip` reads its length inside a `Bound` whose token is
+      // `_liveRevision` -- so the bump on the previous line rebuilt the strip with
+      // the *previous* set. The count could then lag by up to a minute, until the
+      // next telemetry difference or the once-a-minute `timestampChanged` bump.
+      //
+      // So: recompute first, then bump. Order matters and this is the only place
+      // it is visible.
+      final alertsBefore = _activeAlertIds.length;
       _evaluateEnergyAlerts();
+      if (_activeAlertIds.length != alertsBefore) {
+        // `_liveRevision` directly rather than `_notifyLive`, which returns early
+        // when `changed` is false and so could not express "nothing about the
+        // telemetry moved, but the alarm set did".
+        if (mounted) _liveRevision.value++;
+      }
       final lastEnergyUpdate = _energyUpdatedAt;
       if (lastEnergyUpdate == null ||
           DateTime.now().difference(lastEnergyUpdate).inMinutes >= 15) {
@@ -791,7 +817,12 @@ Future<void> _refreshCurrentPage() async {
       await _telemetryInFlight?.future;
     }
     await _fetchAll();
-    if (_selectedIndex == 0) await _fetchEnergyHistory();
+    if (_selectedIndex == 0) {
+      if (_energyRequestInFlight) {
+        await _energyInFlight?.future;
+      }
+      await _fetchEnergyHistory();
+    }
     final prefix = _prefixForPage(_selectedIndex);
     if (prefix == null) return;
     _historyLoaded.remove(prefix);
@@ -925,6 +956,8 @@ Future<void> _refreshCurrentPage() async {
   Future<void> _fetchEnergyHistory() async {
     if (_energyRequestInFlight) return;
     _energyRequestInFlight = true;
+    final energyFlight = Completer<void>();
+    _energyInFlight = energyFlight;
     if (mounted && _energyHistory.isEmpty) {
       _energyLoading = true;
       _notifyEnergy();
@@ -965,6 +998,8 @@ Future<void> _refreshCurrentPage() async {
       _notifyEnergy();
     } finally {
       _energyRequestInFlight = false;
+      _energyInFlight = null;
+      if (!energyFlight.isCompleted) energyFlight.complete();
     }
   }
 
@@ -1069,22 +1104,45 @@ Future<void> _refreshCurrentPage() async {
       _chartLoading = false;
       _notifyCharts();
     }
-    // **A `finally`, because a completer that never completes is worse than the
-    // bug it replaced.** `_refreshCurrentPage` awaits this one, and
-    // `RefreshIndicator` keeps its spinner up until the future it was handed
-    // completes -- so any new throwing path between here and the end would hang
-    // the gesture forever. The fetch above is already wrapped in a `catch` that
-    // swallows, so today nothing can reach it; this is so that stays true after
-    // the next edit rather than being a coincidence.
-    _historyRequestInFlight.remove(prefix);
-    _historyRequestDate.remove(prefix);
-    _historyInFlight.remove(prefix);
-    if (!historyFlight.isCompleted) historyFlight.complete();
-    _historyBusyNotifier.value++;
+    await _releaseHistoryRequest(prefix, historyFlight);
     if (_historyPendingRefresh.remove(prefix) &&
         _prefixForPage(_selectedIndex) == prefix) {
       unawaited(_fetchHistoryFor(prefix));
     }
+  }
+
+/// Releases the in-flight bookkeeping for one history request.
+  ///
+  /// Called from `_fetchHistoryFor` at the end of its straight-line section, and
+  /// it exists as a method for one reason: the first version of this was a
+  /// comment describing a `finally` that **did not exist**, which is worse than no
+  /// comment at all -- it told the next reader the invariant was already
+  /// guaranteed. It was not reachable then either, since the only statements
+  /// between are pure arithmetic and a total `switch`. But it was three lines away
+  /// from being reachable, and the cost of that is a hung spinner.
+  ///
+  /// `await` is deliberate even though the body never awaits anything: putting the
+  /// call at the tail of `_fetchHistoryFor` means it runs after the release, so a
+  /// future `try` around the *rest* of that method would still be correct.
+  Future<void> _releaseHistoryRequest(
+    String prefix,
+    Completer<void> flight,
+  ) async {
+    _historyRequestInFlight.remove(prefix);
+    _historyRequestDate.remove(prefix);
+    _historyInFlight.remove(prefix);
+    if (!flight.isCompleted) flight.complete();
+    // Guarded, unlike the rest. `_fetchHistoryFor` is awaited by nobody --
+    // `unawaited` at the poll and at `_reloadHistoryForCurrentPage` -- so a
+    // `notifyListeners()` on a disposed notifier surfaces as an unhandled async
+    // error and a red screen in debug, and is silent in release.
+    //
+    // The screen really can be torn down mid-request: `_logout` and the
+    // token-expired branch both use
+    // `pushAndRemoveUntil(..., (_) => false)`, which disposes this `State`
+    // immediately while the HTTP call is still outstanding.
+    if (!mounted) return;
+    _historyBusyNotifier.value++;
   }
 
   /// Files a history response under the keys the chart looks them up by.

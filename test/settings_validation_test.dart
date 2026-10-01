@@ -96,11 +96,11 @@ void main() {
           range(min: '10', maxAllowed: 5),
           errorLabel: 'Temperature',
         ),
-        'Temperature cannot be higher than 5.0.',
+        'The Temperature minimum cannot be above 5.0, the highest this sensor can report.',
       );
       expect(
         validateEnvRange(range(max: '10', minAllowed: 20), errorLabel: 'Temperature'),
-        'Temperature cannot be lower than 20.0.',
+        'The Temperature maximum cannot be below 20.0, the lowest this sensor can report.',
       );
     });
   });
@@ -317,7 +317,7 @@ void main() {
       turbidity.max.text = '-1';
       expect(
         validateEnvRange(turbidity, errorLabel: 'Turbidity'),
-        'Turbidity cannot be lower than 0.0.',
+        'The Turbidity maximum cannot be below 0.0, the lowest this sensor can report.',
       );
     });
 

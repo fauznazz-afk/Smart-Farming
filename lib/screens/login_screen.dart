@@ -29,6 +29,24 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMsg;
   bool _obscurePassword = true;
 
+  /// **This class had no `dispose()` at all.**
+  ///
+  /// Both controllers are created here and handed to a `TextField`, which does
+  /// not own them and does not dispose them. Each sign-in builds a fresh
+  /// `LoginScreen` — `pushReplacement` after a successful login and
+  /// `pushAndRemoveUntil(..., (_) => false)` on logout — so two
+  /// `TextEditingController`s, each a `ChangeNotifier` holding an editable value
+  /// and a selection, were abandoned per attempt.
+  ///
+  /// Small, and invisible, and the same shape as every other resource leak this
+  /// file's siblings were audited for.
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _handleLogin() async {
     setState(() {
       _loading = true;

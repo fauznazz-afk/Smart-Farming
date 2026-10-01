@@ -98,15 +98,35 @@ String? validateEnvRange(
       (maxText.isNotEmpty && maxValue == null)) {
     return '$errorLabel must be a valid number.';
   }
-  for (final value in [minValue, maxValue]) {
+// **The loop carried no idea which field it was checking,** so the sentence
+  // named a floor while the user was standing in the ceiling box. Type `-1` into
+  // Turbidity *Max* and it said "Turbidity cannot be lower than 0.0." -- telling
+  // someone who has just asked to raise a maximum that the problem is that it is
+  // too low. Turbidity is the case that makes it reachable: its `minKey` is null
+  // while `minAllowed` is 0, so the ceiling is validated against a floor at all.
+  //
+  // The field name travels with the value so the sentence can name it, and the
+  // wording is the other half of the fix: for the maximum, a value under
+  // `minAllowed` is not "too low", it is *below the lowest this sensor can
+  // report*, which is a different and more useful thing to be told.
+  for (final (field, value) in [
+    ('minimum', minValue),
+    ('maximum', maxValue),
+  ]) {
     if (value == null) continue;
     final minAllowed = setting.minAllowed;
     final maxAllowed = setting.maxAllowed;
     if (minAllowed != null && value < minAllowed) {
-      return '$errorLabel cannot be lower than $minAllowed.';
+      return field == 'maximum'
+          ? 'The $errorLabel maximum cannot be below $minAllowed, the lowest '
+                'this sensor can report.'
+          : '$errorLabel cannot be lower than $minAllowed.';
     }
     if (maxAllowed != null && value > maxAllowed) {
-      return '$errorLabel cannot be higher than $maxAllowed.';
+      return field == 'minimum'
+          ? 'The $errorLabel minimum cannot be above $maxAllowed, the highest '
+                'this sensor can report.'
+          : '$errorLabel cannot be higher than $maxAllowed.';
     }
   }
   if (minValue != null && maxValue != null && minValue >= maxValue) {
