@@ -49,19 +49,45 @@ class DateStrip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Row(
             children: [
-              IconButton(
-                tooltip: 'Pick a date range',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(
-                  width: 28,
-                  height: 28,
-                ),
-                padding: EdgeInsets.zero,
-                onPressed: onPickRange,
-                icon: Icon(
-                  Icons.calendar_month_outlined,
-                  size: 16,
-                  color: faintColor(theme.isDark),
+              // **The `Material` is load-bearing, and so is the 48.**
+              //
+              // `IconButton` is an `InkWell`, and `Scaffold`'s single `Material`
+              // paints its ink features *below* its own child subtree. The
+              // dashboard body is `AppBackground` -> an opaque
+              // `ColoredBox(AppSurfaces.page(theme))`, so an `IconButton` in the
+              // body with no nearer `Material` has its splash painted underneath
+              // that `ColoredBox`. The ripple is not faint; it is invisible.
+              //
+              // This app's whole vocabulary is "no ripple, geometric press
+              // instead" -- the nav bar presses by changing its decoration -- so a
+              // button with no ink was not quieter than its neighbours. It was the
+              // one control in the row with no feedback at all, and the user had
+              // no way to tell the tap had landed.
+              //
+              // `MaterialType.transparency` because the page colour behind the
+              // strip must show through.
+              //
+              // The size is the other half. This was `tightFor(28, 28)` with
+              // `VisualDensity.compact`, which lands at 26-28 dp against the 48 dp
+              // floor -- and this is the only date control on the Power,
+              // Hydroponics and Fish tabs. The row is already 68 dp tall because
+              // of the chips, so 48 costs no vertical space; it moves the caption
+              // 20 dp right, which is the honest trade for a target you can hit.
+              Material(
+                type: MaterialType.transparency,
+                child: IconButton(
+                  tooltip: 'Pick a date range',
+                  constraints: const BoxConstraints.tightFor(
+                    width: 48,
+                    height: 48,
+                  ),
+                  padding: EdgeInsets.zero,
+                  onPressed: onPickRange,
+                  icon: Icon(
+                    Icons.calendar_month_outlined,
+                    size: 16,
+                    color: faintColor(theme.isDark),
+                  ),
                 ),
               ),
               const SizedBox(width: 4),

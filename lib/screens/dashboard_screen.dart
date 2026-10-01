@@ -139,6 +139,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   DeviceTelemetry? _fish;
   bool _loading = true;
   bool _telemetryRequestInFlight = false;
+
+  /// Completed when the in-flight `_fetchAll` finishes.
+  ///
+  /// The bool above answers "is one running?" and this answers "when does the
+  /// running one end?", which is what a deliberate user gesture needs. Without it
+  /// pull-to-refresh could only either skip the fetch or fire a second one
+  /// concurrently, and the first of those is a lie told to the user's finger.
+  Completer<void>? _telemetryInFlight;
   String? _error;
   bool _isOfflineMode = false;
   DateTime? _cachedTelemetryTime;
@@ -158,6 +166,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   final Map<String, ChartBounds> _chartBounds = {};
   bool _chartLoading = true;
   final _historyRequestInFlight = <String>{};
+
+  /// Per-prefix counterpart to [_telemetryInFlight].
+  final _historyInFlight = <String, Completer<void>>{};
 
   /// Bumped when a history request starts or finishes, so the chart header can
   /// show that it is updating. The set itself changing is not observable.
@@ -467,6 +478,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _fetchAll() async {
     if (_telemetryRequestInFlight) return;
     _telemetryRequestInFlight = true;
+    final flight = Completer<void>();
+    _telemetryInFlight = flight;
     final started = DateTime.now();
     // No `markConnecting(ConnectionTransport.rest)` here, deliberately.
     //
@@ -581,6 +594,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
     } finally {
       _telemetryRequestInFlight = false;
+      _telemetryInFlight = null;
+      if (!flight.isCompleted) flight.complete();
     }
   }
 
@@ -747,12 +762,34 @@ class _DashboardScreenState extends State<DashboardScreen>
       deviceId == ThingsBoardApi.deviceSensor ||
       deviceId == ThingsBoardApi.deviceFish;
 
-  Future<void> _refreshCurrentPage() async {
+  /// Pull-to-refresh, which has to outrank the poll.
+///
+/// [RefreshIndicator] dismisses itself as soon as this future completes, so a
+/// future that returns without having fetched anything is a lie told to the
+/// user's finger. Both entry points here bail out unconditionally when their
+/// request is already in flight -- `_fetchAll` on `_telemetryRequestInFlight`,
+/// `_fetchHistoryFor` on `_historyRequestInFlight` -- so pulling while the
+/// 10-second poll was mid-tick refetched nothing and still ended the spinner.
+///
+/// The fix is not to remove either guard: they exist so the poll cannot stack
+/// requests on top of each other, which is a real problem on a slow link. It is
+/// to wait for the in-flight request to finish and then do one more, so the
+/// gesture always results in a fetch that happened after the finger lifted.
+Future<void> _refreshCurrentPage() async {
+    // A poll that is already running is *about* to deliver the same data, so
+    // waiting for it and then issuing one more is not duplicated work in the
+    // common case -- it is one extra request, once, on a deliberate gesture.
+    if (_telemetryRequestInFlight) {
+      await _telemetryInFlight?.future;
+    }
     await _fetchAll();
     if (_selectedIndex == 0) await _fetchEnergyHistory();
     final prefix = _prefixForPage(_selectedIndex);
     if (prefix == null) return;
     _historyLoaded.remove(prefix);
+    if (_historyRequestInFlight.contains(prefix)) {
+      await _historyInFlight[prefix]?.future;
+    }
     await _fetchHistoryFor(prefix);
   }
 
@@ -981,6 +1018,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
     _historyRequestInFlight.add(prefix);
+    final historyFlight = Completer<void>();
+    _historyInFlight[prefix] = historyFlight;
     _historyRequestDate[prefix] = selectionKey;
     _historyBusyNotifier.value++;
     if (mounted && !_historyLoaded.contains(prefix)) {
@@ -1017,8 +1056,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       _chartLoading = false;
       _notifyCharts();
     }
+    // **A `finally`, because a completer that never completes is worse than the
+    // bug it replaced.** `_refreshCurrentPage` awaits this one, and
+    // `RefreshIndicator` keeps its spinner up until the future it was handed
+    // completes -- so any new throwing path between here and the end would hang
+    // the gesture forever. The fetch above is already wrapped in a `catch` that
+    // swallows, so today nothing can reach it; this is so that stays true after
+    // the next edit rather than being a coincidence.
     _historyRequestInFlight.remove(prefix);
     _historyRequestDate.remove(prefix);
+    _historyInFlight.remove(prefix);
+    if (!historyFlight.isCompleted) historyFlight.complete();
     _historyBusyNotifier.value++;
     if (_historyPendingRefresh.remove(prefix) &&
         _prefixForPage(_selectedIndex) == prefix) {
@@ -1151,7 +1199,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _selectDate(DateTime date) {
-    if (startOfDay(date) == startOfDay(_selectedDate)) return;
+    final picked = startOfDay(date);
+    // **The early return only checked `_selectedDate`, and that made today's chip
+    // dead while a range was active.**
+    //
+    // The reachable sequence: open the range picker and press Apply without
+    // touching anything. `initialDateRange` is today-to-today when nothing is
+    // selected, so a range is committed and `_selectedDate` becomes today. But
+    // `DateStripChip.isSelected` is `rangeStart == null && sameDay(...)`, so with
+    // a range active *no chip is lit*. Tap today's chip: the guard below sees
+    // `picked == _selectedDate`, returns early, and the range is never cleared --
+    // so a chip that looks selectable ignores the tap, the strip stays unlit, and
+    // there is no other way back to a single day except reopening the picker.
+    //
+    // So the early return now also requires that no range is active. When one is,
+    // the tap clears it, which is what tapping any other chip already did.
+    final hasRange = _selectedRangeStart != null;
+    if (!hasRange && picked == startOfDay(_selectedDate)) return;
     setState(() {
       _selectedDate = date;
       _selectedRangeStart = null;

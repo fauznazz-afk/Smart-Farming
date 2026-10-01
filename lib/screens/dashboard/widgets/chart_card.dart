@@ -673,18 +673,37 @@ class _SingleSeriesStatistics extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          series.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: series.color,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+        // **`Flexible`, without which the two lines below are decorative.**
+        //
+        // A non-flex child in a `Row` is laid out at its intrinsic width: it gets
+        // unbounded main-axis constraints, so `maxLines: 1` and
+        // `TextOverflow.ellipsis` can never take effect. The `Flexible` sibling
+        // then receives whatever is left, which is zero the moment the label is
+        // wide. Today's labels are short -- "Voltage", "Turbidity" -- so this is
+        // latent rather than visible, and latent is exactly how it survives.
+        //
+        // It matters because this is the same widget that already refuses to
+        // truncate a number for the sake of a label. The `FittedBox` on the right
+        // exists because "max 300..." is worse than a smaller figure; a label
+        // that can push the numbers to nothing reintroduces that failure from
+        // the other side. The label gives way first because a series name is
+        // shorter and less informative than its own figures.
+        Flexible(
+          flex: 2,
+          child: Text(
+            series.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: series.color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Flexible(
+          flex: 3,
           // Scale down rather than ellipsise.
           //
           // Turbidity is the case that decides it: "Last 2786.34 · min 2395.53 ·

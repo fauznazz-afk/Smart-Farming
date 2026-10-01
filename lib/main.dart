@@ -282,13 +282,32 @@ ThemeData _appThemeData(AppTheme theme, Color accent) => ThemeData(
       // brightness. If this line ever published the dark page, Dracula would
       // render as the app's dark mode everywhere in the tree.
       scaffoldBackgroundColor: AppSurfaces.page(theme),
-      // Cards are the page colour, so a Material `Card` on this surface is
-      // invisible without a shadow. `elevation` is what supplies one, and
-      // the four energy-report cards set no `shape` of their own, so their
-      // radius was the framework's default until this.
+// Cards are the page colour, so a Material `Card` on this surface is
+      // invisible without a shadow, and `elevation` is what supplies one.
+      //
+      // **It was `0`, sitting directly under a comment saying it supplies the
+      // shadow.** So the four energy-report cards -- totals, chart, note and
+      // empty-state -- rendered as page-coloured rectangles with a hairline and no
+      // shadow pair, which is a different surface language from every `AppCard`
+      // on the dashboard. The comment stated the intent and the value contradicted
+      // it, which is the most durable kind of bug: it reads as done.
+      //
+      // `elevation` is Material's own mechanism and `CardTheme` cannot express
+      // the app's three-shadow neumorphic pair, so the two surfaces still differ
+      // in shape. What matches now is that both have depth and both sit on the
+      // page colour, which is what the eye reads as the same language. Converting
+      // them to `AppCard` is the real fix and is a bigger change than a token.
       cardTheme: CardThemeData(
         color: AppSurfaces.page(theme),
-        elevation: 0,
+        // 3, not 0. Material's shadow at this elevation is a single soft drop,
+        // which is not the app's three-shadow pair, but "no depth at all" is a
+        // worse mismatch than "a different depth".
+        elevation: 3,
+        // Without this, Material tints its shadow by `ThemeData.shadowColor`,
+        // which defaults to a scrim of `colorScheme.shadow`. On a near-black page
+        // that washes the drop out to nothing, which is the failure this whole
+        // value exists to avoid.
+        shadowColor: Colors.black.withValues(alpha: theme.isDark ? 0.45 : 0.20),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
           side: BorderSide(

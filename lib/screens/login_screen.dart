@@ -162,6 +162,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 24),
                         TextField(
                           controller: _usernameCtrl,
+                          // **`TextInputAction.next`, not the implicit `done`.**
+                          //
+                          // With no action set, Flutter resolves a single-line
+                          // field's action to `done`, and `done` routes to
+                          // `focusNode.unfocus()` unless an `onEditingComplete` or
+                          // `onSubmitted` is supplied. Neither was. So the keyboard
+                          // offered "Done", the user pressed it, the keyboard
+                          // closed, and nothing happened -- with a password field
+                          // directly below that the same gesture should have moved
+                          // to. The password field does have
+                          // `onSubmitted: _handleLogin`, which is why the last step
+                          // of the form worked and this one did not.
+                          textInputAction: TextInputAction.next,
+                          onSubmitted: (_) =>
+                              FocusScope.of(context).nextFocus(),
                           decoration: InputDecoration(
                             labelText: 'Username / Email',
                             prefixIcon: Padding(

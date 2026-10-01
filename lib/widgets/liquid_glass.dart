@@ -211,7 +211,32 @@ class AppCard extends StatelessWidget {
     final card = RepaintBoundary(child: content);
 
     if (semanticLabel != null) {
-      return Semantics(label: semanticLabel, container: true, child: card);
+      // **`excludeSemantics: true`, and the reason is that the caller has already
+      // written the better sentence.**
+      //
+      // `container: true` creates a node but does not stop the children being
+      // walked, so a screen reader read the caller's summary and then went on to
+      // read every `Text` beneath it -- for a chart card that meant the summary,
+      // then the legend, then the live values, then each of the three statistics
+      // rows, all of which the summary had just said in one sentence. The
+      // summary exists precisely because it is a better description than the
+      // concatenation of its parts.
+      //
+      // `TelemetryChartCard` is the case that made this worth changing. Its
+      // custom `LineChart` exposes nothing to a screen reader, which is why the
+      // sentence is there at all, and the statistics rows *are* real text -- so
+      // before this, a screen-reader user heard "Voltage, Current, Power. Last
+      // 24 hours" and then the same six numbers again.
+      //
+      // Cards without a `semanticLabel` are untouched: they have no summary, so
+      // their contents are the only description there is, and suppressing them
+      // would leave a card silent.
+      return Semantics(
+        label: semanticLabel,
+        container: true,
+        excludeSemantics: true,
+        child: card,
+      );
     }
     return card;
   }

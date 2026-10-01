@@ -83,15 +83,64 @@ class OfflineBanner extends StatelessWidget {
                 ),
               ),
             ),
-            InkWell(
-              onTap: onRetry,
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(Icons.refresh, size: 18, color: color),
-              ),
-            ),
+            RetryButton(onRetry: onRetry, color: color),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The retry button both banners share.
+///
+/// **It exists as its own widget because of an ink defect, not for tidiness.**
+///
+/// `Scaffold` wraps the page in one `Material`, and a `Material` paints its own
+/// ink features *above* its own colour but *below* its entire child subtree. The
+/// dashboard body is `AppBackground` -> `ColoredBox(AppSurfaces.page(theme))`,
+/// which is opaque, so a bare `InkWell` in the body with no nearer `Material` has
+/// its splash painted underneath that `ColoredBox`. The ripple is not faint, it
+/// is invisible.
+///
+/// That matters more than usual here, because this app's whole vocabulary is
+/// "no ripple, geometric press instead" -- the nav bar presses by changing its
+/// decoration. So a control with no visible ink was not "a subtler ripple than
+/// the others"; it was the only control in the app with no feedback of either
+/// kind, and the user had no way to know the tap registered.
+///
+/// This is the same defect `AGENTS.md` records for `AppCard`, and the same fix:
+/// a transparent `Material` between the decorated box and the content so the ink
+/// has a surface to live on. `MaterialType.transparency` rather than a coloured
+/// one, because the banner's own fill must show through.
+class RetryButton extends StatelessWidget {
+  const RetryButton({super.key, required this.onRetry, required this.color});
+
+  /// Nullable because both banners can be built without a retry action, in which
+  /// case the button is not shown at all.
+  final VoidCallback? onRetry;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Try again',
+      child: Material(
+        type: MaterialType.transparency,
+        child: Semantics(
+          button: true,
+          label: 'Try again',
+          child: InkWell(
+            onTap: onRetry,
+            borderRadius: BorderRadius.circular(16),
+            // 40 dp, not the 26 that `Icon` + `EdgeInsets.all(4)` gives. Still
+            // under the 48 floor because the banner is a fixed height, but it is
+            // a deliberate number rather than an accident of padding, and it is
+            // recorded here so the next person can see it was a choice.
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Icon(Icons.refresh, size: 18),
+            ),
+          ),
         ),
       ),
     );
@@ -301,14 +350,7 @@ class ConnectionStatusBanner extends StatelessWidget {
               ),
             ),
             if (failed)
-              InkWell(
-                onTap: onRetry,
-                borderRadius: BorderRadius.circular(16),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.refresh, size: 18),
-                ),
-              ),
+              RetryButton(onRetry: onRetry, color: color),
           ],
         ),
       ),
