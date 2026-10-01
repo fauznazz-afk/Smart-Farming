@@ -4,12 +4,27 @@
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
 **Dokumen:** 1.2
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.6.0 (build 12), tag `v1.6.0` — setiap prosedur di dokumen ini
+**Rilis acuan:** 1.7.1 (build 15), tag `v1.7.1` — setiap prosedur di dokumen ini
 dijalankan untuk rilis itu kecuali uji upgrade `adb install -r` di §5, yang
-dilewati dengan sadar pada 28 September 2026 karena perangkat uji memakai build
-debug (jalur terakhir yang berhasil menjalankan langkah itu adalah 1.5.0, dari
-1.4.0). Pemeriksaan fingerprint `apksigner` di §3 dan unduhan pasca-publikasi
-dengan pembandingan SHA-256 terhadap build lokal keduanya berjalan untuk 1.6.0 —
+dilewati **sengaja** pada 2 Oktober 2026. Perangkat uji yang tersedia saat itu
+adalah emulator, dan satu-satunya build yang terpasang di sana ditandatangani dengan
+kunci yang sama adalah build 1.7.1 itu sendiri, sehingga `adb install -r`
+hanya akan menguji dirinya sendiri. Jalur terakhir yang benar-benar menjalankan
+upgrade antar-rilis adalah 1.5.0 dari 1.4.0.
+
+Pemeriksaan fingerprint `apksigner` di §3 berjalan untuk 1.7.1 dan cocok dengan
+nilai yang diharapkan di Bagian 3. Unduhan pasca-publikasi dengan pembandingan
+SHA-256 terhadap build lokal juga berjalan, untuk APK **dan** `CHANGELOG.md` yang
+terlampir:
+
+| | |
+|---|---|
+| SHA-256 APK lokal dan unduhan | `97D99B1D2E098E2F53655B18F9261883FCFBEFB26451BD69381CEEE11CCBCBEC` |
+| Fingerprint sertifikat APK unduhan | `504d13ee0bbfa8df2a24c20ef3cc59bde4f35b69596a12ceabb709cf702564b5` |
+| `versionName` / `versionCode` APK unduhan | `1.7.1` / `15` |
+| Scheme v2 | `true` |
+
+Untuk 1.6.0, langkah yang sama menghasilkan
 `828d9afdcf89cb4da4a65e4fcafd8a43ca1d201700e44aff3984074ef0c85777`, identik.
 
 ---
