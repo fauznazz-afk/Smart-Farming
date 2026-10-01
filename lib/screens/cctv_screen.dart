@@ -407,14 +407,33 @@ class _CctvScreenState extends State<CctvScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        _InfoBar(
-          theme: appTheme,
-          primary: primary,
-          isPlaying: _playing,
-          showReload: _playing && !_loading,
-          onReload: _controller?.reload,
-        ),
+        // **Only while the stream is running, and this bar was on screen in every
+        // state until an emulator screenshot showed what it looks like.**
+        //
+        // In the idle state the viewport already says "Camera ready", "The stream
+        // does not run until you press Play" and offers a "Play camera" button.
+        // Directly beneath that, this bar said "Press Play when you are ready to
+        // watch the camera." Three renderings of one fact, stacked, with the
+        // redundant one in a bordered box that reads as a notice.
+        //
+        // That is the same failure `AGENTS.md` records twice already: a permanent
+        // element asserting a condition that is boring when true, permanently
+        // occupying the space where a real warning needs to go. A user who has not
+        // pressed Play has not done anything wrong, and the bar framed it as
+        // something they needed to be told.
+        //
+        // While playing it earns its place for two reasons that are not its text:
+        // it is the Reload button's home, and a dropped HLS stream is the one
+        // failure on this screen with no other recovery control.
+        if (_playing) ...[
+          const SizedBox(height: 12),
+          _InfoBar(
+            theme: appTheme,
+            primary: primary,
+            showReload: !_loading,
+            onReload: _controller?.reload,
+          ),
+        ],
       ],
     );
   }
@@ -430,12 +449,15 @@ class _CctvScreenState extends State<CctvScreen> {
   }
 }
 
-/// Explanatory text below the player, with a reload action while live.
+/// The bar under a **running** stream: what it is, and the Reload action.
+///
+/// Only built while playing. In the idle and error states the viewport above says
+/// the same thing better and offers its own control, so a second copy here was
+/// three renderings of one fact stacked vertically.
 class _InfoBar extends StatelessWidget {
   const _InfoBar({
     required this.theme,
     required this.primary,
-    required this.isPlaying,
     required this.showReload,
     required this.onReload,
   });
@@ -448,7 +470,9 @@ class _InfoBar extends StatelessWidget {
   /// exists to draw.
   final AppTheme theme;
   final Color primary;
-  final bool isPlaying;
+
+  /// Reload is hidden while the stream page is loading, so the action cannot
+  /// appear for a stream that is not up yet.
   final bool showReload;
   final VoidCallback? onReload;
 
@@ -494,9 +518,13 @@ class _InfoBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              isPlaying
-                  ? 'The stream is running on an internet connection.'
-                  : 'Press Play when you are ready to watch the camera.',
+              // **Unconditional, and the bar is only built while playing.** The
+              // idle wording this replaced lived here permanently, under a viewport
+              // that was already saying the same thing; the whole fix was to stop
+              // building the bar, and the branch went with it. Leaving a dead
+              // branch behind would invite someone to restore the bar and the
+              // message together.
+              'The stream is running on an internet connection.',
               style: textTheme.textTheme.bodySmall,
             ),
           ),

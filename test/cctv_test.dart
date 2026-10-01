@@ -236,9 +236,50 @@ void main() {
       expect(find.text('CCTV Monitoring'), findsOneWidget);
       expect(find.text('STANDBY'), findsOneWidget);
       expect(find.text('Play camera'), findsOneWidget);
+      // The viewport already says "Camera ready" and "The stream does not run
+      // until you press Play", with the button above. This used to assert a *fourth*
+      // rendering of the same fact, in a bordered box, directly beneath the other
+      // three -- found on an emulator, not by reading the code.
+      expect(find.text('Camera ready'), findsOneWidget);
       expect(
-        find.text('Press Play when you are ready to watch the camera.'),
+        find.text('The stream does not run until you press Play'),
         findsOneWidget,
+      );
+      // And the bar that duplicated it is gone entirely while idle, rather than
+      // being present and empty.
+      expect(find.text('The stream is running on an internet connection.'),
+          findsNothing);
+      expect(find.byTooltip('Reload camera'), findsNothing);
+    });
+
+    testWidgets('the idle screen says the same thing exactly once', (tester) async {
+      // Counted rather than spot-checked. The defect was duplication, so the
+      // assertion that catches it is the one about how *many* things say it, and
+      // a test that only looks for a specific string cannot notice a second copy
+      // appearing in some other wording later.
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: CctvScreen(streamUrl: defaultAllowedCctvUrl)),
+        ),
+      );
+      await tester.pump();
+
+      // Explanations only. The button's own label is the control, not a
+      // duplicate of the explanation, and counting it would make this test fail
+      // for a reason that is not the defect.
+      const buttonLabel = 'Play camera';
+      final text = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .where((s) => s.toLowerCase().contains('play') && s != buttonLabel)
+          .toList();
+
+      expect(
+        text.length,
+        lessThanOrEqualTo(1),
+        reason: 'the idle screen says "$text" -- the viewport already covers it, '
+            'and a second copy is a permanent notice occupying the space a real '
+            'warning needs',
       );
     });
 

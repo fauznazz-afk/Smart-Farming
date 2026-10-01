@@ -207,13 +207,18 @@ class EnvRangeField extends StatelessWidget {
   }
 }
 
-/// One line saying how many limits are still showing an unsaved default.
+/// One line saying how many **limits** are still showing an unsaved default.
 ///
 /// Exists because a default sitting in a field reads exactly like a stored one,
 /// and the two are not the same thing: a stored limit has a rule behind it, a
-/// default does not. The per-field mark is a colour and a "Not saved yet"
-/// caption, which is deliberately quiet; this is the sentence that makes the
-/// consequence plain, stated once instead of on every field.
+/// default does not. The per-field caption says *which* fields; this says what
+/// that means, and how many, in one sentence.
+///
+/// The two are deliberately different kinds of statement. The per-field "Not
+/// saved yet" is a label on a control; repeating the consequence under every one
+/// of them would be the three-ways-to-signal-one-state problem the environment
+/// cards had. So the count and the consequence live here, and the per-field mark
+/// stays a caption.
 class UnsavedDefaultsNote extends StatelessWidget {
   const UnsavedDefaultsNote({super.key, required this.ranges});
 
@@ -222,9 +227,21 @@ class UnsavedDefaultsNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final count = ranges
-        .where((r) => r.minIsPrefill || r.maxIsPrefill)
-        .length;
+    // **Counting fields, not ranges. This said "3 limits" while the screen showed
+    // five.** It counted the ranges that had at least one prefilled side, and the
+    // Environment screen has three of those -- temperature, humidity, TDS -- with
+    // five prefilled *fields* between them, because temperature and humidity
+    // prefill both ends and TDS prefills only its minimum.
+    //
+    // Found on an emulator: the sentence at the bottom of the card read "3 limits
+    // are shown as defaults" directly under five fields each captioned "Not saved
+    // yet". A count that contradicts the thing it is counting is worse than no
+    // count, and it is exactly the failure `FEATURE.md` records for
+    // `_history` being reported dead: a number that looks authoritative and is not.
+    final count = ranges.fold<int>(
+      0,
+      (sum, r) => sum + (r.minIsPrefill ? 1 : 0) + (r.maxIsPrefill ? 1 : 0),
+    );
     if (count == 0) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 10),

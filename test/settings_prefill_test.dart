@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/models/settings_keys.dart';
 import 'package:plts_monitoring/screens/settings/settings_controller.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
+import 'package:plts_monitoring/screens/settings/widgets/settings_fields.dart';
 import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -145,6 +147,56 @@ void main() {
         isFalse,
         reason: 'The key is in the store, so this is a saved limit and must not '
             'be marked as an unsaved default.',
+      );
+    });
+
+    testWidgets('the note counts limits, and they match the fields it sits under',
+        (tester) async {
+      // **Found on an emulator.** The note at the foot of the Environment alerts
+      // card read "3 limits are shown as defaults" directly beneath five fields
+      // each captioned "Not saved yet". It counted the *ranges* that had at least
+      // one prefilled side -- temperature, humidity, TDS -- while the sentence and
+      // the per-field captions are both about *limits*.
+      //
+      // The count is derived from the controller rather than written out, so this
+      // cannot drift from the data again. And the cross-check against the actual
+      // count of flagged fields is the part that matters: it is what makes the
+      // sentence a claim about the screen rather than a claim about the model.
+      final c = await controller();
+      final flaggedFields = [
+        for (final range in c.envRanges) ...[
+          if (range.minIsPrefill) 'min',
+          if (range.maxIsPrefill) 'max',
+        ],
+      ].length;
+
+      expect(
+        flaggedFields,
+        greaterThan(0),
+        reason: 'a fresh install has defaults, so there is something to count; '
+            'if this is zero the test is not exercising the case at all',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UnsavedDefaultsNote(ranges: c.envRanges),
+          ),
+        ),
+      );
+
+      // Read the sentence off the rendered paragraph rather than asserting a
+      // literal, so this test breaks when the *number* is wrong and not when the
+      // wording is reworded.
+      final text = tester.widgetList<Text>(find.byType(Text)).first.data!;
+      final match = RegExp(r'^(\d+) limits?').firstMatch(text);
+      expect(match, isNotNull, reason: 'the note said "$text"');
+      expect(
+        int.parse(match!.group(1)!),
+        flaggedFields,
+        reason: 'the note said "$text" while $flaggedFields fields are captioned '
+            '"Not saved yet" -- a count that contradicts what it counts is worse '
+            'than no count',
       );
     });
   });
