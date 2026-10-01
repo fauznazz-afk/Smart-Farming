@@ -112,6 +112,114 @@
   the same defect the accent-tinted hairline caused in 1.7.0, one step further
   down the alpha scale.
 
+- **Three widgets on the Overview page invented zeros for telemetry that had
+  never arrived.** `acPower`, `batteryPower`, `soc`, `voltage` and `frequency`
+  were non-nullable and filled in at the call site with `?? 0.0`. So a BMS that
+  had never reported rendered as a red **0%** beside `min 20%` with a
+  `battery_alert` glyph, and an absent meter as a red **Unstable 0 V - 0 Hz**.
+  Both verdicts fail on zero, so an absence became a fault.
+
+  The furthest-reaching part was in words rather than in a number. With a real
+  solar figure and a fabricated house draw of zero, `LivePowerCard`'s closing
+  sentence resolved to **"The array covers the house load"** — a confident claim
+  about the user's own house, derived from data that never arrived, and with no
+  minus sign to make a reader suspicious.
+
+  `SystemStatusStrip` now widens `_Verdict.ok` to `bool?`, because "no reading"
+  is deliberately neither good nor bad: not the status colour, since nothing has
+  gone wrong, and not the accent, since the accent there means "this verdict is
+  good" and we do not know that. `LivePowerCard` prints `--`, names the pack
+  `Battery` rather than inventing a direction — a zero reading is `standby`, an
+  absent one is a claim about our knowledge — and leads the closing sentence with
+  "House draw unavailable until the meter reports" in `faint`, because an absent
+  meter is not a shortfall.
+
+- **Two overflows in `LivePowerCard` that only appeared above a 1.0 font scale.**
+  The three flow terms share about 89 dp each at the documented 381 dp viewport,
+  and a battery figure of `-1250` needs roughly that much for a sign, four
+  digits, icon, gaps and unit at 24 sp. The figure was a non-flex `Row` child, so
+  it got unbounded width and could never shrink. Same for the header's title and
+  age label either side of a `Spacer` that absorbs zero in exactly the case that
+  matters — and the age label is the only liveness indicator on the card.
+
+  Both are now `Flexible` plus `FittedBox.scaleDown`, not `ellipsis`. A number
+  scaled down is still readable; a cut-off number cannot be told from a rounded
+  one.
+
+- **A failed chart request was reported as "No data for this range".**
+  `_fetchHistoryFor` caught every exception and substituted an empty map, so a
+  dropped connection and a quiet day reached the card as the same value. That
+  sentence is not neutral: it tells the user the greenhouse produced nothing,
+  which sends them out to look at the plants, for what is overwhelmingly a
+  network problem. It now says "Could not load this range", and the failure is
+  cleared on the next attempt so a recovered chart does not keep warning.
+
+- **Four controls had no feedback at all.** `Scaffold`'s single `Material` paints
+  its ink features *below* its own child subtree, and the dashboard body is an
+  opaque `ColoredBox`, so the two banner retry buttons and the date-strip calendar
+  button had their splash painted underneath it — invisible, not faint. That
+  matters more than usual here because the app's whole vocabulary is "no ripple,
+  geometric press instead", so those were the only controls with no feedback of
+  either kind. Same fix as `AppCard`: a transparent `Material` between the
+  decorated box and the content. The retry buttons also gained a tooltip and a
+  `Semantics` label, which neither had.
+
+  The calendar button was also a 26–28 dp target against a 48 dp floor, on the only
+  date control that exists on three of the four tabs.
+
+- **Pull-to-refresh refetched nothing when a poll was in flight, and still
+  dismissed its own spinner.** Both guards were left alone — they stop the
+  10-second poll stacking requests on a slow link — and each request now also
+  publishes a `Completer` that the gesture awaits, so it always ends in a fetch
+  that happened after the finger lifted. Completed in a `finally`, because a
+  completer that never completes hangs the spinner forever.
+
+- **Tapping today's date chip did nothing while a custom range was active.** The
+  early return compared only `_selectedDate`, so a committed today-to-today range
+  left the strip with no chip lit and no way back to a single day except the
+  picker.
+
+- **Metric grid readings were cut off at a large font scale** — `2396` at 22 sp
+  fits a three-column card at 1.0 and is wider than the slot at 2.0, and that
+  turbidity reading is real. This is the third truncation this repo has shipped
+  (`109....`, `max 300...`, and now `239...`); all three passed `flutter analyze`,
+  a release build and every existing test, because none of them can see a pixel.
+  The figure now scales down instead.
+
+- **`DateStripChip` quietly overrode the user's font scale.** The day name was in
+  `SizedBox(height: 13)` with a `FittedBox` inside, so at 2x it was laid out at
+  20 sp and scaled straight back to 13 dp — rendering at its 1.0 size whatever the
+  user asked for. The fixed box is gone and `height: 68` became
+  `minHeight: 68`, so the chip grows instead of shrinking its text. The second half
+  of that was found by the test: with the text free to grow but the height still
+  fixed, it overflowed by 40 px.
+
+- **`cardTheme.elevation` was `0`, directly under a comment saying it supplies the
+  shadow.** The four energy-report cards rendered as page-coloured rectangles with
+  a hairline and no depth, in a different surface language from every `AppCard` on
+  the dashboard. The comment stated the intent and the value contradicted it,
+  which is the most durable kind of bug: it reads as done.
+
+- **`AppCard.semanticLabel` did not suppress its children**, so a screen reader
+  read the caller's summary and then walked every `Text` beneath it. For a chart
+  card that meant the summary, the legend, the live values and three statistics
+  rows — all of which the summary had just said in one sentence. Cards without a
+  label are untouched: they have no summary, so their contents are the only
+  description there is.
+
+- **The login form's username field had no `textInputAction`.** Flutter resolves
+  a single-line field's null action to `done`, which unfocuses unless an
+  `onEditingComplete` or `onSubmitted` is given; neither was. The keyboard offered
+  "Done", the user pressed it, and nothing happened, with a password field
+  directly below. The password field already had `onSubmitted`, which is why the
+  last step of the form worked and this one did not.
+
+- **A single-series chart's label was unconstrained.** `maxLines: 1` and
+  `ellipsis` on a non-flex `Row` child can never take effect, so the `Flexible`
+  sibling received whatever was left — which is zero once the label is wide. Both
+  sides are now `Flexible` with the label on the lower flex, because a label that
+  can push the numbers to nothing reintroduces from the other side the very
+  truncation its sibling `FittedBox` exists to prevent.
 - **Every pH alarm read `pH too high: 9.10  (limit 8.5 )`** — two spaces before
   the parenthesis and one before the closing paren. pH is the only rule built
   with an empty unit, and the message template interpolated the unit with
@@ -173,6 +281,11 @@
   than the bounce does, and that light keeps its larger alpha because its page
   has a ninth of the headroom. **Verified not vacuous**: the guard fails on both
   dark themes when the alpha is put back to `0x14` and passes at `0x0A`.
+- `absent_and_failed_states_test.dart`: five tests for the two states this app was
+  conflating -- a failed chart request versus a quiet day, and a date chip that
+  honours the font scale it was silently overriding.
+- `alarm_rules_test.dart` gains four tests for the message formatter, which
+  previously had no direct coverage of the range messages.
 
 ### Changed
 

@@ -1146,6 +1146,48 @@ warna, dan seharusnya diambil karena desires keseluruhan bentuk, bukan karena
 satu scanline. Tercatat di sini supaya tidak hilang, dan supaya tidak ada yang
 menganggapnya sudah diperbaiki.
 
+### 18.0f Nol yang dipabrikasi di tiga widget, dan kalimat yang paling berbahaya
+
+Ditemukan audit baca-saja 1 Oktober 2026, diverifikasi di sumber sebelum
+diubah. Ini yang paling damaging dari semua bug sesi ini, bukan karena salah
+hitung, tetapi karena **iaENTS tidak pernah salah**: tidak ada yang merah,
+tidak ada yang crash, dan angka yang tampil terlihat seperti pengukuran.
+
+Tiga widget di halaman Overview memakai `?? 0.0` untuk telemetry yang belum
+pernah datang:
+
+| widget | data absen → yang tampil |
+|---|---|
+| `SystemStatusStrip` | **0%** merah + ikon `battery_alert`, dan **Unstable 0 V · 0 Hz** |
+| `LivePowerCard` | **House 0 W**, **Charge 0%** |
+| `LivePowerCard` (kalimat) | **"The array covers the house load"** |
+
+Dua verdict (`batteryOk`, `gridOk`) sama-sama **gagal pada nol**, jadi ketiadaan
+berubah jadi kerusakan. Dan `coversLoad` membandingkan angka solar yang asli
+dengan nol yang dibuat-buat — itu yang menghasilkan kalimatnya.
+
+**Kalimatnya yang paling berbahaya, karena berbentuk kata-kata.** "The array covers
+the house load" adalah klaim tegas tentang rumah user sendiri, yang diturunkan
+dari data yang tidak pernah tiba, dan tidak ada tanda minus yang membuat
+pembaca curiga.
+
+Tiga widget, satu halaman, **dua jawaban berbeda** untuk "apa arti ketiadaan".
+`LivePowerCard` sudah menjawab dengan benar untuk sisi solar (`Power flow
+unavailable until the inverter reports`), jadi ini perubahan nullability yang
+mengikuti jawaban yang sudah ada — bukan ide baru. Yang punya field non-nullable
+justru yang paling berbohong.
+
+Perbaikannya: `bool?` untuk `_Verdict.ok` karena "tidak ada pembacaan" sengaja
+bukan baik maupun buruk — bukan warna status (tidak ada yang salah), bukan accent
+(accent di sana berarti "verdict ini bagus" dan kita tidak tahu). `LivePowerCard`
+mencetak `--`, menamai pack `Battery` alih-alih mengarang arah (pembacaan nol
+adalah `standby`, pembacaan absen adalah klaim tentang pengetahuan kita), dan
+kalimat penutupnya dimulai dengan "House draw unavailable until the meter
+reports" dalam `faint`, karena meter absen bukan shortfall.
+
+Sembilan test baru; yang keenam kombinasi viewport dan skala font menguji
+`_Term` sekaligus dan menemukan overflow kedua di header yang tidak saya prakirakan.
+
 ### 18.0b Dua bug yang ditemukan sesi ini, keduanya kelas yang sama
 
 **`AppTile` di bawah WCAG AA, dan test yang mengukurnya salah mengecualikannya.**
@@ -1326,6 +1368,33 @@ Bukan bug, tapi mudah disalahpahami:
 - **Energy report dengan data bulan penuh** — window selalu ~2 bulan dan ThingsBoard
   membatasi query agregat di bawah 31 hari.
 - **ThingsBoard sekarang menjalankan 4 device, bukan 3.** App sudah menyebut semuanya, tapi hanya ketiga device lama yang pernah diverifikasi di perangkat.
+
+### 18.8 Tiga widget diam-diam mengganti satu makna dengan makna lain
+
+Audit baca-saja pada sesi 1 Oktober 2026 menemukan pola yang sama di tiga tempat:
+widget **tampak sedang mengatakan satu hal, padahal mengatakan hal lain**. Yang
+membedakan ketiganya dari bug biasa: tidak ada yang salah kompilasi, dan tidak
+satu pun bisa ditangkap `flutter analyze`.
+
+1. **Nol palsunya sudah diperbaiki** — lihat §18.0f.
+2. **"No data for this range" untuk request yang gagal.** `_fetchHistoryFor`
+   menangkap setiap exception lalu assigns `const {}`, sehingga koneksi putus dan
+   hari yang tenang sampai ke kartu sebagai nilai yang sama. Kalimat itu tidak
+   netral: "No data" memberi tahu greenhouse tidak menghasilkan apa pun, yang
+   mengarahkan user memeriksa tanaman — padahal penyebab overwhelmingly adalah
+   jaringan yang tidak bisa diperbaiki di lapangan. `EnergySummaryCard` sudah
+   membedakan keduanya dan fetch energy sudah memasang pesan spesifik; chart
+   satu-satunya yang tidak.
+3. **Skala font diabaikan diam-diam oleh `DateStripChip`.** Nama hari berada di
+   `SizedBox(height: 13)` dengan `FittedBox` di dalamnya, jadi di skala 2.0
+   teksnya dilayout pada 20 sp lalu **diskalakan kembali ke 13 dp**. Playbook §7.9
+   sudah mencatat bahwa `flutter analyze` tidak menangkap apa pun di device;
+   ini kasus di mana teks terlihat benar di analyze dan salah di layar, dan tidak
+   ada tes yang bisa menangkapnya tanpa device.
+
+Yang **tidak** boleh disimpulkan dari audit ini adalah "widget ini aman". Yang
+benar-benar dibuktikan hanya bahwa ketiga defect ini ada dan sudah tertutup;
+sisanya masih menunggu device.
 
 ### 18.6 Konvensi tanda sensor
 
