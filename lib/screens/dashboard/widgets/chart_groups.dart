@@ -11,13 +11,36 @@ import 'package:flutter/material.dart';
 /// series in it".
 ///
 /// The rule that decides how a page's readings are grouped is the **unit**.
-/// Voltage, current and power share an axis because they are one electrical
-/// system in comparable magnitudes. `temp_dht` and `temp_ds18b20` share an axis
-/// because they are both degrees Celsius, which is a real comparison. `lux` and
-/// `ppm` do not share an axis with anything, and putting them on one would
-/// produce a chart whose shape is an artefact of the units rather than of the
-/// greenhouse. So each becomes its own group, and that is a property of the data
-/// rather than a layout decision.
+/// `temp_dht` and `temp_ds18b20` share an axis because they are both degrees
+/// Celsius, which is a real comparison. `lux` and `ppm` do not share an axis with
+/// anything, and putting them on one would produce a chart whose shape is an
+/// artefact of the units rather than of the greenhouse. So each becomes its own
+/// group, and that is a property of the data rather than a layout decision.
+///
+/// **The one exception, and it is the weakest claim in this file.** Voltage,
+/// current and power share an axis because they are "one electrical system in
+/// comparable magnitudes". Measured on the test instance on 2 October 2026, on
+/// the AC page: 220 V, 0.11 A and 18.5 W. That is three orders of magnitude, and
+/// the resulting chart drew all three series as horizontal lines — 220, 18 and 0
+/// on a 0–300 axis — so the shape of every curve on it was a property of the
+/// units rather than of the grid. On PV only the power curve carries information;
+/// voltage and current are flat because the power scale is about 100× their size.
+///
+/// Splitting the electrical pages into one group per quantity was implemented and
+/// measured, and is **not** in this file. It throws away the
+/// voltage/current/power relationship that an electrician reads an inverter for,
+/// it costs three times the vertical space on the three most-used pages, and each
+/// resulting single-series group loses the red/green/blue triad and takes the
+/// user's accent instead. None of that can be judged from a screenshot, and at the
+/// time it was written no device was reachable.
+///
+/// So: the grouping below is a deliberate choice with a **false justification**,
+/// and the honest position is that the justification is the defect, not the
+/// grouping. Anyone revisiting this should decide it in front of the user rather
+/// than on the strength of a comment. The history request is unaffected either way,
+/// because [chartKeysForPrefix] flattens the groups — so changing this list cannot
+/// desynchronise what is fetched from what is plotted, and the change is
+/// reversible in one list.
 class ChartSeriesSpec {
   const ChartSeriesSpec({
     required this.key,
@@ -269,6 +292,27 @@ List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
 List<String> chartKeysForPrefix(String prefix) => [
   for (final group in chartGroupsForPrefix(prefix)) ...group.keys,
 ];
+
+/// The keys each page requests, pinned.
+///
+/// Derived from [chartGroupsForPrefix] in the app and *listed* here, which looks
+/// like exactly the kind of copy this file exists to prevent — and normally it
+/// would be. The difference is that this list is a change detector, not a second
+/// source: nothing reads it, and it exists so that regrouping a page's charts
+/// cannot silently change what is fetched from ThingsBoard.
+///
+/// That is not hypothetical. Splitting the electrical pages into one group per
+/// quantity is a live proposal (see the note on the grouping rule), and anyone
+/// attempting it will find the flattened key list comes out byte-for-byte
+/// identical — which is the property worth proving, because it is what makes the
+/// experiment safe to try and trivial to undo.
+const Map<String, List<String>> kHistoryKeysByPrefix = {
+  'pv': ['voltage_dc', 'current_dc', 'power_dc'],
+  'ac': ['voltage_ac', 'current_ac', 'power_ac'],
+  'battery': ['voltage', 'current', 'power'],
+  'env': ['temp_dht', 'temp_ds18b20', 'humidity_dht', 'lux', 'tds_ppm'],
+  'fish': ['ph', 'suhu', 'turbidity_ntu'],
+};
 
 /// The page title for a prefix, or null when the prefix draws no chart.
 String? chartPageTitle(String prefix) => switch (prefix) {

@@ -310,8 +310,26 @@
   ending a real session, so it was left alone.
 - A scanline across a card's **top** edge. The light half of Dracula's pair has
   never been sampled, and that is the one open question the correction raises.
-- No frame-time telemetry has ever been taken.
+- **The electrical pages' chart grouping.** PV, AC and Battery put voltage,
+  current and power on one shared Y axis, and the justification in
+  `chart_groups.dart` is measurably false: on the AC page the three read
+  220 V, 0.11 A and 18.5 W, which is three orders of magnitude, and the chart
+  draws all three as horizontal lines. So the axis -- and therefore the shape of
+  every curve on it -- is a property of the units rather than of the grid, which
+  is the one thing the file's own rule forbids.
 
+  Splitting each page into one chart per quantity was implemented and measured,
+  and **is deliberately not in the tree**. It gives up the
+  voltage/current/power relationship an electrician reads an inverter for, it
+  costs three times the vertical space on the three most-used pages, and each
+  resulting single-series group loses the red/green/blue triad for the user's
+  accent. None of that trade can be judged from a test, and the emulator could
+  not be logged into at the time -- `adb input` taps do not reach the login
+  text fields reliably on this image, though they reach buttons fine.
+
+  What *is* in the tree: the false claim is corrected in the file, and a new test
+  pins each page's history key list so regrouping provably cannot change what is
+  fetched from ThingsBoard. The change is reversible in one list.
 ## [1.7.0] - 2026-10-01
 
 ### Fixed

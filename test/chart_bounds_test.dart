@@ -28,6 +28,10 @@ List<TelemetryPoint> ramp(List<double> values) => [
 /// Written out rather than generated, because the interesting cases are the ones
 /// the hardware actually produces: a discharging battery is negative, a pH
 /// sensor drifts in a narrow band, and a lux sensor crosses zero at dusk.
+///
+/// The three electrical pages supply one group of three series, which is the
+/// grouping `chart_groups.dart` documents and the reason its own comment is
+/// flagged as making a false claim. See the note there.
 Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
   'pv': [
     [
@@ -38,23 +42,24 @@ Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
   ],
   'ac': [
     [
-      [228.0, 231.0, 0.0, 229.0],
-      [0.0, 1.2, -0.6, 0.9],
-      [0.0, 277.0, -138.0, 206.0],
+      [228.0, 231.0, 0.0, 229.0], // V
+      [0.0, 1.2, -0.6, 0.9], // A
+      [0.0, 277.0, -138.0, 206.0], // W
     ],
   ],
   'battery': [
     [
-      [13.2, 12.6, 12.1],
-      [-0.97, -1.4, 0.0], // discharging
-      [-12.92, -17.6, 0.0],
+      [13.2, 12.6, 12.1], // V
+      [-0.97, -1.4, 0.0], // A, discharging
+      [-12.92, -17.6, 0.0], // W
     ],
   ],
   'env': [
     [
       [22.7, 25.1, 23.4],
       [23.9, 27.8, 25.1],
-    ], // degC, air and panel
+    ], // degC, air and panel: two series sharing an axis is the case the unit
+        // rule is actually about
     [
       [78.0, 61.0, 84.0],
     ], // %
@@ -362,6 +367,37 @@ void main() {
                 '${dimensionless ? 'must' : 'must not'} anchor at zero',
           );
         }
+      }
+    });
+
+    test('the history request is the pinned key list, whatever the grouping',
+        () {
+      // Regrouping a page's charts must not change what is fetched.
+      //
+      // The reason this is worth a test: `chartKeysForPrefix` flattens the groups,
+      // so splitting one three-series group into three single-series groups
+      // produces a byte-for-byte identical request. That is the property which
+      // makes regrouping safe to attempt, and it is invisible in the app -- the
+      // only way to break it is to change a key, and the only way to notice is to
+      // compare lists.
+      //
+      // A key appearing in two groups would be fetched once (the request is a set
+      // of keys) but plotted twice, and one key disappearing from both would be
+      // silently unplotted. Both are checked here rather than by reading.
+      for (final entry in kHistoryKeysByPrefix.entries) {
+        final derived = chartKeysForPrefix(entry.key);
+        expect(
+          derived,
+          entry.value,
+          reason: "'${entry.key}' requests something other than the pinned "
+              'list. Regrouping must not change the request.',
+        );
+        expect(
+          derived.toSet().length,
+          derived.length,
+          reason: "'${entry.key}' has a key in two groups, so it is fetched once "
+              'and plotted twice',
+        );
       }
     });
 

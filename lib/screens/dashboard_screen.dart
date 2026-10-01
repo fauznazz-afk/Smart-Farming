@@ -2069,14 +2069,30 @@ Future<void> _refreshCurrentPage() async {
         ],
       ),
     ),
-    () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('PV', 'pv', theme),
-    () => const SizedBox(height: 8),
-    () => _bindRevision(
-      _chartRevision,
-      theme,
-      () => _chartCard('pv', chartGroupsForPrefix('pv').single, theme),
-    ),
+    // **Through `_chartSectionThunks`, which iterates the groups.** This used to
+    // hand-write a header and one
+    // `_chartCard('pv', chartGroupsForPrefix('pv').single, theme)`.
+    //
+    // **That `.single` was a landmine, and it is worth recording how it was found
+    // because the failure mode was invisible.** An experiment split the electrical
+    // pages into one chart group per unit — see the note on
+    // `chartGroupsForPrefix` — and the three `.single` calls immediately threw
+    // `Bad state: Too many elements` on the first frame.
+    //
+    // In a **release** build that was a blank page: no stripe, no log line, no
+    // crash dialog. `flutter analyze` was clean, `flutter test` was fully green,
+    // and the release APK built without complaint, because nothing in the suite
+    // constructs a dashboard page and release mode strips Dart error reporting.
+    // The page painted as one flat grey card, since the `Bound` that had already
+    // thrown kept its empty child. It took a **profile** build on the emulator to
+    // read the actual `Bad state` out of logcat.
+    //
+    // So the third way of declaring a page's charts is gone. There is one
+    // implementation, it iterates, and a page with two groups is now simply a page
+    // with two groups. Nothing about the current layout changes: each of the three
+    // electrical pages still declares exactly one group, and `_chartHeaderGap`
+    // moves inside the shared path where the other two pages were missing it.
+    ..._chartSectionThunks('pv', theme),
   ];
 
   List<Widget Function()> _acPage(AppTheme theme) => [
@@ -2107,14 +2123,10 @@ Future<void> _refreshCurrentPage() async {
         ],
       ),
     ),
-    () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('AC', 'ac', theme),
-    () => const SizedBox(height: 8),
-    () => _bindRevision(
-      _chartRevision,
-      theme,
-      () => _chartCard('ac', chartGroupsForPrefix('ac').single, theme),
-    ),
+    // `_chartSections`, for the reason on the PV page: the hand-written
+    // `.single` is what threw `Bad state: Too many elements` when the electrical
+    // pages were split into one group per unit.
+    ..._chartSectionThunks('ac', theme),
   ];
 
   List<Widget Function()> _batteryPage(AppTheme theme) => [
@@ -2155,14 +2167,8 @@ Future<void> _refreshCurrentPage() async {
         ],
       ),
     ),
-    () => const SizedBox(height: _chartHeaderGap),
-    () => _chartSectionHeader('Battery', 'battery', theme),
-    () => const SizedBox(height: 8),
-    () => _bindRevision(
-      _chartRevision,
-      theme,
-      () => _chartCard('battery', chartGroupsForPrefix('battery').single, theme),
-    ),
+    // `_chartSections`, for the reason on the PV page.
+    ..._chartSectionThunks('battery', theme),
   ];
 
   // ── Hydroponics page ──────────────────────────────────────────────────────────
@@ -2331,13 +2337,39 @@ Future<void> _refreshCurrentPage() async {
   /// The electrical pages declare a single three-series group, so this renders
   /// exactly what it rendered before. The greenhouse declares four, which is why
   /// the page grew its first charts at all.
-  List<Widget> _chartSections(String prefix, AppTheme theme) {
-    final pageTitle = chartPageTitle(prefix);
-    if (pageTitle == null) return const [];
+  List<Widget> _chartSections(String prefix, AppTheme theme) => [
+    for (final build in _chartSectionThunks(prefix, theme)) build(),
+  ];
+
+  /// One thunk per section, for a page's charts.
+  ///
+  /// The thunks rather than the widgets because every page's item list is
+  /// `List<Widget Function()>`, and because the card is the thing `Bound` has to
+  /// be able to defer. Building the list twice -- once as thunks for the three
+  /// electrical pages and once as widgets for the other two -- is how the
+  /// electrical pages ended up with their own hand-written chart wiring, and that
+  /// wiring is what threw `Bad state: Too many elements` when the groups were
+  /// split. There is now one implementation of "a page's charts".
+  List<Widget Function()> _chartSectionThunks(String prefix, AppTheme theme) {
+    if (chartPageTitle(prefix) == null) return const [];
     return [
       for (final group in chartGroupsForPrefix(prefix)) ...[
-        _chartSectionHeader(group.title, prefix, theme),
-        _chartCard(prefix, group, theme),
+        // The gap is before the header, for the reason on [_chartHeaderGap]: a
+        // header needs the card above it to have finished before the label lands.
+        //
+        // **It used to be written out by the three electrical pages and not by the
+        // other two**, so the greenhouse and fish pages ran their chart headers
+        // straight into the card above with nothing but [_cardGap] between them —
+        // the exact thing that constant exists to prevent. Emitting it here makes
+        // the rule uniform instead of per-page.
+        () => const SizedBox(height: _chartHeaderGap),
+        () => _chartSectionHeader(group.title, prefix, theme),
+        () => const SizedBox(height: 8),
+        () => _bindRevision(
+          _chartRevision,
+          theme,
+          () => _chartCard(prefix, group, theme),
+        ),
       ],
     ];
   }
