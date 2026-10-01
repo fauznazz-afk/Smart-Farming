@@ -275,8 +275,147 @@
   plain `RenderFlex` in a `Row`, and a widget test sets the viewport width
   through `MediaQueryData.size` and the scale through `textScaler`.
 
+- **The Live/Polling indicator was frozen on two tabs.** `_realtimeConnected`
+  changes only through a plain `setState` -- it is not a notifier, and
+  `_chartRevision` is not bumped by it -- so a `Bound` whose token omitted it
+  kept its cached child. Hydroponics and Fish omitted it because they declared
+  their own `Bound(listenable: _chartRevision, token: theme)` instead of going
+  through `_bindRevision` like the other three. Eight chart headers were frozen
+  at whatever they last showed and corrected only on a page switch, a date change
+  or a pull-to-refresh.
+
+  The same field therefore behaved differently either side of a page boundary,
+  which is the worst shape this kind of bug can have: it looks like the pages are
+  simply different. Both halves are fixed -- the flag is in `_visualToken`, and
+  both tabs use `_bindRevision` -- so there is no third way to declare a bound
+  subtree.
+
+- **Four measurement bugs in one widget, all found by looking at a screen at 2x.**
+  Every one is the same mistake: a measurement that hand-writes the value it is
+  measuring.
+
+  The date strip still clipped `Mon` and `Wed` as `M...` and `W...`, because the
+  measurement used a hand-written `TextStyle(fontSize: 10, w600)` and the theme
+  supplies two things that changes: `family: Roboto` and `letterSpacing: 0.3`.
+  Three characters at 0.3 each is 0.9 px under, and a chip 0.75 px too narrow
+  clips. The style is now resolved from the ambient `DefaultTextStyle`, and the
+  chip's own padding and border are read from `DateStripChip`'s constants rather
+  than re-guessed as `10 + 2`.
+
+  The battery label rendered `Dischar...`. `Flexible` distributes a row in
+  proportion to its flex values, so when the three labels together want more room
+  than the row has, *every* slot shrinks proportionally -- including the longest,
+  which is still the one that does not fit. Sized against the width a slot asked
+  for rather than the width it gets, it reserved one line and the second was never
+  painted. That string is the one this app is least allowed to get wrong: the
+  direction of the pack has to be carried by the label, because a minus sign is
+  not a direction and the two are deliberately not interchangeable.
+
+  The label block was 45% too short **at every font scale**, which had been true
+  all along. Its line-height probe also used a hand-written style, which has no
+  height multiplier and no family; the theme sets `height: 1.4`, so the probe
+  answered 11 px where the painted paragraph needs 16. A `SizedBox` that is too
+  short does not overflow -- it silently fails to paint the rest, with no stripe
+  and no exception.
+
+  And the charge row overflowed by 38 px on a 320 dp viewport at 3.0, because
+  `Charge` and `80%` were plain `Text` children and each got unbounded width.
+  That one is pre-existing and unrelated to the font-scale work.
+
+  The comment that shipped with the first attempt claimed "a day name that reads
+  'Mo' instead of 'Mon' is still a day name". That was simply wrong, and only a
+  screen could show it: at 2x not even two letters fit a 42 dp chip. A calendar
+  that reads `S, M, W, T, T, F, S` is a row of initials, and an ambiguous one --
+  Saturday and Sunday share a letter, and so do Tuesday and Thursday. It is
+  corrected where it was.
+
+- **A `RenderFlex` overflow in the date strip's header**, which the emulator never
+  showed: `Pick a day` was a non-flex `Text`, so at 2x on a 360 dp viewport it
+  claimed 16 px more than the row had, and at 3.0 it was 37. The label and the
+  hint are a `Wrap` now, which is the honest answer to "do these two fit on one
+  line". Two flex children competing for one line is a negotiation with no right
+  answer; a second line is a right answer.
+
+- **A null telemetry payload became a confident zero, and reached the alarm
+  engine.** A key present with a `null` payload was stored as `0.0`, which is
+  indistinguishable from a real reading. `evaluateAlarmRules` reads
+  `if (value == null) continue;`, so a key that is *present* never took that
+  branch -- it was compared instead, and a null `soc` produced
+  `Battery charge low: 0%` at **critical** severity, persisted and notified.
+
+  A key whose payload is not a readable number is now left out of the map
+  entirely, which is what makes the existing "a device that produced no reading is
+  not stale" rule reachable for a key that is present but empty. `lastUpdate`
+  still advances, because the device did answer -- it just did not report a
+  number. `thingsboard_api.dart` already documented this hazard for the boolean
+  `turbidity_keruh` key and avoided it by never requesting that key, which is a
+  narrower fix than it looks: it protects one key and leaves the fallback in
+  place for every numeric one, which is the case that reaches the alarms.
+
+- **The unsaved-defaults note counted ranges and called them limits.** On the
+  Environment alerts screen it read "3 limits are shown as defaults" directly
+  beneath five fields each captioned "Not saved yet". It counted the ranges with
+  at least one prefilled side -- temperature, humidity, TDS -- while the sentence
+  and the captions are both about limits. A count that contradicts the thing it
+  is counting is worse than no count.
+
+- **The CCTV idle screen said the same thing four times.** The viewport says
+  "Camera ready", "The stream does not run until you press Play" and offers a
+  "Play camera" button; directly beneath, a bordered bar said "Press Play when
+  you are ready to watch the camera." That is the failure `AGENTS.md` records
+  twice already: a permanent element asserting a condition that is boring when
+  true, permanently occupying the space where a real warning needs to go. The bar
+  is built only while the stream runs, where it is the Reload button's home and a
+  dropped HLS stream has no other recovery control.
+
+- **One writer could shrink the offline telemetry cache.** Two writers share
+  `cached_telemetry` and do not have the same reach: the REST poll has all four
+  devices, the WebSocket service only the devices it has heard on the socket --
+  which, for a BMS that reports first and quietly, is often one device for a long
+  while. A single socket frame from one device erased the other three, and if the
+  network then dropped, those pages came up blank until a successful poll healed
+  them.
+
+  The write now merges with what is cached, **new over old**. That direction is
+  not incidental: the first attempt had it backwards, which let a stale cached
+  reading overwrite a live one -- the same class of bug as the overwrite it fixes,
+  only slower. The new test caught it on its first run.
+
+- **A pending history refresh was discarded when the user left the tab.** The
+  flag was removed before the page check that decides whether to act on it, so a
+  request registered as pending on one tab, where the user swiped away before it
+  landed, had its pending refresh thrown away and that chart silently kept the old
+  date range until the user touched the date again. The flag now survives, which
+  is the entire purpose of a pending flag.
+
+- **Alarm history records were being lost.** `addAlarm` was an unserialised
+  read-modify-write against one `SharedPreferences` key, and the dashboard calls
+  it `unawaited` once per newly-active signal from a single synchronous loop. Four
+  simultaneous alarms -- the realistic trigger is the MQTT socket dropping, so
+  every `stale_*` goes active at once -- ran four overlapping cycles, all reading
+  the same snapshot, and only the last write survived. The dashboard banner showed
+  all four while the history the user opened to find out what had happened showed
+  one.
+
 ### Added
 
+- `date_strip_test.dart`: 36 tests across four viewport widths and eight font
+  scales, including the 411 dp width the defect was found at. Every clipping
+  assertion reads `RenderParagraph.didExceedMaxLines` rather than `find.text`,
+  because `find.text` matches a `Text` widget by its *data* -- the full string,
+  even after the engine has clipped it. **Verified not vacuous**: reverting the
+  `DefaultTextStyle` resolution makes it fail.
+- `absent_reading_alarm_test.dart`: seven tests for a telemetry key that is
+  present but not a readable number, including the two cases that pull in opposite
+  directions -- a null payload raises no low-SOC alarm, and a real `0` still
+  raises one.
+- `alarm_history_serialisation_test.dart`, whose header states plainly that it
+  **does not** reproduce the race it was written for. With the serialiser removed
+  the assertions still pass, because `SharedPreferences.setMockInitialValues` is
+  in-memory and completes immediately, so four overlapping cycles never actually
+  interleave. What it pins is narrower and worth keeping: four simultaneous
+  writes leave four records, and the cooldown still de-duplicates. The fix is
+  justified by reading the call path, not by that suite.
 - `design_tokens_test.dart` now asserts the hairline lifts each dark page less
   than the bounce does, and that light keeps its larger alpha because its page
   has a ninth of the headroom. **Verified not vacuous**: the guard fails on both
@@ -289,14 +428,32 @@
 
 ### Changed
 
+- **A page's chart count is no longer a constant.** Three pages hand-wrote
+  `_chartCard(prefix, chartGroupsForPrefix(prefix).single, theme)` while the other
+  two went through a shared path that iterates. The `.single` was a landmine, and
+  **a release build reported nothing when it went off**: no stripe, no log line,
+  no crash dialog, just a flat grey card, because the `Bound` that had already
+  thrown kept its empty child. `flutter analyze` was clean, 581 tests were green,
+  and the release APK built without complaint -- nothing in the suite constructs
+  a dashboard page, and release mode strips Dart error reporting. It took a
+  **profile** build on the emulator to read the actual `Bad state` out of logcat.
+
+  There is one implementation now, it iterates, and a page with two groups is
+  simply a page with two groups. Nothing about the current layout changes. It
+  also moves `_chartHeaderGap` inside the shared path, which incidentally gives
+  the greenhouse and fish pages the 28 dp before their chart headers that only
+  the electrical three were emitting.
+
+  This is the fourth time this repository has been bitten by a check that passes
+  while the thing it checks is not exercised at all.
 - `FEATURE.md` §18.5 has asked for a pixel-brightness scanline across a card
   edge since before the file existed. It has now been run, and it is the reason
-  this patch exists — twice over, first for the Dracula shadow alphas and then
+  this patch exists - twice over, first for the Dracula shadow alphas and then
   for the hairline. What it also did was invalidate the arithmetic guard in
   `design_tokens_test.dart` that had been standing in for it, which is the
   argument for doing the measurement.
-- Test count corrected from 452 to 479, and the file count from 32 to 33, in
-  the five places that claimed it. Counted per file rather than taken on trust.
+- Test count corrected from 452 to **581**, and the file count from 32 to **38**,
+  in every place that claimed it. Counted per file rather than taken on trust.
 
 ### Still unverified
 
