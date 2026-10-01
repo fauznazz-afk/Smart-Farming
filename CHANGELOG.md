@@ -54,12 +54,54 @@
   10% band to a 40% band, which is a real loss of precision bought on purpose
   and recorded as such in the test.
 
+### Fixed
+
+- **The hairline was the brightest thing on the card edge on both dark themes,
+  and on Dracula it outshone the bounce shadow.** 1.7.0's Dracula cards read as
+  outlined rather than embossed, and this is why: the one-pixel hairline was
+  landing at +17.0 luminance against a page of 42.4 while the bounce that is
+  supposed to define the edge only managed +16.0.
+
+  Measured on the Xiaomi, one card, one build, 8-bit scanline:
+
+  | | page | bounce | hairline | as a fraction of the page |
+  |---|---|---|---|---|
+  | light `#E1E7E4` | 229.5 | — | 244.5 (+15.0) | +6.5% |
+  | dark `#1A211F` | 31.4 | 51.6 (+20.2) | 48.7 (+17.3) | +55% |
+  | dracula `#282A36` | 42.4 | 58.4 (+16.0) | 59.4 (+17.0) | +40% |
+
+  The cause is not obvious from the token file. White has 255 of headroom above
+  every page in the app, but a page at 229.5 can only be lifted 25.5 units by
+  going to pure white while a page at 31.4 has 223.6 available. One alpha
+  therefore spans a factor of nine in perceived weight across the three presets.
+  **An alpha is not a perceptual quantity**; the gap between the page and white
+  is, and the three pages do not share it.
+
+  Dark themes move from `0x14` to `0x0A`. Measured after: the hairline lands at
+  +9.0 on dark and +8.0 on Dracula, against bounce peaks of +20.2 and +16.0, so
+  the shadow is unambiguously the brightest thing on the light edge — which is
+  what a dark surface is supposed to look like. Light is left at `0x99` because
+  it is already doing that job.
+
+  The previous doc comment claimed the hairline was "a whisper, not an outline".
+  It was not a whisper on a dark page, and nobody had put a ruler on it. This is
+  the same defect the accent-tinted hairline caused in 1.7.0, one step further
+  down the alpha scale.
+
+### Added
+
+- `design_tokens_test.dart` now asserts the hairline lifts each dark page less
+  than the bounce does, and that light keeps its larger alpha because its page
+  has a ninth of the headroom. **Verified not vacuous**: the guard fails on both
+  dark themes when the alpha is put back to `0x14` and passes at `0x0A`.
+
 ### Changed
 
 - `FEATURE.md` §18.5 has asked for a pixel-brightness scanline across a card
   edge since before the file existed. It has now been run, and it is the reason
-  this patch exists. What it also did was invalidate the arithmetic guard in
-  `design_tokens_test.dart` that had been standing in for it — which is the
+  this patch exists — twice over, first for the Dracula shadow alphas and then
+  for the hairline. What it also did was invalidate the arithmetic guard in
+  `design_tokens_test.dart` that had been standing in for it, which is the
   argument for doing the measurement.
 
 ### Still unverified

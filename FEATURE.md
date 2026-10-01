@@ -1091,8 +1091,61 @@ Konsekuensi yang terlihat: hubungan terang-gelap **terbalik**. Di tema dark
 separuh terang yang menentukan edge, rasionya 3,80; di Dracula half gelap
 sekarang yang bekerja, dan pasangannya 2,41. Guard rasio di `design_tokens_test`
 turun dari toleransi 10 % ke 40 %, dan itu kehilangan presisi yang disengaja,
-dengan alasannya dicatat di test itu sendiri. Scanline melintasi tepi **atas**
-kartu belum diambil, jadi pertanyaannya masih terbuka.
+dengan alasannya dicatat di test itu sendiri.
+
+### 18.0d Hairline yang paling terang di tepi kartu
+
+Scanline yang sama menemukan bug kedua, di file yang sama dan tidak terkait
+dengan alpha bayangan.
+
+Pengukuran satu kartu, satu build, luminansi 8-bit:
+
+| | halaman | bounce | **hairline** | sebagai pecahan halaman |
+|---|---|---|---|---|
+| light `#E1E7E4` | 229,5 | — | 244,5 (+15,0) | **+6,5 %** |
+| dark `#1A211F` | 31,4 | 51,6 (+20,2) | 48,7 (+17,3) | **+55 %** |
+| dracula `#282A36` | 42,4 | 58,4 (+16,0) | 59,4 (+17,0) | **+40 %** |
+
+**Di Dracula hairline lebih terang dari bounce** — 59,4 lawan 58,4. Di kedua
+halaman gelap ia adalah unsur paling terang dalam dua piksel dari tepi kartu,
+artinya mata membaca **outline satu piksel**, bukan permukaan yang emboss. Dan
+outline yang digambar adalah tepat hal yang gaya ini exist untuk
+menggantikannya. Ini bukan hal yang halus: inicacat yang sama yang dulu
+disebabkan hairline bertint accent, satu anak tangga lebih rendah di skala alpha,
+dan ia bertahan karena tidak pernah ada yang mengukur.
+
+Penyebabnya tidak terlihat dari token file. Putih punya 255 headroom di atas
+setiap halaman app, tapi halaman 229,5 hanya bisa diangkat 25,5 unit menuju
+putih murni sementara halaman 31,4 punya 223,6. **Jadi satu alpha memberi rentang
+berat perseptual yang berbeda sembilan kali** di tiga preset. Alpha bukan
+kuantitas perseptual; jarak antara halaman dan putih yang begitu, dan tiga
+halaman itu tidak memilikinya bersama.
+
+Diperbaiki: `0x14` → `0x0A` pada dua tema gelap. Terukur sesudahnya, hairline
++9,0 di dark dan +8,0 di Dracula, melawan bounce +20,2 dan +16,0 — jadi
+bayangan jelas menjadi unsur paling terang di sisi terang, seperti seharusnya
+permukaan gelap. Light dibiarkan di `0x99` karena sudah accomplishes tugas itu.
+
+Guard baru di `design_tokens_test.dart` mengunci hubungan itu, dan sudah
+dibuktikan **tidak vakum**: ia gagal di kedua tema gelap saat alpha dikembalikan
+ke `0x14`, dan lulus di `0x0A`.
+
+### 18.0e Yang terukur tapi sengaja tidak diperbaiki
+
+**Palung celah antar kartu tidak pernah kembali ke warna halaman.** Pada Dracula
+halaman 42,4, palung di celah 20 dp turun ke 22,2 (−20,2); di dark halaman 31,4
+turun ke 14,6 (−16,8). Ambient (`blurRadius` 22 dp) masih −2,7 pada 22 dp dari
+tepi kartu, jadi dua ambient menumpuk di seluruh celah dan saling menambah.
+
+**Tidak diubah, dan alasannya bukan karena tidak qrsa.** Fenomena ini ada di
+ketiga tema dengan bentuk yang sama, termasuk light mode — dan light mode
+adalah mode yang untuknya seluruh sistem ini disetel dan tidak dikeluhkan.
+Menyingkirkan
+ambient berarti memperkecil `blurRadius`, yang melawan seluruh proyek soft-UI
+dan membuat bayangan lebih keras. Itu keputusan struktural, bukan perbaikan
+warna, dan seharusnya diambil karena desires keseluruhan bentuk, bukan karena
+satu scanline. Tercatat di sini supaya tidak hilang, dan supaya tidak ada yang
+menganggapnya sudah diperbaiki.
 
 ### 18.0b Dua bug yang ditemukan sesi ini, keduanya kelas yang sama
 
@@ -1229,11 +1282,13 @@ Bukan bug, tapi mudah disalahpahami:
 ### 18.5 Yang belum diverifikasi di perangkat
 
 - ~~**Scanline kecerahan piksel melintasi tepi kartu.**~~ **Selesai 1 Oktober
-  2026, dan langsung menemukan bug.** Scanline di Xiaomi membuktikan alpha
-  Dracula 1,9× terlalu lemah — kartu memang terbaca rata, bukan persepsi. Detail,
-  angka dan cara memperbaikinya di §18.0c. Yang **masih** belum diambil adalah
-  scanline melintasi tepi **atas** kartu, jadi setengah terang pasangan Dracula
-  belum pernah diukur dan masih pada nilai hasil solusi awal.
+  2026, dan menemukan dua bug.** Scanline di Xiaomi membuktikan alpha
+  Dracula 1,9× terlalu lemah — kartu memang terbaca rata, bukan persepsi — dan
+  lalu hairline ternyata unsur **paling terang** di tepi kartu pada kedua tema
+  gelap, lebih terang dari bounce Dracula: 59,4 lawan 58,4. Detail, angka dan
+  perbaikannya di §18.0c. Yang **masih** terukur tanpa diperbaiki adalah scanline
+  melintasi celah antar kartu, palungnya −20,2 di Dracula dan −16,8 di dark;
+  alasannya ada di §18.0c.
 - **Nilai bertanda negatif di hero card.** Saat screenshot terakhir baterai standby
   0 W, jadi hanya `Standby` yang terlihat. Kodenya mencetak nilai mentah, tapi belum
   pernah dilihat di layar.

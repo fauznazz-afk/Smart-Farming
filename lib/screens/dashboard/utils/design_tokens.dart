@@ -778,25 +778,55 @@ class AppElevation {
   /// On the device it was unmistakable — five green-outlined cards reading as
   /// Material, which is the exact look this migration was for.
   ///
-  /// So the hairline is now a very light neutral, aligned with the light source:
-  /// it reinforces the top-left lip rather than framing the card. It is a
-  /// whisper, not an outline. [accent] is kept in the signature so a call site
-  /// that genuinely needs a themed edge can still ask for one via
-  /// [controlEdge] — but no card does.
+  /// So the hairline is now a neutral, aligned with the light source: it
+  /// reinforces the top-left lip rather than framing the card. [accent] is kept
+  /// in the signature so a call site that genuinely needs a themed edge can
+  /// still ask for one via [controlEdge] — but no card does.
   ///
-  /// **Dracula reuses the dark alpha unchanged, and the measurement says that
-  /// is the right call rather than a shortcut.** At `0x14` the composited
-  /// hairline sits at relative luminance 0.0440 on `#282A36` and 0.0307 on
-  /// `#1A211F`, which is a step of +0.0203 against +0.0166 — 22% stronger in
-  /// absolute terms. So the honest reading is that Dracula's hairline is
-  /// marginally *more* present than the app's, and the direction of that error
-  /// is harmless: it is a lighter page, a more present whisper is consistent
-  /// with it, and for scale the composited `#393B46` lands within about two
-  /// units per channel of Dracula's own chrome step `#343746`. Introducing a
-  /// fourth alpha to move 0.0037 of luminance on a line this design calls a
-  /// whisper would be a constant whose only function is to exist.
+  /// **The dark alphas were cut from `0x14` to `0x0A` on 1 October 2026, because
+  /// the scanline showed this line was the loudest thing on the card edge.**
+  ///
+  /// Measured on the Xiaomi, one card, one build, 8-bit luminance scanline:
+  ///
+  /// | | page | bounce peak | **hairline** | as a fraction of the page |
+  /// |---|---|---|---|---|
+  /// | light `#E1E7E4` | 229.5 | — | 244.5 (+15.0) | **+6.5 %** |
+  /// | dark `#1A211F` | 31.4 | 51.6 (+20.2) | 48.7 (+17.3) | **+55 %** |
+  /// | dracula `#282A36` | 42.4 | 58.4 (+16.0) | 59.4 (+17.0) | **+40 %** |
+  ///
+  /// The previous doc comment here claimed the dark hairline was "a whisper, not
+  /// an outline", and the measurement contradicted it in the one way that
+  /// matters: **on Dracula the hairline was brighter than the bounce.** 59.4
+  /// against 58.4. On both dark pages it was the brightest element within two
+  /// pixels of the card's edge, which means the eye reads a one-pixel outline
+  /// rather than an embossed surface — and a drawn edge is precisely the thing
+  /// this style exists to replace. That is not a subtlety; it is the same defect
+  /// the accent-tinted hairline caused, one step further down the alpha scale,
+  /// and it survived because nobody had ever put a ruler on it.
+  ///
+  /// **Why the same alpha reads so differently per theme.** `0x14` is white at
+  /// 8 % over the page. White has 255 of headroom above every page in the app,
+  /// but a page at 229.5 can only be lifted 25.5 units by going to pure white,
+  /// while a page at 31.4 has 223.6. So one alpha yields +6.5 % on light and
+  /// +55 % on dark. An alpha is not a perceptual quantity; the gap between the
+  /// page and white is, and that gap differs by a factor of nine across the
+  /// three presets. This is the same lesson as the Dracula shadow alphas in
+  /// [AppElevation], arrived at from the other direction: **a constant in the
+  /// token file is a claim about arithmetic, and the three pages do not share
+  /// the arithmetic.**
+  ///
+  /// `0x0A` puts the dark hairline at roughly +8.7 on both dark pages — 28 % and
+  /// 20 % of their page against the bounce's 64 % and 38 %, so the bounce is
+  /// unambiguously the brightest thing on the light edge, which is what a dark
+  /// surface is supposed to look like. Light is left at `0x99` because it is
+  /// already doing that job.
+  ///
+  /// What the line still buys, on every theme, is the measurable edge a
+  /// low-vision user has: the card fill is identical to the page fill, so without
+  /// it the two have 1:1 contrast in fill terms. It is weaker on dark now, and
+  /// the shadow halo is what carries the boundary there.
   static Color hairline({required Color accent, required AppTheme theme}) =>
-      theme.isDark ? const Color(0x14FFFFFF) : const Color(0x99FFFFFF);
+      theme.isDark ? const Color(0x0AFFFFFF) : const Color(0x99FFFFFF);
 
   /// The outline on a control the user can press, where 3:1 is a real
   /// requirement rather than a nicety.

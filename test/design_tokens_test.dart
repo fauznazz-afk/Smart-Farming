@@ -303,6 +303,77 @@ void main() {
       'pressed': (AppElevation.pressed, AppElevation.pressed),
     };
 
+    // Measured on the Xiaomi, one card, one build, 8-bit luminance scanline.
+    //
+    //   |               | page   | bounce | hairline | fraction of page |
+    //   |----------------|--------|--------|----------|------------------|
+    //   | light #E1E7E4 | 229.5  |   --   |  244.5   |  +6.5%           |
+    //   | dark  #1A211F |  31.4  |  51.6  |   48.7   | +55%            |
+    //   | drac  #282A36 |  42.4  |  58.4  |   59.4   | +40%            |
+    //
+    // At the alpha this file used to carry, the hairline was the brightest
+    // element within two pixels of the card edge on both dark pages, and on
+    // Dracula it was brighter than the bounce itself -- 59.4 against 58.4. The
+    // eye reads a one-pixel outline instead of an embossed surface, and a drawn
+    // edge is the one thing this style exists to replace.
+    //
+    // The cause is worth stating because it is not obvious from the token file.
+    // White has 255 of headroom above every page in the app, but a page at 229.5
+    // can only be lifted 25.5 units by going to pure white while a page at 31.4
+    // has 223.6. One alpha therefore spans a factor of nine in perceived weight
+    // across the three presets. An alpha is not a perceptual quantity; the gap
+    // between the page and white is, and the three pages do not share it.
+    group('the hairline must stay below the shadow that defines the edge', () {
+      const accent = Color(0xFF3D4A44);
+
+      for (final theme in [AppTheme.dark, AppTheme.dracula]) {
+        test('$theme: hairline lifts the page less than the bounce does', () {
+          final page = AppSurfaces.page(theme);
+          final shadows = AppElevation.raised(theme);
+          final bounce = shadows
+              .where((s) => !isDarkHalf(s))
+              .map((s) => luminanceStep(page, s))
+              .reduce(math.max);
+          // The hairline is a colour rather than a shadow, so it gets composed
+          // directly. Note this is `computeLuminance` -- linear relative
+          // luminance -- while the numbers in the table above are 8-bit weighted
+          // from the screenshot. The two scales differ by a lot on a near-black
+          // page, which is exactly why the device had to be the arbiter and why
+          // this assertion is stated as an ordering rather than as the 55%
+          // figure.
+          final hairline = AppElevation.hairline(accent: accent, theme: theme);
+          final line = Color.lerp(page, Colors.white, hairline.a)!
+              .computeLuminance() -
+              page.computeLuminance();
+
+          expect(
+            line,
+            lessThan(bounce * 0.6),
+            reason: 'hairline lifts $page by ${line.toStringAsFixed(4)} but '
+                'the bounce only manages ${bounce.toStringAsFixed(4)}. The '
+                'brightest thing on the card edge must be the shadow, not a '
+                'drawn line -- this is the Dracula 59.4-against-58.4 defect.',
+          );
+        });
+      }
+
+      test('light keeps its stronger alpha, because its page has no headroom',
+          () {
+        // The asymmetry is deliberate and the comment above is the reason. Light
+        // can only be lifted 25.5 units by pure white, so it needs a far larger
+        // alpha to reach a visible lip; the dark pages have 223.6 available and
+        // reach the same weight at 0x0A.
+        expect(
+          AppElevation.hairline(accent: accent, theme: AppTheme.light).a,
+          greaterThan(
+            AppElevation.hairline(accent: accent, theme: AppTheme.dark).a * 8,
+          ),
+          reason: 'if the light hairline were cut to match the dark ones it '
+              'would vanish entirely, because it has a ninth of the headroom',
+        );
+      });
+    });
+
     /// **This assertion was wrong, and one device measurement is what proved it.**
     ///
     /// It required every shadow to make the same *composited* step on both dark
