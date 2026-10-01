@@ -46,7 +46,7 @@ Kalau ada yang belum bisa Anda jawab, **Anda belum cukup membaca**.
 | File Dart di `lib/` | 68 |
 | Baris Dart | ~13 200 |
 | File Kotlin | 15 (13 di modul alarm) |
-| File test | 32, melaporkan **452 test** |
+| File test | 32, melaporkan **455 test** |
 | File terbesar | `lib/screens/dashboard_screen.dart` — 1 745 baris |
 
 Lima file yang paling sering jadi sumber bug, karena isinya besar dan dipakai
@@ -464,12 +464,12 @@ angka yang paling tidak boleh hilang. Satu angka per baris.
 Terjadi nyata pada 29 September 2026, dan Mahal karena saya membaca resulting
 layar hitam sebagai "aplikasi hang" lalu dilaporkan sebagai temuan.
 
-Aplikasi EnerGrow lewat layar kunci biometrik saat cold start. Prompt sidik jarinya
+Pada saat itu aplikasi EnerGrow masih lewat layar kunci biometrik saat cold start, jadi prompt sidik jarinya
 bukan window aplikasi: MIUI menampilkannya sebagai **dua `com.miui.securitycenter
 /.FloatingWindow`**. Jendela itu `FLAG_SECURE`, dan selama ada jendela secure di
 layar, `adb shell screencap` mengembalikan **hitam penuh untuk seluruh display** —
 bukan hanya area window-nya. Yang tetap terlihat cuma satu cincin brightness
-180 di y≈2438, yaitu indikator sidik jari, dan itu membuat file PNG-nya kecil
+180 di y≈2438 (saat itu indikator sidik jari), dan itu membuat file PNG-nya kecil
 (31 KB) dan *byte-identical* antar dua screenshot yang diambil 3 detik terpisah.
 
 Tiga kesalahan yang lahir dari sana, semuanya karena mempercayai yang dilihat:
@@ -496,7 +496,7 @@ Kalau ukuran file lompat dari ~31 KB ke ~1,1 MB setelah prompt ditutup, itu
 bukan bug — itu `screencap` yang sebelumnya diblokir. **Ukuran file PNG adalah
 sinyal yang lebih cepat dan lebih jujur daripada menatap gambarnya.**
 
-Konsekuensi praktis: **aplikasi yang butuh biometrik tidak bisa diuji visual
+Konsekuensi praktis: **aplikasi yang memunculkan jendela secure tidak bisa diuji visual
 sambil prompt-nya terbuka.** Selama itu terbuka, satu-satunya yang bisa dibuktikan
 adalah `logcat`, `dumpsys`, dan `pm`.
 

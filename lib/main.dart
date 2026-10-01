@@ -9,7 +9,6 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:local_auth/local_auth.dart';
 
 import 'services/thingsboard_api.dart';
 import 'screens/login_screen.dart';
@@ -114,8 +113,8 @@ SegmentedButtonThemeData _segmentedTheme(Color seed, AppTheme theme) {
 /// The app's buttons, which until now had no theme at all.
 ///
 /// `filledButtonTheme` was simply absent, so every `FilledButton` in the app --
-/// "Sign in", "Unlock with biometrics", "Save settings", "Play camera" -- was a
-/// raw Material `colorScheme.primary` block with a default elevation and the
+/// "Sign in", "Save settings", "Play camera" -- was a raw Material
+/// `colorScheme.primary` block with a default elevation and the
 /// framework's own corner radius. Two things were wrong with that on a device,
 /// and only one of them was cosmetic:
 ///
@@ -464,12 +463,8 @@ class _SplashRouter extends StatefulWidget {
 
 class _SplashRouterState extends State<_SplashRouter> {
   final _api = ThingsBoardApi();
-  final _localAuth = LocalAuthentication();
   bool _checking = true;
   bool _hasToken = false;
-  bool _unlocked = false;
-  bool _authenticating = false;
-  String? _authError;
 
   @override
   void initState() {
@@ -483,48 +478,6 @@ class _SplashRouterState extends State<_SplashRouter> {
     setState(() {
       _hasToken = has;
       _checking = false;
-    });
-    if (has) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _authenticate();
-      });
-    }
-  }
-
-  Future<void> _authenticate() async {
-    if (_authenticating || !_hasToken || _unlocked) return;
-    setState(() {
-      _authenticating = true;
-      _authError = null;
-    });
-    try {
-      final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Authenticate to unlock the EnerGrow session',
-        biometricOnly: true,
-        persistAcrossBackgrounding: true,
-      );
-      if (!mounted) return;
-      setState(() {
-        _unlocked = authenticated;
-        _authError = authenticated
-            ? null
-            : 'Authentication cancelled. Use biometrics to continue.';
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _authError =
-            'Biometrics unavailable. Sign in with your ThingsBoard account.';
-      });
-    } finally {
-      _authenticating = false;
-    }
-  }
-
-  void _usePasswordLogin() {
-    setState(() {
-      _hasToken = false;
-      _authError = null;
     });
   }
 
@@ -549,84 +502,6 @@ class _SplashRouterState extends State<_SplashRouter> {
                 ),
               ),
             ],
-          ),
-        ),
-      );
-    }
-    if (_hasToken && !_unlocked) {
-      // The widget layer's own resolution, for the same reason the nav-bar
-      // builder does it: `Brightness` alone cannot say which dark preset this
-      // is. See `_appThemeOf` in `liquid_glass.dart`.
-      final theme = resolveAppTheme(
-        widget.themeController.option,
-        Theme.of(context).brightness,
-      );
-      final isDark = theme.isDark;
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: AppBackground(
-          theme: theme,
-          child: SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: const BrandLogo(size: 88),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Sesi EnerGrow tersimpan',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Use your fingerprint or face recognition to unlock the app.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: faintColor(isDark),
-                      ),
-                    ),
-                    if (_authError != null) ...[
-                      const SizedBox(height: 14),
-                      Text(
-                        _authError!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: statusBad(isDark)),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: _authenticating ? null : _authenticate,
-                      icon: _authenticating
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.fingerprint),
-                      label: Text(
-                        _authenticating
-                            ? 'Verifying…'
-                            : 'Unlock with biometrics',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _usePasswordLogin,
-                      child: const Text(
-                        'Sign in with your ThingsBoard account',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
         ),
       );

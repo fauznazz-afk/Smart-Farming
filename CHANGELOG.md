@@ -1,5 +1,31 @@
 ## [1.7.1] - 2026-10-01
 
+### Removed
+
+- **The biometric unlock gate.** At cold start, a stored ThingsBoard session was
+  held behind a fingerprint or face prompt. It is gone: `_SplashRouter` now
+  routes straight to the dashboard when a session exists, and straight to
+  `LoginScreen` when it does not. There is no lock screen, no fingerprint
+  button, and no second factor.
+
+  Removed with it: the `local_auth` dependency, the `USE_BIOMETRIC` Android
+  permission, and the `NSFaceIDUsageDescription` key in `ios/Runner/Info.plist`
+  — which shipped a user-facing Face ID string for a feature that no longer
+  existed, and was found only because the removal was audited rather than
+  assumed complete.
+
+  **`MainActivity` is now a plain `FlutterActivity`.** It extended
+  `FlutterFragmentActivity` for exactly one reason: `local_auth` needs a
+  Fragment to host its `BiometricPrompt`. That reason is gone, so the superclass
+  went with it. This is stated explicitly because "why is this not a
+  `FlutterFragmentActivity`?" is the question a future reader will ask, and
+  grepping the repository will now find nothing.
+
+  Note what this gives up: the lock screen was the only thing standing between
+  someone holding an unlocked phone and this app's telemetry. The JWT in
+  `flutter_secure_storage` is unaffected, and so is the rest of the security
+  posture described in `AGENTS.md`, which never depended on the biometric gate.
+
 ### Fixed
 
 - **Dracula's cards read flat, and the derivation that produced them was wrong by
@@ -106,6 +132,14 @@
 
 ### Still unverified
 
+- **The `LoginScreen` route after removing the biometric gate.** The device had
+  a stored session, so the straight-to-dashboard path was confirmed on screen
+  with a genuine cold start — and so was the absence of the prompt, checked
+  against the `FLAG_SECURE` failure mode described in `AGENT_PLAYBOOK.md` §7.10
+  that would otherwise have produced a black screenshot. The no-session branch
+  is a one-line ternary that `flutter analyze` and the suite agree with, but it
+  has not been looked at on a screen. Signing out to see it would have meant
+  ending a real session, so it was left alone.
 - A scanline across a card's **top** edge. The light half of Dracula's pair has
   never been sampled, and that is the one open question the correction raises.
 - No frame-time telemetry has ever been taken.

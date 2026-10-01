@@ -52,7 +52,7 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 
 - Login menggunakan username dan password akun ThingsBoard.
 - JWT dan refresh token disimpan menggunakan secure storage. Ada migrasi token lama dari SharedPreferences.
-- Sesi tersimpan dimuat saat aplikasi dibuka. Jika ada token tersimpan, pengguna dapat membuka sesi dengan biometrik atau memilih login ThingsBoard.
+- Sesi tersimpan dimuat saat aplikasi dibuka. Jika ada token tersimpan, sesi langsung dipakai tanpa langkah unlock tambahan, atau pengguna dapat memilih login ThingsBoard.
 - Request API mencoba memperbarui access token menggunakan refresh token. Jika sesi ditolak, dashboard menghapus sesi dan mengarahkan pengguna ke Login.
 - Logout manual tersedia melalui Settings.
 - Tidak ada Register atau Lupa Password; akun dibuat/dikelola di ThingsBoard.

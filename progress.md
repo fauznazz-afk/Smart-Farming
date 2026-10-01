@@ -293,7 +293,7 @@ Pola yang dipakai konsisten di semua layar: **state container, widgets presentas
 
 ```
 lib/                                    62 file, 11.445 baris
-  main.dart                             entry, theme, biometric gate, routing
+  main.dart                             entry, theme, routing
   models/
     telemetry_model.dart                DeviceTelemetry, TelemetryPoint
     settings_keys.dart                  kontrak SharedPreferences (dibuat sesi ini)
@@ -493,6 +493,12 @@ Semula hanya 4 test. Penambahan test bukan bonus. Beberapa regression di atas
 
 > Baris "Weather (OpenWeatherMap)" di atas adalah catatan historis: integrasi
 > itu dihapus dari aplikasi pada 1.6.0, termasuk izin lokasi dan API key-nya.
+>
+> Baris "Biometric gate" di atas juga catatan historis: gate biometrik dihapus
+> pada 1.7.1. Dependensi `local_auth`, izin `USE_BIOMETRIC`, dan kunci
+> `NSFaceIDUsageDescription` ikut dicabut, dan `MainActivity` kembali menjadi
+> `FlutterActivity` biasa karena `FlutterFragmentActivity` hanya ada untuk
+> `BiometricPrompt`.
 
 ---
 

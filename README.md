@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-452%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-455%20Dart%20%2B%2011%20Kotlin-4CAF50">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
@@ -109,7 +109,6 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 **Lain-lain**
 
 - Login **Customer User** ThingsBoard dengan token yang disimpan di keystore terenkripsi
-- **Biometric gate** (sidik jari / pengenalan wajah) untuk membuka sesi
 - Dua stream CCTV (go2rtc) — greenhouse di Hydroponics dan `?src=cam2` di Fish —
   dengan allowlist host, dan status koneksi yang jujur
   (standby / connecting / live / offline)
@@ -148,7 +147,7 @@ pernah ditulis di luar itu.
 
 ```
 lib/
-├── main.dart                        # Entry point, cek token, biometrik, routing awal
+├── main.dart                        # Entry point, cek token, routing awal
 ├── models/
 │   ├── alarm_record.dart            # AlarmType, AlarmSeverity, AlarmRecord (murni)
 │   └── telemetry_model.dart         # Model parsing response telemetry
@@ -283,7 +282,6 @@ Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
 - [x] Chart Hydroponics (Temperature dua sensor, Humidity, Light, TDS) dan Fish (pH, Temperature, Turbidity)
 - [x] Energy analytics, termasuk proyeksi runtime baterai
 - [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
-- [x] Biometric gate (sidik jari)
 - [x] go2rtc CCTV live, video decode berjalan
 - [x] **Alarm background**: notifikasi muncul saat app tertutup, 450 ms, tanpa duplikat
 - [x] Alarm dijalankan ulang setelah reboot (`BOOT_COMPLETED`)

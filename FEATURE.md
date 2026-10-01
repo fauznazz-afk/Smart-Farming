@@ -21,7 +21,7 @@ AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
 **Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**452 lulus** di 32 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
+**455 lulus** di 32 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
 Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
 kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
 yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
@@ -100,7 +100,6 @@ aturan yang lahir dari riwayat itu ada di §18.6.
 | JWT + refresh token di secure storage | ✅ | `flutter_secure_storage`, key `tb_token` / `tb_refresh_token` |
 | Migrasi token lama dari SharedPreferences, lalu dihapus | ✅ | `loadSavedToken()` |
 | Sesi dimuat saat aplikasi dibuka | ✅ | `main.dart` → `_SplashRouterState._checkToken` |
-| Login biometrik ke sesi tersimpan | ✅ | `local_auth`, splash screen |
 | Refresh access token otomatis saat 401 | ✅ | `_getWithTokenRefresh` |
 | Deteksi token kedaluwarsa | ✅ | **reaktif terhadap 401 saja** — tidak ada decode JWT, tidak ada cek `exp` |
 | Logout manual dengan dialog konfirmasi | ✅ | Settings → Account |
@@ -529,7 +528,7 @@ dan kalender.
 | `AlarmDebugReceiver` | **debug saja** | `true`, **dan menolak** kecuali app debuggable |
 | `MainActivity` | main | `true`, `launchMode="singleTop"` |
 
-Permissions: `INTERNET` · `USE_BIOMETRIC` · `POST_NOTIFICATIONS` · `VIBRATE` ·
+Permissions: `INTERNET` · `POST_NOTIFICATIONS` · `VIBRATE` ·
 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` · `RECEIVE_BOOT_COMPLETED` ·
 `ACCESS_FINE_LOCATION` · `ACCESS_COARSE_LOCATION`.
 
@@ -903,7 +902,7 @@ satu sisi tidak bisa diam-diam hilang dari sisi lain.
 | `fl_chart` | chart telemetry + bar chart laporan |
 | `webview_flutter` | CCTV |
 | ~~`geolocator`~~ | **⛔ dihapus** bersama integrasi OpenWeatherMap; `ACCESS_FINE_LOCATION` dan `ACCESS_COARSE_LOCATION` juga dicabut dari manifest |
-| `local_auth` | login biometrik |
+| ~~`local_auth`~~ | **Dihapus 1.7.1** - gate biometrik dihapus, dan `NSFaceIDUsageDescription` ikut dicabut |
 | `package_info_plus` | versi aplikasi di About |
 | `flutter_secure_storage` | JWT ThingsBoard + URL CCTV |
 | `flutter_local_notifications` | channel notifikasi alarm |
@@ -917,7 +916,7 @@ satu sisi tidak bisa diam-diam hilang dari sisi lain.
 ### Startup
 
 `runApp` → `AlarmNotificationService.initialize()` (request permission) →
-`sync()` (push rules + token) → `SplashRouter` → cek token tersimpan → biometric
+`sync()` (push rules + token) → `SplashRouter` → cek token tersimpan → sesi dipakai langsung
 atau Login → `DashboardScreen.initState` → muat preferensi → set
 foreground(true) → alarm sync → fetch pertama.
 
@@ -934,7 +933,7 @@ foreground(true) → alarm sync → fetch pertama.
 | `share_plus` | ✅ | ekspor CSV energy report |
 | `package_info_plus` | ✅ | versi di About, **tidak pernah hardcode** |
 | `flutter_secure_storage` | ✅ | token ThingsBoard + URL CCTV |
-| `local_auth` | ✅ | login biometrik |
+| ~~`local_auth`~~ | **Dihapus** | tidak ada lagi; tidak ada permission biometrik di manifest Android maupun iOS |
 | ~~`geolocator`~~ | **⛔** | tidak ada lagi; tidak ada permission lokasi di manifest |
 | `webview_flutter` | ✅ | CCTV |
 
@@ -1438,7 +1437,7 @@ saling cocok, dan itu belum ada.
 
 ```bash
 flutter analyze                                 # harus: No issues found!
-flutter test                                    # 452 test, jalankan PER-FILE (OOM)
+flutter test                                    # 455 test, jalankan PER-FILE (OOM)
 cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 ```
 
