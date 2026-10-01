@@ -1038,6 +1038,62 @@ diverifikasi di perangkat ada di §18.5.
    `AGENTS.md` sudah merekam yang pertama (`dashboard_screen._history`). Keduanya
    bermula dari laporan, bukan dari pengukuran.
 
+### 18.0c Scanline kartu di perangkat, dan alpha Dracula yang salah 1,9×
+
+`FEATURE.md` §18.5 sudah meminta scanline kecerahan piksel melintasi tepi kartu
+sejak file ini ada. **Permintaan itu akhirnya dijalankan**, dan yang ia temukan
+adalah derivasi yang terlihat rapi di `design_tokens.dart` salah.
+
+Pengukuran di Xiaomi, **build yang sama, kartu yang sama, tepi kanan**, luminansi
+8-bit:
+
+| | halaman | contact | ΔL terukur | sebagai pecahan halaman |
+|---|---|---|---|---|
+| dark `#1A211F` | 31,4 | 15,5 | **15,9** | 51 % |
+| dracula `#282A36` (lama) | 42,4 | 34,2 | **8,2** | 19 % |
+
+Dracula hanya menghasilkan **52 %** penurunan yang dihasilkan tema dark, pada
+saat `design_tokens_test.dart` **lulus** dengan langkah terkomposisi yang saling
+cocok dalam 0,0007.
+
+**Penyebabnya bukan salah hitung, salah definisi.** Alpha Dracula diselesaikan
+supaya *langkah luminansi terkomposisi* di kedua halaman sama persis. Itu
+benar tentang `Color.lerp` dan tidak mengatakan apa pun soal apa yang sampai ke
+layar: mask blur memakan porsi berbeda dari tiap halaman — 28 % di halaman dark,
+38 % di Dracula — sehingga blur yang sama memberi ΔL berbeda. Test itu
+mengunci sebuah hubungan aritmetika, dan hubungan aritmetika tidak bisa melihat
+blur.
+
+**Koreksinya dua titik data terukur, bukan sebuah solusi.** Hubungan antara
+alpha dan ΔL *terukur* adalah **cembung** — blur memakan sebagian besar puncak
+bayangan lemah dan hampir tidak menyentuh yang kuat — sehingga kenaikan alpha
+sepasang dari basis lemah membeli ΔL jauh lebih banyak:
+
+| alpha contact | ΔL terukur |
+|---|---|
+| `0x50` | 8,2 |
+| `0x8C` | **20,0** ← dikirim |
+| `0x98` | 21,3 |
+
+Skala seragam 1,9× dari `0x50` mendarat di `0x98` dan terbaca **lebih berat**
+daripada tema dark. `0x8C` adalah titik_between yang diinterpolasi. Nilai 20,0
+itu **47 %** dari halaman Dracula, terhadap 15,9 yang **51 %** dari halamannya
+sendiri — jadi ini dekat, dan lebih pelan sedikit, yang memang dikehendaki.
+
+**Separuh terang sengaja tidak disentuh.** Yang dipindahkan hanya setiap alpha
+`0x??000000`; setiap `0x??FFFFFF` masih nilai hasil solusi awal. Setengah gelap
+adalah yang terukur dan yang gagal — bayangan lemah di halaman lebih terang
+itulah yang membuat kartu rata — jadi hanya itu yang ada buktinya untuk
+dipindahkan. Menaikkan setengah terang dengan faktor yang dipinjam dari separuh
+lain akan mengulangi persis kesalahan yang dicatat di sini.
+
+Konsekuensi yang terlihat: hubungan terang-gelap **terbalik**. Di tema dark
+separuh terang yang menentukan edge, rasionya 3,80; di Dracula half gelap
+sekarang yang bekerja, dan pasangannya 2,41. Guard rasio di `design_tokens_test`
+turun dari toleransi 10 % ke 40 %, dan itu kehilangan presisi yang disengaja,
+dengan alasannya dicatat di test itu sendiri. Scanline melintasi tepi **atas**
+kartu belum diambil, jadi pertanyaannya masih terbuka.
+
 ### 18.0b Dua bug yang ditemukan sesi ini, keduanya kelas yang sama
 
 **`AppTile` di bawah WCAG AA, dan test yang mengukurnya salah mengecualikannya.**
@@ -1172,6 +1228,12 @@ Bukan bug, tapi mudah disalahpahami:
 
 ### 18.5 Yang belum diverifikasi di perangkat
 
+- ~~**Scanline kecerahan piksel melintasi tepi kartu.**~~ **Selesai 1 Oktober
+  2026, dan langsung menemukan bug.** Scanline di Xiaomi membuktikan alpha
+  Dracula 1,9× terlalu lemah — kartu memang terbaca rata, bukan persepsi. Detail,
+  angka dan cara memperbaikinya di §18.0c. Yang **masih** belum diambil adalah
+  scanline melintasi tepi **atas** kartu, jadi setengah terang pasangan Dracula
+  belum pernah diukur dan masih pada nilai hasil solusi awal.
 - **Nilai bertanda negatif di hero card.** Saat screenshot terakhir baterai standby
   0 W, jadi hanya `Standby` yang terlihat. Kodenya mencetak nilai mentah, tapi belum
   pernah dilihat di layar.

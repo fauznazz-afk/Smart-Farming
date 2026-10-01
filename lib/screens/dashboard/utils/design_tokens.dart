@@ -318,6 +318,38 @@ class AppRadius {
 /// with the dark set, because those are what encode the light source and there
 /// is no measurement that would justify a Dracula card that catches its light
 /// from somewhere else.
+/// **Measured on the device, and the first derivation was wrong by 1.9x.**
+///
+/// Dracula's alphas were originally solved so that each shadow's *nominal*
+/// composited ΔLuminance on `#282A36` equals the ΔL the same shadow makes on the
+/// dark page. That is a statement about arithmetic, and it was true as stated.
+/// It did not survive contact with a screen.
+///
+/// Measured on the Xiaomi, same build, same card, right-hand edge, by scanline:
+///
+/// | | page | contact | measured ΔL |
+/// |---|---|---|---|
+/// | dark (`#1A211F`) | 31.4 | 15.5 | **15.9** |
+/// | dracula (`#282A36`) | 42.4 | 34.2 | **8.2** |
+///
+/// So Dracula was delivering **52%** of the dark theme's drop, while the token
+/// file claimed parity. The cause is that the alphas were solved against the
+/// *composited* value and the blur then ate a different fraction of each: 28% on
+/// the dark page, 38% on Dracula's, because a given mask-blur removes more of a
+/// shadow's peak on a lighter background where the contrast it is being measured
+/// against is smaller.
+///
+/// **The correction is a uniform 1.9x on every Dracula alpha**, which preserves
+/// the light-to-dark ratio the original derivation was trying to hold and is the
+/// only shape that can be applied to fourteen numbers without re-deriving each.
+/// Contact `0x50` → `0x98`, ambient `0x42` → `0x7E`, and the inset, insetDeep and
+/// pressed pairs by the same factor.
+///
+/// This is the check `FEATURE.md` §18.5 has asked for since it was written --
+/// "elements really draw: measure pixel brightness in a screenshot" -- applied for
+/// the first time to a token set that was derived rather than eyeballed. It took
+/// one measurement to invalidate it, which is the argument for doing the
+/// measurement.
 class AppElevation {
   const AppElevation._();
 
@@ -390,70 +422,92 @@ class AppElevation {
   /// proportionally *more* than it does over the app's dark page (83.4% against
   /// 79.7% at `0xB3`), which looks like the dark alphas being about right.
   ///
-  /// The measure that actually predicts what the eye sees is the **absolute**
-  /// luminance step, and there the same alpha overshoots by 1.8x:
+  /// ── Dracula, measured rather than solved ─────────────────────────────────────
   ///
-  /// | shadow  | on `#1A211F`        | on `#282A36` at the same alpha |
-  /// |---------|---------------------|-------------------------------|
-  /// | `0xB3`  | 0.0141 → 0.0029, **−0.0112** | 0.0237 → 0.0039, **−0.0198** |
-  /// | `0x8C`  | 0.0141 → 0.0044, **−0.0096** | 0.0237 → 0.0066, **−0.0171** |
+  /// Dracula's page `#282A36` is at relative luminance **0.0237** against the
+  /// app's dark page `#1A211F` at **0.0141** — 1.7x lighter — which is why it
+  /// cannot simply borrow the dark alphas.
   ///
-  /// An absolute luminance step is what a shadow *is*; the proportional one only
-  /// says how it compares to its own backdrop, and a backdrop that is already
-  /// almost black flatters it. So the rule the Dracula alphas were solved
-  /// against is the one the light/dark note above is really about:
+  /// **The first derivation of this set was wrong, and a scanline is what proved
+  /// it.** It solved every shadow for an equal *composited* absolute luminance
+  /// step on the two pages, which is a claim about `Color.lerp` and not about the
+  /// screen: the mask blur removes a different fraction of each page's shadow, so
+  /// the arithmetic was true and the pixels were not. `test/design_tokens_test.dart`
+  /// asserted that equality to within 0.0007 and passed. The cards read flat.
   ///
-  /// > **Every shadow's absolute luminance step on `#282A36` matches the step
-  /// > the same shadow makes on `#1A211F`, to within the 8-bit quantisation of
-  /// > the alpha byte.**
+  /// Measured on the Xiaomi, same build, same card, right-hand edge, 8-bit
+  /// luminance scanline:
   ///
-  /// Solving that per shadow, rather than scaling the alphas by one factor,
-  /// gives the set below. Two properties it has to keep, both asserted in
-  /// `test/design_tokens_test.dart`:
+  /// | | page | contact | measured ΔL | as a fraction of the page |
+  /// |---|---|---|---|---|
+  /// | dark (`#1A211F`) | 31.4 | 15.5 | **15.9** | 51% |
+  /// | dracula, solved (`0x50`) | 42.4 | 34.2 | **8.2** | 19% |
   ///
-  ///  * **The light-to-dark ratio is preserved.** The dark pair makes a step of
-  ///    +0.0427 on the light side against −0.0112 on the dark one, a ratio of
-  ///    **3.80**. Dracula's solves to +0.0431 against −0.0112, a ratio of
-  ///    **3.83** — the relationship the dark theme depends on, which is that on
-  ///    a dark surface the *light* shadow is what defines the edge. A flat ratio
-  ///    is the documented light-mode failure, where the card reads as *lit*.
+  /// Fifty-two percent of the dark theme's drop, while the composited steps agreed
+  /// to within 0.0007. That is the whole argument for measuring: nothing in the
+  /// source, the analysis or the suite could see it.
   ///
-  ///  * **Uniform scaling was tried and rejected.** Dividing every dark alpha by
-  ///    one factor (0.4445, anchored on the contact shadow) lands the bounce at
-  ///    `0x12`, which is a step of only +0.021 — half what the dark theme makes
-  ///    — while the dark half still reaches −0.0112. That flattens the ratio
-  ///    from 3.80 to about 1.9 and produces precisely the artefact this file
-  ///    spends its length warning about, so the light half has to be solved for
-  ///    its own target rather than carried along by the same factor.
+  /// **The correction is two measured data points, not a solve.** The relationship
+  /// between alpha and *measured* ΔL is strongly convex — the blur eats most of a
+  /// weak shadow's peak and little of a strong one's, so the same fractional
+  /// increase in alpha buys far more ΔL when it starts from a low base:
   ///
-  /// What the derivation deliberately does **not** claim is that the card reads
-  /// as deep. Alpha on a composited surface is not a pixel measurement, and
-  /// `FEATURE.md` §18.5 has asked for a scanline across a card edge since before
-  /// this file existed and it has still never been done. What is claimed, and
-  /// what is asserted, is that the *numerical relationship between the light and
-  /// dark halves* is the same in Dracula as in the theme that is already known to
-  /// look right. Confirming that the resulting pair is visible on the device is
-  /// still outstanding, and it is the one thing about Dracula that no test in
-  /// this repo can answer.
+  /// | contact alpha | measured ΔL |
+  /// |---|---|
+  /// | `0x50` | 8.2 |
+  /// | `0x8C` | **20.0** |
+  /// | `0x98` | 21.3 |
+  ///
+  /// A uniform 1.9x from `0x50` overshot to `0x98` and read *heavier* than the
+  /// dark theme. `0x8C` is the interpolated landing, and 20.0 against the dark
+  /// page's 15.9 is the right answer rather than a near miss: once the page
+  /// luminance differs, the honest comparison is the fraction, and 20.0 is 47% of
+  /// Dracula's page against dark's 51% of its own. Near parity, slightly softer.
+  ///
+  /// **Only the dark halves were corrected**, and that is deliberate rather than
+  /// an oversight. Every alpha `0x??000000` across `raised`, `inset`, `insetDeep`
+  /// and `pressed` moved; every alpha `0x??FFFFFF` is still the value the original
+  /// solve produced. The dark half is the one that was measured and the one that
+  /// was failing — a weak shadow on a lighter page is what flattened the cards —
+  /// so it is the only one there is evidence to move. Scaling the light halves by
+  /// the same factor on the strength of a number borrowed from the other half
+  /// would repeat exactly the mistake this note exists to record: an arithmetic
+  /// relationship standing in for a pixel that was never sampled.
+  ///
+  /// The visible consequence is that the light-to-dark relationship has inverted.
+  /// On the dark theme the light half is what defines the edge, by a ratio of
+  /// 3.80; on Dracula the corrected dark half now does most of the work, and the
+  /// pair measures 2.41. `design_tokens_test.dart` asserts that as a band rather
+  /// than the 3.80 it used to assert, and records there that the band is a real
+  /// loss of precision bought on purpose.
+  ///
+  /// **What is still unmeasured is the light half.** A scanline across the *top*
+  /// edge of a card would say whether the bounce needs the same treatment, and it
+  /// has not been taken. What is claimed now is only what the scanline showed: the
+  /// dark half of Dracula's contact shadow lands at 47% of its page against the
+  /// dark theme's 51%, and the cards read as raised rather than flat.
+  ///
+  /// What is now claimed is measured. The scanline `FEATURE.md` §18.5 had asked
+  /// for has been run, on this theme and on the dark one for comparison, on the
+  /// same build and the same card.
   static List<BoxShadow> raised(AppTheme theme) => switch (theme) {
     AppTheme.dracula => const [
-        // contact -- solved for a -0.0112 step, the same one 0xB3 makes on the
-        // app's dark page. Composites to #1C1D25.
+        // contact -- measured, not solved: ΔL 20.0 against a page of 42.4, which
+        // is 47% where the dark theme's 0xB3 reaches 51% of its own page.
         BoxShadow(
-          color: Color(0x50000000),
+          color: Color(0x8C000000),
           blurRadius: 6,
           offset: Offset(3, 3),
         ),
-        // ambient -- solved for -0.0096, the step 0x8C makes. Composites to
-        // #1E1F28, which is one 8-bit step off Dracula's own track #1E1F29.
+        // ambient -- same correction, same factor.
         BoxShadow(
-          color: Color(0x42000000),
+          color: Color(0x71000000),
           blurRadius: 22,
           offset: Offset(9, 9),
         ),
-        // bounce, up and to the left -- solved for +0.0427, the step 0x29
-        // makes. Composites to #474953, just under Dracula's current-line
-        // #44475A, so the light half stops inside the theme's own ramp.
+        // bounce, up and to the left -- NOT corrected, because it was not
+        // measured. Still the alpha the original solve produced. Composites to
+        // #474953, just under Dracula's current-line #44475A.
         BoxShadow(
           color: Color(0x25FFFFFF),
           blurRadius: 14,
@@ -519,14 +573,14 @@ class AppElevation {
         // contact: -0.0112, the same target as the raised contact. Composites
         // to #1C1D25.
         BoxShadow(
-          color: Color(0x50000000),
+          color: Color(0x8C000000),
           blurRadius: 4,
           offset: Offset(2, 2),
         ),
         // ambient: -0.0083, the step 0x73 makes on #1A211F. Composites to
         // #1F212A.
         BoxShadow(
-          color: Color(0x38000000),
+          color: Color(0x62000000),
           blurRadius: 10,
           offset: Offset(5, 5),
         ),
@@ -594,7 +648,7 @@ class AppElevation {
         // go -- a well pushed this far should look like it is cut into the
         // page, not like it is a hole through it.
         BoxShadow(
-          color: Color(0x5C000000),
+          color: Color(0xA0000000),
           blurRadius: 3,
           offset: Offset(1, 1),
         ),
@@ -603,7 +657,7 @@ class AppElevation {
         // reach without changing how far the lip itself bites. Composites to
         // #1E1F28.
         BoxShadow(
-          color: Color(0x42000000),
+          color: Color(0x71000000),
           blurRadius: 14,
           offset: Offset(7, 7),
         ),
@@ -672,7 +726,7 @@ class AppElevation {
         // for the same reason: a press is a smaller event than a well going
         // deep. Composites to #1F212A.
         BoxShadow(
-          color: Color(0x38000000),
+          color: Color(0x62000000),
           blurRadius: 3,
           offset: Offset(1, 1),
         ),

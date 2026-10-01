@@ -128,8 +128,36 @@ of the bar when the finger pushes it in. There is a test for exactly that.
 `flutter analyze` and pass every test, and still be invisible on the device. The
 check is a scanline of pixel brightness across a card edge, and the numbers to
 compare are the card fill against the page and against the shadow's darkest
-point. `FEATURE.md` §18.5 has asked for this since it was written and it had
-never been done.
+point.
+
+**That scanline was finally taken on 1 October 2026, and it invalidated a
+derivation.** Dracula's shadow alphas had been solved so that each shadow's
+*composited* luminance step on `#282A36` equalled the step it makes on the dark
+page, and `design_tokens_test.dart` asserted that equality to within 0.0007 and
+passed. A scanline of the same card on the same build measured ΔL **8.2 against
+the dark theme's 15.9** — 52% of it, with the suite green.
+
+The reason is not a typo. It is that the mask blur removes a different fraction
+of each page's shadow, so the same blur and the same alpha land on different
+visible steps. **An arithmetic relationship and a pixel are different claims,
+and only one of them is the thing the user sees.** This is the third time in
+this repo that a guard encoding an arithmetic relationship has been the thing
+that was wrong — after the stale surface list in `color_helpers_test.dart` and
+after `_history` being reported dead.
+
+Two things follow, and both are in the code:
+
+- **The relation between alpha and *measured* ΔL is convex.** The blur eats most
+  of a weak shadow's peak and little of a strong one's, so a uniform factor
+  overshoots badly. Correcting a 1.9× shortfall by scaling alphas 1.9× overshot
+  to 2.6×. It was fixed by interpolation between two measured points.
+- **Correct only the half you measured.** Dracula's dark halves moved and its
+  light halves did not, because only the dark half had been sampled. Scaling both
+  by a number borrowed from one of them is the mistake the patch exists to
+  correct, and doing it would have looked tidier.
+
+`FEATURE.md` §18.5 has been updated: the top-edge scanline is the one open
+question this leaves.
 
 ### Soft-UI surfaces, and why they are opaque
 

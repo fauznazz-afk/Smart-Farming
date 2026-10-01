@@ -1,3 +1,73 @@
+## [1.7.1] - 2026-10-01
+
+### Fixed
+
+- **Dracula's cards read flat, and the derivation that produced them was wrong by
+  1.9x.** This is the one item of 1.7.0 that had never been seen on a device,
+  and it turns out the reason it had not been seen was that it would not have
+  survived looking at.
+
+  The alphas were solved so that every shadow's *composited* absolute luminance
+  step on `#282A36` equalled the step the same shadow makes on the dark page.
+  That is a claim about `Color.lerp`, and `test/design_tokens_test.dart`
+  asserted it to within 0.0007 and passed. It says nothing about what reaches
+  the screen, because the mask blur removes a different fraction of each page's
+  shadow.
+
+  Measured on the Xiaomi, same build, same card, right-hand edge, 8-bit
+  luminance scanline:
+
+  | | page | contact | measured ΔL | as a fraction of the page |
+  |---|---|---|---|---|
+  | dark `#1A211F` | 31.4 | 15.5 | **15.9** | 51% |
+  | dracula, as shipped in 1.7.0 | 42.4 | 34.2 | **8.2** | 19% |
+
+  Dracula was delivering 52% of the dark theme's drop. Fifty-two percent, with
+  every test green.
+
+  **The correction is two measured data points, not a new solve.** The relation
+  between alpha and measured ΔL is convex — the blur eats most of a weak
+  shadow's peak and little of a strong one's — so the same fractional alpha
+  increase buys far more ΔL when it starts from a low base:
+
+  | contact alpha | measured ΔL |
+  |---|---|
+  | `0x50` | 8.2 |
+  | `0x8C` | **20.0** ← shipped |
+  | `0x98` | 21.3 |
+
+  A uniform 1.9x overshot to `0x98` and read heavier than the dark theme. `0x8C`
+  lands at 47% of Dracula's page against dark's 51% of its own — near parity,
+  slightly softer, which is the intent.
+
+- **Only the dark halves moved.** Every `0x??000000` across `raised`, `inset`,
+  `insetDeep` and `pressed` was corrected by the measured factor; every
+  `0x??FFFFFF` is still the value the original solve produced. The dark half is
+  the one that was measured and the one that was failing, so it is the only one
+  there is evidence to move. Scaling the light halves by a number borrowed from
+  the other half would repeat the exact mistake this release corrects.
+
+  The visible consequence is that Dracula's light-to-dark relationship has
+  **inverted**: on the dark theme the light half defines the edge, at a ratio of
+  3.80; on Dracula the corrected dark half now does most of the work, and the
+  pair measures 2.41. The ratio guard in `design_tokens_test.dart` moves from a
+  10% band to a 40% band, which is a real loss of precision bought on purpose
+  and recorded as such in the test.
+
+### Changed
+
+- `FEATURE.md` §18.5 has asked for a pixel-brightness scanline across a card
+  edge since before the file existed. It has now been run, and it is the reason
+  this patch exists. What it also did was invalidate the arithmetic guard in
+  `design_tokens_test.dart` that had been standing in for it — which is the
+  argument for doing the measurement.
+
+### Still unverified
+
+- A scanline across a card's **top** edge. The light half of Dracula's pair has
+  never been sampled, and that is the one open question the correction raises.
+- No frame-time telemetry has ever been taken.
+
 ## [1.7.0] - 2026-10-01
 
 ### Fixed
