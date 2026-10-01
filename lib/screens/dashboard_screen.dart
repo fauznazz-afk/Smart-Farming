@@ -1105,8 +1105,25 @@ Future<void> _refreshCurrentPage() async {
       _notifyCharts();
     }
     await _releaseHistoryRequest(prefix, historyFlight);
-    if (_historyPendingRefresh.remove(prefix) &&
+
+    // **The page check comes first, and that order was the bug.**
+    //
+    // `_historyPendingRefresh` is registered when a request is asked for while one
+    // is already in flight, which is what a second date tap does. It means "when
+    // this request lands, go again for the current selection".
+    //
+    // `remove` was evaluated first, so the flag was cleared unconditionally. A
+    // prefix registered as pending while the user was on page A, who then swipes
+    // to page B before the in-flight request returns, had its pending-refresh
+    // request discarded -- the chart for A silently kept the old date range, and
+    // nothing would re-fetch it until the user touched the date again.
+    //
+    // Leaving the flag set instead is correct in that case: when the user comes
+    // back to A, the next request for A consumes it. That is the whole point of a
+    // pending flag.
+    if (_historyPendingRefresh.contains(prefix) &&
         _prefixForPage(_selectedIndex) == prefix) {
+      _historyPendingRefresh.remove(prefix);
       unawaited(_fetchHistoryFor(prefix));
     }
   }

@@ -8,7 +8,7 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-507%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-511%20Dart%20%2B%2011%20Kotlin-4CAF50">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**

@@ -441,11 +441,39 @@ class ThingsBoardApi {
     if (mergedValues.isEmpty) return;
     try {
       final preferences = await SharedPreferences.getInstance();
+      // **Merged with what is already cached, and this was not doing that.**
+      //
+      // Two callers write here with different reach. The dashboard's poll has all
+      // four devices every tick. The WebSocket service passes only the devices it
+      // has actually seen on the socket -- which, for a BMS that reports first and
+      // quietly, is often one device for a long while.
+      //
+      // Replacing the cache meant a single socket frame from one device overwrote
+      // the four-device snapshot the poll had just written, so `cached_telemetry`
+      // lost `voltage_ac`, `ph`, `turbidity_ntu` and the rest. If the network then
+      // dropped, `_applyOfflineFallback` -> `splitCachedTelemetry` produced empty
+      // maps for every device the socket had not heard from, and those pages came
+      // up blank until a successful poll healed them.
+      //
+      // The trade is that a key removed server-side lingers in the cache until a
+      // poll that no longer reports it overwrites the whole set... which it never
+      // does, since the poll writes everything it saw. So the trade is real but
+      // small: a stale key can outlive its device in the offline cache. Losing a
+      // device outright, on every single socket frame, is a much worse failure and
+      // is the one that was happening.
+      final previous = _readCachedValues(preferences);
+      // The snapshot being written wins per key; the cache only supplies keys it
+      // has and this call does not. **The direction matters and the test for it
+      // caught this being written backwards first:** `mergedValues.addAll(previous)`
+      // let a stale reading in the cache overwrite a live one from the socket,
+      // which is the same class of bug as the overwrite this whole change exists
+      // to fix, just slower.
+      final union = <String, double>{...previous, ...mergedValues};
       await preferences.setString(
         'cached_telemetry',
         jsonEncode(
           DeviceTelemetry(
-            latestValues: mergedValues,
+            latestValues: union,
             lastUpdate: latest,
           ).toJson(),
         ),
@@ -456,6 +484,29 @@ class ThingsBoardApi {
       );
     } catch (_) {
       // Best-effort: a failed cache must never fail a successful fetch.
+    }
+  }
+
+  /// The values already in the offline cache, or empty if there are none.
+  ///
+  /// Best-effort in the same way the write is: a cache that cannot be read is a
+  /// cache that will be replaced wholesale, which is the old behaviour and is not
+  /// a failure worth propagating into a successful fetch.
+  Map<String, double> _readCachedValues(SharedPreferences preferences) {
+    try {
+      final raw = preferences.getString('cached_telemetry');
+      if (raw == null) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      final values = decoded['latestValues'];
+      if (values is! Map) return {};
+      return {
+        for (final entry in values.entries)
+          if (entry.value is num)
+            entry.key.toString(): (entry.value as num).toDouble(),
+        };
+    } catch (_) {
+      return {};
     }
   }
 
