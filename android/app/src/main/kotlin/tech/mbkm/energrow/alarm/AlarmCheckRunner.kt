@@ -92,8 +92,15 @@ class AlarmCheckRunner(context: Context) {
             return finish("no credentials stored")
         }
 
-        val readings = readDevices(config, token, deadline)
-            ?: return endSession("session ended; background check disabled")
+        // `readDevices` calls `endSession` itself before returning null, so the
+        // bare `return` here is deliberate: the caller must not finish a second
+        // time. It used to call `endSession` again with a vaguer message, which
+        // meant the truthful "refresh token rejected" line was recorded and then
+        // immediately overwritten by whatever this check went on to conclude --
+        // including "ok, no alarms", on the very tick where the server had just
+        // refused the session. A check that reports success because its session
+        // died is indistinguishable from a check that is not running.
+        val readings = readDevices(config, token, deadline) ?: return
         if (readings.isEmpty()) {
             // No device produced data. That is a network or credential problem,
             // not stale telemetry, and reporting it as stale would turn an outage
@@ -173,48 +180,120 @@ class AlarmCheckRunner(context: Context) {
             Log.w(TAG, "out of time before the token refresh; retrying next tick")
             return first.readings
         }
-        val refreshed = refreshToken(config, deadline) ?: return first.readings
-        Log.i(TAG, "refreshed the access token and retrying ${unauthorized.size} device(s)")
-        val client = ThingsBoardClient(config.baseUrl, refreshed.accessToken)
-        AlarmTokenStore.put(
-            context,
-            refreshed.accessToken,
-            refreshed.refreshToken ?: AlarmTokenStore.refreshToken(context),
-        )
-        val readings = first.readings.toMutableMap()
-        for (deviceConfig in config.devices) {
-            if (deviceConfig.device !in unauthorized) continue
-            if (System.currentTimeMillis() >= deadline) {
-                Log.w(TAG, "out of time before retrying every device; deferring to next tick")
-                break
+        // Three outcomes, not two, and the distinction is the whole point of this
+        // return type.
+        //
+        // `Renewed` and `Unavailable` both mean "no session decision", so they
+        // carry on with the readings already in hand and the next tick retries.
+        // `Rejected` means the server ended the session, and that is not something
+        // to carry on from: nothing here should keep polling with a token the user
+        // expects to be gone.
+        //
+        // This used to be a nullable `TokenRefresh`, which collapsed `Rejected`
+        // into `Unavailable` and made the caller's `?: return endSession(...)`
+        // unreachable -- every path in this function returned a non-null map. The
+        // result was that `endSession` ran from inside the refresh and then the
+        // caller ran to the end and finished a second time, overwriting the
+        // session-ended outcome with the verdict of a check that had no session.
+        when (val outcome = refreshToken(config, deadline)) {
+            RefreshOutcome.Rejected -> {
+                endSession("refresh token rejected; background check disabled")
+                return null
             }
-            try {
-                readings[deviceConfig.device] = client.fetch(deviceConfig.device, deviceConfig)
-            } catch (error: Exception) {
-                Log.w(
+
+            // "Could not ask" is not "told no". Both of these mean the next tick
+            // tries again, and neither is a reason to discard readings that were
+            // fetched successfully before the 401.
+            RefreshOutcome.Unavailable,
+            RefreshOutcome.Failed,
+            -> return first.readings
+
+            is RefreshOutcome.Renewed -> {
+                Log.i(
                     TAG,
-                    "could not read ${deviceConfig.device.wireName} after refresh: ${error.message}",
+                    "refreshed the access token and retrying ${unauthorized.size} device(s)",
                 )
+                AlarmTokenStore.put(
+                    context,
+                    outcome.token,
+                    outcome.refreshToken ?: AlarmTokenStore.refreshToken(context),
+                )
+                val client = ThingsBoardClient(config.baseUrl, outcome.token)
+                val readings = first.readings.toMutableMap()
+                for (deviceConfig in config.devices) {
+                    if (deviceConfig.device !in unauthorized) continue
+                    if (System.currentTimeMillis() >= deadline) {
+                        Log.w(
+                            TAG,
+                            "out of time before retrying every device; deferring to next tick",
+                        )
+                        break
+                    }
+                    try {
+                        readings[deviceConfig.device] =
+                            client.fetch(deviceConfig.device, deviceConfig)
+                    } catch (error: Exception) {
+                        Log.w(
+                            TAG,
+                            "could not read ${deviceConfig.device.wireName} after refresh: ${error.message}",
+                        )
+                    }
+                }
+                return readings
             }
         }
-        return readings
     }
 
-    /** Refreshes the access token, or returns null when it could not be renewed. */
-    private fun refreshToken(config: AlarmConfig, deadline: Long): TokenRefresh? {
+    /**
+     * What trying to renew the access token actually produced.
+     *
+     * [Unavailable] and [Rejected] were one `null` before, and the two need
+     * opposite handling: one means "nothing to decide, carry on with what we
+     * have and let the next tick try again", the other means "the session is
+     * over" and is a decision the check must not paper over.
+     */
+    private sealed interface RefreshOutcome {
+        /** A new access token. */
+        data class Renewed(val token: String, val refreshToken: String?) : RefreshOutcome
+
+        /** No refresh token is stored, so renewal is impossible right now. */
+        data object Unavailable : RefreshOutcome
+
+        /** The server refused the refresh token, so the session has ended. */
+        data object Rejected : RefreshOutcome
+
+        /**
+         * The renewal request itself failed -- offline, timed out, 5xx.
+         *
+         * A fourth case that the nullable `TokenRefresh` used to hide. "We could
+         * not ask" is not "the server said no", and only the second one ends a
+         * session. Collapsing them would let a flaky network tear down a working
+         * session.
+         */
+        data object Failed : RefreshOutcome
+    }
+
+    /** Renews the access token, distinguishing "could not" from "no longer allowed". */
+    private fun refreshToken(config: AlarmConfig, deadline: Long): RefreshOutcome {
         val refreshToken = AlarmTokenStore.refreshToken(context) ?: run {
             Log.i(TAG, "no refresh token stored; cannot renew the access token")
-            return null
+            return RefreshOutcome.Unavailable
         }
         val client = ThingsBoardClient(config.baseUrl, AlarmTokenStore.accessToken(context).orEmpty())
         return try {
-            client.refresh(refreshToken, deadline)
+            val renewed = client.refresh(refreshToken, deadline)
+            if (renewed == null) {
+                Log.w(TAG, "could not renew the access token; retrying next tick")
+                RefreshOutcome.Failed
+            } else {
+                RefreshOutcome.Renewed(renewed.accessToken, renewed.refreshToken)
+            }
         } catch (error: RefreshRejectedException) {
             // The session ended somewhere else, most likely the user signed out.
-            // Nothing here should keep polling with a token the user expects to
-            // be gone, so the check is torn down until the next login.
-            endSession("refresh token rejected; background check disabled")
-            null
+            // The caller tears the check down; it is not decided here, because
+            // `endSession` records an outcome and this function must not record
+            // one that the caller is about to overwrite.
+            RefreshOutcome.Rejected
         }
     }
 

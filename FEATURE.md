@@ -185,6 +185,7 @@ Calendar: rentang `today−90 … today`, locale `en_US`.
 | Auto-refresh mati | WebSocket saja, tanpa polling REST sama sekali |
 | Device fetch | 3 request paralel, dijaga `in-flight` flag |
 | Rebuild avoidance | 3 penghitung revisi (`_liveRevision`, `_energyRevision`, `_chartRevision`) + widget `Bound` dengan token hash |
+| **Backoff saat WebSocket hidup** | **2 Oktober 2026.** Interval poll efektif adalah `max(setelan pengguna, 60)` saat WebSocket terhubung, dan kembali ke setelan begitu socket putus. Poll **tidak** dihentikan: socket tidak mengirim ping, jadi koneksi yang mati tanpa tertutup hanya ketahuan oleh re-read. Keputusan murni di `utils/poll_interval.dart`. Tanpa ini, sesi terbuka 10 detik × 3 device ≈ **25 900 request/hari** — enam kali beban pemeriksaan background yang diberi interval 60 s justru karena biayanya ~4 300/hari |
 | Pause | `paused` / `inactive` / `hidden` membatalkan timer |
 
 ---
@@ -1320,10 +1321,30 @@ Bukan bug, tapi mudah disalahpahami:
   `thingsboard_api.dart`), tapi tidak ada pemanggil production yang mengirim
   nilai selain null — sisa budget poll belum benar-benar di-*share* ke tiap
   request dan tetap berhenti di cap bawaan.
-- `readDevices` tidak pernah mengembalikan null, jadi cabang
+- ~~`readDevices` tidak pernah mengembalikan null, jadi cabang
   `"session ended; background check disabled"` tidak terjangkau, dan refresh yang
   ditolak menghasilkan **dua** `finish()` dengan pesan kedua yang menang di
-  `lastOutcome`.
+  `lastOutcome`.~~ **Diperbaiki 2 Oktober 2026.** Akar masalahnya adalah
+  `refreshToken` yang mengembalikan `TokenRefresh?` — satu `null` untuk **dua
+  keadaan** yang butuh penanganan berlawanan: "tidak ada refresh token tersimpan"
+  (coba lagi tick berikutnya) dan "server menolak refresh token" (sesi selesai).
+  Karena keduanya tidak bisa dibedakan, `readDevices` tidak pernah mengembalikan
+  null, cabang `?: return endSession(...)` tidak terjangkau, dan **check yang
+  melaporkan sukses justru di tick saat server menolak sesi** — outcome
+  `endSession` ditimpa oleh `finish(...)`, yang paling sering menulis
+  `"ok, no alarms"`.
+
+  `RefreshOutcome` sekarang empat kasus, dan yang keempat adalah yang dulu
+  disappears oleh `null`: **"kita tidak sempat bertanya" bukan "server bilang
+  tidak"**. Jaringan berfluktuasi dulu tidak bisa dibedakan dari pengguna yang
+  sudah logout, dan kalau itu diperlakukan sama akan menebaskan sesi yang
+  masih jalan. Hanya `Rejected` yang memanggil `endSession`.
+
+  *Tidak ada test JVM untuk `AlarmCheckRunner`* — ia butuh `Context`. Yang bisa
+  dilakukan adalah membacanya; klaim ini dari membaca kode, bukan dari
+  menjalankan runner-nya. Verifikasi di perangkat yang sebenarnya adalah dengan
+  logout dari ThingsBoard lalu membaca `check finished:` di logcat, dan itu
+  **belum pernah dilakukan**.
 - `_fetchWithRetry` melewati refresh token juga, jadi saat jaringan mati satu batch
   bisa menghasilkan 8 request per device.
 - WebSocket tidak mengirim ping — koneksi idle yang tutup hanya ketahuan lewat

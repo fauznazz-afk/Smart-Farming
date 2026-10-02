@@ -19,6 +19,7 @@ import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
+import '../utils/poll_interval.dart';
 import '../widgets/energy_summary_card.dart';
 import '../widgets/liquid_glass.dart';
 import 'alarm_history_screen.dart';
@@ -485,7 +486,22 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
     _connectionHealth.markConnected(ConnectionTransport.polling);
-    _refreshTimer = Timer.periodic(Duration(seconds: _refreshSeconds), (_) async {
+    // **The interval depends on whether the WebSocket is carrying telemetry.**
+    //
+    // It did not, and the line was plainly `Duration(seconds: _refreshSeconds)`.
+    // The WebSocket pushes every value into these slots the moment it arrives --
+    // see `_handleRealtimeTelemetry` -- so a 10 s REST re-read is fetching values
+    // the screen already has, and does it for three devices for as long as the
+    // app stays open.
+    //
+    // The floor is 60 s and the poll still runs, because the socket sends no
+    // ping and a dead-but-open connection is only noticed by a re-read. The
+    // reasoning and the arithmetic are in `utils/poll_interval.dart`.
+    final interval = effectivePollIntervalSeconds(
+      requestedSeconds: _refreshSeconds,
+      realtimeConnected: _realtimeConnected,
+    );
+    _refreshTimer = Timer.periodic(Duration(seconds: interval), (_) async {
       final started = DateTime.now();
       await _fetchAll();
       if (_error == null) {
@@ -718,6 +734,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     } else {
       _connectionHealth.markDisconnected(ConnectionTransport.webSocket);
     }
+    // The poll interval follows this state, so the timer has to be re-armed
+    // when it changes -- in both directions. Without the second call the socket
+    // could drop and the dashboard would keep the 60 s safety-net cadence for
+    // the rest of the session, which is the exact case the short interval exists
+    // for. Re-arming is cheap: it cancels a timer and makes another.
+    _restartRefreshTimer();
   }
 
   void _handleRealtimeTelemetry(

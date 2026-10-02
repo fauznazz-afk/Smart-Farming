@@ -1,3 +1,62 @@
+## [Unreleased]
+
+### Fixed
+
+- **The background alarm check reported success on the tick where the server
+  rejected the session.** `AlarmCheckRunner.readDevices` declared a nullable
+  return with the contract *"Returns null only when the session is over"* — and
+  every one of its paths returned a non-null map, so the caller's
+  `?: return endSession(...)` was unreachable. When a refresh token was refused,
+  `endSession` recorded `"refresh token rejected; background check disabled"`
+  and the run then carried on to `finish(...)`, **overwriting that line with the
+  verdict of a check that no longer had a session** — commonly `"ok, no alarms"`.
+
+  That is the exact failure this module's logging exists to prevent: a check that
+  reports success because its session died is indistinguishable from a check that
+  is not running, which is the thing `AGENTS.md` records as having gone unnoticed
+  for so long.
+
+  `refreshToken` now returns a four-way `RefreshOutcome` rather than a nullable
+  `TokenRefresh`. The fourth case is the one the `null` was hiding: **"we could
+  not ask" is not "the server said no"**, and only the second ends a session. A
+  flaky network used to be indistinguishable from a signed-out user, and had it
+  been acted on it would have torn down a working session. Only `Rejected` calls
+  `endSession` now, and it returns `null` so the caller stops without finishing a
+  second time.
+
+- **The dashboard re-read all three devices over REST every ten seconds while its
+  WebSocket was already delivering the same values.** `_handleRealtimeTelemetry`
+  pushes every value into the displayed slots as it arrives, so the poll was
+  fetching what the screen already had — and the timer was armed at the user's
+  interval without ever consulting the connection state.
+
+  At the 10 s default this is the **dominant request load in the app**: roughly
+  25 900 REST requests a day for an open session, against the same single-board
+  ThingsBoard instance the repo deliberately gave the background alarm check a
+  60 s interval for costing "roughly 4 300 requests a day". The dashboard was
+  issuing six times that and nobody had counted it.
+
+  The interval now backs off to 60 s while the socket is connected, and returns to
+  the user's setting the moment it drops. **The floor is 60 s and not "stop
+  polling", for a specific reason:** the WebSocket sends no ping, so an idle
+  connection is only noticed through `onDone` — a socket that has died without
+  closing leaves the app looking connected while nothing arrives, and the re-read
+  is the only thing that notices. A minute of stale numbers beats a frozen screen.
+
+  It is a floor, never an override: a user who asks for 5 s still gets 5 s,
+  because backing off may only ever make polling *less* frequent than they asked
+  for. The decision is a pure function in `utils/poll_interval.dart` precisely so
+  it can be asserted on — the line it replaces mentioned only `_refreshSeconds`
+  and there was nothing to test.
+
+### Added
+
+- **`test/poll_interval_test.dart`**, covering both directions, that a slow
+  setting is never sped up, and that the poll continues rather than stopping.
+- **`test/system_status_strip_test.dart` and `test/poll_interval_test.dart`** are
+  new; the 1.7.2 changes to the hero card, the energy card and the status strip
+  are covered in the commits below.
+
 ## [1.7.2] - 2026-10-02
 
 ### Fixed
