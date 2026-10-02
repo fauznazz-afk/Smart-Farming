@@ -186,12 +186,17 @@ panjang ada di `FEATURE.md` §18 (celah yang diketahui).
    `alarm_notification_service.dart` baru punya test untuk helper-nya; yang belum
    tercover adalah pemanggilan method channel dan lifecycle scheduling.
    `energy_report/widgets/chart_card.dart` (280 baris) belum pernah di-refactor
-   dan belum punya test widget. **`EnergySummaryCard` (339 baris) juga belum
-   punya widget test sama sekali** — itu celah yang paling mungkin menangkap
-   regresi label berikutnya, karena tiga regresi label di sesi 27 September 2026
-   lolos `flutter analyze`, lolos build, dan lolos seluruh test yang ada:
-   `PV Output` yang muncul tiga kali dalam satu kartu, satuan yang terpotong
-   jadi `109....`, dan label yang ellipsised hanya saat verdict muncul.
+   dan belum punya test widget. ~~**`EnergySummaryCard` (339 baris) juga belum
+   punya widget test sama sekali**~~ — **selesai 2 Oktober 2026**
+   (`energy_summary_card_test.dart`, 37 test), dan ini bukan tambahan administratif:
+   test itu langsung menangkap **tiga cacat nyata** dalam sekejap — satuan `kWh`
+   teramputasi jadi `1.53 k…` di 320 dp, header kartu meluap di skala font 1.5
+   sampai 2.0 **di semua lebar layar** termasuk 411 dp, dan caption
+   "none last period" yang menyangkal angka 0,05 kWh yang ditampilkan satu baris
+   di atasnya. Ketiganya lolos `flutter analyze`, lolos release build, dan lolos
+   seluruh 581 test yang ada. **Catatan koreksi:** klaim "belum punya widget
+   test sama sekali" sudah basi sebelum ini dikerjakan — `energy_summary_card_icons_test.dart`
+   sudah ada; yang hilang adalah cakupan **label**, bukan widget-nya.
    ~~Widget test untuk `LivePowerCard` dan `EnvironmentGrid`~~ — **selesai di
    1.6.0** (`live_power_card_test.dart`, `metric_grid_test.dart`), dan keduanya
    langsung menangkap lima assertion yang gagal, termasuk dua yang memakai

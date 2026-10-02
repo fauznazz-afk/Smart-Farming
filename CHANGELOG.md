@@ -2,6 +2,92 @@
 
 ### Fixed
 
+- **Three defects in `EnergySummaryCard`, found by writing the widget test
+  `PRD §7.1` has been asking for since the label regressions of 27 September
+  2026.** All three passed `flutter analyze`, passed a release build, and passed
+  every test that existed. They are grouped because one measurement found all
+  three, and none of them is visible on the device the work was done on.
+
+  **The unit was amputated off an ordinary reading.** The two tiles share a row
+  and each takes an `Expanded`, so at 320 dp a column is about 115 dp wide — and
+  `1.53 kWh` at 17 sp w800 needs slightly more. The engine drew `1.53 k…` and
+  `0.27 k…`. This is the `109....` regression again under a different number, on
+  a screen size nobody had checked. The value is now inside a
+  `FittedBox(scaleDown)`, which is *not* the `DateStripChip` mistake: that widget
+  laid its label out at one size and scaled it back to another, discarding the
+  user's font scale. This one lays out at the size and scale the user chose and
+  only shrinks if it genuinely does not fit. The ellipsis is gone, because there
+  is no width at which amputating this number is the right answer.
+
+  **The header overflowed at large system fonts, on every phone.** The title was
+  in an `Expanded` and the two controls at their intrinsic widths; an `Expanded`
+  can shrink the title to nothing but cannot shrink a `SegmentedButton`, and at a
+  2.0 system font the toggle's labels are 28 sp. It overflowed by 20 px on a
+  411 dp phone, so this was never a small-screen problem — **it is an
+  accessibility bug that a user with a large system font hits everywhere**, at
+  every scale above roughly 1.4, throwing on every frame and painting the
+  overflow stripe. The header is now a `Wrap`, so it lays out on one run when it
+  fits and moves the controls to a second when it does not, and the toggle sits
+  in a `Flexible` with ellipsising segment labels. The range selector reading
+  `7 da…` at 2.0 on a 320 dp phone is a deliberate trade against a layout that
+  throws; the test names those two strings as the only exemption rather than
+  loosening the assertion for everything.
+
+  **A caption denied a figure the screen was showing.** When both periods fall
+  under the 0.1 kWh threshold and the current one is non-zero, the tile said
+  **"none last period"** about a previous period of 0.02 kWh — displayed one line
+  above. The decision was right all along: no ratio is claimed between two
+  periods that are both rounding noise. Only the wording was a lie, and
+  `energy_report_helpers_test.dart` was pinning it.
+
+  That last one is why the decision is now shared rather than merely consistent.
+  `EnergySummaryCard._comparison` and the report's `comparisonLabel` each held
+  their own copy of the same four-way `if`, sharing only the `0.1` constant, and
+  a comment claimed they "cannot disagree" — a statement about a convention that
+  no compiler and no test could check. They did disagree: the same wrong
+  sentence was in both. `classifyEnergyChange` in
+  `lib/utils/energy_comparison.dart` now makes the decision and the percentage
+  once, and each surface maps it to its own wording, which stays deliberately
+  different because the card's two captions sit side by side and the report's
+  have a full line. Fixing one copy and not the other is the failure this file
+  exists to end.
+
+### Added
+
+- **`test/energy_summary_card_test.dart` grows the coverage that was missing**
+  rather than replacing what was there. The file already existed and already
+  asserted the chrome, the theming, the accent-wash behaviour and the semantics
+  merge; those tests are untouched. What was added is the width-and-scale matrix
+  — 320/360/411 dp at scales 1.0, 1.5 and 2.0 — asserting that **nothing is
+  truncated**, read off `RenderParagraph.didExceedMaxLines` rather than inferred
+  from the widget tree. That distinction is the whole point: the tree still
+  reports `1234.56 kWh` in full after the engine has clipped it, so an assertion
+  built on `find.text` passes with the truncation present, which is how three
+  label regressions got through in a row.
+
+  A companion test asserts the card lays out with **no `RenderFlex` overflow** at
+  any of those nine combinations, because an overflowing row still renders — it
+  just renders broken, and nothing that looks for text will notice.
+
+- **`test/widget_text_helpers.dart`**, holding the truncation check and the
+  `ellipsised` string builder that `live_power_card_test.dart` had as a private
+  copy. It was extracted rather than copied a second time, and
+  `live_power_card_test.dart` now imports it — the same reasoning `FEATURE.md`
+  applies to the surface list in `color_helpers_test.dart`: a literal in a test
+  whose job is to describe the app's own widgets is a copy, and copies drift.
+
+  The helper also documents a trap it nearly fell into: passing `maxWidth` to the
+  `TextPainter` makes it wrap the probe to fit, so every candidate measures as
+  fitting and `ellipsised` returns the full source with an ellipsis glued on.
+
+- **`test/energy_comparison_test.dart`**, pinning the classification on its own,
+  including that a null previous period and a zero one stay distinguishable (the
+  report needs the difference), that the 0.1 kWh threshold is exclusive, and that
+  the same pair of numbers always produces the same decision — the property the
+  two duplicated copies could not have had.
+
+### Fixed
+
 - **The hero card's verdict sentence did not know the battery existed.** Two
   defects, one cause, both found by looking at the running app on the test
   device on 2 October 2026 rather than by reading the code.

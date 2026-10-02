@@ -1,4 +1,8 @@
-import '../../../utils/energy_comparison.dart' show kMeaningfulEnergyKwh;
+import '../../../utils/energy_comparison.dart'
+    show
+        EnergyChangeKind,
+        classifyEnergyChange,
+        kMeaningfulEnergyKwh;
 
 /// Formats a date as DD/MM/YYYY.
 String formatDateLabel(DateTime date) =>
@@ -30,19 +34,11 @@ const _monthNames = [
 /// Escapes a value for CSV output.
 String escapeCsv(String value) => '"${value.replaceAll('"', '""')}"';
 
-/// Below this, two periods are both too small for a ratio to mean anything.
-///
-/// The threshold is [kMeaningfulEnergyKwh], shared with
-/// `EnergySummaryCard._comparison` in `lib/widgets/energy_summary_card.dart`
-/// rather than duplicated in it. The two were separate literals, and the report's
-/// copy was the one that had never been fixed while the card's had, which is
-/// precisely how a dashboard and a report end up contradicting each other about
-/// the same two numbers.
-const double _meaningfulPrevious = kMeaningfulEnergyKwh;
-
-/// Formats a kWh figure the way the card does — two decimals, the same
-/// precision the comparison threshold is reasoned about in.
-String _formatEnergy(double value) => value.toStringAsFixed(2);
+/// The threshold and the decision both come from `energy_comparison.dart` now,
+/// not just the constant. They used to be a shared `0.1` and two private
+/// four-way `if`s, with a comment here asserting that the branch order "cannot
+/// disagree" — which was a claim about a convention rather than anything a
+/// compiler or a test could check, and the two did disagree.
 
 /// Generates a comparison label between current and previous values.
 ///
@@ -60,17 +56,24 @@ String _formatEnergy(double value) => value.toStringAsFixed(2);
 /// no-change phrasings keep this report's existing wording, which is longer
 /// than the card's because these labels are not side by side in a two-tile row.
 String comparisonLabel(double current, double? previous) {
-  if (previous == null) return 'No comparison data yet';
-  if (previous <= 0) return 'Previous period: 0 kWh';
-  if (previous < _meaningfulPrevious) {
-    if (current < _meaningfulPrevious) {
-      return current <= 0
-          ? 'No production'
-          : '${_formatEnergy(current)} kWh, none last period';
-    }
-    return 'Nothing to compare yet';
-  }
-  final change = ((current - previous) / previous * 100).round();
-  if (change == 0) return 'Same as the previous period';
-  return '${change > 0 ? '+' : ''}$change% from the previous period';
+  final change = classifyEnergyChange(current, previous);
+  return switch (change.kind) {
+    // The two the card folds together, kept apart here because this surface has
+    // a real "no previous period selected" state and the difference is worth a
+    // sentence to a reader choosing between ranges.
+    EnergyChangeKind.noPreviousData => 'No comparison data yet',
+    EnergyChangeKind.previousWasZero => 'Previous period: 0 kWh',
+    EnergyChangeKind.noProduction => 'No production',
+    // **This used to be '${_formatEnergy(current)} kWh, none last period'.** The
+    // decision is unchanged — both periods are under the threshold — but the
+    // wording claimed an absence the report was displaying one line above. The
+    // decision now comes from `classifyEnergyChange`, so the dashboard and this
+    // report cannot answer this case differently again.
+    EnergyChangeKind.bothNegligible =>
+      'Both periods under ${kMeaningfulEnergyKwh.toStringAsFixed(1)} kWh',
+    EnergyChangeKind.nothingToCompare => 'Nothing to compare yet',
+    EnergyChangeKind.unchanged => 'Same as the previous period',
+    EnergyChangeKind.changed =>
+      '${change.percent > 0 ? '+' : ''}${change.percent}% from the previous period',
+  };
 }

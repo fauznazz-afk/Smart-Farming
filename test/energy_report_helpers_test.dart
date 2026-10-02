@@ -294,13 +294,20 @@ void main() {
       expect(comparisonLabel(0, 0.09), 'No production');
     });
 
-    test('spells out a small current against an empty previous period', () {
-      // Both periods are below 0.1 kWh, but the current one is not zero, so the
-      // figure is quoted instead of a ratio being claimed. The threshold is
-      // 0.1, not the 0.01 the value is displayed to, which is why 0.04 and 0.02
-      // are not simply "0.00 kWh".
-      expect(comparisonLabel(0.04, 0.02), '0.04 kWh, none last period');
-      expect(comparisonLabel(0.09, 0.01), '0.09 kWh, none last period');
+    test('does not claim an absence for a small non-zero previous period', () {
+      // **This assertion used to pin the wrong answer.** It read
+      // `'0.04 kWh, none last period'` for a previous period of 0.02 kWh — a
+      // period that produced something. The report draws that 0.02 one line
+      // above, so the label denied a figure the screen was showing, and the test
+      // passed on the denial because nobody asked whether the wording was true.
+      //
+      // The *decision* is unchanged and still correct: both periods are under the
+      // 0.1 kWh threshold, so no ratio is claimed. Only the wording moved, and
+      // it moved because `classifyEnergyChange` now names the case instead of
+      // each surface inventing a sentence for it.
+      expect(comparisonLabel(0.04, 0.02), 'Both periods under 0.1 kWh');
+      expect(comparisonLabel(0.09, 0.01), 'Both periods under 0.1 kWh');
+      expect(comparisonLabel(0.04, 0.02), isNot(contains('none')));
     });
 
     test('withholds a ratio when only the previous period is below it', () {

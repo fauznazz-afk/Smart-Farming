@@ -1382,6 +1382,32 @@ Bukan bug, tapi mudah disalahpahami:
   tiga ikon lain ada di `opacity: 0` saat collapse, dan mengetuk tombol yang
   tersisa akan mengembalikannya. Dicatat di sini karena ia terbaca sebagai cacat dan
   biayanya satu screenshot untuk menyingkirkannya.
+
+- **Skala font sistem besar, diukur untuk pertama kalinya — dan hanya satu dari
+  dua widget yang withstand-nya.** `font_scale` perangkat dinaikkan ke 2.0 pada
+  2 Oktober 2026. `EnergySummaryCard` bersih setelah perbaikannya, tapi
+  `SystemStatusStrip` dan `LivePowerCard` **memotong label di 2.0 pada 380 dp** —
+  layar tempat semua pekerjaan ini dilakukan:
+
+  | Widget | Yang dipotong di layar |
+  |---|---|
+  | `SystemStatusStrip` | `Bat…`, `AC …`, `Ala…`, `Sta…`, `min 1…`, `221 V …` |
+  | `LivePowerCard` | `Live po…`, `Sola` |
+
+  Yang membuatnya lolos semua gate adalah alasan yang sama seperti `109....`:
+  `live_power_card_test.dart` memang memarametrisasi lebar dan skala, dan
+  **lulus**, karena ia merender kartu pada lebar permukaan penuh — sedangkan di
+  aplikasi nyata kartu itu duduk di dalam margin halaman 24 dp di kiri dan kanan,
+  jadi lebar efektifnya sekitar 80 dp lebih sempit dari yang diuji. Test
+  mengukur widget yang lebih lebar daripada widget yang benar-benar tampil.
+  Lebar yang benar harus berasal dari margin halaman, bukan dari `physicalSize`
+  telanjang.
+
+  Belum diperbaiki di sini karena cakupannya dua widget dan setiap perbaikannya
+  adalah keputusan layout tersendiri. Tapi klasifikasinya jelas: ini **cacat
+  aksesibilitas**, bukan preferensi kosmetik — `Sta…` kehilangan makna yang
+  dibawanya, dan kehilangan makna itu justru pada layar yang seorang pengguna
+  memperbesar font-nya supaya bisa membaca angka.
 - **~~Tekan pada kontrol.~~ Terverifikasi 30 September 2026** untuk date strip
   chip dan navbar; `Pressable` belum dipasang di tombol `FilledButton` (lihat
   §18.0 butir 3) atau di kartu mana pun yang bisa ditekan. Yang benar-benar

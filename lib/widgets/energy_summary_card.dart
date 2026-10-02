@@ -64,33 +64,35 @@ class EnergySummaryCard extends StatelessWidget {
   /// both rounding noise, and a user reading "−100%" against "0.00 kWh" is being
   /// told a hundred percent about a number that is displayed as zero.
   String _comparison(double current, double previous) {
-    if (previous <= 0) return 'Nothing to compare yet';
-    if (previous < _meaningfulPrevious) {
-      if (current < _meaningfulPrevious) {
-        return current <= 0
-            ? 'No production'
-            : '${_formatEnergy(current)} kWh, none last period';
-      }
-      return 'Nothing to compare yet';
-    }
-    final change = ((current - previous) / previous * 100).round();
-    if (change == 0) return 'Same as before';
-    // Short on purpose. The two tiles sit side by side and wrap independently,
-    // so a caption long enough to wrap on one of them leaves the pair with
-    // mismatched heights. "from the previous period" was long enough to do that
-    // on a 360dp screen.
-    return '${change > 0 ? '+' : ''}$change% vs previous';
+    final change = classifyEnergyChange(current, previous);
+    return switch (change.kind) {
+      // The card has no "no previous period selected" state, so a null and a
+      // zero previous period are the same situation here and are allowed to say
+      // the same thing. The kinds stay separate so a surface that *does*
+      // distinguish them, as the report does, still can.
+      EnergyChangeKind.noPreviousData ||
+      EnergyChangeKind.previousWasZero ||
+      EnergyChangeKind.nothingToCompare =>
+        'Nothing to compare yet',
+      EnergyChangeKind.noProduction => 'No production',
+      // Short on purpose. The two tiles sit side by side and wrap independently,
+      // so a caption long enough to wrap on one of them leaves the pair with
+      // mismatched heights. "from the previous period" was long enough to do that
+      // on a 360dp screen.
+      EnergyChangeKind.bothNegligible =>
+        'Both periods under ${kMeaningfulEnergyKwh.toStringAsFixed(1)} kWh',
+      EnergyChangeKind.unchanged => 'Same as before',
+      EnergyChangeKind.changed =>
+        '${change.percent > 0 ? '+' : ''}${change.percent}% vs previous',
+    };
   }
 
-  /// Below this, two periods are both too small for a ratio to mean anything.
-  ///
-  /// Shared with the energy report's `comparisonLabel` through
-  /// [kMeaningfulEnergyKwh]. The two used to hold separate `0.1` literals, and
-  /// the report's was the copy that had never been fixed — so the same pair of
-  /// numbers could be called a 20% fall on the dashboard and a rounding
-  /// artefact in the report.
-  static const double _meaningfulPrevious = kMeaningfulEnergyKwh;
-
+  /// The threshold and the decision both come from
+  /// `lib/utils/energy_comparison.dart`, which is what the energy report's
+  /// `comparisonLabel` uses too. The two used to hold separate `0.1` literals
+  /// *and* separate copies of the same branch order, and the report's copies were
+  /// the ones that had never been fixed — so the same pair of numbers could be
+  /// called a 20% fall on this card and a rounding artefact in the report.
   Widget _metric({
     required String title,
     required double value,
@@ -116,19 +118,58 @@ class EnergySummaryCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(title, style: const TextStyle(fontSize: 11)),
                 const SizedBox(height: 2),
-                Text(
-                  '${_formatEnergy(value)} kWh',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                // **`FittedBox(scaleDown)`, and this is not the `DateStripChip`
+                // mistake.** That widget put its label inside a `SizedBox` of
+                // fixed height, so the text was laid out at one size and scaled
+                // back to another and the user's font-scale setting was quietly
+                // discarded. Here the box is unconstrained vertically, the text is
+                // laid out at the size and scale the user actually chose, and it
+                // only shrinks if it genuinely does not fit the column it was
+                // given.
+                //
+                // It is there because the alternative was measured, not assumed.
+                // The two tiles share a row and each gets an `Expanded`, so at
+                // 320 dp a column is about 115 dp wide -- and `1.53 kWh` at 17sp
+                // w800 needs a little more than that. With `overflow: ellipsis`
+                // the engine drew `1.53 k…` and `0.27 k…`: the unit amputated off
+                // an entirely ordinary reading, on a phone narrower than any
+                // this had ever been checked on. That is the `109....` regression
+                // from 27 September 2026 again under a different number, and it
+                // is the reason this widget had no test.
+                //
+                // `softWrap: false` so a long value cannot become two lines
+                // inside a box whose height is the scaled child's; the figure
+                // shrinks instead, which keeps it on one line and readable.
+                // The ellipsis is gone on purpose -- there is no width at which
+                // amputating this number is the right answer.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${_formatEnergy(value)} kWh',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   label,
-                  maxLines: 2,
+                  // **Three lines, and the two before it were two and one.**
+                  //
+                  // The caption is short on purpose so the pair of tiles keeps a
+                  // matching height, which is why it was capped rather than
+                  // allowed to wrap freely. At a 2.0 system font `10 sp` becomes
+                  // `20 sp`, and `-3% vs previous` then needs about three lines in
+                  // a column roughly 115 dp wide -- so the cap amputated it to
+                  // `-3% v…`, which is a *worse* caption than a wrapped one
+                  // because it looks like a complete statement. A tile pair of
+                  // slightly unequal height is a cosmetic cost; a comparison the
+                  // user cannot finish reading is a correctness one.
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
@@ -205,29 +246,87 @@ class EnergySummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          // **`Wrap`, not `Row`, and this is a measured fix rather than a
+          // preference.**
+          //
+          // The `Row` held the title in an `Expanded` and the two controls at
+          // their intrinsic widths. `Expanded` can shrink the title to nothing,
+          // but it cannot shrink a `SegmentedButton`, and at a 2.0 system font
+          // the toggle's labels are 28 sp -- so the fixed part of the row grew
+          // past the card and the layout overflowed. It overflowed on a 411 dp
+          // phone too, by 20 px, so this was not a small-screen problem at all:
+          // **it is an accessibility bug that a user with a large system font
+          // hits on every phone this app runs on**, at every text scale above
+          // roughly 1.4.
+          //
+          // `Wrap` is the right shape for "these belong together, but not at any
+          // cost": when everything fits it lays out on one run and
+          // `spaceBetween` spreads the title and the controls to the edges,
+          // which is what the `Row` did; when it does not fit, the controls move
+          // to a second run and both stay whole. The alternatives were a fixed
+          // two-line header, which costs the design a line on every phone to fix
+          // a problem only large fonts have, and letting the title ellipsise,
+          // which does nothing because the title was never the part that did not
+          // fit.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: 6,
             children: [
-              const Expanded(
-                child: Text(
-                  'Energy analytics',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                ),
+              const Text(
+                'Energy analytics',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
-              SegmentedButton<bool>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Day')),
-                  ButtonSegment(value: true, label: Text('7 days')),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // **`Flexible`, and the `Wrap` above was not enough on its
+                  // own.** Moving the controls to their own run fixed the header
+                  // `Row` but not this one: at 2.0 the toggle is about 285 dp
+                  // wide against 298 dp available, plus a 48 dp button, and a
+                  // `SegmentedButton` at its intrinsic width cannot be squeezed
+                  // -- so the inner row overflowed by 35 to 111 px instead.
+                  //
+                  // `Flexible` lets it take what is there and no more, and the
+                  // segment labels ellipsise rather than being clipped silently.
+                  // A truncated `7 day…` is a far smaller failure than a layout
+                  // that throws on every frame and paints the overflow stripe,
+                  // and at 2.0 the toggle is still perfectly usable because the
+                  // selected segment is the one that keeps its full label for as
+                  // long as it can.
+                  Flexible(
+                    child: SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          label: Text(
+                            'Day',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text(
+                            '7 days',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      selected: {weekly},
+                      onSelectionChanged: (selection) =>
+                          onRangeChanged(selection.first),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Open the energy report',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onOpenReport,
+                    icon: const Icon(Icons.insert_chart_outlined_rounded),
+                  ),
                 ],
-                selected: {weekly},
-                onSelectionChanged: (selection) =>
-                    onRangeChanged(selection.first),
-              ),
-              IconButton(
-                tooltip: 'Open the energy report',
-                visualDensity: VisualDensity.compact,
-                onPressed: onOpenReport,
-                icon: const Icon(Icons.insert_chart_outlined_rounded),
               ),
             ],
           ),

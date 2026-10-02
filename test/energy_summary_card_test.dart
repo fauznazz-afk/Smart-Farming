@@ -13,6 +13,8 @@ import 'package:plts_monitoring/services/energy_forecast_service.dart';
 import 'package:plts_monitoring/widgets/energy_summary_card.dart';
 import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
+import 'widget_text_helpers.dart';
+
 void main() {
   const seedColor = Color(0xFF35A968);
 
@@ -213,13 +215,20 @@ void main() {
       expect(find.text('-100% vs previous'), findsNothing);
     });
 
-    testWidgets('describes a small current against an empty previous period',
+    testWidgets('does not claim an absence for a small non-zero previous period',
         (tester) async {
       useTallSurface(tester);
-      // Both periods are below _meaningfulPrevious but the current one is not
-      // zero, so line 63 spells the figure out instead of claiming a ratio.
-      // The threshold is 0.1 kWh, not the 0.01 kWh the value is displayed to,
-      // which is why 0.04 and 0.03 are not simply "0.00 kWh".
+      // **This test used to assert the wrong sentence.** Both periods are below
+      // the 0.1 kWh threshold and the current one is not zero, so the tile
+      // spelled the figure out — and it said "none last period" about a previous
+      // period of 0.02 kWh. The 0.02 was on screen one line above. The *decision*
+      // is unchanged and still right: no ratio is claimed between two periods
+      // that are both rounding noise. Only the wording moved, because
+      // `classifyEnergyChange` now names the case instead of each surface
+      // inventing a sentence for it — and the energy report had the identical
+      // sentence, so fixing one and not the other would have left the pair
+      // contradicting each other again, which is the failure this repo has
+      // already paid for once.
       await tester.pumpWidget(
         wrap(
           card(
@@ -231,8 +240,8 @@ void main() {
         ),
       );
 
-      expect(find.text('0.04 kWh, none last period'), findsOneWidget);
-      expect(find.text('0.03 kWh, none last period'), findsOneWidget);
+      expect(find.text('Both periods under 0.1 kWh'), findsNWidgets(2));
+      expect(find.textContaining('none last period'), findsNothing);
     });
 
     testWidgets('says "Same as before" when the change rounds to zero',
@@ -547,4 +556,133 @@ void main() {
       expect(find.text('4.20 kWh'), findsOneWidget);
     });
   });
+
+  // The two groups below are the ones written on 2 October 2026 after the card
+  // was measured at widths and text scales it had never been measured at. They
+  // are not a rewrite of the file above — that file was already here and its
+  // chrome, theming and accent-wash coverage is kept as it was.
+  group('EnergySummaryCard never amputates a figure', () {
+    /// Resizes the surface to [widthDp] logical pixels.
+    ///
+    /// `physicalSize` is in physical pixels and `devicePixelRatio` is 1, so the
+    /// two are the same number here. Setting only one of them is the mistake
+    /// that makes a "narrow screen" test quietly run at the default 800x600,
+    /// which is wide enough that nothing truncates and the assertion passes for
+    /// the wrong reason — which is what this group exists to rule out.
+    void useWidth(WidgetTester tester, double widthDp) {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = Size(widthDp, 1600);
+      addTearDown(tester.view.reset);
+    }
+
+    /// Resizes and sets a system font scale together, because neither is the
+    /// interesting case on its own.
+    Future<void> pumpScaled(
+      WidgetTester tester, {
+      required double widthDp,
+      required double scale,
+    }) async {
+      useWidth(tester, widthDp);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: wrap(
+            card(solarKwh: 1234.56, previousSolarKwh: 1400, loadKwh: 987.65, previousLoadKwh: 1200),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    // The `109....` regression, reproduced with a different number.
+    //
+    // The two tiles share a row and each gets an `Expanded`, so at 320 dp a
+    // column is about 115 dp wide — and `1.53 kWh` at 17 sp w800 needs a little
+    // more than that. With `overflow: ellipsis` the engine drew `1.53 k…` and
+    // `0.27 k…`: **the unit amputated off an entirely ordinary reading**, on a
+    // phone narrower than any this had ever been checked on.
+    //
+    // `didExceedMaxLines` rather than `find.text`, because the widget tree still
+    // reports the full string after the engine has clipped it. An assertion built
+    // on `find.text` passes with the truncation present — which is why this one
+    // passed for three label regressions in a row on 27 September 2026.
+    for (final width in kNarrowWidthsDp) {
+      testWidgets('nothing is truncated at ${width.toInt()} dp, scale 1.0', (
+        tester,
+      ) async {
+        await pumpScaled(tester, widthDp: width, scale: 1.0);
+
+        expectNothingClipped(tester, ignore: _controlLabels);
+      });
+    }
+
+    // 2.0 is not hypothetical: `DateStripChip` laid its label out at 20 sp and
+    // scaled it back to 13 dp, and nothing in the suite could see it.
+    for (final width in kNarrowWidthsDp) {
+      for (final scale in kTextScales) {
+        testWidgets('nothing is truncated at ${width.toInt()} dp, scale $scale', (
+          tester,
+        ) async {
+          await pumpScaled(tester, widthDp: width, scale: scale);
+
+          expectNothingClipped(tester, ignore: _controlLabels);
+        });
+      }
+    }
+
+    // A `RenderFlex` overflow is not a warning, it is an exception on every
+    // frame, and it paints the black-and-yellow stripe. This asserts none is
+    // thrown rather than reading the tree, because a `Row` that overflows still
+    // renders — it just renders broken.
+    testWidgets('the card lays out without overflowing at any scale', (
+      tester,
+    ) async {
+      for (final width in kNarrowWidthsDp) {
+        for (final scale in kTextScales) {
+          await pumpScaled(tester, widthDp: width, scale: scale);
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: 'a RenderFlex overflowed at ${width.toInt()} dp, scale '
+                '$scale. The header held the title in an Expanded and the '
+                'SegmentedButton at its intrinsic width, and a SegmentedButton '
+                'cannot be squeezed -- so a user with a large system font got a '
+                'broken card on a 411 dp phone, not only on a small one.',
+          );
+        }
+      }
+    });
+  });
+
+  group('EnergySummaryCard states each label once', () {
+    // The `PV Output` regression: one card, three copies of one phrase. A count
+    // is the only assertion that catches a reintroduction, because each copy on
+    // its own is perfectly correct.
+    testWidgets('the kWh figure and its unit are one string', (tester) async {
+      useWidth900(tester);
+      await tester.pumpWidget(wrap(card()));
+
+      // If the unit were ever lifted out of the value into its own row it would
+      // appear twice and the tile would grow a line for no information.
+      expect(find.textContaining('kWh'), findsNWidgets(2));
+    });
+  });
+}
+
+/// The range selector's own label, and only it.
+///
+/// At a 2.0 system font on a 320 dp phone `7 days` does not fit beside the
+/// report button, and the alternative measured was a row that overflowed by
+/// 111 px and painted the stripe on every frame. A control that reads `7 da…` is
+/// still operable; a layout that throws is not. The kWh figures have no such
+/// exemption, which is the whole reason this list names two strings instead of
+/// loosening the assertion.
+const Set<String> _controlLabels = {'Day', '7 days'};
+
+/// 900 dp, the width [EnergySummaryCard]'s other group uses so the whole card
+/// sits on one screen.
+void useWidth900(WidgetTester tester) {
+  tester.view.physicalSize = const Size(900, 1600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
 }

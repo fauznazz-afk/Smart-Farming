@@ -1,74 +1,10 @@
 import 'package:flutter/material.dart';
-// `RenderParagraph`, for `didExceedMaxLines`. Not exported by `material.dart` --
-// and not by `flutter_test.dart` either, which is why the import is explicit
-// rather than free.
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
 
-/// Every label the card's painter had to truncate, mapped to what it drew.
-///
-/// Read off [RenderParagraph.didExceedMaxLines] rather than inferred from the
-/// widget tree, because the widget tree still reports the full string after the
-/// engine has clipped it. That distinction is the whole point: an assertion built
-/// on `find.text` passes with the truncation present.
-Map<String, String> clippedLabels(WidgetTester tester) {
-  final clipped = <String, String>{};
-  for (final element in find.byType(RichText).evaluate()) {
-    final box = element.renderObject;
-    if (box is! RenderParagraph) continue;
-    if (!box.didExceedMaxLines) continue;
-    final span = box.text;
-    if (span is! TextSpan) continue;
-    if (span.toPlainText().isEmpty) continue;
-    clipped[span.toPlainText()] = ellipsised(
-      source: span.toPlainText(),
-      style: span.style,
-      // Read off the render object rather than the span. The paragraph is what
-      // resolved the direction and the scale for this particular layout, so it is
-      // the authority -- a `TextSpan` carries a `TextStyle`, and a style knows
-      // nothing about the user's font-scale setting.
-      direction: box.textDirection,
-      scaler: box.textScaler,
-      maxWidth: box.size.width,
-    );
-  }
-  return clipped;
-}
-
-/// The string the engine would have drawn: the longest prefix that still fits once
-/// the ellipsis itself is accounted for.
-///
-/// Not a prettification. A test's job when it fails is to *report* what the user
-/// saw, and "the label was truncated" without saying to what is a much weaker
-/// thing to act on from a log.
-String ellipsised({
-  required String source,
-  required TextStyle? style,
-  required TextDirection direction,
-  required TextScaler scaler,
-  required double maxWidth,
-}) {
-  var lo = 0;
-  var hi = source.length;
-  while (lo < hi) {
-    final mid = (lo + hi + 1) ~/ 2;
-    final probe = TextPainter(
-      text: TextSpan(text: '${source.substring(0, mid)}…', style: style),
-      textDirection: direction,
-      textScaler: scaler,
-    )..layout();
-    final fits = probe.width <= maxWidth;
-    probe.dispose();
-    if (fits) {
-      lo = mid;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return '${source.substring(0, lo)}…';
-}
+import 'widget_text_helpers.dart';
 
 void main() {
   const seedColor = Color(0xFF35A968);
