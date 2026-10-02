@@ -1383,31 +1383,45 @@ Bukan bug, tapi mudah disalahpahami:
   tersisa akan mengembalikannya. Dicatat di sini karena ia terbaca sebagai cacat dan
   biayanya satu screenshot untuk menyingkirkannya.
 
-- **Skala font sistem besar, diukur untuk pertama kalinya — dan hanya satu dari
-  dua widget yang withstand-nya.** `font_scale` perangkat dinaikkan ke 2.0 pada
-  2 Oktober 2026. `EnergySummaryCard` bersih setelah perbaikannya, tapi
-  `SystemStatusStrip` dan `LivePowerCard` **memotong label di 2.0 pada 380 dp** —
-  layar tempat semua pekerjaan ini dilakukan:
+- ~~**Skala font sistem besar, diukur untuk pertama kalinya.**~~ **Selesai
+  2 Oktober 2026 — ditemukan, diperbaiki, dan akar masalahnya lebih dalam dari
+  yang terlihat.** `font_scale` dinaikkan ke 2.0 dan tiga widget memotong label:
 
-  | Widget | Yang dipotong di layar |
-  |---|---|
-  | `SystemStatusStrip` | `Bat…`, `AC …`, `Ala…`, `Sta…`, `min 1…`, `221 V …` |
-  | `LivePowerCard` | `Live po…`, `Sola` |
+  | Widget | Yang dipotong di layar | Status |
+  |---|---|---|
+  | `EnergySummaryCard` | — | sudah bersih |
+  | `SystemStatusStrip` | `Bat…`, `AC …`, `Ala…`, `Sta…`, `min 1…`, `221 V …` | sudah diperbaiki |
+  | `LivePowerCard` | `Live po…`, `Sola` | sudah diperbaiki |
 
-  Yang membuatnya lolos semua gate adalah alasan yang sama seperti `109....`:
+  **Akar masalahnya bukan ketiga widget itu, melainkan harness-nya.**
   `live_power_card_test.dart` memang memarametrisasi lebar dan skala, dan
-  **lulus**, karena ia merender kartu pada lebar permukaan penuh — sedangkan di
-  aplikasi nyata kartu itu duduk di dalam margin halaman 24 dp di kiri dan kanan,
-  jadi lebar efektifnya sekitar 80 dp lebih sempit dari yang diuji. Test
-  mengukur widget yang lebih lebar daripada widget yang benar-benar tampil.
-  Lebar yang benar harus berasal dari margin halaman, bukan dari `physicalSize`
-  telanjang.
+  **lulus** — karena ia merender kartu pada lebar permukaan penuh, sedangkan
+  setiap halaman dashboard adalah `ListView` dengan padding 24 dp per sisi. Jadi
+  **kartu di ponsel 320 dp itu selebar 272 dp**, dan setiap lebar yang diklaim
+  diuji test itu 48 dp lebih longgar daripada perangkatnya. Test mengukur widget
+  yang lebih lebar daripada widget yang benar-benar tampil, dan itu gagal
+  *senyap*: tidak ada assertion yang melemah, hanya assertion yang diam.
 
-  Belum diperbaiki di sini karena cakupannya dua widget dan setiap perbaikannya
-  adalah keputusan layout tersendiri. Tapi klasifikasinya jelas: ini **cacat
-  aksesibilitas**, bukan preferensi kosmetik — `Sta…` kehilangan makna yang
-  dibawanya, dan kehilangan makna itu justru pada layar yang seorang pengguna
-  memperbesar font-nya supaya bisa membaca angka.
+  Setelah marginnya benar, **dua cacat langsung muncul** yang tidak ada
+  sebelumnya: `RenderFlex` meluap 3,7 px (satuan `W` kaku di sebelah angka yang
+  sudah `FittedBox`, di bawah komentar yang mengklaim satuan itu "nowhere near
+  the limit" — yang benar hanya ketika kartu dirender tanpa margin), dan judul
+  kartu terpotong jadi `Live po…` karena ia ellipsis padahal sudah `Flexible`.
+
+  **Dan `expectNoLabelIsCut` ternyata buta separuh.** Ia mengukur *tinggi* —
+  apakah label butuh lebih banyak baris daripada yang dialokasikan — karena
+  label flow sengaja tidak punya `maxLines` dan label yang terbungkus tapi
+  terlalu tinggi terpotong tanpa flag apa pun. Pemeriksaan itu **tidak bisa
+  melihat ellipsis horizontal sama sekali**: label satu baris yang terpotong
+  sideways punya tinggi persis sama dengan yang diberikan, jadi lolos. Sebuah
+  helper lain memang memakai `didExceedMaxLines`, tapi hanya pernah dipanggil
+  untuk satu string hard-coded (`'Discharging'`). Keduanya sudah sekarang
+  dijalankan untuk seluruh kartu di setiap kombinasi.
+
+  `_pageHorizontalMargin` menjadi `kDashboardPageMargin` yang publik dan dibaca
+  `test/widget_text_helpers.dart`, **bukan disalin** — karena literal di test
+  yang tugasnya menggambarkan tata letak aplikasi adalah salinan, dan `FEATURE.md`
+  sudah mencatat harga satu salinan basi di repo ini.
 - **~~Tekan pada kontrol.~~ Terverifikasi 30 September 2026** untuk date strip
   chip dan navbar; `Pressable` belum dipasang di tombol `FilledButton` (lihat
   §18.0 butir 3) atau di kartu mana pun yang bisa ditekan. Yang benar-benar

@@ -614,15 +614,28 @@ void main() {
                 .copyWith(textScaler: TextScaler.linear(scale)),
             child: Scaffold(
               body: SingleChildScrollView(
-                child: LivePowerCard(
-                  pvPower: 0,
-                  acPower: 18,
-                  batteryPower: batteryPower,
-                  soc: 81,
-                  pzemStale: false,
-                  pzemAgeLabel: 'Just now',
-                  theme: AppTheme.light,
-                  seedColor: seedColor,
+                // **The page margin, and this was a 48 dp blind spot.**
+                //
+                // `width` is the width of the *phone*. On the dashboard every
+                // card sits inside a `ListView` padded 24 dp on each side, so
+                // the card is `width - 48` dp wide — and this rendered the card
+                // at the full `width`, so the "320 dp" case measured a card 320
+                // dp wide when a real 320 dp phone gives it 272. Every width in
+                // this group was 48 dp more generous than the device it claimed
+                // to cover, which is how `Solar` rendering as `Sola` and
+                // `Live power` as `Live po…` survived a suite that already
+                // parametrized both dimensions.
+                child: atDashboardPageWidth(
+                  LivePowerCard(
+                    pvPower: 0,
+                    acPower: 18,
+                    batteryPower: batteryPower,
+                    soc: 81,
+                    pzemStale: false,
+                    pzemAgeLabel: 'Just now',
+                    theme: AppTheme.light,
+                    seedColor: seedColor,
+                  ),
                 ),
               ),
             ),
@@ -709,6 +722,33 @@ void main() {
       }
     }
 
+    /// The **horizontal** half of the same question, and the half this group was
+    /// blind to on the device.
+    ///
+    /// [expectNoLabelIsCut] measures *height*: it asks whether a label needs more
+    /// lines than the block allotted, because the flow labels deliberately carry
+    /// no `maxLines` and a wrapped-but-too-tall label is silently cut with no
+    /// flag at all. That check cannot see a label that is ellipsised *sideways* —
+    /// `maxLines: 1` with too little width — because such a label has exactly the
+    /// height it was given. And [expectNotClipped] does use `didExceedMaxLines`,
+    /// but it was only ever called for `'Discharging'`.
+    ///
+    /// Between them, the card rendered `Sola` for `Solar` and `Live po...` for
+    /// `Live power` on the test device at a 2.0 system font, with this file
+    /// green. Nothing here had ever asked what the painter *dropped* anywhere
+    /// except one hard-coded string.
+    Future<void> expectNothingTruncatedSideways(WidgetTester tester) async {
+      final clipped = clippedLabels(tester);
+      expect(
+        clipped,
+        isEmpty,
+        reason: 'These labels were cut sideways rather than wrapped, so the '
+            'height check above could not see them. A cut word is worse than a '
+            'wrapped one: "Sola" is not a word, and "Live po..." is not a '
+            'title. Truncated: $clipped',
+      );
+    }
+
     for (final scale in [1.0, 1.5, 2.0, 3.0]) {
       testWidgets('"Discharging" is whole at scale $scale', (tester) async {
         await pumpAtScale(tester, width: 381, scale: scale, batteryPower: -34);
@@ -722,6 +762,12 @@ void main() {
     // The emulator is 411 dp, the Xiaomi 381, and the label needed 170 dp of it.
     // A fix verified only at 381 would have been verified at a width the defect
     // did not reproduce at.
+    //
+    // Both halves run at every combination: [expectNoLabelIsCut] for a label that
+    // wrapped into a box one line too short, and
+    // [expectNothingTruncatedSideways] for one the painter cut. Neither alone
+    // covers the card, and running only the first is how `Solar` shipped as
+    // `Sola`.
     for (final width in [411.0, 381.0, 360.0, 320.0]) {
       for (final scale in [1.0, 1.3, 1.5, 2.0, 2.5, 3.0]) {
         testWidgets('no label is cut at ${width.toInt()} dp, scale $scale',
@@ -734,6 +780,7 @@ void main() {
           );
           expect(tester.takeException(), isNull);
           await expectNoLabelIsCut(tester);
+          await expectNothingTruncatedSideways(tester);
         });
       }
     }

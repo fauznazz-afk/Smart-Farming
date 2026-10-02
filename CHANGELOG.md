@@ -2,6 +2,63 @@
 
 ### Fixed
 
+- **The width tests were measuring a wider widget than the one that ships, and
+  that is why two of them were green while the device was broken.**
+  `live_power_card_test.dart` parametrised 320/360/381/411 dp and rendered the
+  card straight into a `Scaffold` with no padding. But every dashboard page is a
+  `ListView` padded 24 dp on each side, so **a card on a 320 dp phone is 272 dp
+  wide** — the test's "320 dp" case measured a card 320 dp wide. Every width it
+  claimed to cover was 48 dp more generous than the device, and it still passed
+  while the phone rendered `Sola` for `Solar`, `Live po...` for `Live power` and
+  `Sta...` for `Stable`.
+
+  The margin is no longer restated in a test. `_pageHorizontalMargin` is now
+  `kDashboardPageMargin`, public, and `test/widget_text_helpers.dart` reads it —
+  because a literal in a test whose job is to describe the app's own layout is a
+  copy, and `FEATURE.md` already records what a stale copy of that kind cost this
+  repo once, when six hand-written surface hexes in `color_helpers_test.dart`
+  drifted from the fills they claimed to measure and three colours sat under AA
+  with the suite green. A width parameter now means "a phone this wide", and
+  `atDashboardPageWidth` applies the margin.
+
+  With the real width, **two more defects appeared immediately.**
+
+  **A `RenderFlex` overflowed by 3.7 px** in the hero card's figure row. The `W`
+  unit was a rigid `Text` beside an already-`FittedBox` number, under a comment
+  asserting that the unit "keeps its own size because it is nowhere near the
+  limit". That was true when the card was rendered edge to edge and false
+  everywhere else: at 2.5 and 3.0 system fonts the unit was the part that pushed
+  the row over, in a slot 48 dp narrower than the one the comment reasoned
+  about. It is `Flexible` with `scaleDown` now, so the only rigid parts left in
+  that row are a 13 px icon and two 2-4 px gaps.
+
+  **The card title was cut to `Live po...`.** It already had a `Flexible`, and
+  its own comment explained that the *age label* was the victim — but the title
+  was ellipsising, so once the margin took its 48 dp the title simply claimed the
+  space. It scales down instead. A cut word is not a word, and `Live power` is a
+  name rather than a reading, so it is the right thing to shrink.
+
+- **`SystemStatusStrip` had no test at all, and at a 2.0 system font it rendered
+  six fragments**: `Bat...`, `AC ...`, `Ala...`, `Sta...` for the word
+  **Stable**, `min 1...` and `221 V ...`. All three fields in all three columns
+  were `maxLines: 1` with `ellipsis`, which no linter has an opinion about.
+
+  `Stable` is the one that mattered: it is the entire claim the strip makes, and
+  `Sta...` cannot be told from `Standby` or from a truncated something else.
+  All three fields now scale down and none of them ellipsises.
+
+  **Wrapping was tried first and does not work here**, which is worth recording
+  because it is the obvious thing to reach for. The three columns are
+  `Expanded`, so at 320 dp with the margin each is about 85 dp, and the labels are
+  single words — `Battery` cannot wrap at all, it can only be cut. The
+  measurement said `{'Battery': 'B...', 'AC grid': 'A...'}`.
+
+  `test/system_status_strip_test.dart` is the widget's first test. It pins the
+  three verdicts, that a healthy strip shows no alarm column at all, that the
+  grid verdict needs *both* the frequency and the voltage, and that an absent
+  state of charge is not printed as `0%` — then runs the same width/scale matrix
+  the other cards get.
+
 - **Three defects in `EnergySummaryCard`, found by writing the widget test
   `PRD §7.1` has been asking for since the label regressions of 27 September
   2026.** All three passed `flutter analyze`, passed a release build, and passed

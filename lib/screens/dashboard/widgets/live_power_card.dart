@@ -852,7 +852,28 @@ class _Term extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 2),
-            Text('W', style: TextStyle(fontSize: 11, color: faint)),
+            // **`Flexible` on the unit too, and the comment that used to be here
+            // was wrong.** It said the unit "keeps its own size because it is
+            // nowhere near the limit". That was true at the 381 dp viewport with
+            // the card rendered edge to edge, and false everywhere else: with the
+            // dashboard's 24 dp page margin on each side the slot is 48 dp
+            // narrower, and at a 2.5 or 3.0 system font an 11 sp `W` is wide
+            // enough to be the thing that pushes the row over. It overflowed by
+            // 3.7 px.
+            //
+            // The number beside it was already given a `FittedBox` for exactly
+            // this reason, and the unit was left rigid on the assumption it would
+            // never need one. A row whose only rigid parts are a 13 px icon and
+            // two 2-4 px gaps cannot overflow at all, which is a property worth
+            // more than the unit keeping its size — a scaled-down `W` is still
+            // perfectly legible, and the number is what has to survive.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text('W', style: TextStyle(fontSize: 11, color: faint)),
+              ),
+            ),
           ],
         ),
       ],
@@ -907,15 +928,35 @@ class _Header extends StatelessWidget {
         // scale 1.5 -- so it overflowed from around 1.3 upwards, and the age label
         // is the half that gets cut, which silently removes the only liveness
         // indicator on the card.
+        //
+        // **And `FittedBox(scaleDown)` rather than `ellipsis`, which is the second
+        // half of a defect the comment above describes as being in the age label.**
+        // Two things had to be true for the age label to be the victim: the title
+        // had to be flexible, and the title had to be willing to shrink. It was
+        // flexible but it was ellipsising, so once the dashboard's 24 dp page
+        // margin took 48 dp off the card width -- which no test in this file
+        // accounted for, because it rendered the card edge to edge -- the title
+        // claimed the space and the device showed `Live po...`.
+        //
+        // A cut word is not a word. The title is a name rather than a reading, so
+        // it is the right thing to scale: a slightly smaller `Live power` reads
+        // perfectly well, and the age label keeps its own ellipsis as the thing
+        // that gives way when the two genuinely cannot coexist. This is the same
+        // reasoning as the figure's `FittedBox` below and for the same stated
+        // reason: this project has shipped a truncated figure twice.
         Flexible(
-          child: Text(
-            'Live power',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: faintColor(theme.isDark),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Live power',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: faintColor(theme.isDark),
+              ),
             ),
           ),
         ),

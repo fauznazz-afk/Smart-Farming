@@ -297,43 +297,103 @@ class _Verdict extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 13, color: iconColor),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: faintColor(isDark),
+          // **Every one of these three lines was `maxLines: 1` with
+          // `ellipsis`, and all three of them were cut on the device.**
+              //
+              // Measured on the Xiaomi 24090RA29G at a 2.0 system font, with the
+              // card at its real width inside the page's 24 dp margins:
+              // `Bat...` for Battery, `AC ...` for AC grid, `Ala...` for Alarm,
+              // `Sta...` for the word **Stable**, `min 1...` for the minimum
+              // state of charge and `221 V ...` for the mains reading. This widget
+              // had no test at all, so nothing in the suite could have noticed,
+              // and the plainest reading of the screen at that font scale is a
+              // grid of fragments.
+              //
+              // The three are treated differently on purpose, because they are
+              // not three copies of the same kind of text:
+              //
+              //  * the **label** is a category name, one or two words, so it is
+              //    allowed to wrap onto a second line. `AC grid` on two lines is
+              //    a legible caption; `AC ...` is not a caption at all.
+              //  * the **value** is the verdict, and it is the one thing on this
+              //    strip that must not be ambiguous. `Stable` and `Unstable` are
+              //    the whole claim, and `Sta...` cannot be told from `Standby` or
+              //    from a truncated `Stable` of something else. It scales down
+              //    instead, which is the same trade the hero card's figure makes
+              //    and for the reason `AGENTS.md` records: a cut-off reading is
+              //    worse than a small one, because a cut one can be mistaken for
+              //    a different reading.
+              //  * the **detail** is supplementary and already two facts on one
+              //    line (`221 V · 50 Hz`), so it wraps to two lines.
+              //
+              // `maxLines: 2` rather than unbounded so a long value cannot grow
+              // the strip without limit, and no `ellipsis` anywhere: if two lines
+              // still cannot hold it, scaling is the honest answer, and this
+              // widget is three equal columns of a dashboard rather than prose.
+              //
+              // **Wrapping was tried first and does not work here, which is worth
+              // recording because it is the obvious thing to reach for.** The
+              // three columns are `Expanded`, so at 320 dp with the page margin
+              // each is about 85 dp, and the labels are single words: `Battery`
+              // cannot wrap at all, it can only be cut. The measurement said
+              // `{'Battery': 'B...', 'AC grid': 'A...'}`. So all three fields
+              // scale instead, and the only rigid parts left in a column are
+              // three `SizedBox`es of a few dp.
+              Row(
+                children: [
+                  Icon(icon, size: 13, color: iconColor),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: faintColor(isDark),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 1),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    detail,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 10, color: faintColor(isDark)),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            detail,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 10, color: faintColor(isDark)),
-          ),
-        ],
-      ),
-    );
+      );
   }
 }

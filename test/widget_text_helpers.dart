@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 // rather than free.
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard_screen.dart'
+    show kDashboardPageMargin;
 
 /// Every label a widget under test had to truncate, mapped to what it drew.
 ///
@@ -123,6 +125,40 @@ void expectNothingClipped(
 /// `live_power_card_test.dart` parametrizes down to 320, and a card that only
 /// holds together at 360 is a card that will break on a budget handset.
 const List<double> kNarrowWidthsDp = [320, 360, 411];
+
+/// The dashboard's horizontal page margin, in logical pixels.
+///
+/// **Read from the app, not restated here.** `live_power_card_test.dart`
+/// parametrised 320/360/411 dp and rendered the card directly into a `Scaffold`
+/// with no padding, so its "320 dp" case measured a card 320 dp wide. **On a
+/// real 320 dp phone the card is 272 dp wide.** The test was measuring a widget
+/// 48 dp wider than the one that ships, at every width it claimed to cover, and
+/// it passed while the device rendered `Sola` for `Solar` and `Live po...` for
+/// `Live power` at a 2.0 system font. Nothing in that file was wrong; the
+/// harness was measuring the wrong thing.
+///
+/// Every page is a `ListView` padded by this value on each side, so a card on
+/// screen is `screenWidth - 2 * kDashboardPageMargin` dp wide.
+const double kDashboardPageMarginDp = kDashboardPageMargin;
+
+/// The width a card actually gets on a phone [screenWidthDp] wide.
+///
+/// Use this instead of [screenWidthDp] wherever a test means "on a narrow
+/// phone", and keep the parameter named for the *screen* so a reader does not
+/// have to remember to subtract anything.
+double cardWidthFor(double screenWidthDp) =>
+    screenWidthDp - 2 * kDashboardPageMarginDp;
+
+/// Wraps a widget in the dashboard's page margin, so a test's width parameter
+/// means the width of the phone rather than the width of the card.
+///
+/// The alternative — passing the screen width straight through — is what
+/// produced the 48 dp blind spot above, and it fails *silently*: every
+/// assertion is a little weaker than it reads and nothing reports a problem.
+Widget atDashboardPageWidth(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: kDashboardPageMarginDp),
+      child: child,
+    );
 
 /// The text scales that have actually broken something in this app.
 ///

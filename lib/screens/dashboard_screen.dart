@@ -73,7 +73,17 @@ import 'settings_screen.dart';
 /// The cost is 16dp of width per side: on this device a card goes from 349dp to
 /// 333dp, so every two-column metric cell loses 8dp. That is the one thing here
 /// that cannot be checked without the device.
-const double _pageHorizontalMargin = 24;
+/// The dashboard's horizontal page margin, in logical pixels.
+///
+/// **Public so a test can read it rather than restate it.** Every page is a
+/// `ListView` whose padding is this value on each side, so a card on screen is
+/// `screenWidth - 2 * kDashboardPageMargin` dp wide. `test/widget_text_helpers.dart`
+/// needs that number to measure a card at the width it really has, and a test
+/// that copied the literal would be a copy — the failure mode `FEATURE.md`
+/// records twice already, where a list of surface hex values in
+/// `color_helpers_test.dart` drifted from the fills it claimed to measure and
+/// three colours sat under AA with the suite green.
+const double kDashboardPageMargin = 24;
 
 /// The gap between two cards on the same page.
 ///
@@ -1616,9 +1626,9 @@ Future<void> _refreshCurrentPage() async {
           child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
-              _pageHorizontalMargin,
+              kDashboardPageMargin,
               MediaQuery.paddingOf(context).top + kToolbarHeight - 6,
-              _pageHorizontalMargin,
+              kDashboardPageMargin,
               MediaQuery.paddingOf(context).bottom + 76,
             ),
             itemCount: items.length,
