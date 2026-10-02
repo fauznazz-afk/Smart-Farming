@@ -1,3 +1,71 @@
+## [Unreleased]
+
+### Fixed
+
+- **The hero card's verdict sentence did not know the battery existed.** Two
+  defects, one cause, both found by looking at the running app on the test
+  device on 2 October 2026 rather than by reading the code.
+
+  The sentence under the power flow was a function of the array and the house
+  alone, so the card could print **"The array covers the house, 7 W spare"** on
+  the same line as **"Discharging -19 W"**. Each half is true; together they say
+  something neither says. A reader takes the first as the array carrying the
+  house by itself and the second as an idle battery standing beside it. On the
+  device the surplus was 7 W while the battery was delivering 19 W, so the array
+  was the *smaller* of the two contributors — the opposite of what the sentence
+  implied. It now reads "The array covers the house, and the battery adds 19 W"
+  when the battery is the larger contributor, and keeps the plain surplus
+  sentence when it is not, so a clear afternoon does not grow a clause.
+
+  The louder half was the colour. **A shortfall the battery is covering is not
+  a shortfall the user needs warning about**, and the card painted `statusWarn`
+  amber on "The array is not covering the house load right now" whenever the
+  array came in under the house. On a battery-backed system that is not a fault,
+  it is the design working — at 15:50 the card read `Solar 5 W / House 17 W /
+  Discharging -30 W` and warned, in amber, about a house the battery was
+  supplying. The point is that the condition is *structurally guaranteed* to be
+  true every evening, which is what makes it a false alarm rather than a warning.
+  `AGENTS.md` already rejected the mirror image of this — a permanent green
+  badge asserting a condition that is boring when true — and a warning that
+  cannot stop being true has the same defect with the opposite sign. The card now
+  says "The array is short, and the battery adds 30 W" in ordinary text. A
+  shortfall with the battery in **standby** still gets the amber, because then
+  nothing is making the difference up.
+
+  Four regression guards, each verified by breaking the rule and confirming the
+  test fails with a real assertion — a guard that cannot fail is not a guard. One
+  of them required changing an existing fixture: `shows warning when array is
+  not covering load` used `batteryPower: -100`, which is *discharging*, so it
+  was asserting an amber warning about a house the battery was supplying. The
+  shortfall warning is real, but only when nothing is making the difference up,
+  so the fixture is now standby. `pv 100 / ac 500` is unchanged.
+
+### Verified
+
+- **Layout at a second screen size, for the first time.**
+  `PRD_PLTS_Monitoring_App.md` §7.2 named this as never done and noted that
+  `flutter test` cannot catch it. The device was driven to 720x1280 @ 320dpi
+  (360x640 dp) and the three places most likely to break all hold: the
+  three-item power flow bar stays on one line, both Energy analytics tiles fit,
+  and the three-series chart legend fits. The device was restored to its native
+  1220x2712 afterwards.
+
+  One thing that *looked* like a bug there is not: the navigation bar collapses
+  to a single button when the page is scrolled, so three of the four tabs
+  disappear. That is documented behaviour (`nav_bar.dart`) — the other three
+  icons sit at `opacity: 0` while collapsed, and tapping the remaining button
+  expands them. It is recorded here because it reads as a defect and cost a
+  screenshot to rule out.
+
+- **The native alarm module, on the device, against claims that had only ever
+  been written down.** `dumpsys alarm` and logcat confirm two armed
+  `CHECK_ALARMS` triggers, `repeatInterval=60000` for the cadence and
+  `flags=0x8` (`ALLOW_WHILE_IDLE`) for the backup; `configured 20 rule(s)
+  across 4 device(s)` confirms the four-device config; and the foreground
+  stand-down is real — not one `check started` line appears while the app is
+  open. The MIUI failure recorded in `AGENTS.md`, where a repeating alarm fired
+  six times and then vanished from `dumpsys alarm`, has not reproduced here.
+
 ## [1.7.1] - 2026-10-01
 
 ### Removed

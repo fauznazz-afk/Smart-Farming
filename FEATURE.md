@@ -1258,6 +1258,42 @@ yang tidak bisa ditindaklanjuti user. Kata "Resolved" tetap ada, teks biasa.
     prakiraan dibutuhkan lagi, jalurnya bukan API cuaca melainkan backend push
     atau prediksi FNN-XAI — `PRD_PLTS_Monitoring_App.md` §7.4 sudah menandai arah
     itu, dan keduanya butuh jalur yang belum ada.
+5. **Setiap cold start mengulang semua alarm yang masih menyala.** Ditemukan di
+   perangkat 2 Oktober 2026 lewat layar Alarm History, bukan lewat log.
+
+   Buktinya: TDS **terus-menerus** di bawah limit 800 ppm sepanjang hari —
+   tercatat 540,0 (06:27), 372,9 (09:44), 370,5 (10:01), 366,6 (11:48), 532,8
+   (15:34), 549,5 (15:37), 553,3 (15:40), 524,8 (15:50) — yaitu **delapan record
+   untuk satu kondisi yang tidak pernah clear**. Humidity bahkan punya dua record
+   pada menit yang sama (06:27, 90.4 % dan 90.5 %). Setiap pengulangan berarti
+   satu record riwayat **dan** satu notifikasi, jadi user diberi tahu tentang
+   masalah yang sama berulang kali.
+
+   Penyebabnya struktural, dan bukan flapping ambang. `_persistAlarm` hanya
+   dipanggil untuk sinyal dari `newlyActiveSignals`, jadi pengulangan berarti
+   alarm dianggap baru — dan `_primeActiveAlerts` (`dashboard_screen.dart`)
+   kembali lebih awal bila active set dari modul native kosong:
+
+   ```dart
+   if (!mounted || background.isEmpty) return;
+   ```
+
+   Active set itu **selalu dikosongkan** saat app foreground: `AlarmBridge
+   .setForeground` membuat pemeriksaan native stand down, jadi modul native tidak
+   pernah mengisinya. Akibatnya di Usage foreground, active set native kosong
+   setiap kali, `_activeAlertIds` mulai kosong setiap kali proses baru, dan
+   setiap alarm yang masih menyala terlihat baru.
+
+   Yang **belum** dibedakan: apakah semua delapan record itu dari cold start, atau
+   sebagian juga dari TDS yang berayun melewati 800 tanpa histeresis. Keduanya
+   mungkin terjadi. Tidak diperbaiki di sini karena perbaikannya menyentuh
+   semantik alarm — active set sisi Dart perlu dipersistensi, dan itu keputusan
+   produk ("apakah user boleh diberi tahu lagi setiap membuka app?"), bukan
+   sekadar pekerjaan. Dan sebagian yang jelas **tidak boleh** diperbaiki di
+   `evaluateAlarmRules`, karena fungsi itu dipin fixture paritas dengan
+   `AlarmEvaluator.kt`; histeresis harus hidup di pemanggilnya agar kedua sisi
+   tidak berbeda pendapat tentang alarm aktif — yang justru penyebab notifikasi
+   ganda yang seluruh desain active set ini ada untuk mencegahnya.
 
 ### 18.2 Kode mati / tidak terjangkau
 
@@ -1333,9 +1369,19 @@ Bukan bug, tapi mudah disalahpahami:
 - **Nilai bertanda negatif di hero card.** Saat screenshot terakhir baterai standby
   0 W, jadi hanya `Standby` yang terlihat. Kodenya mencetak nilai mentah, tapi belum
   pernah dilihat di layar.
-- **Layout di ukuran layar selain 1220×2712 @ density 520.** Tiga tempat paling
-  mungkin pecah: bar tiga item power flow, legenda chart tiga seri, dua tile
-  Energy analytics.
+- ~~**Layout di ukuran layar selain 1220×2712 @ density 520.**~~ **Selesai
+  2 Oktober 2026, dan tidak ada yang pecah.** Perangkat didorong ke
+  720x1280 @ 320dpi (360x640 dp) dan ketiga tempat yang paling mungkin pecah
+  semuanya utuh: bar tiga item power flow tetap satu baris, dua tile Energy
+  analytics muat, dan legenda chart tiga seri muat. Perangkat dikembalikan ke
+  1220x2712 sesudahnya.
+
+ Satu hal yang **terlihat** seperti bug di sana ternyata bukan: nav bar
+  menyusut jadi satu tombol saat halaman digulir, sehingga tiga dari empat tab
+  menghilang. Itu perilaku yang didokumentasikan (`nav_bar.dart` baris 44) —
+  tiga ikon lain ada di `opacity: 0` saat collapse, dan mengetuk tombol yang
+  tersisa akan mengembalikannya. Dicatat di sini karena ia terbaca sebagai cacat dan
+  biayanya satu screenshot untuk menyingkirkannya.
 - **~~Tekan pada kontrol.~~ Terverifikasi 30 September 2026** untuk date strip
   chip dan navbar; `Pressable` belum dipasang di tombol `FilledButton` (lihat
   §18.0 butir 3) atau di kartu mana pun yang bisa ditekan. Yang benar-benar

@@ -205,13 +205,23 @@ void main() {
       expect(find.text('Standby'), findsOneWidget);
     });
 
-    testWidgets('shows warning when array is not covering load', (tester) async {
+    // **The battery figure here was changed from -100 to 0, and that is the whole
+    // point of this test now.** It used to be -100, which is *discharging*, so the
+    // card was asserting an amber "the array is not covering the house" about a
+    // house the battery was in fact supplying -- a warning that was structurally
+    // true every evening and therefore never wrong and never useful. The
+    // shortfall warning is real, but only when nothing is making the difference
+    // up, so the fixture is standby. `pv 100 / ac 500` is unchanged: the array is
+    // still four fifths short, and the amber sentence is still the correct one.
+    testWidgets('shows warning when array is short and the battery is idle', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrap(
           LivePowerCard(
             pvPower: 100,
             acPower: 500,
-            batteryPower: -100,
+            batteryPower: 0,
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
@@ -224,6 +234,39 @@ void main() {
       expect(
         find.text('The array is not covering the house load right now'),
         findsOneWidget,
+      );
+    });
+
+    // The dusk case, with the device's own numbers from 2 October 2026 at 15:50:
+    // `Solar 5 W / House 17 W / Discharging -30 W`. The house is supplied, the
+    // array is not the supplier, and the card used to say so in amber.
+    testWidgets('a shortfall the battery covers is not a warning', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          LivePowerCard(
+            pvPower: 5,
+            acPower: 17,
+            batteryPower: -30,
+            soc: 99,
+            pzemStale: false,
+            pzemAgeLabel: null,
+            theme: AppTheme.light,
+            seedColor: seedColor,
+          ),
+        ),
+      );
+
+      expect(
+        find.text('The array is short, and the battery adds 30 W'),
+        findsOneWidget,
+      );
+      // The old sentence must be gone, and this is the half that carries the
+      // fix: a substring match on "the array" would pass on either wording.
+      expect(
+        find.text('The array is not covering the house load right now'),
+        findsNothing,
       );
     });
 
@@ -247,6 +290,96 @@ void main() {
         find.textContaining('The array covers the house'),
         findsOneWidget,
       );
+    });
+
+    // The figures are the ones the test device reported on 2 October 2026, and
+    // they are the whole defect: a 7 W surplus next to a 19 W battery draw. The
+    // old sentence printed only the surplus, so the card showed "The array covers
+    // the house, 7 W spare" directly above "Discharging -19 W" -- the array
+    // reading as the main contributor when it was the smaller of the two.
+    //
+    // Asserting the old string is *absent* is the half that matters. Finding the
+    // new text is a weaker check, because a substring match on "The array covers
+    // the house" would also be satisfied by the misleading sentence.
+    testWidgets('names the battery when it supplies more than the surplus', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          LivePowerCard(
+            pvPower: 25,
+            acPower: 18,
+            batteryPower: -19,
+            soc: 99,
+            pzemStale: false,
+            pzemAgeLabel: null,
+            theme: AppTheme.light,
+            seedColor: seedColor,
+          ),
+        ),
+      );
+
+      expect(
+        find.text('The array covers the house, and the battery adds 19 W'),
+        findsOneWidget,
+      );
+      // The surplus is real, so this is not a replacement -- it is the clause
+      // that was hiding the larger contributor.
+      expect(find.textContaining('W spare'), findsNothing);
+    });
+
+    // The other side of the same boundary. A 100 W draw against a 300 W surplus
+    // leaves the array as the larger contributor, so the original sentence was
+    // fair and must not have grown a clause. Without this the fix would quietly
+    // start narrating the battery on every clear afternoon.
+    testWidgets('keeps the spare sentence when the array contributes more', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          LivePowerCard(
+            pvPower: 500,
+            acPower: 200,
+            batteryPower: -100,
+            soc: 75,
+            pzemStale: false,
+            pzemAgeLabel: null,
+            theme: AppTheme.light,
+            seedColor: seedColor,
+          ),
+        ),
+      );
+
+      expect(
+        find.text('The array covers the house, 300 W spare'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('the battery adds'), findsNothing);
+    });
+
+    // Standby is not a direction, so a battery sitting at zero draw must not
+    // trigger the new clause even though `abs()` of it is small and positive.
+    // This is the `battery_sign.dart` rule reaching this widget.
+    testWidgets('does not name the battery while it is in standby', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          LivePowerCard(
+            pvPower: 32,
+            acPower: 18,
+            batteryPower: 0,
+            soc: 99,
+            pzemStale: false,
+            pzemAgeLabel: null,
+            theme: AppTheme.light,
+            seedColor: seedColor,
+          ),
+        ),
+      );
+
+      expect(find.textContaining('the battery adds'), findsNothing);
+      expect(find.text('Standby'), findsOneWidget);
     });
 
     testWidgets('renders in dark mode', (tester) async {

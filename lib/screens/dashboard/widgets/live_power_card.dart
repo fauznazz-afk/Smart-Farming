@@ -178,6 +178,61 @@ class _PowerFlow extends StatelessWidget {
         knownShare ? (loadForBar / solarForBar).clamp(0.0, 1.0) : 0.0;
     final coversLoad = knownShare && solarForBar >= loadForBar;
 
+    // The surplus, and the battery's own contribution, as two plain numbers, so
+    // the verdict below states both rather than deriving one from the other.
+    //
+    // **The verdict used to be a function of the array and the house alone**, and
+    // the card could therefore print "The array covers the house, 7 W spare" on
+    // the same line as "Discharging -19 W". Each of those is true on its own and
+    // together they say something neither says: the first reads as the array
+    // carrying the house by itself, the second as an idle battery standing
+    // alongside it. Measured on the test device on 2 October 2026, the surplus
+    // was 7 W while the battery was delivering 19 W, so the array was the
+    // *smaller* of the two contributors -- the opposite of what the sentence
+    // implied. This is the `FEATURE.md` 18.8 class of defect: a widget that looks
+    // as though it is saying one thing while it says another, with no exception
+    // and nothing for `flutter analyze` to catch.
+    //
+    // `>` and not a sign test, deliberately. The sentence only has to mention the
+    // battery when what the battery delivers is *larger* than the surplus; below
+    // that the array genuinely is the larger contributor and the original sentence
+    // was fair, so this does not add a clause to every dusk reading.
+    //
+    // `batteryPower!` is safe on this branch rather than merely convenient:
+    // `discharging` is only ever true when `chargeState` was derived from a
+    // non-null `batteryPower`, and `&&` short-circuits, so the bang is never
+    // reached with a null.
+    final spareWatts = knownShare ? solarForBar - loadForBar : 0.0;
+    final batterySupplies = discharging && batteryPower!.abs() > spareWatts;
+
+    // The other half of the same omission, and the louder one.
+    //
+    // **A shortfall the battery is covering is not a shortfall the user needs
+    // warning about.** This card painted `statusWarn` on the sentence "The array
+    // is not covering the house load right now" whenever the array came in under
+    // the house, and on a battery-backed system that is not a fault -- it is the
+    // design working. On the test device at 15:50 on 2 October 2026 the card read
+    // `Solar 5 W / House 17 W / Discharging -30 W` with that sentence in amber:
+    // the house was fully supplied, the array was not the supplier, and the card
+    // was warning about it.
+    //
+    // The point is that the condition is *structurally guaranteed* to be true
+    // every evening, which is what makes it a false alarm rather than a warning.
+    // `AGENTS.md` already rejected the mirror image of this -- "a permanent green
+    // 'semua normal' badge ... asserted a condition that is boring when true" --
+    // and a warning that cannot stop being true has the same defect with the
+    // opposite sign. Status colour means a condition, and a battery discharging at
+    // dusk is not one.
+    //
+    // The wording stays parallel to the surplus branch on purpose, so both
+    // battery-involved sentences have the same shape: what the array did, and what
+    // the battery added. Neither claims where the power physically went.
+    //
+    // Scoped to `discharging` on purpose. If the array is short and the battery is
+    // in standby, nothing is making the difference up, and the original amber
+    // sentence is the correct and only warning on the card.
+    final batteryMakesUp = discharging && !coversLoad;
+
     // `theme.isDark` and not a three-way switch, and that is a deliberate
     // no-change rather than an oversight: these two are hand-picked HSL
     // lightnesses, not a token with a per-theme answer, so Dracula takes the
@@ -433,15 +488,29 @@ class _PowerFlow extends StatelessWidget {
           // an absent meter is not a shortfall and must not wear its colour.
           acPower == null
               ? 'House draw unavailable until the meter reports'
+              : batteryMakesUp
+              ? 'The array is short, and the battery adds '
+                    '${batteryPower!.abs().toStringAsFixed(0)} W'
               : !coversLoad
               ? 'The array is not covering the house load right now'
-              : solarForBar - loadForBar > 0.5
+              : batterySupplies
+              // Ahead of the surplus branch, and not after it. A battery that is
+              // delivering more than the array has spare is the more surprising
+              // fact of the two, and printing the surplus first would bury it
+              // under the reassuring half of the sentence.
+              ? 'The array covers the house, and the battery adds '
+                    '${batteryPower!.abs().toStringAsFixed(0)} W'
+              : spareWatts > 0.5
               ? 'The array covers the house, '
-                    '${(solarForBar - loadForBar).toStringAsFixed(0)} W spare'
+                    '${spareWatts.toStringAsFixed(0)} W spare'
               : 'The array is just covering the house load',
           style: TextStyle(
             fontSize: 11,
-            color: acPower != null && !coversLoad
+            // `!batteryMakesUp` on the warning, and it is the same fact as the
+            // branch above it: a shortfall the battery is covering keeps the
+            // ordinary faint text, because it is not a warning. A shortfall with
+            // the battery in standby still gets the amber.
+            color: acPower != null && !coversLoad && !batteryMakesUp
                 ? statusWarn(theme.isDark)
                 : faint,
           ),

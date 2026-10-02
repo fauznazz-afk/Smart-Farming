@@ -308,7 +308,7 @@ diukur pada 1.4.0: 1038 ms.
   dan secara nonaktif battery optimisation untuk EnerGrow di pengaturan Xiaomi.
 - **Video CCTV membebani baterai** — WebView decoding berjalan di perangkat sementara
   dashboard tetap polling. Aliran ini sudah diisolasi di balik `RepaintBoundary` dan
-  tidak melakukan rebuild, tapi tetap boros; tidak ada pengaturan untuk 이를.
+  tidak melakukan rebuild, tapi tetap boros; tidak ada pengaturan untuk ini.
 - **Sumbu Y dibulatkan** — label sumbu memakai angka bersih (1 / 2 / 2,5 / 5), jadi nilai
   ekstrem bisa membuat label berbeda dari angka yang tercatat.
 
