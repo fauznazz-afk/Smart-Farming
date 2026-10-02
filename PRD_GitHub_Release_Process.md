@@ -4,28 +4,41 @@
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
 **Dokumen:** 1.2
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.7.1 (build 15), tag `v1.7.1` — setiap prosedur di dokumen ini
-dijalankan untuk rilis itu kecuali uji upgrade `adb install -r` di §5, yang
-dilewati **sengaja** pada 2 Oktober 2026. Perangkat uji yang tersedia saat itu
-adalah emulator, dan satu-satunya build yang terpasang di sana ditandatangani dengan
-kunci yang sama adalah build 1.7.1 itu sendiri, sehingga `adb install -r`
-hanya akan menguji dirinya sendiri. Jalur terakhir yang benar-benar menjalankan
-upgrade antar-rilis adalah 1.5.0 dari 1.4.0.
+**Rilis acuan:** 1.7.2 (build 16), tag `v1.7.2`
 
-Pemeriksaan fingerprint `apksigner` di §3 berjalan untuk 1.7.1 dan cocok dengan
-nilai yang diharapkan di Bagian 3. Unduhan pasca-publikasi dengan pembandingan
+**1.7.2 — 2 Oktober 2026.** Rilis perbaikan; tiga commit perbaikan dan tidak ada
+fitur baru, jadi nomornya patch dan build naik 15 → 16.
+
+Pemeriksaan fingerprint `apksigner` di §3 berjalan untuk 1.7.2 dan cocok dengan
+nilai yang diharapkan di Bagian 3, baik pada build lokal maupun pada APK yang
+diunduh ulang dari halaman rilis. Unduhan pasca-publikasi dengan pembandingan
 SHA-256 terhadap build lokal juga berjalan, untuk APK **dan** `CHANGELOG.md` yang
 terlampir:
 
 | | |
 |---|---|
-| SHA-256 APK lokal dan unduhan | `97D99B1D2E098E2F53655B18F9261883FCFBEFB26451BD69381CEEE11CCBCBEC` |
+| SHA-256 APK lokal dan unduhan | `FAB0BF383F6368165188B0B7522E97B85EB548A3C868E0E683E1C222204F8F9B` |
 | Fingerprint sertifikat APK unduhan | `504d13ee0bbfa8df2a24c20ef3cc59bde4f35b69596a12ceabb709cf702564b5` |
-| `versionName` / `versionCode` APK unduhan | `1.7.1` / `15` |
+| `versionName` / `versionCode` APK | `1.7.2` / `16` |
 | Scheme v2 | `true` |
+| Release APK menyertakan `AlarmDebugReceiver`? | **tidak** — hanya `AlarmCheckReceiver` dan `AlarmBootReceiver` |
+| `flutter analyze` | bersih |
+| `flutter test` | 625 lulus di 40 file, per-file dengan upto 3 percobaan |
 
-Untuk 1.6.0, langkah yang sama menghasilkan
-`828d9afdcf89cb4da4a65e4fcafd8a43ca1d201700e44aff3984074ef0c85777`, identik.
+**Dua langkah §5 dan §8 dilewati, dan keduanya karena perangkat tidak ada.**
+`adb install -r` untuk menguji upgrade antar-rilis dilewati seperti pada 1.7.1,
+sehingga **jalur upgrade yang terakhir benar-benar berjalan masih 1.5.0 dari
+1.4.0**. Dan ketiga perbaikan terakhir pada rilis ini — satuan `kWh` yang
+terpotong, header yang meluap pada font besar, dan strip status yang menjadi
+pecahan kata — **belum pernah dilihat di perangkat**: cacatnya ditemukan di
+perangkat nyata pada font 2.0, tetapi perangkat terputus sebelum APK-nya sempat
+dippasang, jadi perbaikannya dipin oleh test pada lebar yang benar dan belum
+sekali dilihat di layar. Ini dinyatakan di `RELEASE_NOTES_v1.7.2.md`, bukan
+dilewati.
+
+`.\gradlew.bat :app:testDebugUnitTest` **tidak dijalankan** pada 1.7.2: tidak
+ada aturan alarm atau `AlarmMessageFormat.kt` yang berubah, sehingga paritas
+Dart↔Kotlin tidak tersentuh.
 
 ---
 
