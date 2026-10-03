@@ -1,5 +1,32 @@
 ## [Unreleased]
 
+### Known
+
+- **The three figures in the hero card no longer share a size at large system
+  fonts, which is a regression from the 1.7.2 fix and is visible on the device.**
+  Found on the Xiaomi 24090RA29G on 3 October 2026 at a 2.0 system font: with
+  `Solar 250 W / House 17 W / Charging 93 W`, the `250` renders visibly smaller
+  and raised above the other two, because each figure has its own
+  `FittedBox(scaleDown)` and `250` is the only one that needs to shrink.
+
+  The card's own comment says the flow "reads as three equal stations", so a
+  figure drawn at a different size is a figure that looks like a different
+  quantity — the same objection `AGENTS.md` raises about a chart whose shape is
+  an artefact of its units.
+
+  **Not fixed, deliberately.** The per-term `FittedBox` was the right call for
+  each figure *individually* and the wrong shape for the row: equal station sizes
+  need **one** scale derived from the most constrained slot, applied to all three,
+  and that has to be measured with a `TextPainter` the way `_labelLineCount`
+  already measures the labels. Fixing it by scaling each figure on its own — or
+  by capping the longest label's width instead — trades one defect for the one
+  just fixed. It wants its own change and its own device check.
+
+  Everything else in this release was confirmed on the device at 2.0: `Charging`,
+  `AC grid`, `Stable`, `min 15%` and `221 V · 50 Hz` in the status strip, the
+  `kWh` figures, and `Live power` / `Solar` / `Charging` in the hero card all
+  render whole, and no overflow stripe is painted anywhere.
+
 ### Fixed
 
 - **The background alarm check reported success on the tick where the server
