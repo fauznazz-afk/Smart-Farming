@@ -33,6 +33,7 @@ import 'dashboard/utils/energy_helpers.dart';
 import 'dashboard/utils/history_range.dart';
 import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
+import 'dashboard/widgets/chart_carousel.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
 import 'dashboard/widgets/date_strip.dart';
@@ -2366,9 +2367,17 @@ Future<void> _refreshCurrentPage() async {
 
   /// One header plus one card per group a prefix declares.
   ///
-  /// The electrical pages declare a single three-series group, so this renders
-  /// exactly what it rendered before. The greenhouse declares four, which is why
-  /// the page grew its first charts at all.
+  /// **More than one group becomes a carousel rather than a stack.** The
+  /// greenhouse declares four and the fish tank three, and stacked they meant
+  /// scrolling past three plots to reach the fourth on a phone, every time. The
+  /// electrical pages declare one each and keep the plain layout -- a carousel
+  /// holding a single chart cannot be swiped and only looks like it should.
+  ///
+  /// The header, the date-range picker and the Live indicator stay outside the
+  /// carousel because they describe the page rather than the plot; only the plot
+  /// moves. The dots below it are load-bearing rather than decorative, and the
+  /// reason is that a carousel with no position indicator is indistinguishable
+  /// from a chart the user has finished with.
   List<Widget> _chartSections(String prefix, AppTheme theme) => [
     for (final build in _chartSectionThunks(prefix, theme)) build(),
   ];
@@ -2383,26 +2392,64 @@ Future<void> _refreshCurrentPage() async {
   /// wiring is what threw `Bad state: Too many elements` when the groups were
   /// split. There is now one implementation of "a page's charts".
   List<Widget Function()> _chartSectionThunks(String prefix, AppTheme theme) {
-    if (chartPageTitle(prefix) == null) return const [];
-    return [
-      for (final group in chartGroupsForPrefix(prefix)) ...[
-        // The gap is before the header, for the reason on [_chartHeaderGap]: a
-        // header needs the card above it to have finished before the label lands.
-        //
-        // **It used to be written out by the three electrical pages and not by the
-        // other two**, so the greenhouse and fish pages ran their chart headers
-        // straight into the card above with nothing but [_cardGap] between them —
-        // the exact thing that constant exists to prevent. Emitting it here makes
-        // the rule uniform instead of per-page.
+    final title = chartPageTitle(prefix);
+    if (title == null) return const [];
+    final groups = chartGroupsForPrefix(prefix);
+    if (groups.isEmpty) return const [];
+
+    // One group: the header and the card, exactly as this always rendered.
+    //
+    // **The single-group path is not a special case for tidiness.** The header
+    // names the chart, so on a one-chart page the header must name that chart,
+    // which is `groups.single.title` and not the page name. Collapsing the two
+    // would rename "PV" to "Power" on the PV tab.
+    if (groups.length == 1) {
+      return [
         () => const SizedBox(height: _chartHeaderGap),
-        () => _chartSectionHeader(group.title, prefix, theme),
+        () => _chartSectionHeader(groups.single.title, prefix, theme),
         () => const SizedBox(height: 8),
         () => _bindRevision(
           _chartRevision,
           theme,
-          () => _chartCard(prefix, group, theme),
+          () => _chartCard(prefix, groups.single, theme),
         ),
-      ],
+      ];
+    }
+
+    // The tallest card in the set sizes the slot. Every card already declares
+    // its own height, so this is a maximum over declared values rather than a
+    // number chosen here -- which is why the carousel costs no vertical
+    // accuracy: each card still paints into the height it asked for.
+    final tallest = groups
+        .map((g) => g.height ?? 400.0)
+        .reduce((a, b) => a > b ? a : b);
+
+    return [
+      () => const SizedBox(height: _chartHeaderGap),
+      // The page name, not the chart name, because in a carousel the chart name
+      // moves and this does not. The indicator below the plot carries it.
+      () => _chartSectionHeader(title, prefix, theme),
+      () => const SizedBox(height: 8),
+      // One `Bound` around the whole carousel rather than one per page. The
+      // pages are a fixed list and they move together, and a `Bound` per page
+      // would let four boundaries rebuild because one of them changed.
+      () => _bindRevision(
+        _chartRevision,
+        theme,
+        () => ChartCarousel(
+          itemCount: groups.length,
+          height: tallest,
+          isDark: theme.isDark,
+          seedColor: _accent,
+          // The dashboard's own pager gate, reused. Two horizontal pagers are
+          // nested here and without this the outer one takes every swipe — the
+          // first build swiped from the Temperature chart to the Fish Tank tab.
+          onPointerActive: _setChartPointerActive,
+          inset: kDashboardPageMargin,
+          labelBuilder: (i) => groups[i].title,
+          itemBuilder: (context, i) => _chartCard(prefix, groups[i], theme),
+        ),
+      ),
     ];
   }
 }

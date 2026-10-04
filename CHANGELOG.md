@@ -1,6 +1,57 @@
 ## [Unreleased]
 
+### Added
+
+- **Charts on the greenhouse and fish tank pages are one swipeable card rather
+  than a stack.** The greenhouse declares four chart groups and the fish tank
+  three; stacked, reaching the TDS plot meant scrolling past Temperature,
+  Humidity and Light on a phone every time. The header, the date-range picker and
+  the Live indicator stay outside — they describe the page, not the plot — and the
+  indicator below the plot carries the chart's own name and position, because a
+  carousel with no position indicator is indistinguishable from a chart the user
+  has finished with. The electrical pages declare one group each and keep the
+  plain layout; a carousel holding a single chart cannot be swiped and only looks
+  like it should.
+
+  The slot is sized from the **tallest declared card height** rather than a
+  number chosen here, so no card is drawn at a height it did not ask for.
+
+  The gesture was the hard part, and it failed first: with two horizontal pagers
+  nested, the outer one took every swipe and the first build moved from the
+  Temperature chart to the **Fish Tank tab**. It works now because the carousel
+  reports pointer-down to the dashboard's existing `ChartGestureLockPhysics`
+  rather than inventing a second gesture arbitration. Reusing that class is the
+  point — it exists for exactly this, and a carousel-specific alternative would be
+  a second thing to get wrong. Confirmed on the device: a swipe moves the chart
+  and the page indicator, and stays on the same tab.
+
 ### Known
+
+- **The chart card inside the carousel has no shadow on its left edge, while a
+  comparable full-width card on the same page does.** Measured on the Xiaomi
+  24090RA29G on 4 October 2026, scanning row brightness across the page margin:
+
+  | x | 13 | 16 | 20 | 40 | 50 |
+  |---|---|---|---|---|---|
+  | Energy analytics card (no carousel) | 24 | **23** | **23** | 25 | 26 |
+  | chart card (in the carousel) | 26 | 26 | 26 | 26 | 26 |
+
+  The reference shows a shadow ramp and recovers; the carousel card is **flat
+  across the whole margin**. It is missing the *light* half of the pair too —
+  `AppElevation.raised` offsets that to `Offset(-6, -6)`, up and to the left, and
+  there is no brightening there either — so this is not a directional-light
+  asymmetry the design already accounts for. A whole half of the shadow pair is
+  absent.
+
+  A first attempt widened the carousel slot to the full screen and inset the card
+  by the page margin, on the theory that `PageView` clips its children and the
+  ambient half reaches 20–31 dp. **That did not fix it**, so the clipping theory
+  is unconfirmed and the real cause is still open. The inset is kept because it is
+  the width the card should have regardless, but it is not the fix.
+
+  Not chased further here. The cause is not identified, and making a second
+  layout change on a guess is how this repo has produced confident wrong answers
+  before.
 
 - **The three figures in the hero card no longer share a size at large system
   fonts, which is a regression from the 1.7.2 fix and is visible on the device.**
