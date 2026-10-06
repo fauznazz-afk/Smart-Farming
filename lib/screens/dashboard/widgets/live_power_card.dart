@@ -331,9 +331,26 @@ class _PowerFlow extends StatelessWidget {
             // The number that matters is `available * need / total`, which is the
             // share the row will hand this slot, and a line count measured against
             // anything else is a line count about a layout that does not exist.
+            //
+            // **Still keyed to the labels alone, on purpose.** Reallocating each
+            // slot as `max(its label, its figure)` so the figures could claim
+            // room was implemented and measured, and it moved the shared scale by
+            // about 1% while breaking where the labels wrap -- ten tests in `the
+            // battery state label is never amputated`. The labels dominate the
+            // total demand, so the narrowest slot lands within a pixel or two of
+            // where it already was. See [_sharedFigureScale].
             double slotWidthAt(int index) => allLabelsFitOnOneLine
                 ? fairShare
                 : available * needed[index] / total;
+
+            final figureScale = _sharedFigureScale(
+              context,
+              slotWidths: [
+                for (var i = 0; i < needed.length; i++) slotWidthAt(i),
+              ],
+              watts: [solarForBar, acPower, batteryPower],
+              color: faint,
+            );
 
             final labelHeight = _labelBlockHeight(
               context,
@@ -373,6 +390,7 @@ class _PowerFlow extends StatelessWidget {
                 watts: solarForBar,
                 color: accent,
                 isDark: theme.isDark,
+                figureScale: figureScale,
               ),
               0,
             ),
@@ -388,6 +406,7 @@ class _PowerFlow extends StatelessWidget {
                 watts: acPower,
                 color: loadColor,
                 isDark: theme.isDark,
+                figureScale: figureScale,
               ),
               1,
             ),
@@ -417,6 +436,7 @@ class _PowerFlow extends StatelessWidget {
                 watts: batteryPower,
                 color: accent,
                 isDark: theme.isDark,
+                figureScale: figureScale,
               ),
               2,
             ),
@@ -651,25 +671,138 @@ TextStyle _termLabelStyle(BuildContext context) => DefaultTextStyle.of(context)
     // annotation wants, and it would be a fourth number to keep in step.
     ;
 
+/// The width of one string on one line at the current text scale.
+///
+/// The single place a `TextPainter` is asked "how wide is this", so that every
+/// measurement in this file resolves the same scaler and direction. The label
+/// widths, the label block height and the flow-row solver all need this number
+/// and none of them may compute their own -- a measurement that hand-writes the
+/// style it is measuring is a copy, and this file has already produced four
+/// bugs that way (see [_labelBlockHeight]).
+double _naturalWidth(BuildContext context, String text, TextStyle style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final width = painter.width;
+  painter.dispose();
+  return width;
+}
+
+/// The figure's own style, and the unit beside it.
+///
+/// **Defined once and used by both the widget and the measurement that sizes
+/// it.** See [_naturalWidth] for why a hand-written copy of a style is a bug
+/// waiting to happen here rather than a stylistic choice.
+TextStyle _termFigureStyle({required Color color}) => TextStyle(
+  fontSize: 24,
+  fontWeight: FontWeight.w800,
+  height: 1.0,
+  color: color,
+);
+
+TextStyle _termUnitStyle({required Color color}) =>
+    TextStyle(fontSize: 11, color: color);
+
+/// The figure's text, as the card prints it.
+///
+/// `--` for no reading, matching `MetricGrid` and `SystemStatusStrip`. A `0` here
+/// would be a measurement, and there is not one.
+///
+/// Shared with [_sharedFigureScale] so the string that was measured is provably
+/// the string that gets drawn.
+String? _figureText(double? watts) =>
+    watts == null ? '--' : watts.toStringAsFixed(0);
+
+/// The **one** scale all three flow-row figures are drawn at.
+///
+/// This is the fix for a device-found regression: each `_Term` carried its own
+/// `FittedBox(scaleDown)`, so at a 2.0 system font on the Xiaomi 24090RA29G the
+/// `250` in `Solar 250 W / House 17 W / Charging 93 W` drew visibly smaller and
+/// raised above `17` and `93` -- it was the only one of the three wide enough to
+/// need to shrink at all. Measured, the three were 11.3 / 16.9 / 29.8 px, a 2.6x
+/// spread. The card's own comment says the row "reads as three equal stations",
+/// and a figure at a different size reads as a different *quantity*.
+///
+/// ### The constraint that decides the size
+///
+/// **The figure gets half its slot, not the rest of it.** The figure and the
+/// unit `W` are two `Flexible` siblings, so `Flex` divides what is left after the
+/// icon and the gaps *equally*, whatever their natural widths. At 381 dp and 2.0,
+/// slots of 87 / 87 / 137 px become flex shares of 34 / 34 / 59 px. Assuming
+/// `slotWidth - 19` here overstates the room by exactly 2x, and the symptom of
+/// getting that wrong is a scale too large to fit -- which leaves the `FittedBox`
+/// to shrink anyway and so *reproduces the very difference being fixed*.
+///
+/// Text advance width is linear in font size, and the unit and figure share a
+/// slot equally, so for one term:
+///
+/// ```text
+///   s <= (slotWidth - icon - gaps) / 2 / max(w_fig, w_unit)
+/// ```
+///
+/// and the shared scale is the smallest such `s`, capped at 1.0 so nothing is
+/// ever enlarged. The unit scales with the figure, which keeps each station's
+/// proportions and keeps the three identical.
+///
+/// ### What was tried and rejected: sizing the slots by figure demand too
+///
+/// The slots are allocated by *label* width, so `Solar` -- the shortest label --
+/// gets the narrowest slot, and it is the one holding the three-digit `250`
+/// while `Charging` gets 137 px for a two-digit `93`. That allocation is
+/// inverted with respect to what the figures need, so reallocating each slot as
+/// `max(its label, its figure)` and solving the scale against *that* allocation
+/// looks like the real fix.
+///
+/// It was implemented and measured, and it is **not worth it**: the scale moved
+/// from 0.2331 to 0.2359 -- about 1% -- because the labels, not the figures,
+/// dominate the total demand. At 2.0 the three labels measure 111 / 111 / 178 px
+/// into a 313 px row, so the label block overruns the row before any figure is
+/// placed and the narrowest slot lands within a pixel or two of where it already
+/// was. It also moved where the labels wrap, which broke ten existing tests in
+/// `the battery state label is never amputated`.
+///
+/// The ceiling is the labels, then, and raising it means a layout change -- not
+/// a scale change. Recorded rather than shipped.
+///
+/// **`FittedBox` deliberately stays.** Without it this function is only an
+/// optimisation; with it, a slot too narrow even at this scale degrades to
+/// shrinking rather than to a stripe across the number. That has shipped twice in
+/// this app -- `109....` and `239...` -- and both times the toolchain was green.
+double _sharedFigureScale(
+  BuildContext context, {
+  required List<double> slotWidths,
+  required List<double?> watts,
+  required Color color,
+}) {
+  const icon = 13.0;
+  const gaps = 4.0 + 2.0;
+
+  // Measured once, at scale 1. Every step below is arithmetic on these.
+  final figureNeeds = [
+    for (final w in watts)
+      _naturalWidth(context, _figureText(w)!, _termFigureStyle(color: color)),
+  ];
+  final unitNeed = _naturalWidth(context, 'W', _termUnitStyle(color: color));
+
+  var scale = 1.0;
+  for (var i = 0; i < watts.length; i++) {
+    // The share each of the two flexible children receives. Not
+    // `slotWidth - icon - gaps`: see the note above.
+    final share = (slotWidths[i] - icon - gaps) / 2;
+    if (share <= 0) continue;
+    final text = math.max(figureNeeds[i], unitNeed);
+    if (text > 0) scale = math.min(scale, share / text);
+  }
+  return scale.clamp(0.0, 1.0);
+}
+
 /// Each label's width on one line, at the current text scale.
 List<double> _labelNaturalWidths(BuildContext context, List<String> labels) {
   final style = _termLabelStyle(context);
-  final scaler = MediaQuery.textScalerOf(context);
-  final direction = Directionality.of(context);
-  return [
-    for (final label in labels)
-      () {
-        final painter = TextPainter(
-          text: TextSpan(text: label, style: style),
-          textDirection: direction,
-          textScaler: scaler,
-          maxLines: 1,
-        )..layout();
-        final width = painter.width;
-        painter.dispose();
-        return width;
-      }(),
-  ];
+  return [for (final label in labels) _naturalWidth(context, label, style)];
 }
 
 /// How many lines one flow-row label takes at the width its slot actually gets.
@@ -738,6 +871,7 @@ class _Term extends StatelessWidget {
     required this.color,
     required this.isDark,
     this.labelHeight,
+    this.figureScale = 1,
   });
 
   final IconData icon;
@@ -748,6 +882,15 @@ class _Term extends StatelessWidget {
   /// Set to the tallest of the three flow-row labels, so the figures underneath
   /// them share a baseline. See [_labelBlockHeight].
   final double? labelHeight;
+
+  /// **The same value for all three terms, deliberately.**
+  ///
+  /// 1.0 unless a figure genuinely does not fit the slot the row hands it, in
+  /// which case every figure is drawn at this fraction of 24 sp. The previous
+  /// code gave each `_Term` its own `FittedBox` and let it settle at its own
+  /// factor, which is what made `250` draw smaller than `17` and `93` on the
+  /// device at a 2.0 system font. See [_solveFlowRow].
+  final double figureScale;
 
   /// This term's figure in watts, or `null` when there is no reading to print.
   final double? watts;
@@ -841,13 +984,12 @@ class _Term extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  watts == null ? '--' : watts!.toStringAsFixed(0),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
+                  // `_figureText`, not an inline format, so the string the scale
+                  // was solved against is provably the string drawn here.
+                  _figureText(watts)!,
+                  style: _termFigureStyle(
                     color: watts == null ? faint : color,
-                  ),
+                  ).copyWith(fontSize: 24 * figureScale),
                 ),
               ),
             ),
@@ -871,7 +1013,12 @@ class _Term extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text('W', style: TextStyle(fontSize: 11, color: faint)),
+                child: Text(
+                  'W',
+                  style: _termUnitStyle(
+                    color: faint,
+                  ).copyWith(fontSize: 11 * figureScale),
+                ),
               ),
             ),
           ],

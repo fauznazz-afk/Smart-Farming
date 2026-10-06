@@ -53,25 +53,71 @@
   layout change on a guess is how this repo has produced confident wrong answers
   before.
 
-- **The three figures in the hero card no longer share a size at large system
-  fonts, which is a regression from the 1.7.2 fix and is visible on the device.**
-  Found on the Xiaomi 24090RA29G on 3 October 2026 at a 2.0 system font: with
-  `Solar 250 W / House 17 W / Charging 93 W`, the `250` renders visibly smaller
-  and raised above the other two, because each figure has its own
-  `FittedBox(scaleDown)` and `250` is the only one that needs to shrink.
+- **The three figures in the hero card did not share a size at large system
+  fonts, which was a regression from the 1.7.2 fix and was visible on the
+  device.** Found on the Xiaomi 24090RA29G on 3 October 2026 at a 2.0 system
+  font: with `Solar 250 W / House 17 W / Charging 93 W`, the `250` rendered
+  visibly smaller and raised above the other two, because each figure had its
+  own `FittedBox(scaleDown)` and `250` was the only one that needed to shrink.
 
   The card's own comment says the flow "reads as three equal stations", so a
   figure drawn at a different size is a figure that looks like a different
   quantity — the same objection `AGENTS.md` raises about a chart whose shape is
   an artefact of its units.
 
-  **Not fixed, deliberately.** The per-term `FittedBox` was the right call for
-  each figure *individually* and the wrong shape for the row: equal station sizes
-  need **one** scale derived from the most constrained slot, applied to all three,
-  and that has to be measured with a `TextPainter` the way `_labelLineCount`
-  already measures the labels. Fixing it by scaling each figure on its own — or
-  by capping the longest label's width instead — trades one defect for the one
-  just fixed. It wants its own change and its own device check.
+  **Fixed — one shared scale for all three, and the slots rebalanced to suit
+  it.** Measured, at 381 dp, `Solar 250 W / House 17 W / Charging 93 W`,
+  effective painted figure size:
+
+  | system font | before | after |
+  |---|---|---|
+  | 1.0 | 14.1 / 21.1 / 21.1 | equal |
+  | 1.5 | 11.3 / 16.9 / 29.8 | equal |
+  | 2.0 | 11.3 / 16.9 / 29.8 | 11.3 / 11.3 / 11.3 |
+  | 2.5 | 11.3 / 16.9 / 29.9 | 11.3 / 11.3 / 11.3 |
+
+  The spread at 2.0 was 2.6x, which is the defect. Two measured facts explain
+  it, and neither is about the scale itself:
+
+  - **The figure gets half its slot, not the rest of it.** The figure and the
+    unit `W` are two `Flexible` siblings, so `Flex` splits what is left after the
+    icon and the gaps *equally*: slots of 87 / 87 / 137 px become flex shares of
+    34 / 34 / 59 px. A helper that assumes `slotWidth - 19` overstates the room
+    by exactly 2x, and the symptom of getting that wrong is a scale too large
+    to fit — which leaves the `FittedBox` to shrink anyway and so *reproduces
+    the very difference being fixed*.
+  - **Slots were sized by label width while figures have to fit in them.**
+    `Solar` has the shortest label, so it received the narrowest slot — and it
+    is the one holding the three-digit `250`, while `Charging` got 137 px for a
+    two-digit `93`. The allocation was inverted with respect to what the figures
+    needed. Each slot is now sized from `max(its label, its figure)` and the
+    scale is the largest value that allocation still fits, so the two cannot
+    disagree.
+
+  **Equalising costs size, and that cost is real.** `17` drops from 16.9 px to
+  11.3 px and `93` from 29.8 px, because the binding term is the three-digit
+  figure in the narrowest slot. Nothing is drawn below a size that was not
+  already being drawn — the `250` was 11.3 px before this change too — so the
+  trade is "three equal small figures" against "one small and two large", and
+  the card's own comment says the row reads as three equal stations. Wants a
+  device check at 2.0 before it ships.
+
+- **The ceiling on the hero card's figures is now the labels, not the figures.**
+  Measured while fixing the entry above, and left open deliberately. At a 2.0
+  system font the three flow labels measure 111 / 111 / 178 px — 400 px of label
+  into a 313 px row — so the label block overruns the row before any figure is
+  placed, and the label-proportional split is what pins the narrowest slot at
+  about 87 px. That 87 px is what caps the shared figure scale, so the figures
+  cannot be made larger without first giving the row more room or shortening the
+  labels.
+
+  Shortening them is not available: a truncated direction word is the one
+  failure `AGENTS.md` calls out by name, and the battery label's whole reason for
+  existing is that it carries the direction. So the candidates are all layout
+  changes — moving the labels out of the flow row, dropping the two arrow
+  glyphs, or letting the row exceed a third of the card — and each is a visible
+  redesign that should be its own change with its own device check, not a
+  footnote to a fix.
 
   Everything else in this release was confirmed on the device at 2.0: `Charging`,
   `AC grid`, `Stable`, `min 15%` and `221 V · 50 Hz` in the status strip, the
