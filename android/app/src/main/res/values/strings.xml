@@ -16,5 +16,9 @@
     <string name="alarm_channel_critical">EnerGrow critical alarms</string>
     <string name="alarm_channel_critical_description">Alerts that need attention soon, such as a low battery charge</string>
     <string name="alarm_title_critical">EnerGrow: Critical alarm</string>
+    <!-- Shown on a locked screen in place of the real body. Says that an alarm
+         fired and how serious it is, and nothing about the greenhouse. -->
+    <string name="alarm_public_body_critical">Something needs attention soon. Unlock to read.</string>
+    <string name="alarm_public_body_warning">Open EnerGrow to read this alert.</string>
     <string name="alarm_title_warning">EnerGrow: Warning alarm</string>
 </resources>

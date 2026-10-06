@@ -39,7 +39,7 @@ class AlarmStateStore(context: Context) {
         return try {
             JSONObject(raw)
         } catch (error: Exception) {
-            Log.w(TAG, "stored alarm config is not valid JSON; discarding it", error)
+            Log.w(TAG, "stored alarm config is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(KEY_CONFIG).apply()
             null
         }
@@ -135,7 +135,7 @@ class AlarmStateStore(context: Context) {
         return try {
             JSONArray(raw)
         } catch (error: Exception) {
-            Log.w(TAG, "stored alarm history is not valid JSON; discarding it", error)
+            Log.w(TAG, "stored alarm history is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(KEY_RECORDS).apply()
             JSONArray()
         }
@@ -151,7 +151,7 @@ class AlarmStateStore(context: Context) {
                 }
             }
         } catch (error: Exception) {
-            Log.w(TAG, "stored $key is not valid JSON; discarding it", error)
+            Log.w(TAG, "stored $key is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(key).apply()
             emptySet()
         }
@@ -181,3 +181,4 @@ class AlarmStateStore(context: Context) {
         const val MAX_RECORDS = 100
     }
 }
+

@@ -49,6 +49,10 @@ class ThingsBoardClient(
             setRequestProperty("X-Authorization", "Bearer $token")
             setRequestProperty("Accept", "application/json")
             useCaches = false
+            // **Redirects are refused, deliberately.** See the companion note
+            // on the same line in [refresh]. A 3xx here is now reported as an
+            // ordinary HTTP failure rather than being followed off-host.
+            instanceFollowRedirects = false
         }
         try {
             val status = connection.responseCode
@@ -86,6 +90,14 @@ class ThingsBoardClient(
      * something unexpected, which is a reason to try again on the next tick.
      * A rejected refresh token raises [RefreshRejectedException] instead, because
      * retrying it is pointless: the session is over.
+     *
+     * **Redirects are not followed, and that is the point of the flag below.**
+     * This request carries the refresh token in its body, so a followed redirect
+     * hands a renewable session to whoever named the target. `X-Authorization`
+     * is a custom header, and OkHttp strips only the standard `Authorization`
+     * when a redirect crosses origins -- so the allowlist in [AlarmRule] is
+     * checked once, at config-parse time, and never again. Turning redirects off
+     * is the one fix that does not depend on the header's name.
      */
     fun refresh(refreshToken: String, deadlineMs: Long): TokenRefresh? {
         val url = URL("$baseUrl/api/auth/token")
@@ -97,6 +109,7 @@ class ThingsBoardClient(
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
             useCaches = false
+            instanceFollowRedirects = false
         }
         return try {
             val payload = JSONObject().put("refreshToken", refreshToken).toString()

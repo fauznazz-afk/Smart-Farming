@@ -1,5 +1,6 @@
 package tech.mbkm.energrow.alarm
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -77,6 +78,8 @@ class AlarmNotifier(private val context: Context) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(signal.message))
             .setPriority(if (critical) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicVersion(signal, channel))
             .setAutoCancel(true)
             .setContentIntent(openAppIntent(signal.id))
             .build()
@@ -89,6 +92,58 @@ class AlarmNotifier(private val context: Context) {
     private fun title(signal: AlarmSignal): String = context.getString(
         if (signal.rule.isCritical) R.string.alarm_title_critical else R.string.alarm_title_warning,
     )
+
+    /**
+     * What a locked screen is allowed to show.
+     *
+     * [NotificationCompat]'s default is [NotificationCompat.VISIBILITY_PRIVATE], and
+     * the thing that surprises people about it is that "private" still shows the
+     * title and the whole body -- it only withholds the icon. So on a swipe-only
+     * device, or a phone picked up by someone else, the lock screen was reading
+     * out `"TDS too high: 2400.0 ppm (limit 800.0 ppm)"`: that a greenhouse alarm
+     * exists, which subsystem tripped, and the measured value against the limit
+     * the operator chose.
+     *
+     * That value is not an identifier -- the title is a fixed string and the
+     * device labels are generic enum names ("Battery", "PZEM", "Environment
+     * sensor") -- so it is a reading rather than a name. Still, it answers
+     * "what is this person monitoring" to anyone who can see the screen.
+     *
+     * [NotificationCompat.VISIBILITY_SECRET] would fix that by hiding the body
+     * outright, at the cost of an alarm that tells you nothing at a glance. On a
+     * phone lying on the greenhouse bench that is the wrong trade: the reader
+     * wants to know whether it is worth unlocking, not the reading itself. So the
+     * public version keeps the *urgency* and drops the *detail*.
+     *
+     * Nothing about a device id, hostname or user name ever reached here, so this
+     * is the whole of what was on the lock screen before.
+     */
+    private fun publicVersion(
+        signal: AlarmSignal,
+        channel: String,
+    ): Notification = NotificationCompat.Builder(context, channel)
+        .setSmallIcon(R.drawable.ic_energrow)
+        .setContentTitle(title(signal))
+        .setContentText(
+            context.getString(
+                if (signal.rule.isCritical) {
+                    R.string.alarm_public_body_critical
+                } else {
+                    R.string.alarm_public_body_warning
+                },
+            ),
+        )
+        .setPriority(
+            if (signal.rule.isCritical) {
+                NotificationCompat.PRIORITY_HIGH
+            } else {
+                NotificationCompat.PRIORITY_DEFAULT
+            },
+        )
+        .setCategory(NotificationCompat.CATEGORY_ALARM)
+        .setAutoCancel(true)
+        .setContentIntent(openAppIntent(signal.id))
+        .build()
 
     private fun openAppIntent(alarmId: String): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {

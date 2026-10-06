@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
+import '../services/secure_window.dart';
 import '../theme/app_theme_of.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
@@ -116,6 +119,13 @@ class _CctvScreenState extends State<CctvScreen> {
   @override
   void initState() {
     super.initState();
+    // **Set in `initState`, not `build`.** A camera feed that the user can
+    // screenshot, screen-record, or find in the Recents thumbnail is the whole
+    // finding: this screen exists to answer "is the equipment box open, is
+    // there water on the floor", and the thumbnail alone answers it to anyone
+    // who can see the launcher. Applying it in `build` would also mean the flag
+    // is reasserted on every frame, which hides a failure to set it at all.
+    unawaited(SecureWindow.acquire());
     if (!widget.fullScreen) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -126,6 +136,10 @@ class _CctvScreenState extends State<CctvScreen> {
 
   @override
   void dispose() {
+    // Released, or the rest of the app inherits it: a flag left set is an app
+    // the user cannot screenshot anywhere, including screens where that is the
+    // wrong answer.
+    unawaited(SecureWindow.release());
     if (widget.fullScreen) _exitImmersiveMode();
     super.dispose();
   }
@@ -182,9 +196,14 @@ class _CctvScreenState extends State<CctvScreen> {
           // The stream page is the only host we allow, so the web view cannot
           // be navigated off the official camera origin.
           onNavigationRequest: (request) =>
-              parseAllowedCctvUrl(request.url) == null
-              ? NavigationDecision.prevent
-              : NavigationDecision.navigate,
+                  // The *loose* guard, not `parseAllowedCctvUrl`. These are the
+                  // page's own navigations, not the user's stored setting, and
+                  // go2rtc navigates internally -- pinning the path here refused
+                  // the player itself, which is what a strict guard on this
+                  // callback is for. Same origin, nothing else.
+                  isAllowedCctvNavigation(Uri.parse(request.url))
+                  ? NavigationDecision.navigate
+                  : NavigationDecision.prevent,
           onWebResourceError: (error) {
             if (mounted && error.isForMainFrame == true) {
               setState(() {
@@ -540,3 +559,5 @@ class _InfoBar extends StatelessWidget {
     );
   }
 }
+
+

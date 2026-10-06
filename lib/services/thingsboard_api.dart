@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
+import 'alarm_bridge.dart';
 
 enum _TokenRefreshResult { refreshed, rejected, unavailable }
 
@@ -18,10 +19,61 @@ class _NonRetryableTelemetryException implements Exception {
   String toString() => message;
 }
 
+/// A 3xx the client refused to follow.
+///
+/// Refusing is the whole point: the token is attached to the request before the
+/// status code is known, so following the redirect is what leaks it. This is
+/// thrown rather than returned so that no call site can treat it as data --
+/// `jsonDecode` on a redirect body either throws something unrelated or, worse,
+/// succeeds on an HTML error page.
+class _UnexpectedRedirect implements Exception {
+  const _UnexpectedRedirect(this.statusCode);
+
+  final int statusCode;
+
+  @override
+  String toString() =>
+      'The server replied $statusCode and asked to be redirected somewhere '
+      'else. This client does not follow redirects, because the request '
+      'carries a credential.';
+}
+
+/// A response body past `_maxResponseBytes`.
+///
+/// The size is deliberately not echoed: it is attacker-influenced, and it would
+/// land in a log line via a caller's `toString`.
+class _ResponseTooLarge implements Exception {
+  const _ResponseTooLarge();
+
+  @override
+  String toString() =>
+      'The server sent a response larger than this client will read. It was '
+      'discarded rather than parsed.';
+}
+
 class ThingsBoardApi {
   static const _requestTimeout = Duration(seconds: 15);
   // Ganti sesuai domain lo
   static const String baseUrl = 'https://dashboard.mbkm20262027.tech';
+
+  /// The only host this client will talk to.
+  ///
+  /// **This exists to mirror `requireAllowedThingsBoardHost` on the Kotlin
+  /// side, which had one and this did not.** The native background module pinned
+  /// its host, rejected userinfo, a non-443 port and any path, and returned a
+  /// constant rather than the caller's string. The Dart side simply
+  /// interpolated `baseUrl` into six `Uri.parse` calls with no check at all.
+  ///
+  /// Today that is safe for one reason only: [baseUrl] is a `static const` with
+  /// no override, no `--dart-define` and no settings key. Nothing at runtime can
+  /// change where the JWT goes -- which also means nothing catches it if the
+  /// *build* is tampered with, and no test would fail.
+  ///
+  /// So the allowlist is derived from the same constant rather than written out
+  /// a second time. That keeps them in step by construction: a copy of a host
+  /// string is exactly what `AGENTS.md` warns about, and it is what the six
+  /// `Uri.parse` call sites already were.
+  static String get _allowedHost => Uri.parse(baseUrl).host;
 
   // Device ID (UUID) — bukan token
   static const String deviceBattery = '9465cf90-b264-11f1-9294-d92385142e6d';
@@ -119,16 +171,36 @@ class ThingsBoardApi {
   // Invalidates a refresh that completes after an explicit logout.
   int _sessionVersion = 0;
 
+  /// Best-effort teardown of the native alarm module.
+  ///
+  /// The native `disable` clears `AlarmTokenStore`, the stored config, the
+  /// active-alert set and the schedule. It is awaited rather than fired with
+  /// `unawaited`, because the previous caller did the latter and a process death
+  /// between the tap and the reply is exactly how a signed-out session kept
+  /// reading the greenhouse for as long as its refresh token lived.
+  ///
+  /// Failure is swallowed on purpose and **not** retried: a `PlatformException`
+  /// here means the native side is unavailable, which on a non-Android host is
+  /// every time, and retrying would spin. `_invoke` records the failure in
+  /// `lastError`, which the background status panel surfaces — so this is not a
+  /// silent gap, it is a visible one.
+  Future<void> _disableNativeAlarmModule() async {
+    try {
+      await AlarmBridge.instance.disable();
+    } catch (e) {
+      debugPrint('ThingsBoardApi: could not disable the native alarm module ($e)');
+    }
+  }
+
   /// Login pakai customer user, simpan token ke secure storage.
   Future<bool> login(String username, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
-    final response = await http
-        .post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'username': username, 'password': password}),
-        )
-        .timeout(_requestTimeout);
+    final response = await _send(
+      http.Request('POST', url)
+        ..headers.addAll({'Content-Type': 'application/json'})
+        ..body = jsonEncode({'username': username, 'password': password}),
+      _requestTimeout,
+    );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -211,10 +283,16 @@ class ThingsBoardApi {
 
   Future<void> logout() async {
     _sessionVersion++;
-    // A storage failure must not leave the in-memory session alive, so the
-    // local state is cleared first and the deletes are best effort after it.
+    // The local state is cleared first: a storage failure must not leave an
+    // in-memory session alive.
     _token = null;
     _refreshToken = null;
+    // **And before the storage work, which can throw.** The background module
+    // keeps its own encrypted copy of these credentials, and a signed-out
+    // session that keeps reading the greenhouse every minute is worse than a
+    // stale cache entry -- so it is torn down first and nothing below is allowed
+    // to skip it.
+    await _disableNativeAlarmModule();
     try {
       await _secureStorage.delete(key: 'tb_token');
       await _secureStorage.delete(key: 'tb_refresh_token');
@@ -279,9 +357,26 @@ class ThingsBoardApi {
 
   Uri get telemetryWebSocketUri {
     final base = Uri.parse(baseUrl);
-    final scheme = base.scheme == 'https' ? 'wss' : 'ws';
+    // **Refuse to derive `ws://`, rather than falling back to it.** This used to
+    // be `base.scheme == 'https' ? 'wss' : 'ws'`, which is correct for today's
+    // constant and silent about every other input: an `http://` base produced a
+    // cleartext `ws://` carrying the access token in the query string, with no
+    // error, no warning and no UI signal. Nothing caught it because `baseUrl` is
+    // a `static const` with no override, so the branch was unreachable.
+    //
+    // It is reachable the moment someone makes the base URL configurable, which
+    // is the obvious next feature for a multi-tenant install -- and the failure
+    // would be a token on the wire in cleartext, discovered by a user rather than
+    // by a test. So the unsafe direction now throws instead, and the cause names
+    // itself.
+    if (base.scheme != 'https') {
+      throw StateError(
+        'ThingsBoardApi: the base URL must be https, so the telemetry socket '
+        'can be wss. Refusing to derive a cleartext ws:// for base "$baseUrl".',
+      );
+    }
     return base.replace(
-      scheme: scheme,
+      scheme: 'wss',
       path: '${base.path}/api/ws/plugins/telemetry',
       // ThingsBoard requires the JWT in this WebSocket query parameter.
       // Avoid emitting token= for an unauthenticated connection attempt.
@@ -296,11 +391,112 @@ class ThingsBoardApi {
     'X-Authorization': 'Bearer $_token',
   };
 
-  Future<http.Response> _getWithTokenRefresh(Uri url, {DateTime? deadline}) async {
-    final timeout = _timeoutFor(deadline);
-    final response = await http
-        .get(url, headers: _authHeaders)
-        .timeout(timeout);
+  /// The largest response body this app will read.
+///
+/// ThingsBoard is not fully under the user's control: a compromised sensor
+/// gateway, or anyone with tenant write access to a device, can make a telemetry
+/// endpoint return an arbitrarily large body. `jsonDecode` would then
+/// materialise all of it on the UI isolate, which is a memory-pressure denial of
+/// service that needs no credential.
+///
+/// **Two sizes, because the two workloads are not the same size.** The native
+/// background client reads a *latest-value* snapshot and caps that at 256 KiB
+/// (`ThingsBoardClient.kt`), and this originally did the same for everything --
+/// which would have been wrong. A history request asks for `limit: 2000` points
+/// per key across several keys, which is an order of magnitude larger by design.
+/// Capping that at the snapshot figure trades a DoS for silently lost history,
+/// so it gets its own ceiling and its own reason.
+static const _maxSnapshotBytes = 256 * 1024;
+static const _maxHistoryBytes = 4 * 1024 * 1024;
+
+  /// Send one request under this client's transport policy.
+  ///
+  /// Two policy decisions live here rather than at each call site, because both
+  /// are the kind that fail silently when only one of four call sites remembers
+  /// them.
+  ///
+  /// **Redirects are not followed.** `dart:io` strips six header names when a
+  /// redirect crosses an origin: `authorization`, `www-authenticate`,
+  /// `proxy-authorization`, `proxy-authenticate`, `cookie`, `cookie2`
+  /// (`http_impl.dart`). `X-Authorization` is not one of them, because that list
+  /// belongs to the SDK and knows nothing about ThingsBoard's header name — so
+  /// the access token rides along to whatever host a redirect names. The
+  /// `refreshToken` POST is worse: it travels in the body, which is replayed on
+  /// a 307, turning a leaked access token into a renewable session.
+  ///
+  /// The header cannot simply be renamed to `Authorization`: that is what puts
+  /// it on the SDK's strip list, but it is not what ThingsBoard's API accepts.
+  /// Refusing to follow redirects is the fix that does not depend on the header
+  /// name at all. ThingsBoard does not redirect the REST paths this app calls,
+  /// so nothing legitimate is lost.
+  ///
+  /// **The body is read with a cap** rather than through `http.get`, which
+  /// decodes the whole thing before returning.
+  Future<http.Response> _send(
+    http.BaseRequest request,
+    Duration timeout, {
+    int maxBytes = _maxSnapshotBytes,
+  }) async {
+    // **Every request asserts its own destination.** This is the Dart half of
+    // the mirror described on [_allowedHost], and it is deliberately in `_send`
+    // rather than at each call site: there are six `Uri.parse` sites, and a check
+    // that only some of them remember is not a check. One place, so a sixth call
+    // site added next year inherits it for free.
+    //
+    // It cannot fail today. That is the point of writing it anyway: the failure
+    // it guards against is a `baseUrl` that stops being a constant, and at that
+    // moment this is the difference between a test failing and a token going
+    // somewhere unvetted.
+    if (request.url.host != _allowedHost) {
+      throw StateError(
+        'ThingsBoardApi: refusing to send a credential to '
+        '"${request.url.host}". This client only talks to "$_allowedHost".',
+      );
+    }
+    request.followRedirects = false;
+    final client = http.Client();
+    try {
+      final streamed = await client.send(request).timeout(timeout);
+      if (_isRedirect(streamed.statusCode)) {
+        throw _UnexpectedRedirect(streamed.statusCode);
+      }
+      // **The body read is inside the timeout, deliberately.** `client.send`
+      // returns as soon as the headers arrive, so wrapping only that would let a
+      // server that sends headers promptly and then stalls hold the future open
+      // indefinitely. `http.get(url).timeout(t)` -- what this replaced -- covered
+      // the whole exchange, and losing that is a regression the cap test cannot
+      // see because the cap test's server always finishes.
+      final body = await streamed.stream
+          .timeout(timeout)
+          .fold<List<int>>(<int>[], (bytes, chunk) {
+            if (bytes.length + chunk.length > maxBytes) {
+              throw const _ResponseTooLarge();
+            }
+            return bytes..addAll(chunk);
+          });
+      return http.Response.bytes(
+        body,
+        streamed.statusCode,
+        headers: streamed.headers,
+        request: request,
+      );
+    } finally {
+      client.close();
+    }
+  }
+
+  static bool _isRedirect(int statusCode) => statusCode >= 300 && statusCode < 400;
+
+  Future<http.Response> _getWithTokenRefresh(
+    Uri url, {
+    DateTime? deadline,
+    int maxBytes = _maxSnapshotBytes,
+  }) async {
+    final response = await _send(
+      http.Request('GET', url)..headers.addAll(_authHeaders),
+      _timeoutFor(deadline),
+      maxBytes: maxBytes,
+    );
     if (response.statusCode != 401) return response;
 
     final refreshResult = await _refreshAccessToken();
@@ -312,7 +508,11 @@ class ThingsBoardApi {
     }
     if (refreshResult == _TokenRefreshResult.rejected) return response;
 
-    return http.get(url, headers: _authHeaders).timeout(_timeoutFor(deadline));
+    return _send(
+      http.Request('GET', url)..headers.addAll(_authHeaders),
+      _timeoutFor(deadline),
+      maxBytes: maxBytes,
+    );
   }
 
   /// Compute the timeout for a request, capped by the remaining budget.
@@ -351,13 +551,12 @@ class ThingsBoardApi {
 
     late final http.Response response;
     try {
-      response = await http
-          .post(
-            Uri.parse('$baseUrl/api/auth/token'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': refreshToken}),
-          )
-          .timeout(_requestTimeout);
+      response = await _send(
+        http.Request('POST', Uri.parse('$baseUrl/api/auth/token'))
+          ..headers.addAll({'Content-Type': 'application/json'})
+          ..body = jsonEncode({'refreshToken': refreshToken}),
+        _requestTimeout,
+      );
     } catch (_) {
       return _TokenRefreshResult.unavailable;
     }
@@ -557,11 +756,20 @@ class ThingsBoardApi {
           );
         }
       } on Exception catch (e) {
+        // Network error, timeout, 5xx, or a refused redirect — retry.
+        //
+        // **Except the body cap, which is the one failure retrying cannot fix.**
+        // An oversized body is a property of the response, so all three
+        // back-off attempts return the same oversized response: that is three
+        // wasted round-trips and about seven seconds of dead time per device per
+        // poll tick, every ten seconds, for a result that cannot change. It is
+        // surfaced as non-retryable for the same reason a 403 is.
         if (e is _NonRetryableTelemetryException) {
           rethrow;
         }
-        // Network error, timeout, or 5xx — retry
-        lastError = e;
+        if (e is _ResponseTooLarge) {
+          throw _NonRetryableTelemetryException(e.toString());
+        }        lastError = e;
         continue;
       }
     }
@@ -633,7 +841,11 @@ class ThingsBoardApi {
           },
         );
 
-    final response = await _getWithTokenRefresh(url);
+    // The history ceiling, not the snapshot one: this asks for `limit` points per
+    // key across several keys, which is legitimately far larger than a
+    // latest-value snapshot. Capping it at 256 KiB would throw away the chart
+    // rather than the attack.
+    final response = await _getWithTokenRefresh(url, maxBytes: _maxHistoryBytes);
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;

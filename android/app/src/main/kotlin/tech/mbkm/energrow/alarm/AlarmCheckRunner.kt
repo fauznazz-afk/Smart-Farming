@@ -36,6 +36,26 @@ class AlarmCheckRunner(context: Context) {
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
 
     /**
+     * Why every catch below logs `error.javaClass.simpleName` and not
+     * `error.message`.
+     *
+     * `org.json` embeds a fragment of the input in its parse errors, so an
+     * exception message thrown while reading a ThingsBoard response can carry a
+     * slice of that response body into logcat. `AlarmCheckRunner` reads
+     * telemetry, so those are sensor values; on the refresh path they are the
+     * token itself, which is why `ThingsBoardClient` already logs the class
+     * name only and says so in a comment.
+     *
+     * This file did not follow that, so the rule was half-applied. The class
+     * name is what actually identifies a failure -- `JSONException` versus
+     * `SocketTimeoutException` says everything useful, and the fragment of JSON
+     * says nothing except what the server sent.
+     *
+     * Found in review on 6 October 2026. Nothing here logged a credential; this
+     * is about sensor values and response bodies reaching a world-readable log.
+     */
+
+    /**
      * Runs one check, unless another one is already in flight.
      *
      * Three entry points reach this class: the scheduled receiver, the "check
@@ -150,7 +170,7 @@ class AlarmCheckRunner(context: Context) {
             // Keep the stored config: it is probably from an app version this
             // build cannot read, and the next launch will replace it. Disabling
             // checks now would make the problem permanent instead of temporary.
-            Log.e(TAG, "stored alarm config is unusable", error)
+            Log.e(TAG, "stored alarm config is unusable: ${error.javaClass.simpleName}")
             null
         }
     }
@@ -235,7 +255,7 @@ class AlarmCheckRunner(context: Context) {
                     } catch (error: Exception) {
                         Log.w(
                             TAG,
-                            "could not read ${deviceConfig.device.wireName} after refresh: ${error.message}",
+                            "could not read ${deviceConfig.device.wireName} after refresh: ${error.javaClass.simpleName}",
                         )
                     }
                 }
@@ -330,14 +350,14 @@ class AlarmCheckRunner(context: Context) {
                             } else {
                                 Log.w(
                                     TAG,
-                                    "could not read ${deviceConfig.device.wireName}: ${error.message}",
+                                    "could not read ${deviceConfig.device.wireName}: ${error.javaClass.simpleName}",
                                 )
                                 null
                             }
                         } catch (error: Exception) {
                             Log.w(
                                 TAG,
-                                "could not read ${deviceConfig.device.wireName}: ${error.message}",
+                                "could not read ${deviceConfig.device.wireName}: ${error.javaClass.simpleName}",
                             )
                             null
                         }
@@ -354,7 +374,7 @@ class AlarmCheckRunner(context: Context) {
                         else -> Unit
                     }
                 } catch (error: Exception) {
-                    Log.w(TAG, "device read did not finish: ${error.message}")
+                    Log.w(TAG, "device read did not finish: ${error.javaClass.simpleName}")
                 }
             }
             ReadAttempt(readings, unauthorized)
@@ -406,3 +426,4 @@ class AlarmCheckRunner(context: Context) {
         val running = java.util.concurrent.atomic.AtomicBoolean(false)
     }
 }
+

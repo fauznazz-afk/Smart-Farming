@@ -151,6 +151,96 @@ class AlarmParityTest {
         assertEquals("https://$BASE_URL", config.baseUrl)
     }
 
+    @Test
+    fun `a device id that is not a uuid is refused so it cannot retarget the token`() {
+        // Found in review on 6 October 2026. `deviceId` is interpolated straight
+        // into `/DEVICE/$deviceId/values/timeseries`, so `../../rpc` would move
+        // the bearer token to a different endpoint on the *same* host -- which is
+        // precisely the case the host allowlist is blind to, because the host
+        // never moves.
+        for (hostile in listOf("../../rpc", "../auth/user", "x/../../y", "a b")) {
+            val failure = runCatching {
+                parseAlarmConfig(
+                    JSONObject()
+                        .put("version", SUPPORTED_VERSION)
+                        .put("baseUrl", "https://$BASE_URL")
+                        .put(
+                            "devices",
+                            JSONArray().put(
+                                JSONObject()
+                                    .put("device", "battery")
+                                    .put("deviceId", hostile)
+                                    .put("keys", JSONArray().put("soc")),
+                            ),
+                        )
+                        .put(
+                            "rules",
+                            JSONArray().put(
+                                JSONObject()
+                                    .put("id", "low_soc")
+                                    .put("type", "lowSoc")
+                                    .put("severity", "critical")
+                                    .put("device", "battery")
+                                    .put("metric", "soc")
+                                    .put("comparison", "lessThan")
+                                    .put("limit", 20.0)
+                                    .put("label", "Battery")
+                                    .put("unit", "%")
+                                    .put("decimals", 0)
+                                    .put("message", "lowSoc")
+                                    .put("staleMinutes", 10),
+                            ),
+                        ),
+                )
+            }.exceptionOrNull()
+            assertTrue(
+                "expected \"$hostile\" to be rejected, got $failure",
+                failure is AlarmConfigException,
+            )
+        }
+    }
+
+    @Test
+    fun `a real uuid device id is accepted`() {
+        // The other half: a check that rejects everything is not a check.
+        val config = parseAlarmConfig(
+            JSONObject()
+                .put("version", SUPPORTED_VERSION)
+                .put("baseUrl", "https://$BASE_URL")
+                .put(
+                    "devices",
+                    JSONArray().put(
+                        JSONObject()
+                            .put("device", "battery")
+                            .put("deviceId", "9465cf90-b264-11f1-9294-d92385142e6d")
+                            .put("keys", JSONArray().put("soc")),
+                    ),
+                )
+                .put(
+                    "rules",
+                    JSONArray().put(
+                        JSONObject()
+                            .put("id", "low_soc")
+                            .put("type", "lowSoc")
+                            .put("severity", "critical")
+                            .put("device", "battery")
+                            .put("metric", "soc")
+                            .put("comparison", "lessThan")
+                            .put("limit", 20.0)
+                            .put("label", "Battery")
+                            .put("unit", "%")
+                            .put("decimals", 0)
+                            .put("message", "lowSoc")
+                            .put("staleMinutes", 10),
+                    ),
+                ),
+        )
+        // Pinned on the id rather than the enum name, because the id is what goes
+        // into the request path and that is the thing the check protects.
+        assertEquals("9465cf90-b264-11f1-9294-d92385142e6d", config.devices.single().deviceId)
+        assertEquals(listOf("soc"), config.devices.single().keys)
+    }
+
     private fun assertRejected(baseUrl: String) {
         val failure = runCatching {
             parseAlarmConfig(

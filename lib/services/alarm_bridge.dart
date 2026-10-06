@@ -80,7 +80,27 @@ class AlarmBridge {
   }
 
   /// Cancels the check and forgets the stored configuration and credentials.
-  Future<void> disable() => _invoke<void>('disable');
+///
+/// **This is the logout teardown, and `logout()` awaits it.** The native
+/// `disable` handler clears the alarm schedule, `AlarmTokenStore`, the stored
+/// config and the active-alert set — everything a signed-out session should not
+/// leave behind.
+///
+/// It used to be reached the wrong way, in two separate ways, both found in
+/// review on 6 October 2026:
+///
+/// - The dashboard called it through `unawaited`, so a process death between the
+///   tap and the reply left the native module holding a valid token. It then
+///   self-renewed on a 401 and read all four devices every minute for as long as
+///   the refresh token lived, across app restarts.
+/// - A first attempt added a `clearStoredCredentials()` that sent `configure`
+///   with an empty config. That looked like the fix and was the opposite of one:
+///   `parseAlarmConfig` rejects a payload with no `version` and a blank
+///   `baseUrl` *before* `AlarmTokenStore.clear` is reached, and the resulting
+///   `PlatformException` is swallowed on the Dart side — so it failed more
+///   quietly than doing nothing. `disable` already clears the store; a second
+///   teardown path only ever needed to be wrong.
+Future<void> disable() => _invoke<void>('disable');
 
   /// Alarm IDs that are currently active and have already been reported.
   Future<Set<String>> activeAlerts() async {

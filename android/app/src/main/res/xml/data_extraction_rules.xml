@@ -5,8 +5,15 @@
   turns off Google Drive backup but *not* D2D transfer, so a device-to-device
   migration would otherwise carry the app's private storage to the new phone.
   That storage holds the ThingsBoard display name, the cached telemetry, the
-  alarm thresholds, the alarm history, and the OpenWeatherMap key in plaintext
-  preferences.
+  alarm thresholds, the alarm history, and the legacy plaintext copies of the
+  ThingsBoard tokens that a pre-1.7 build may still have written.
+
+  (An earlier version of this comment named an OpenWeatherMap key here. That
+  integration was removed in 1.6.0 — it was the only credential in plain
+  SharedPreferences, which is part of why it went. The exclusions below are
+  blanket per-domain rather than per-key, so the rule was never weakened by the
+  stale text; but a reader auditing this file for what it protects was being sent
+  to look for a key that no longer exists.)
 
   The two encrypted stores are not the concern here and are not reachable by
   this rule anyway: the ThingsBoard JWT lives in `flutter_secure_storage` and the

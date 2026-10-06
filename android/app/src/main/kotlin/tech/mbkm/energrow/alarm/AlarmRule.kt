@@ -173,6 +173,21 @@ fun parseAlarmConfig(payload: JSONObject): AlarmConfig {
         if (deviceId.isBlank()) {
             throw AlarmConfigException("device $wireName has no deviceId")
         }
+        // **A UUID, and only a UUID.** This string is interpolated straight into
+        // the request path (`/DEVICE/$deviceId/values/timeseries`), so a value
+        // like `../../rpc` or `../auth/user` would retarget the bearer token to a
+        // different endpoint on the same host. The allowlist cannot catch that:
+        // the host never moves, which is why this was invisible to it.
+        //
+        // Reachable only by writing the app's private `energrow_alarm_state`
+        // preferences -- root, a forensic image, or a malicious backup. Every
+        // caller in the app passes a `const` UUID, so this rejects nothing
+        // legitimate; it closes the shape rather than the reachable path.
+        if (!UUID_PATTERN.matches(deviceId)) {
+            throw AlarmConfigException(
+                "device $wireName has a deviceId that is not a UUID",
+            )
+        }
         if (!seenDevices.add(device)) {
             throw AlarmConfigException("device $wireName appears twice")
         }
@@ -259,6 +274,10 @@ private fun parseAlarmRule(json: JSONObject): AlarmRule {
  */
 private const val ALLOWED_THINGSBOARD_HOST = "dashboard.mbkm20262027.tech"
 
+/** The device-id shape ThingsBoard issues, enforced so it stays a path segment. */
+private val UUID_PATTERN =
+    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 internal fun requireAllowedThingsBoardHost(baseUrl: String): String {
     val uri = try {
         URI(baseUrl)
@@ -273,9 +292,21 @@ internal fun requireAllowedThingsBoardHost(baseUrl: String): String {
     if (uri.userInfo != null) {
         throw AlarmConfigException("alarm config baseUrl must not carry credentials")
     }
-    if (!uri.host.equals(ALLOWED_THINGSBOARD_HOST, ignoreCase = true)) {
+    // `URI.getHost()` returns null for an authority it cannot parse as
+    // server-based -- notably a non-ASCII hostname. `uri.host` is a Kotlin
+    // platform type, so `.equals` on it compiles and throws NullPointerException
+    // at runtime. That NPE is not an `AlarmConfigException`, so it escaped the
+    // caller's guard entirely: the check aborted with no outcome recorded. It
+    // fails closed either way, which is why this was never a credential
+    // problem -- but "throws the wrong exception" is a bug even when the
+    // direction is safe, so read it as null and reject it deliberately.
+    val host = uri.host
+    if (host == null) {
+        throw AlarmConfigException("alarm config baseUrl has no parseable host")
+    }
+    if (!host.equals(ALLOWED_THINGSBOARD_HOST, ignoreCase = true)) {
         throw AlarmConfigException(
-            "alarm config baseUrl host \"${uri.host}\" is not $ALLOWED_THINGSBOARD_HOST",
+            "alarm config baseUrl host \"$host\" is not $ALLOWED_THINGSBOARD_HOST",
         )
     }
     if (uri.port != -1 && uri.port != 443) {

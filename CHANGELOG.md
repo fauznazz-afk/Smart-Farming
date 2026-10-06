@@ -1,5 +1,118 @@
 ## [Unreleased]
 
+### Security
+
+Six findings from a full source-level review of the app (Dart, Kotlin, both
+manifests, the backup rules and the WebView), on 6 October 2026. No Critical and
+no High beyond the first item. Verified against the source and, where the claim
+was behavioural, by execution — not by reading a shape and asserting on it.
+
+- **The ThingsBoard token leaked to any host a redirect named.** Dart's `dart:io`
+  strips six header names on a cross-origin redirect — `authorization`,
+  `www-authenticate`, `proxy-authorization`, `proxy-authenticate`, `cookie`,
+  `cookie2` — and `X-Authorization`, which is what ThingsBoard's API requires, is
+  not one of them. `package:http` follows redirects by default. So one `302`
+  from the server handed the access token to whoever the header named, and the
+  refresh `POST` was worse: its body holds the refresh token and is replayed on a
+  307, which turns a transient leak into a renewable session.
+
+  Reproduced against two loopback servers before fixing it, because the fix that
+  sounds right — rename the header to `Authorization`, which is *on* the strip
+  list — is not available: that is not what the API accepts. Refusing to follow
+  redirects is the fix that does not depend on the header's name at all.
+  Applied to both sides: `ThingsBoardApi._send` and
+  `ThingsBoardClient.instanceFollowRedirects = false`.
+
+- **Signing out left the background module authenticated.** `logout()` on the
+  Dart side had no knowledge of `AlarmTokenStore`, and nothing cleared it — the
+  one call that would have (`configure` with `clearCredentials`) was never sent.
+  The native side logs "configure arrived without an access token" and carries
+  on, deliberately, so a signed-out session kept a valid token, self-renewed it on
+  a 401, and read all four devices every minute for as long as the refresh token
+  lived, across app restarts. That is a bug rather than a vulnerability, and it
+  was the second-most-serious thing in the review.
+
+  The fix is `await`, not a new mechanism: the dashboard was already calling
+  `AlarmBridge.disable()` through `unawaited`, and the native `disable` handler
+  already clears `AlarmTokenStore`, the config, the active set and the schedule.
+  A first attempt added a dedicated `clearStoredCredentials()` that sent
+  `configure` with an empty config. That looked like the fix and was the opposite
+  of one: `parseAlarmConfig` rejects a payload with no `version` and a blank
+  `baseUrl` *before* the store is cleared, and the resulting `PlatformException`
+  is swallowed on the Dart side, so it failed more quietly than doing nothing. A
+  second teardown path only ever needed to be wrong.
+
+- **`?src=` on the camera URL was unconstrained.** The allowlist checked the host
+  and stopped there, so `?src=rtsp://203.0.113.9/x` passed, was saved, and turned
+  the user's own camera box into a relay that dials out of their LAN. `src` is
+  now a stream *name* (`[A-Za-z0-9_-]`) rather than anything else, the path is
+  pinned to the go2rtc player page, and userinfo is rejected — the last of those
+  because `requireAllowedThingsBoardHost` already rejected it and this was
+  supposed to be its mirror.
+
+  The strict form now governs **stored configuration only**. The WebView's
+  navigation guard keeps a looser rule — same origin, same scheme, no
+  credentials — because go2rtc navigates internally and pinning the path there
+  refused the player itself. One function serving both purposes is exactly how
+  that broke on the first attempt.
+
+- **The camera feed was photographable.** No `FLAG_SECURE`, so the live view was
+  captured by the screenshot key and, worse, by the Recents thumbnail that the
+  launcher renders and persists on its own. Set on entering the screen and
+  released on leaving, via a small window channel — `FLAG_SECURE` has no Flutter
+  API — and **reference-counted**, because the flag belongs to the window rather
+  than the widget: the embedded view and the fullscreen route pushed over it
+  share one flag, and a plain boolean released in `dispose` lets whichever
+  disposes first clear it while a camera is still visible.
+
+- **The alarm lock screen read out the greenhouse.** `VISIBILITY_PRIVATE` is the
+  default and still shows the whole body; on a swipe-only device it displayed
+  `"TDS too high: 2400.0 ppm (limit 800.0 ppm)"`. A `setPublicVersion` keeps the
+  urgency and drops the detail, which is the right trade here: `VISIBILITY_SECRET`
+  would fix it by hiding the alarm entirely, and an alarm you cannot read at a
+  glance is an alarm you miss. No device id, hostname or user name ever reached
+  the notification, so this was a reading rather than an identifier.
+
+- **Response bodies were unbounded on the Dart side.** The native client already
+  capped its read at 256 KiB; the Dart client had only a 15 s timeout, and
+  `jsonDecode` then materialised whatever arrived on the UI isolate every ten
+  seconds. A compromised sensor gateway is enough.
+
+  Read through one helper rather than four call sites, and with **two** ceilings:
+  256 KiB for a latest-value snapshot, mirroring the native client, and 4 MiB for
+  a history request — which asks for `limit: 2000` points per key and is
+  legitimately an order of magnitude larger. One shared number would have traded
+  a DoS for silently lost charts. An oversized response is also non-retryable,
+  because all three back-off attempts return the same oversized response: that is
+  four wasted round-trips and about seven seconds of dead time per device per
+  poll, every ten seconds, for a result that cannot change.
+
+  The body read sits inside the request timeout. `client.send` returns as soon as
+  the headers arrive, so wrapping only that — which the first attempt did — let a
+  server that sends headers promptly and then stalls hold the future open
+  indefinitely. `http.get(url).timeout(t)` covered the whole exchange, and losing
+  that was a regression the cap test could not see, because the cap test's server
+  always finishes.
+
+Also fixed, all LOW: `uri.host` is now read null-safely on the Kotlin side, so an
+IDN host raises `AlarmConfigException` instead of an NPE that escaped the guard
+and aborted a cycle with no outcome recorded. `deviceId` is now required to be a
+UUID, since it is interpolated straight into a request path and `../../rpc` would
+have retargeted the bearer token to a different endpoint on the *same* host —
+which is the one case the host allowlist is blind to, because the host never
+moves. `org.json` fragments no longer reach logcat: five catch blocks in
+`AlarmCheckRunner` and three in `AlarmStateStore` logged `error.message` or the
+exception object, and `org.json` embeds a slice of the input in its parse errors.
+The backup-rules comment named an OpenWeatherMap key that was removed in 1.6.0.
+
+Two latent defects were closed while they were still latent, and both are
+pinned now. `telemetryWebSocketUri` derived `ws://` from any non-`https` scheme
+and would have put the access token on the wire in cleartext with no error, the
+moment anyone made `baseUrl` configurable — it throws instead. And the Dart side
+had **no** host allowlist at all, while the Kotlin side had a thorough one; it is
+now derived from the same constant rather than copied, and every request asserts
+its own destination inside the one helper that sends it.
+
 ### Added
 
 - **Charts on the greenhouse and fish tank pages are one swipeable card rather
