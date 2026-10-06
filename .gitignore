@@ -55,3 +55,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# graphify knowledge graph output.
+#
+# Rebuilt, not shared: `graphify update .` is AST-only and needs no API key, and
+# graph.json alone is ~2.7 MB with another ~2.3 MB of graph.html. Committing it
+# would mean every code change carries a regenerated binary blob, and two clones
+# would drift. `AGENTS.md` records how to rebuild it.
+graphify-out/
