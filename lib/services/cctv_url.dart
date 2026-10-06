@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 const allowedCctvHost = 'cctv.mbkm20262027.tech';
 const defaultAllowedCctvUrl =
@@ -125,8 +128,110 @@ Future<void> saveFishCctvUrl(String url) async {
   await _cctvStorage.write(key: _fishCctvUrlKey, value: url);
 }
 
-/// Clear the saved CCTV URL (e.g., on logout or reset).
+/// The scrubber [scrubCctvWebData] is reached through, so a test can assert the
+/// *call sites* without a live WebView.
+///
+/// **The parameter is the WebView controller, and it is optional on purpose.**
+/// Cookies are cleared app-wide with no controller at all; DOM storage is not
+/// reachable except through one (see [scrubCctvWebData]).
+typedef CctvWebDataScrubber =
+    Future<void> Function({WebViewController? controller});
+
+/// What [scrubCctvWebData] is reached through. Overridable for tests, which is
+/// the only reason it is a variable at all — the cookie jar and `WebStorage` are
+/// platform singletons with no Dart-side state, so there is nothing behind this
+/// that a unit test could otherwise assert on. Not annotated
+/// `@visibleForTesting`, because the widget reaches it too.
+CctvWebDataScrubber cctvWebDataScrubber = scrubCctvWebData;
+
+/// Drop what the **WebView** kept about the camera host, as opposed to what
+/// secure storage kept.
+///
+/// **The URL was only half of what survived a sign-out.** [clearCctvUrl] deleted
+/// the two setting keys, so the configuration went, and the camera host's
+/// cookies and DOM storage stayed on the device for the next person to find.
+/// The page is pinned to one allowlisted origin, so nothing here is a
+/// credential this app issued and the impact is low — the defect is the
+/// inconsistency with the logout intent, and it is the same shape as the token
+/// handling elsewhere in the app: the canonical secret is deleted on logout and
+/// its copies have to go with it.
+///
+/// **It lives here rather than in `cctv_screen.dart` because this is where
+/// logout can reach it.** `dashboard_screen._logout` calls [clearCctvUrl] and
+/// there is exactly one call site, so folding the scrub into that function is
+/// what makes "cleared on logout" true without editing a file that other work
+/// owns. Rejected: a `MethodChannel` beside the alarm module's Kotlin, because
+/// this is a `CookieManager`/`WebStorage` call the webview plugin already makes
+/// and putting native code behind a screen that has none is the larger change.
+///
+/// **Never throws, and that is a contract rather than an accident.**
+/// `_CctvScreenState.dispose` fires this without awaiting — `dispose` cannot
+/// await, and there is nothing there to catch — so a failure here would surface
+/// as an unhandled async error on a screen that is already gone.
+Future<void> scrubCctvWebData({WebViewController? controller}) async {
+  // **Checked before constructing anything.** `WebViewCookieManager`'s factory
+  // asserts `WebViewPlatform.instance != null`, so without this the scrub would
+  // throw on every host without the plugin — and, less obviously, inside this
+  // test suite, where `defaultTargetPlatform` is Android but no platform
+  // instance is registered. Mirrors `SecureWindow`'s "not fatal" posture: a
+  // host that cannot host a WebView has no WebView state to clear.
+  if (WebViewPlatform.instance == null) return;
+
+  // **All cookies, for every WebView in the process — not this origin's.** The
+  // platform interface has no per-domain delete (`getCookies` is scoped to a
+  // domain, `clearCookies` is not), and the blast radius is one origin because
+  // this app has exactly one WebView. Chosen over expiring them from JS
+  // `document.cookie`, which cannot reach `HttpOnly` cookies — the ones an
+  // actual session would be.
+  try {
+    await WebViewCookieManager().clearCookies();
+  } on PlatformException catch (e) {
+    // Not fatal, and worth saying rather than failing quietly: the stream still
+    // plays, it just starts without a cleared jar, and "it worked" and "it was
+    // scrubbed" are indistinguishable from the outside.
+    debugPrint('CctvWebData: could not clear cookies (${e.message})');
+  } on MissingPluginException {
+    // Host without the plugin. Nothing to clear, nothing to report.
+  }
+
+  // **DOM storage, app-wide, via the live controller.** `clearLocalStorage` is
+  // the plugin's name for Android's `WebStorage.deleteAllData` — localStorage
+  // and WebSQL, one bucket per origin with no way to address one of them from
+  // Dart. IndexedDB is not claimed to be covered: the plugin exposes no call
+  // for it, and `deleteAllData` is the closest thing that exists, so describing
+  // it as a storage wipe would be a claim this file cannot support.
+  //
+  // **`clearCache` is deliberately not called.** The HTTP cache is not session
+  // state — it holds a copy of a public player page and re-fetching one on the
+  // next play is a cost with no privacy gain.
+  //
+  // A null controller is the normal case, not an edge case: the logout path has
+  // no controller to pass, and at `dispose` the platform view may already be
+  // detached. Cookies, which are the part that genuinely outlives the WebView
+  // object, are cleared on both paths regardless.
+  if (controller == null) return;
+  try {
+    await controller.clearLocalStorage();
+  } on PlatformException catch (e) {
+    debugPrint('CctvWebData: could not clear DOM storage (${e.message})');
+  } on MissingPluginException {
+    // As above.
+  }
+}
+
+/// Clear the saved CCTV URL (e.g., on logout or reset), **and the WebView state
+/// that outlives it**.
+///
+/// The second call is the fix for the finding that this function only ever
+/// scrubbed the setting: deleting two secure-storage keys while leaving the
+/// camera host's cookies and DOM storage on disk is a logout that half
+/// happened. See [scrubCctvWebData] for why the scrub lives here rather than in
+/// the screen — this is the function `dashboard_screen._logout` already awaits,
+/// so hooking it here is what makes the logout path real.
 Future<void> clearCctvUrl() async {
   await _cctvStorage.delete(key: _cctvUrlKey);
   await _cctvStorage.delete(key: _fishCctvUrlKey);
+  // No controller: there is none at this call site, and the cookie half does
+  // not need one.
+  await cctvWebDataScrubber(controller: null);
 }

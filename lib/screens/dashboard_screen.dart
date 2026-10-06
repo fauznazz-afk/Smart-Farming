@@ -19,6 +19,7 @@ import '../services/thingsboard_realtime_service.dart';
 import '../theme/app_theme_controller.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
+import '../utils/app_log.dart';
 import '../utils/poll_interval.dart';
 import '../widgets/energy_summary_card.dart';
 import '../widgets/liquid_glass.dart';
@@ -1024,7 +1025,9 @@ Future<void> _refreshCurrentPage() async {
       _notifyEnergy();
     } catch (error) {
       if (!mounted) return;
-      debugPrint('Energy summary history request failed: $error');
+      // Compiled out in release by `appLog`; the user-visible failure is the
+      // `_energyError` set on the next line, which is unchanged either way.
+      appLog(() => 'Energy summary history request failed: $error');
       _energyLoading = false;
       _energyError =
           'Power history could not be loaded. Pull down to retry.';

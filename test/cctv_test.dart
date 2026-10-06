@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/cctv/utils/cctv_status.dart';
 import 'package:plts_monitoring/screens/cctv/widgets/cctv_viewport.dart';
@@ -336,6 +337,81 @@ void main() {
           isNull,
         );
       });
+    });
+  });
+
+  group('CCTV WebView session state', () {
+    // The scrubber is a module-level seam because what it calls — Android's
+    // `CookieManager` and `WebStorage` — are platform singletons with no Dart
+    // state. So what *is* testable is the call sites: does disposal fire it, does
+    // it fire more than once, does logout reach it.
+    // `dynamic` rather than `WebViewController?`, so this file does not have to
+    // import `webview_flutter` to record an argument it only ever asserts is
+    // null. A `({dynamic})` closure is assignable to the typed signature.
+    late List<dynamic> calls;
+    late CctvWebDataScrubber original;
+
+    setUp(() {
+      calls = <dynamic>[];
+      original = cctvWebDataScrubber;
+      cctvWebDataScrubber = ({controller}) async => calls.add(controller);
+    });
+
+    tearDown(() => cctvWebDataScrubber = original);
+
+    test('with no WebView platform registered it is a no-op, not a throw',
+        () async {
+      // The real function, on the host this suite actually runs on: a widget
+      // test registers no `WebViewPlatform`, so this is the path where
+      // `WebViewCookieManager`'s `assert` would fire. A throw here would be the
+      // whole defect in miniature, because the call is made from `dispose`,
+      // where nothing can catch it.
+      await expectLater(scrubCctvWebData(), completes);
+      await expectLater(scrubCctvWebData(controller: null), completes);
+    });
+
+    testWidgets('leaving the screen scrubs once, not on every rebuild',
+        (tester) async {
+      // A rejected URL, so the screen never builds a controller and the scrub is
+      // reached with `controller: null`. That is not a corner case: playback is
+      // user-initiated, so an idle screen *always* has no controller, and an
+      // implementation that cleared storage only when one existed would pass
+      // every other test here while scrubbing nothing in normal use.
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: CctvScreen(streamUrl: 'https://evil.example.com/stream'),
+          ),
+        ),
+      );
+      // Rebuilds: a rebuild is the case a naive implementation gets wrong by
+      // scrubbing the user's session on every frame the dashboard polls.
+      await tester.pump();
+      await tester.pump();
+      expect(calls, isEmpty, reason: 'a mounted screen must not scrub anything');
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pump();
+
+      expect(calls.length, 1, reason: 'disposal scrubs exactly once');
+    });
+
+    test('logout scrubs the WebView, not just the two stored urls', () async {
+      // `dashboard_screen._logout` calls this and nothing else, so this is the
+      // assertion that logout actually reaches the WebView — and it is why the
+      // scrub is folded into this function rather than left to the widget.
+      FlutterSecureStorage.setMockInitialValues({
+        'cctv_url': defaultAllowedCctvUrl,
+        'cctv_url_fish': defaultAllowedFishCctvUrl,
+      });
+
+      await clearCctvUrl();
+
+      expect(calls.length, 1, reason: 'clearCctvUrl must scrub the WebView too');
+      // With no controller, because logout has none: the cookie half does not
+      // need one and this is the path that would skip the clear if the call were
+      // made conditional on a controller existing.
+      expect(calls.single, isNull);
     });
   });
 

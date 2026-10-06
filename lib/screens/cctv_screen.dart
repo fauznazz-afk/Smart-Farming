@@ -140,6 +140,29 @@ class _CctvScreenState extends State<CctvScreen> {
     // the user cannot screenshot anywhere, including screens where that is the
     // wrong answer.
     unawaited(SecureWindow.release());
+    // And the camera host's own leftovers go with the view. `clearCctvUrl`
+    // covers logout; this is the other half, for the ordinary case where the
+    // screen is torn down with the stream on it.
+    //
+    // **Fire-and-forget, deliberately.** `dispose` cannot await, and the plugin
+    // call outlives this `State` — so there is nothing to await it *to*. That is
+    // why `scrubCctvWebData` is written not to throw: an unawaited failure here
+    // would land as an unhandled async error on a screen that no longer exists,
+    // and the failure mode is invisible by construction. It logs instead.
+    //
+    // **Disposal only, so this cannot fire on a rebuild.** There is a `Bound`
+    // around this widget on the dashboard whose listenable exists precisely to
+    // keep it from rebuilding; nothing here is on that path anyway, since
+    // disposal is not a rebuild. `_openFullScreen` pushes a second screen *over*
+    // this one rather than replacing it, so going full screen does not wipe the
+    // session out from under itself — and when that route is popped, this screen
+    // is still mounted and its WebView still live.
+    //
+    // The controller is passed so the DOM-storage half has something to reach
+    // `WebStorage` through. It may already be detached this late, which is why
+    // cookies — app-global, and the part that actually survives the WebView
+    // object — are cleared whether or not that half succeeds.
+    unawaited(cctvWebDataScrubber(controller: _controller));
     if (widget.fullScreen) _exitImmersiveMode();
     super.dispose();
   }

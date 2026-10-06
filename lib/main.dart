@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'services/thingsboard_api.dart';
+import 'utils/app_log.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'theme/app_theme_controller.dart';
@@ -328,7 +329,7 @@ Future<void> _initializeAlarmServices() async {
     // keeps a slow secure-storage read off the first frame.
     await AlarmNotificationService.sync();
   } catch (error) {
-    debugPrint('Alarm notification initialization failed: $error');
+    appLog(() => 'Alarm notification initialization failed: $error');
   }
 }
 

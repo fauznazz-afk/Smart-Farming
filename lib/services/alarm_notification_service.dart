@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/alarm_rules.dart';
+import '../utils/app_log.dart';
 import 'alarm_bridge.dart';
 import 'alarm_settings.dart';
 import 'thingsboard_api.dart';
@@ -57,7 +57,7 @@ class AlarmNotificationService {
       // starting. The previous implementation swallowed this too, and the result
       // was a release build where alarms silently never appeared and nothing
       // said why.
-      debugPrint('Alarm notification initialization failed: $error');
+      appLog(() => 'Alarm notification initialization failed: $error');
     }
     // The native side owns the channels, but the dashboard can raise a
     // notification before any background check has run.
@@ -78,12 +78,18 @@ class AlarmNotificationService {
 
       // Logged because a background check that arms the wrong rules without
       // saying so cannot be diagnosed from a notification that did or did not
-      // appear.
-      debugPrint(
-        'Alarm sync: energy=${thresholds.energyAlerts} '
-        'environment=${thresholds.environmentAlerts} '
-        'lowSoc=${thresholds.lowSoc} stale=${thresholds.staleMinutes} '
-        'rules=${rules.map((rule) => rule.id).join(',')}',
+      // appear -- and because it is the only place the armed set is visible at
+      // all, Settings reports the thresholds rather than the rules they
+      // produced. Full content, including every rule id and every threshold,
+      // because in a debug build this is the reconnaissance an attacker would
+      // want and in a release build the whole call is compiled out; there is no
+      // intermediate state where it half-exists. See `app_log.dart` for why that
+      // trade was taken and what it costs.
+      appLog(
+        () => 'Alarm sync: energy=${thresholds.energyAlerts} '
+            'environment=${thresholds.environmentAlerts} '
+            'lowSoc=${thresholds.lowSoc} stale=${thresholds.staleMinutes} '
+            'rules=${rules.map((rule) => rule.id).join(',')}',
       );
 
       String? accessToken;
@@ -93,10 +99,14 @@ class AlarmNotificationService {
         final loaded = await client.loadSavedToken();
         accessToken = client.accessToken;
         refreshToken = client.refreshToken;
-        debugPrint(
-          'Alarm sync: session loaded=$loaded '
-          'hasAccessToken=${accessToken != null && accessToken.isNotEmpty} '
-          'hasRefreshToken=${refreshToken != null && refreshToken.isNotEmpty}',
+        // Booleans, never values. That was already true and stays true -- what
+        // changes is only that in a release build the line does not exist, so
+        // even the presence/absence signal stops being available to whoever
+        // holds the USB cable.
+        appLog(
+          () => 'Alarm sync: session loaded=$loaded '
+              'hasAccessToken=${accessToken != null && accessToken.isNotEmpty} '
+              'hasRefreshToken=${refreshToken != null && refreshToken.isNotEmpty}',
         );
       }
 
@@ -110,7 +120,7 @@ class AlarmNotificationService {
       );
       return armed;
     } on Exception catch (error) {
-      debugPrint('Could not sync the background alarm check: $error');
+      appLog(() => 'Could not sync the background alarm check: $error');
       return false;
     }
   }
@@ -153,7 +163,9 @@ class AlarmNotificationService {
         ),
       );
     } on Exception catch (error) {
-      debugPrint('Could not show the notification for $id: $error');
+      // `$id` is a rule id, so this line is reconnaissance for the same reason
+      // the sync line above is, and it is compiled out with it.
+      appLog(() => 'Could not show the notification for $id: $error');
     }
   }
 

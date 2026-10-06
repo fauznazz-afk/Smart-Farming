@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme_controller.dart';
+import '../utils/app_log.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
@@ -51,8 +52,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (exception) {
       // A thrown exception used to escape here as an unhandled async error, so
       // the save failed with no SnackBar and no pop and the button looked
-      // dead. Say so instead, and leave the details in the log.
-      debugPrint('Saving settings failed: $exception');
+      // dead. Say so instead, and leave the details in the log -- in a debug
+      // build. `appLog` compiles the line out in release, so a release user
+      // reporting "save does nothing" now needs a debug build to be chased; see
+      // `app_log.dart`.
+      appLog(() => 'Saving settings failed: $exception');
       error = 'Saving the settings failed. Please try again.';
     }
     if (error != null) {
