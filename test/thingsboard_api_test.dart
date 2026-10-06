@@ -7,7 +7,6 @@ import 'package:plts_monitoring/screens/dashboard/utils/telemetry_helpers.dart';
 import 'package:plts_monitoring/services/thingsboard_api.dart';
 import 'package:plts_monitoring/services/thingsboard_realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 /// A secure storage that fails the way a real keystore does.
 ///
 /// The encryption key lives in the Android keystore, so an entry that cannot be
@@ -161,6 +160,79 @@ void main() {
 
       expect(api.accessToken, 'current-jwt');
     });
+  });
+
+  group('the offline cache is pruned to the keys this app asked for', () {
+    // The finding: `cached_telemetry` was a union, and a union cannot bound the
+    // *set* of keys. ThingsBoard is not fully under the user's control -- a
+    // compromised sensor gateway can return names the app never requested -- and
+    // every one was persisted to plaintext preferences forever, because a key
+    // removed server-side never left. `splitCachedTelemetry` dropped them on read
+    // so nothing rendered; they still accumulated on disk.
+
+    test('knownTelemetryKeys covers every device and nothing else', () {
+      // Derived from `deviceKeysById` precisely so a device added there cannot
+      // be forgotten here -- its readings would be pruned out of the offline
+      // cache and the card would show stale data with nothing to explain it.
+      final derived = <String>{
+        for (final keys in ThingsBoardApi.deviceKeysById.values) ...keys,
+      };
+      expect(ThingsBoardApi.knownTelemetryKeys, derived);
+      expect(ThingsBoardApi.knownTelemetryKeys, isNotEmpty);
+    });
+
+    test('every declared device key survives the prune', () {
+      // The counter-test. A prune that rejected everything would pass an
+      // "unknown keys are dropped" check while quietly breaking every card.
+      for (final keys in ThingsBoardApi.deviceKeysById.values) {
+        for (final key in keys) {
+          expect(
+            ThingsBoardApi.knownTelemetryKeys.contains(key),
+            isTrue,
+            reason: '$key is requested by a device, so it must be cached',
+          );
+        }
+      }
+    });
+
+    test('a key the app never asked for is not one it keeps', () {
+      expect(ThingsBoardApi.knownTelemetryKeys.contains('attacker_key'), isFalse);
+    });
+  });
+
+  group('logout tears down every step independently', () {
+    // The finding: `logout()` awaited its storage cleanup outside any guard, so
+    // one `SharedPreferences` throw left the cached telemetry and the previous
+    // user's CCTV stream URL on disk for whoever picked up the phone next. No
+    // credential survived -- the in-memory session was already nulled -- which
+    // is exactly why it was quiet.
+
+    test('completes and reports even when storage misbehaves', () async {
+      // `logout()` is expected to finish whatever happens. The assertion is that
+      // it does not throw and that the in-memory session is gone, which is the
+      // half the old ordering did guarantee.
+      SharedPreferences.setMockInitialValues({'user_display_name': 'Someone'});
+      final api = ThingsBoardApi();
+
+      await expectLater(api.logout(), completes);
+      expect(api.isLoggedIn, isFalse);
+      expect(api.accessToken, isNull);
+      expect(api.refreshToken, isNull);
+    });
+
+    test('the in-memory session dies before any storage is touched', () async {
+      // Ordering, not just outcome: a signed-out session that keeps reading the
+      // greenhouse is worse than a stale cache entry, so the native teardown and
+      // the nulling happen first and nothing below is allowed to skip them.
+      FlutterSecureStorage.setMockInitialValues({'tb_token': 'jwt-abc-123'});
+      final api = ThingsBoardApi();
+      await api.loadSavedToken();
+      expect(api.isLoggedIn, isTrue);
+
+      await api.logout();
+      expect(api.isLoggedIn, isFalse);
+    });
+
   });
 
   group('unreadable secure storage', () {

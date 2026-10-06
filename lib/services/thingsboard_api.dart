@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry_model.dart';
+import '../utils/app_log.dart';
 import 'alarm_bridge.dart';
 
 enum _TokenRefreshResult { refreshed, rejected, unavailable }
@@ -164,6 +165,28 @@ class ThingsBoardApi {
     deviceFish: fishKeys,
   };
 
+  /// Every telemetry key this app has ever asked for, as a set.
+  ///
+  /// **Derived from [deviceKeysById], not written out.** A fifth hand-written key
+  /// list is exactly the duplication `deviceKeysById` exists to end: a device
+  /// added there and forgotten here would have its readings silently pruned out
+  /// of the offline cache the next time anything was written, and the card would
+  /// show stale data offline with nothing to explain it.
+  ///
+  /// Used to bound what reaches `cached_telemetry`.
+  static final Set<String> knownTelemetryKeys = {
+    for (final keys in deviceKeysById.values) ...keys,
+  };
+
+  /// The plaintext SharedPreferences keys a pre-1.7 build used to write.
+  ///
+  /// Listed once and iterated, so adding a key to the migration is a one-line
+  /// change that cannot leave the purge half-applied.
+  static const List<String> _legacyCredentialKeys = [
+    'tb_token',
+    'tb_refresh_token',
+  ];
+
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   String? _token;
   String? _refreshToken;
@@ -293,15 +316,44 @@ class ThingsBoardApi {
     // stale cache entry -- so it is torn down first and nothing below is allowed
     // to skip it.
     await _disableNativeAlarmModule();
-    try {
+    // **Every storage step isolated, because they are independent and one try
+    // around the pair would let the first failure skip the rest.** `logout()`
+    // used to await these outside any guard, so a `SharedPreferences` throw left
+    // the cached telemetry and the previous user's CCTV stream URL on disk for
+    // whoever picked up the phone next. No credential survived that -- the
+    // in-memory session was already gone -- which is precisely why it was quiet.
+    //
+    // Rejected: a single try around the whole body. It would also swallow
+    // `_disableNativeAlarmModule()` and the in-memory nulling above, turning
+    // four independent attempts into one that stops at the first failure.
+    await _teardownStep('secure storage', () async {
       await _secureStorage.delete(key: 'tb_token');
       await _secureStorage.delete(key: 'tb_refresh_token');
+    });
+    await _teardownStep(
+      'legacy credential purge',
+      _removeLegacyCredentials,
+    );
+    await _teardownStep('user cache', clearUserCache);
+    await _teardownStep('telemetry cache', clearCachedTelemetry);
+  }
+
+  /// Run one logout step, and name it if it fails.
+  ///
+  /// The name is the point. "logout failed" says nothing about whether the token
+  /// went; "could not clear the telemetry cache" says exactly what is still on
+  /// the device and what to remove by hand.
+  Future<void> _teardownStep(
+    String name,
+    Future<void> Function() step,
+  ) async {
+    try {
+      await step();
     } catch (e) {
-      debugPrint('ThingsBoardApi: could not clear secure storage ($e)');
+      appLog(() =>
+          'ThingsBoardApi: logout step "$name" failed (${e.runtimeType}). '
+          'Continuing with the remaining teardown.');
     }
-    await _removeLegacyCredentials();
-    await clearUserCache();
-    await clearCachedTelemetry();
   }
 
   /// Fetches and caches the display name for the logged-in user.
@@ -339,8 +391,56 @@ class ThingsBoardApi {
   ]) async {
     final legacyPreferences =
         preferences ?? await SharedPreferences.getInstance();
-    await legacyPreferences.remove('tb_token');
-    await legacyPreferences.remove('tb_refresh_token');
+
+    // Per key, and never inside one try around the pair. The refresh token is the
+    // long-lived renewable credential, so a throw on the access token must not be
+    // the reason it survives.
+    final reported = <String, bool?>{};
+    for (final key in _legacyCredentialKeys) {
+      try {
+        reported[key] = await legacyPreferences.remove(key);
+      } catch (e) {
+        // Left null, which the re-read below treats the same as a false.
+        appLog(() =>
+            'ThingsBoardApi: could not remove legacy plaintext key "$key" '
+            '(${e.runtimeType}). It will be retried on the next launch.');
+      }
+    }
+
+    // **The re-read is the whole check, and `getString` on its own would be
+    // vacuous.** `SharedPreferences.remove()` drops the key from its own
+    // in-memory cache *before* it calls the platform, so `remove()` followed by
+    // `getString()` reports success for a delete that never reached disk. Only
+    // `reload()` repopulates the cache from the store and can see the value is
+    // still there.
+    //
+    // What a failure costs, honestly: on Android `remove()` is an in-memory
+    // delete plus a queued disk commit, so the value is gone from this process
+    // either way. What survives is a stale plaintext JWT on disk if the process
+    // dies before the commit lands -- a real credential artefact, not a live
+    // session, and only on a device predating the migration.
+    try {
+      await legacyPreferences.reload();
+      for (final key in _legacyCredentialKeys) {
+        if (legacyPreferences.getString(key) != null) {
+          appLog(() =>
+              'ThingsBoardApi: legacy plaintext key "$key" is still readable '
+              'after removal, so a stale JWT may survive on disk. It will be '
+              'retried on the next launch.');
+        } else if (reported[key] == false) {
+          // Absent and gone, the ordinary case for a user who has signed in since
+          // the migration. Logged so a log full of these is distinguishable from
+          // a log full of real failures -- and only ever in a debug build, since
+          // appLog compiles out of release.
+          appLog(() =>
+              'ThingsBoardApi: legacy plaintext key "$key" was already absent.');
+        }
+      }
+    } catch (e) {
+      appLog(() =>
+          'ThingsBoardApi: could not re-read SharedPreferences to verify the '
+          'legacy credential purge (${e.runtimeType}).');
+    }
   }
 
   bool get isLoggedIn => _token != null && _token!.isNotEmpty;
@@ -668,11 +768,31 @@ static const _maxHistoryBytes = 4 * 1024 * 1024;
       // which is the same class of bug as the overwrite this whole change exists
       // to fix, just slower.
       final union = <String, double>{...previous, ...mergedValues};
+      // **The union is then filtered to the keys this app asked for.** The union
+      // itself stays, because the direction above is load-bearing: a socket frame
+      // must not be able to drop a device's readings.
+      //
+      // What a union cannot do is bound the *set of keys*. ThingsBoard is not
+      // fully under the user's control -- a compromised sensor gateway, or anyone
+      // with tenant write access to a device, can make the telemetry endpoint
+      // return names this app never requested -- and each one would be persisted
+      // to plaintext preferences, forever, because a key removed server-side never
+      // leaves. `splitCachedTelemetry` drops unknown keys on read, so nothing
+      // renders them; they still accumulate on disk.
+      //
+      // An allowlist rather than a cap: capping the count or the encoded size
+      // leaves "which keys survive" to map iteration order, so a hostile gateway
+      // could evict a legitimate key by sending enough others. An allowlist has no
+      // such contest.
+      final pruned = <String, double>{
+        for (final entry in union.entries)
+          if (knownTelemetryKeys.contains(entry.key)) entry.key: entry.value,
+      };
       await preferences.setString(
         'cached_telemetry',
         jsonEncode(
           DeviceTelemetry(
-            latestValues: union,
+            latestValues: pruned,
             lastUpdate: latest,
           ).toJson(),
         ),
