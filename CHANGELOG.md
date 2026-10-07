@@ -1,4 +1,6 @@
-## [Unreleased]
+# [1.8.0] - 2026-10-07
+
+Security review of the whole source, and a skeuomorphic interface layer.
 
 ### Added
 
