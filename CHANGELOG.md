@@ -1,5 +1,51 @@
 ## [Unreleased]
 
+### Added
+
+- **Skeuo, a fourth theme carrying the design brief's own palette.** Amber
+  `#F59E0B` and lime `#C4F042` on a `#0A0A0C` page, selectable in Settings →
+  Appearance beside System, Light, Dark and Dracula.
+
+  **A fourth option rather than a replacement, and that is the whole decision.**
+  The brief describes a dark-only palette, so taking it as *the* theme would
+  have deleted the light theme — whose `#E1E7E4` page the design notes single
+  out as the most consequential value in the token file, and with it three
+  contrast guarantees measured against that page. A specified palette is worth
+  exactly as much as the ones it is offered beside.
+
+  The brief's two neutrals became a ramp rather than two fills: `#0A0A0C` is the
+  page *and* the card, as everywhere else, and `#38383C` is `chrome`. Only the
+  brief's own values are kept, and only because it supplied them.
+
+  **Amber is the accent and lime is a signal colour**, which inverts the
+  obvious reading. Lime has the higher contrast on a near-black page and would
+  have been the natural primary, but the brief names amber `primary`, and this
+  app already uses "accent" for the colour that colours controls. Lime is
+  therefore used where a *condition* is reported — not as a second green,
+  because green already means "nothing is wrong" here.
+
+  The shadow ramp is **inverted from the dark theme's**, because `#0A0A0C` is
+  darker than `#1A211F` and a black shadow on a near-black page cannot do the
+  work; the top-left bounce carries the edge instead. **That ramp is derived from
+  the page luminance and has never been on a device** — it is the one number in
+  this release a scanline would replace.
+
+  Two `usesPresetAccent` predicates were quietly answering for a value they
+  knew nothing about: `presetAccent` would have handed skeuo Dracula's purple,
+  and `main.dart` would have published Dracula's entire `ThemeData` for it —
+  page colour, shadow ramp and all — beside an amber accent. Both compiled, both
+  were individually defensible, and together they would have produced an amber
+  theme on a purple page that nobody designed. Both are now switches.
+
+  Contrast is measured rather than assumed: 46 cases in `skeuo_theme_test.dart`
+  cover every caption and status colour against all five surfaces, plus the
+  requirement that no two themes share a page — `appThemeOf` resolves a pushed
+  screen by searching for one, so a shared page would make it ambiguous.
+
+  **Not seen on a device.** The install succeeded and the suite is green, but
+  the phone's wireless-debugging port rotated before the theme could be selected
+  and photographed, so its appearance is unverified.
+
 ### Fixed
 
 - **`FLAG_SECURE` leaked and made the whole app un-screenshottable.** Found on

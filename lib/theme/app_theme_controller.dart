@@ -30,7 +30,20 @@ enum ThemeOption {
   /// It maps to [ThemeMode.dark] because Material has no third brightness and
   /// this is a dark theme; the distinction is carried by [resolveAppTheme] and
   /// the accent, not by the brightness the framework is handed.
-  dracula('dracula');
+  dracula('dracula'),
+
+  /// Skeuo: the design brief's own palette, amber and lime on `#0A0A0C`.
+  ///
+  /// **A fourth option rather than a replacement**, and that is the whole
+  /// decision. The brief describes a dark-only palette, and taking it as *the*
+  /// theme would have deleted the light theme, whose `#E1E7E4` page the design
+  /// notes single out as the most consequential value in the token file, and
+  /// with it three contrast guarantees measured against that page. A specified
+  /// palette is worth having exactly as much as the ones it is offered beside.
+  ///
+  /// Stored as `'skeuo'`. Anything unrecognised still falls back to
+  /// [ThemeOption.dark], so an old install is unaffected.
+  skeuo('skeuo');
 
   const ThemeOption(this.stored);
 
@@ -62,7 +75,8 @@ enum ThemeOption {
   ThemeMode get themeMode => switch (this) {
     ThemeOption.system => ThemeMode.system,
     ThemeOption.light => ThemeMode.light,
-    ThemeOption.dark || ThemeOption.dracula => ThemeMode.dark,
+    ThemeOption.dark || ThemeOption.dracula || ThemeOption.skeuo =>
+      ThemeMode.dark,
   };
 
   /// The inverse of [themeMode], for a caller that only knows the brightness.
@@ -95,6 +109,7 @@ enum ThemeOption {
 AppTheme resolveAppTheme(ThemeOption option, Brightness resolvedBrightness) =>
     switch (option) {
       ThemeOption.dracula => AppTheme.dracula,
+      ThemeOption.skeuo => AppTheme.skeuo,
       ThemeOption.dark => AppTheme.dark,
       ThemeOption.light => AppTheme.light,
       ThemeOption.system => resolvedBrightness == Brightness.dark

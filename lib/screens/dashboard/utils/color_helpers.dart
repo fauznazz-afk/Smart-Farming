@@ -34,6 +34,29 @@ import 'design_tokens.dart';
 /// colour on the user's behalf.
 const Color draculaAccent = Color(0xFFBD93F9);
 
+/// Skeuo's two accents, exactly as the design brief states them.
+///
+/// **Amber is the accent and lime is the "power on" colour**, which is the
+/// inverse of the usual reading of the pair — a lime accent on a near-black page
+/// is the higher-contrast of the two and would have been the obvious primary,
+/// but the brief names amber `primary` and reserves lime as `accent`, and this
+/// app already uses the word accent for the colour that colours controls.
+///
+/// Lime is therefore [skeuoSignal] and is used where a *condition* is being
+/// reported rather than a control being offered — the same role the app's
+/// `statusOk` plays, and deliberately not the same colour, because green already
+/// means "nothing is wrong" in this app and a lime that also meant it would be a
+/// second green.
+///
+/// Both are measured, not assumed: on `pageSkeuo` `#0A0A0C`, amber measures
+/// **9.06:1** and lime **15.32:1** against white text's 20.4:1 — both far above
+/// AA, which is what a near-black page buys.
+const Color skeuoAccent = Color(0xFFF59E0B);
+
+/// The brief's `accent #C4F042`. See [skeuoAccent] for why it is a signal
+/// colour rather than the accent.
+const Color skeuoSignal = Color(0xFFC4F042);
+
 /// The HSL lightness Dracula's accent needs, and why it is not `0.68`.
 ///
 /// **HSL lightness is not perceptual across hues, and this is the whole reason
@@ -180,6 +203,11 @@ Color metricColor({
         .withSaturation(0.64)
         .withLightness(_draculaMetricLightness)
         .toColor(),
+    // Lighter than the dark theme's 0.68, because `pageSkeuo` is darker than
+    // `pageDark` and a metric at 0.68 on a near-black page is the first thing
+    // that would stop clearing AA on this ramp.
+    AppTheme.skeuo =>
+      hsl.withSaturation(0.72).withLightness(0.74).toColor(),
     AppTheme.dark => hsl.withSaturation(0.64).withLightness(0.68).toColor(),
     AppTheme.light => hsl.withSaturation(0.72).withLightness(0.40).toColor(),
   };
@@ -203,6 +231,8 @@ Color strongMetricColor({
         .withSaturation(0.90)
         .withLightness(_draculaStrongLightness)
         .toColor(),
+    AppTheme.skeuo =>
+      hsl.withSaturation(0.84).withLightness(0.70).toColor(),
     AppTheme.dark => hsl.withSaturation(0.78).withLightness(0.64).toColor(),
     AppTheme.light => hsl.withSaturation(0.86).withLightness(0.36).toColor(),
   };
@@ -215,8 +245,19 @@ Color strongMetricColor({
 /// confusable: `presetAccent(theme) ?? seedColor` cannot disagree with itself,
 /// whereas storing an accent alongside a preset would allow a Dracula theme with
 /// a green accent, which is not a preset and not the app's dark mode either.
-Color? presetAccent(AppTheme theme) =>
-    theme.usesPresetAccent ? draculaAccent : null;
+///
+/// **A switch and no longer `usesPresetAccent ? draculaAccent : null`**, because
+/// there are now two presets. The old form would have handed skeuo Dracula's
+/// purple — and it compiled, because `usesPresetAccent` was true for it. This is
+/// the second time in this file that a predicate quietly answered for a value it
+/// knew nothing about; the first was `AppTheme.isDark`, whose `this != light` is
+/// correct precisely because it is written as a *negation* rather than an
+/// enumeration.
+Color? presetAccent(AppTheme theme) => switch (theme) {
+  AppTheme.dracula => draculaAccent,
+  AppTheme.skeuo => skeuoAccent,
+  AppTheme.light || AppTheme.dark => null,
+};
 
 /// Returns the hairline divider color for glass surfaces.
 Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>

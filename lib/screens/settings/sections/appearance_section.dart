@@ -120,6 +120,11 @@ class AppearanceSection extends StatelessWidget {
                 label: Text('Dracula'),
                 icon: Icon(Icons.auto_awesome_outlined),
               ),
+              ButtonSegment(
+                value: ThemeOption.skeuo,
+                label: Text('Skeuo'),
+                icon: Icon(Icons.view_in_ar_outlined),
+              ),
             ],
             selected: {option},
             onSelectionChanged: (selection) {

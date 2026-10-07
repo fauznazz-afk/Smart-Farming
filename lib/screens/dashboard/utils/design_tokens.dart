@@ -23,7 +23,8 @@ import 'package:flutter/material.dart';
 enum AppTheme {
   light,
   dark,
-  dracula;
+  dracula,
+  skeuo;
 
   const AppTheme();
 
@@ -48,7 +49,13 @@ enum AppTheme {
   /// `color_helpers.dart` next to the contrast measurements that justify it;
   /// putting a `Color` on the enum would make this file own a colour decision
   /// that the AA test in `test/color_helpers_test.dart` is what actually checks.
-  bool get usesPresetAccent => this == AppTheme.dracula;
+  ///
+  /// [skeuo] is here for the same reason as [dracula]: it is a *specified*
+  /// palette with its own two accents rather than a hue the user picked in
+  /// Settings, and letting the seed override it would produce a fourth theme
+  /// that is not the one anybody asked for.
+  bool get usesPresetAccent =>
+      this == AppTheme.dracula || this == AppTheme.skeuo;
 }
 
 /// The surface layer of the app: every opaque fill, hairline and dual-shadow
@@ -128,6 +135,29 @@ class AppSurfaces {
   /// exactly this one at 5.17:1 for `statusBad`.
   static const Color chromeDracula = Color(0xFF343746);
 
+  // ── Skeuo ─────────────────────────────────────────────────────────────────
+  //
+  // **The one theme in the app that came from a specification rather than from
+  // measurement.** Its page is the design brief's `background #0A0A0C` and its
+  // chrome is its `surface #38383C`, with amber `primary #F59E0B` and lime
+  // `accent #C4F042` living in `color_helpers.dart`. Everything below is a
+  // *ramp step*, and none of the values are the brief's: `#0A0A0C` is nearly
+  // black and the system needs five distinguishable levels between the page
+  // and a track, which a brief with two neutrals does not have.
+  //
+  // **The card fill is the page fill, as everywhere else.** The brief's `surface
+  // #38383C` becomes `chrome` rather than the card, because
+  // `design_tokens_test.dart` pins "the card fill is still exactly the page
+  // colour" and that invariant is what makes depth readable as shadow rather
+  // than as a second flat colour. The brief's own value is therefore kept, one
+  // level up the stack, instead of being spread across every surface.
+  static const Color pageSkeuo = Color(0xFF0A0A0C);
+  static const Color cardSkeuo = Color(0xFF0A0A0C);
+  static const Color chromeSkeuo = Color(0xFF38383C);
+  static const Color inputSkeuo = Color(0xFF141416);
+  static const Color trackSkeuo = Color(0xFF1E1E22);
+  static const Color tooltipSkeuo = Color(0xFF38383C);
+
   /// Input fills, and the reason the deboss is carried by an inner shadow
   /// rather than by a darker fill.
   ///
@@ -201,6 +231,7 @@ class AppSurfaces {
     AppTheme.light => pageLight,
     AppTheme.dark => pageDark,
     AppTheme.dracula => pageDracula,
+    AppTheme.skeuo => pageSkeuo,
   };
 
   static Color card(AppTheme theme) => page(theme);
@@ -209,24 +240,28 @@ class AppSurfaces {
     AppTheme.light => chromeLight,
     AppTheme.dark => chromeDark,
     AppTheme.dracula => chromeDracula,
+    AppTheme.skeuo => chromeSkeuo,
   };
 
   static Color input(AppTheme theme) => switch (theme) {
     AppTheme.light => inputLight,
     AppTheme.dark => inputDark,
     AppTheme.dracula => inputDracula,
+    AppTheme.skeuo => inputSkeuo,
   };
 
   static Color track(AppTheme theme) => switch (theme) {
     AppTheme.light => trackLight,
     AppTheme.dark => trackDark,
     AppTheme.dracula => trackDracula,
+    AppTheme.skeuo => trackSkeuo,
   };
 
   static Color tooltip(AppTheme theme) => switch (theme) {
     AppTheme.light => tooltipLight,
     AppTheme.dark => tooltipDark,
     AppTheme.dracula => tooltipDracula,
+    AppTheme.skeuo => tooltipSkeuo,
   };
 
   /// Every surface the app paints a caption or a status colour on, for one
@@ -491,6 +526,38 @@ class AppElevation {
   /// for has been run, on this theme and on the dark one for comparison, on the
   /// same build and the same card.
   static List<BoxShadow> raised(AppTheme theme) => switch (theme) {
+    AppTheme.skeuo => const [
+        // **Skeuo's own pair, and it is not the dark theme's.**
+        //
+        // `pageSkeuo` is `#0A0A0C` — darker than the dark theme's `#1A211F` by
+        // more than either is from white. A black shadow on a near-black page
+        // is a small relative move, so the two dark halves are pulled *back*
+        // rather than up, and the light bounce carries the edge instead. That
+        // is the same inversion the notes record for Dracula, arrived at by a
+        // different route: here it is not that only one half was measured, it
+        // is that on this page the dark half cannot do the work.
+        //
+        // **Not measured on a device.** Stated as a first derivation from the
+        // page luminance, which is the weakest thing in this file and is why
+        // every number here is a guess a scanline would replace.
+        BoxShadow(
+          color: Color(0x4D000000),
+          blurRadius: 6,
+          offset: Offset(3, 3),
+        ),
+        BoxShadow(
+          color: Color(0x40000000),
+          blurRadius: 22,
+          offset: Offset(9, 9),
+        ),
+        // The bounce, strengthened well past the dark theme's 0x29: on a page
+        // this dark the top-left highlight is the only edge a card has.
+        BoxShadow(
+          color: Color(0x3DFFFFFF),
+          blurRadius: 14,
+          offset: Offset(-6, -6),
+        ),
+      ],
     AppTheme.dracula => const [
         // contact -- measured, not solved: ΔL 20.0 against a page of 42.4, which
         // is 47% where the dark theme's 0xB3 reaches 51% of its own page.
@@ -569,6 +636,25 @@ class AppElevation {
   /// geometry reads as a block that has fallen *into* the page, which is a
   /// different and wrong impression.
   static List<BoxShadow> inset(AppTheme theme) => switch (theme) {
+    AppTheme.skeuo => const [
+        // Inverted for the same reason as `raised`: on `#0A0A0C` the light half
+        // does the work. Unmeasured, like its raised pair.
+        BoxShadow(
+          color: Color(0x40000000),
+          blurRadius: 6,
+          offset: Offset(2, 2),
+        ),
+        BoxShadow(
+          color: Color(0x26000000),
+          blurRadius: 14,
+          offset: Offset(5, 5),
+        ),
+        BoxShadow(
+          color: Color(0x2EFFFFFF),
+          blurRadius: 12,
+          offset: Offset(-4, -4),
+        ),
+      ],
     AppTheme.dracula => const [
         // contact: -0.0112, the same target as the raised contact. Composites
         // to #1C1D25.
@@ -642,6 +728,24 @@ class AppElevation {
   /// have inverted the offsets and turned a chip being pushed into a chip
   /// popping out, which is the opposite of what the finger is asking for.
   static List<BoxShadow> insetDeep(AppTheme theme) => switch (theme) {
+    AppTheme.skeuo => const [
+        // Unmeasured, like the rest of skeuo's ramp.
+        BoxShadow(
+          color: Color(0x59000000),
+          blurRadius: 7,
+          offset: Offset(3, 3),
+        ),
+        BoxShadow(
+          color: Color(0x38000000),
+          blurRadius: 18,
+          offset: Offset(8, 8),
+        ),
+        BoxShadow(
+          color: Color(0x24FFFFFF),
+          blurRadius: 10,
+          offset: Offset(-3, -3),
+        ),
+      ],
     AppTheme.dracula => const [
         // contact: -0.0126, the step 0xD9 makes on #1A211F. Composites to
         // #1A1B22, and it is the deepest anything in this theme is allowed to
@@ -721,6 +825,25 @@ class AppElevation {
   /// in the app, which meant the whole press vocabulary was written and never
   /// switched on. See `pressable.dart`.
   static List<BoxShadow> pressed(AppTheme theme) => switch (theme) {
+    AppTheme.skeuo => const [
+        // A pressed block flattens into the page, so the light half retreats
+        // here rather than the dark half advancing. Unmeasured.
+        BoxShadow(
+          color: Color(0x26000000),
+          blurRadius: 4,
+          offset: Offset(1, 1),
+        ),
+        BoxShadow(
+          color: Color(0x14000000),
+          blurRadius: 10,
+          offset: Offset(3, 3),
+        ),
+        BoxShadow(
+          color: Color(0x1FFFFFFF),
+          blurRadius: 8,
+          offset: Offset(-2, -2),
+        ),
+      ],
     AppTheme.dracula => const [
         // -0.0083, the step 0x73 makes, and the same value as the inset ambient
         // for the same reason: a press is a smaller event than a well going

@@ -414,11 +414,23 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
 
         // `MaterialApp` has two slots and three appearances, so the `darkTheme`
         // slot carries whichever dark preset is in force. `ThemeOption.dracula`
-        // maps to `ThemeMode.dark` — Material has no third brightness and Dracula
-        // *is* a dark theme — which is why the distinction has to live in the
+        // maps to `ThemeMode.dark` - Material has no third brightness and Dracula
+        // *is* a dark theme - which is why the distinction has to live in the
         // published `ThemeData` rather than in `themeMode`.
-        final darkPreset =
-            appTheme.usesPresetAccent ? AppTheme.dracula : AppTheme.dark;
+        //
+        // **`appTheme` itself and not `usesPresetAccent`.** Both presets set that
+        // flag, so the old expression published Dracula's whole `ThemeData` for
+        // skeuo — page colour, shadow ramp, elevation geometry and all — while
+        // the accent came from `skeuoAccent`. An amber-and-lime theme on
+        // Dracula's purple page. The two would both have been individually
+        // defensible and the result would have been nobody's design; the same
+        // mistake as `presetAccent`, in the one place that decides the whole
+        // theme's surfaces.
+        final darkPreset = switch (appTheme) {
+          AppTheme.dracula => AppTheme.dracula,
+          AppTheme.skeuo => AppTheme.skeuo,
+          AppTheme.dark || AppTheme.light => AppTheme.dark,
+        };
 
         return MaterialApp(
           title: 'EnerGrow',

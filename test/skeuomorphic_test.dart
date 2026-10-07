@@ -105,8 +105,7 @@ void main() {
     }
   });
 
-  test('the rim is lit from the top left, and adds no hue', () {
-    // The highlight is lighter than the surface and the shade darker, in that
+  test('the rim is lit from the top left, and adds no hue', () {    // The highlight is lighter than the surface and the shade darker, in that
     // order, and a well swaps them. Both are mixes of the surface with neutral
     // light, so neither can carry a hue the surface did not already have: the
     // hairline note records a tinted edge putting a green rim on every card.

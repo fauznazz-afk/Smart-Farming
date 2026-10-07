@@ -123,14 +123,22 @@ void main() {
   group('the theme control offers Dracula', () {
     setUp(() => boot());
 
-    testWidgets('the control has four options, not three', (tester) async {
+    testWidgets('the control has five options, not four', (tester) async {
       await pumpSettings(tester);
 
       // The claim is a *count*, not the presence of one label: a control that
-      // grew a second widget for Dracula would show the word without making
-      // these four one choice, and that is the arrangement that says the other
-      // three are more fundamental than the preset.
-      for (final label in ['System', 'Light', 'Dark', 'Dracula']) {
+      // grew a second widget for a preset would show the word without making
+      // these five one choice, and that is the arrangement that says the others
+      // are more fundamental than the preset.
+      for (final label in [
+        'System',
+        'Light',
+        'Dark',
+        'Dracula',
+        // Skeuo, added 7 October 2026 as a fourth preset beside Dracula rather
+        // than as a replacement for the three the user can still choose.
+        'Skeuo',
+      ]) {
         expect(
           find.descendant(
             of: find.byType(SegmentedButton<ThemeOption>),
