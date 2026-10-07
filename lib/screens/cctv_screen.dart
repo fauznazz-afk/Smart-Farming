@@ -91,12 +91,31 @@ const Color cctvVideoGround = Color(0xFF080D0A);
 /// the embedded view does not consume bandwidth while the user browses other
 /// dashboard tabs.
 class CctvScreen extends StatefulWidget {
-  const CctvScreen({super.key, required this.streamUrl, this.fullScreen = false});
+  const CctvScreen({
+    super.key,
+    required this.streamUrl,
+    this.fullScreen = false,
+    this.isVisible = true,
+  });
 
   final String streamUrl;
 
   /// Locks to landscape and hides system bars, starting playback immediately.
   final bool fullScreen;
+
+  /// Whether this panel's tab is the one on screen.
+  ///
+  /// **Required for an inline panel and the reason the flag follows
+  /// visibility rather than the route.** Both cameras live inside the dashboard's
+  /// `IndexedStack`, so both stay mounted whichever tab is showing and neither
+  /// is disposed on a tab change. `RouteAware` cannot see that: its route is
+  /// topmost whichever tab is up, so `didPopNext` re-acquired for a camera
+  /// that was behind two other tabs — measured on the Xiaomi, which left the
+  /// whole app un-screenshottable with no camera anywhere on screen.
+  ///
+  /// Defaults to true, which is the only correct answer for the full-screen
+  /// route and for a panel on a page of its own.
+  final bool isVisible;
 
   @override
   State<CctvScreen> createState() => _CctvScreenState();
@@ -161,10 +180,31 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
   @override
   void didPushNext() => unawaited(SecureWindow.release());
 
-  // The route above was popped, so the camera is visible again and the flag
-  // comes back with it.
+  // The route above was popped, so this screen is the top route again.
+  //
+  // **Re-acquires only when the camera is actually on screen**, which a route
+  // cannot tell. Measured on the Xiaomi on 7 October 2026: `didPopNext` fired
+  // while the camera's route was topmost but its *widget* sat on the Hydroponics
+  // tab, hidden behind an `IndexedStack`, so the flag was held for an off-screen
+  // camera and the whole app stayed un-screenshottable. `isVisible` is the
+  // dashboard telling this screen which tab is showing.
   @override
-  void didPopNext() => unawaited(SecureWindow.acquire());
+  void didPopNext() {
+    if (widget.isVisible) unawaited(SecureWindow.acquire());
+  }
+
+  @override
+  void didUpdateWidget(covariant CctvScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamUrl != widget.streamUrl && _playing) {
+      _startStream();
+    }
+    // Tab change. A camera on a hidden tab is not being photographed, so it
+    // must not hold the flag — this is the whole of the `isVisible` contract.
+    if (oldWidget.isVisible != widget.isVisible) {
+      unawaited(widget.isVisible ? SecureWindow.acquire() : SecureWindow.release());
+    }
+  }
 
   @override
   void dispose() {
@@ -208,14 +248,6 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     unawaited(cctvWebDataScrubber(controller: _controller));
     if (widget.fullScreen) _exitImmersiveMode();
     super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant CctvScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.streamUrl != widget.streamUrl && _playing) {
-      _startStream();
-    }
   }
 
   static void _enterImmersiveMode() {

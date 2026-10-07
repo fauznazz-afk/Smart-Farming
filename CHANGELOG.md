@@ -1,5 +1,54 @@
 ## [Unreleased]
 
+### Fixed
+
+- **`FLAG_SECURE` leaked and made the whole app un-screenshottable.** Found on
+  the Xiaomi on 7 October 2026, not by a test. Opening Settings from the
+  Hydroponics tab left `dumpsys window` reporting `SECURE` on the *dashboard*,
+  and every later screenshot of every other screen was a black frame — not a
+  security win but an app nobody can screenshot or file a bug report from.
+
+  Two independent causes, and the first fix only closed one of them:
+
+  1. A pushed route *covers* a screen without disposing it, so the release in
+     `dispose` never ran. `CctvScreen` now implements `RouteAware` against an
+     observer on `MaterialApp.navigatorObservers`.
+  2. Both cameras live in the dashboard's `IndexedStack`, so both are mounted on
+     every tab and neither is disposed on a tab change — and `RouteAware`
+     cannot see a tab change, because the camera's route is topmost whichever
+     tab is up. `didPopNext` therefore re-acquired for a camera sitting behind
+     two other tabs. `CctvScreen` now takes `isVisible` from the dashboard.
+
+  The first attempt at cause 2 released in `didPush`, which
+  `RouteObserver.subscribe` calls immediately — so it dropped the flag the
+  instant the camera appeared and left it photographable, which is worse than
+  the leak it replaced. Both, and a `ModalRoute.of(context)` in `dispose` that
+  throws on a deactivated widget, were caught by `secure_window_test.dart`.
+
+### Changed
+
+- **The interface is skeuomorphic.** Chamfered rims lit from the top left, fills
+  graded from above, and a gloss on light surfaces, applied through `AppCard`,
+  `AppTile`, `AppBadge`, `DateStripChip` and a new `SkeuoSurface`.
+
+  **The surface tokens did not move.** Rewriting them was tried and reverted:
+  the light page went to near-white, which the design notes name as the one
+  value not to brighten, and three contrast guarantees and three token guards
+  failed. Skeuomorphism is a matter of material, and none of it needs the
+  surfaces themselves to move.
+
+  **One rule makes the layer contrast-safe: a fill may only move away from the
+  colour drawn on it.** The token is therefore always the worst stop, which is
+  what `color_helpers_test.dart` already measures, so every existing contrast
+  proof stands unchanged. `skeuomorphic_test.dart` pins the property itself
+  across 52 cases rather than pinning hex values.
+
+  A bevel cannot be a `Border`: Flutter refuses a border with differently
+  coloured sides when it has a radius or is a circle, and `flutter analyze`
+  cannot see it. Four screens did exactly that and would have thrown on every
+  card in a debug build. The rim is a gradient behind the fill instead, and
+  `skeuo_paint_test.dart` pumps every surface to keep that caught.
+
 ### Security
 
 Six findings from a full source-level review of the app (Dart, Kotlin, both

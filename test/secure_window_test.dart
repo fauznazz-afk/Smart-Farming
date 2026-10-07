@@ -77,4 +77,47 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(calls.last, isFalse, reason: 'the camera is gone');
   });
+
+  testWidgets('a camera on a hidden tab holds no flag', (tester) async {
+    // **The case that actually failed on the device.** Both cameras live in the
+    // dashboard's `IndexedStack`, so both are mounted on every tab and neither
+    // is disposed when the tab changes. `RouteAware` cannot see a tab change --
+    // the camera's route is topmost whichever tab is up -- so `didPopNext`
+    // re-acquired for a camera sitting behind two other tabs, and `dumpsys
+    // window` reported `SECURE` with no camera anywhere on screen.
+    bool visible = true;
+    late StateSetter setState;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorObservers: [SecureWindow.observer],
+        home: StatefulBuilder(
+          builder: (context, set) {
+            setState = set;
+            return Scaffold(
+              body: CctvScreen(
+                streamUrl: 'https://cctv.mbkm20262027.tech/stream.html?src=cam1',
+                isVisible: visible,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(calls.last, isTrue, reason: 'the camera tab is showing');
+
+    setState(() => visible = false);
+    await tester.pumpAndSettle();
+    expect(
+      calls.last,
+      isFalse,
+      reason: 'a camera on a hidden tab is not being photographed, so it must '
+          'not hold a window-wide flag',
+    );
+
+    setState(() => visible = true);
+    await tester.pumpAndSettle();
+    expect(calls.last, isTrue);
+  });
 }

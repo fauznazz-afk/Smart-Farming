@@ -2242,8 +2242,14 @@ Future<void> _refreshCurrentPage() async {
       // thing you want to check most often is the thing furthest from the top.
       () => Bound(
         listenable: _cctvKeepAlive,
-        token: _cctvUrl,
-        builder: () => CctvScreen(streamUrl: _cctvUrl),
+        token: '$_cctvUrl|$_selectedIndex',
+        builder: () => CctvScreen(
+          streamUrl: _cctvUrl,
+          // Hydroponics is tab 2 of the four in `AppDestination` order. The
+          // flag has to know, because this panel is inside an `IndexedStack`
+          // and is therefore mounted on every tab; see `isVisible`.
+          isVisible: _selectedIndex == 2,
+        ),
       ),
       () => const SizedBox(height: 8),
       () => _bindRevision(
@@ -2295,8 +2301,11 @@ Future<void> _refreshCurrentPage() async {
       // lands rather than below three charts.
       () => Bound(
         listenable: _cctvKeepAlive,
-        token: _cctvUrlFish,
-        builder: () => CctvScreen(streamUrl: _cctvUrlFish),
+        token: '$_cctvUrlFish|$_selectedIndex',
+        builder: () => CctvScreen(
+          streamUrl: _cctvUrlFish,
+          isVisible: _selectedIndex == 3,
+        ),
       ),
       () => const SizedBox(height: 8),
       () => _bindRevision(_fishRevision, theme, () => _fishGrid(theme)),
