@@ -111,11 +111,25 @@ class SettingsIconBadge extends StatelessWidget {
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: appTheme.isDark ? 0.20 : 0.12),
+        gradient: RadialGradient(
+          center: const Alignment(-0.3, -0.3),
+          radius: 0.7,
+          colors: [
+            accent.withValues(alpha: appTheme.isDark ? 0.30 : 0.20),
+            accent.withValues(alpha: appTheme.isDark ? 0.15 : 0.06),
+          ],
+        ),
         shape: BoxShape.circle,
         border: Border.all(
           color: AppElevation.controlEdge(accent: accent, theme: appTheme),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.15),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Icon(icon, color: accent, size: 19),
     );
@@ -323,15 +337,35 @@ class SaveSettingsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
-      onPressed: saving ? null : onPressed,
-      icon: saving
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.save),
-      label: Text(saving ? 'Saving...' : 'Save settings'),
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.all(AppRadius.pill),
+        boxShadow: saving
+            ? null
+            : [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+      ),
+      child: FilledButton.icon(
+        onPressed: saving ? null : onPressed,
+        icon: saving
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.save),
+        label: Text(saving ? 'Saving...' : 'Save settings'),
+      ),
     );
   }
 }

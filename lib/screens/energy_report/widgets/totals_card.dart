@@ -37,7 +37,15 @@ class TotalsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: AppSkeuo.fillGradient(
+            AppSurfaces.card(theme),
+            foreground: AppSkeuo.textSide(theme),
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,6 +88,7 @@ class TotalsCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

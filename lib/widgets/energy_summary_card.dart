@@ -320,11 +320,19 @@ class EnergySummaryCard extends StatelessWidget {
                           onRangeChanged(selection.first),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Open the energy report',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: onOpenReport,
-                    icon: const Icon(Icons.insert_chart_outlined_rounded),
+                  // A round raised button. `SkeuoSurface` with `circle`, because
+                  // a two-colour `Border` on `BoxShape.circle` does not paint.
+                  SkeuoSurface(
+                    theme: theme,
+                    base: AppSurfaces.card(theme),
+                    circle: true,
+                    shadows: AppElevation.raised(theme),
+                    child: IconButton(
+                      tooltip: 'Open the energy report',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onOpenReport,
+                      icon: const Icon(Icons.insert_chart_outlined_rounded),
+                    ),
                   ),
                 ],
               ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme_controller.dart';
+import '../theme/app_theme_of.dart';
 import '../utils/app_log.dart';
+import '../widgets/liquid_glass.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
@@ -172,28 +174,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildCategoryList(BuildContext context) {
     final theme = Theme.of(context);
+    final appTheme = appThemeOf(context);
     return ListView.builder(
       key: const ValueKey('settings-list'),
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: _sections.length,
       itemBuilder: (context, index) {
         final section = _sections[index];
-        return ListTile(
-          leading: SettingsIconBadge(icon: section.icon),
-          title: Text(section.title),
-          subtitle: Text(
-            section.subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          // Each settings row is a raised plate. Tokens and the app's own
+          // shadow pair rather than the hex values and two ad-hoc shadows this
+          // replaced, which had no Dracula branch, and `SkeuoSurface` rather
+          // than a four-colour `Border`, which crashes with a radius.
+          child: SkeuoSurface(
+            theme: appTheme,
+            base: AppSurfaces.card(appTheme),
+            radius: AppRadius.card,
+            shadows: AppElevation.raised(appTheme),
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: SettingsIconBadge(icon: section.icon),
+                title: Text(section.title),
+                subtitle: Text(
+                  section.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                onTap: () => _openSection(index),
+              ),
             ),
           ),
-          trailing: Icon(
-            Icons.chevron_right,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          onTap: () => _openSection(index),
         );
       },
     );

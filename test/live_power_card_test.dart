@@ -388,9 +388,20 @@ void main() {
           ),
         );
 
+        // The track is a skeuomorphic groove now — a gradient shaded at the
+        // top with the token as its floor — so the token is looked for as a
+        // stop rather than as a flat `ColoredBox`. The claim is the same: the
+        // bar behind the charge figure is painted from *this* theme's track.
         expect(
           find.byWidgetPredicate(
-            (w) => w is ColoredBox && w.color == AppSurfaces.track(theme),
+            (w) =>
+                w is DecoratedBox &&
+                w.decoration is BoxDecoration &&
+                ((w.decoration as BoxDecoration).gradient
+                            as LinearGradient?)
+                        ?.colors
+                        .contains(AppSurfaces.track(theme)) ==
+                    true,
           ),
           findsWidgets,
           reason: 'AppSurfaces.track(${theme.name}) is '

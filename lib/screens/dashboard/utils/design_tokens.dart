@@ -919,3 +919,167 @@ class AppMotion {
   static const Curve exit = Curves.easeInCubic;
   static const Curve both = Curves.easeInOutCubic;
 }
+
+/// The skeuomorphic layer: gradient fills, bevelled edges and a gloss band.
+///
+/// **Added on 7 October 2026, on top of the soft-UI system rather than instead
+/// of it.** The user asked for the whole app to read as skeuomorphic. A first
+/// attempt rewrote the surface tokens wholesale and was reverted: it moved the
+/// light page to near-white `#F5F5F4`, which the notes above name as the one
+/// value not to brighten, and it failed three contrast guarantees in
+/// `color_helpers_test.dart` and three guards in `design_tokens_test.dart`.
+/// Skeuomorphism is a matter of *material* — light falling across a surface,
+/// a chamfered edge, a reflection — and none of that needs the surfaces
+/// themselves to move. So the tokens stay, and this class decorates them.
+///
+/// **One rule makes the whole layer contrast-safe, and every method here
+/// enforces it: a fill may only move *away* from the colour drawn on it.**
+/// "Depth belongs in the shadow, never in the fill" was written because a
+/// gradient that darkens a light card darkens the background of its caption,
+/// and `faintColor` has roughly 0.05 of headroom over AA. The constraint is not
+/// on gradients; it is on their *direction*. Lightening behind dark text, or
+/// darkening behind light text, can only raise the ratio.
+///
+/// The consequence is the useful part: the token itself is always the stop
+/// closest to the text, so it is the worst case, and the worst case is exactly
+/// the value `color_helpers_test.dart` already measures. Nothing about the
+/// existing contrast proofs changes. `skeuomorphic_test.dart` pins the rule.
+///
+/// The light still comes from the top left, like every shadow in the app. On a
+/// light theme that reads as a lit top edge fading to the token; on a dark
+/// theme as the token at the top falling off into shade at the bottom. Both
+/// are a surface lit from above, which is the only claim a gradient makes.
+class AppSkeuo {
+  const AppSkeuo._();
+
+  /// How far a surface's fill travels from its token. Small on purpose: past
+  /// roughly 8% a gradient stops reading as light and starts reading as a
+  /// second colour.
+  static const double fillTravel = 0.06;
+
+  /// The stronger travel used by controls that are *meant* to look pressable —
+  /// a selected chip, a primary button. Same direction rule.
+  static const double controlTravel = 0.12;
+
+  /// Whether [foreground] is the darker of the pair, which decides the
+  /// direction every method here moves in.
+  static bool foregroundIsDarker(Color base, Color foreground) =>
+      foreground.computeLuminance() < base.computeLuminance();
+
+  /// A top-to-bottom fill for a surface whose text is [foreground].
+  ///
+  /// Returns two stops, one of which is always exactly [base]. Dark text gets a
+  /// lightened top; light text gets a darkened bottom. See the class note for
+  /// why that is what keeps AA intact.
+  static List<Color> fill(
+    Color base, {
+    required Color foreground,
+    double travel = fillTravel,
+  }) {
+    if (foregroundIsDarker(base, foreground)) {
+      return [Color.lerp(base, const Color(0xFFFFFFFF), travel)!, base];
+    }
+    return [base, Color.lerp(base, const Color(0xFF000000), travel)!];
+  }
+
+  /// The same fill as a ready-made [LinearGradient].
+  static LinearGradient fillGradient(
+    Color base, {
+    required Color foreground,
+    double travel = fillTravel,
+  }) =>
+      LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: fill(base, foreground: foreground, travel: travel),
+      );
+
+  /// The usual text colour for a themed surface: the side [fill] moves away
+  /// from. Black and white rather than the real body colour, because only the
+  /// *direction* is used and both real colours sit on the same side.
+  static Color textSide(AppTheme theme) =>
+      theme.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+
+  /// A gloss band — the reflection along a polished top edge — or null when
+  /// there must not be one.
+  ///
+  /// **Painted *beneath* the content, never over it.** A white wash drawn over a
+  /// card's header is a white wash over its text, whatever the alpha. Beneath,
+  /// it is a fill, so the direction rule applies: it lightens, so it is allowed
+  /// only behind dark text. On a dark surface the top bevel line carries the
+  /// highlight instead, and this returns null.
+  static LinearGradient? gloss(Color base, {required Color foreground}) {
+    if (!foregroundIsDarker(base, foreground)) return null;
+    return const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0x26FFFFFF), Color(0x00FFFFFF)],
+    );
+  }
+
+  /// The width of the chamfered rim, in logical pixels. One, like the hairline
+  /// it replaced, so no surface changes size.
+  static const double rimWidth = 1;
+
+  /// A chamfered edge, as a gradient painted *behind* the fill and showing
+  /// [rimWidth] past it: highlight at the top left, shade at the bottom right,
+  /// the same light as every shadow in the app.
+  ///
+  /// **A gradient and not a `Border`, because Flutter cannot paint the obvious
+  /// version.** A `Border` with a light top and a dark bottom has sides of
+  /// different colours, and Flutter rejects that combined with a `borderRadius`
+  /// or a circle: `A borderRadius can only be given on borders with uniform
+  /// colors`. `flutter analyze` cannot see it. The first skeuomorphic pass on
+  /// 7 October 2026 shipped exactly that on `AppCard`, which threw on every card
+  /// in the app in a debug build and painted square edges on rounded cards in a
+  /// release one; `skeuo_paint_test.dart` now pumps every surface to catch it.
+  /// The gradient also reads better: light travels around the rim continuously
+  /// instead of changing colour at the corners.
+  ///
+  /// **Blended from [base], toward white and toward black.** The old hairline
+  /// was once tinted with the accent and put a green outline on every card — a
+  /// drawn edge rather than a lit one. Mixing the surface with neutral light
+  /// adds no hue the surface did not already have.
+  ///
+  /// [inverted] lights the rim from inside, for a well.
+  static LinearGradient rim(
+    Color base,
+    AppTheme theme, {
+    bool inverted = false,
+    double strength = 1,
+  }) {
+    final highlight = Color.lerp(
+      base,
+      const Color(0xFFFFFFFF),
+      ((theme.isDark ? 0.12 : 0.65) * strength).clamp(0.0, 1.0),
+    )!;
+    final shade = Color.lerp(
+      base,
+      const Color(0xFF000000),
+      ((theme.isDark ? 0.45 : 0.14) * strength).clamp(0.0, 1.0),
+    )!;
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: inverted ? [shade, highlight] : [highlight, shade],
+    );
+  }
+
+  /// The tinted badge wash, top and bottom, never stronger than [alpha].
+  ///
+  /// The wash is a tint of a status colour laid on the surface, and a stronger
+  /// wash moves the background *toward* the status text — `AppBadge` records
+  /// 0.08 at 4.63:1 and 0.12 at 4.39:1. So the gradient is made by *weakening*
+  /// one end, never strengthening the other, and [alpha] stays the worst case.
+  /// Which end weakens follows the same light-from-the-top rule as [fill].
+  static List<Color> badgeWash(
+    Color color, {
+    required double alpha,
+    required AppTheme theme,
+  }) {
+    final weak = color.withValues(alpha: alpha * 0.55);
+    final full = color.withValues(alpha: alpha);
+    // A weaker wash is lighter on a light page and darker on a dark one.
+    return theme.isDark ? [full, weak] : [weak, full];
+  }
+}

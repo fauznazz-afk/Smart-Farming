@@ -60,12 +60,23 @@ class OfflineBanner extends StatelessWidget {
     // offline banner is a warning, so it uses the measured one.
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = statusWarn(isDark);
+    final baseAlpha = isDark ? 0.14 : 0.10;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: isDark ? 0.14 : 0.10),
+          // `baseAlpha` is the measured wash and stays the strongest stop; see
+          // `AppSkeuo.badgeWash`. The top stop used to be `baseAlpha + 0.03`.
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppSkeuo.badgeWash(
+              color,
+              alpha: baseAlpha,
+              theme: isDark ? AppTheme.dark : AppTheme.light,
+            ),
+          ),
           borderRadius: BorderRadius.circular(AppRadius.inset),
           border: Border.all(color: color.withValues(alpha: 0.40)),
         ),
@@ -159,10 +170,22 @@ class EnergyAlertBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _alertAccent.withValues(alpha: 0.16),
+        // 0.16 was the shipped wash; the strongest stop stays there rather than
+        // the 0.19 this briefly had, because every point of wash behind the
+        // alarm text is a point of contrast taken from it.
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: AppSkeuo.badgeWash(
+            _alertAccent,
+            alpha: 0.16,
+            theme: isDark ? AppTheme.dark : AppTheme.light,
+          ),
+        ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _alertAccent.withValues(alpha: 0.4)),
       ),
@@ -320,7 +343,16 @@ class ConnectionStatusBanner extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 36),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          // 0.08 was the shipped wash and stays the strongest stop.
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AppSkeuo.badgeWash(
+              color,
+              alpha: 0.08,
+              theme: isDark ? AppTheme.dark : AppTheme.light,
+            ),
+          ),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

@@ -102,7 +102,15 @@ List<Color> _captionPalette(bool isDark) => [
 /// the tile does not own, so this takes the *first*, which is the tile itself
 /// because nothing inside it can precede it — and the optional accent
 /// `ClipRRect`/`ColoredBox` wrap the tile rather than being wrapped by it.
-Future<BoxDecoration> _tileDecoration(WidgetTester tester, bool isDark) async {
+///
+/// **Two layers since the skeuomorphic pass, and both are returned.** The tile
+/// is a chamfered rim (`AppSkeuo.rim`) with the fill inset inside it, so the
+/// first `Container` is the rim — which carries the inset shadow — and the
+/// second is the fill the text is actually drawn on.
+Future<({BoxDecoration rim, BoxDecoration fill})> _tileDecoration(
+  WidgetTester tester,
+  bool isDark,
+) async {
   await tester.pumpWidget(
     MaterialApp(
       home: AppTile(
@@ -111,9 +119,21 @@ Future<BoxDecoration> _tileDecoration(WidgetTester tester, bool isDark) async {
       ),
     ),
   );
-  final container = tester.widget<Container>(find.byType(Container).first);
-  return container.decoration! as BoxDecoration;
+  final layers = tester
+      .widgetList<Container>(find.byType(Container))
+      .take(2)
+      .map((c) => c.decoration! as BoxDecoration)
+      .toList();
+  return (rim: layers[0], fill: layers[1]);
 }
+
+/// Every colour a tile's text can land on: each stop of the fill gradient.
+///
+/// Measuring every stop is *stricter* than the single flat fill this used to
+/// read. `AppSkeuo.fill` promises the token is the worst stop, and this is the
+/// check that the promise holds on the surface actually rendered.
+List<Color> _tileFillStops(BoxDecoration fill) =>
+    (fill.gradient! as LinearGradient).colors;
 
 /// The progress tracks (`AppSurfaces.trackLight` / `trackDark`) are deliberately
 /// in neither list. A track is a 6 to 8dp bar and no text is ever drawn on one,
@@ -474,18 +494,18 @@ void main() {
       // 3.85, 3.87, 3.86 and 3.86 — every one of them under AA.
       for (final isDark in [false, true]) {
         final decoration = await _tileDecoration(tester, isDark);
-        final fill = decoration.color!;
+        final fill = _tileFillStops(decoration.fill);
 
         expectClearsAa('faintColor on the tile fill, isDark=$isDark',
-            faintColor(isDark), [fill]);
+            faintColor(isDark), fill);
         expectClearsAa('statusOk on the tile fill, isDark=$isDark',
-            statusOk(isDark), [fill]);
+            statusOk(isDark), fill);
         expectClearsAa('statusWarn on the tile fill, isDark=$isDark',
-            statusWarn(isDark), [fill]);
+            statusWarn(isDark), fill);
         expectClearsAa('statusBad on the tile fill, isDark=$isDark',
-            statusBad(isDark), [fill]);
+            statusBad(isDark), fill);
         expectClearsAa('statusAlert on the tile fill, isDark=$isDark',
-            statusAlert(isDark), [fill]);
+            statusAlert(isDark), fill);
       }
     });
 
@@ -493,10 +513,11 @@ void main() {
       // Stated separately because the two lists above *do* still exclude the
       // track, and this is the assertion that keeps that exclusion honest: it is
       // scoped to the bars, not to the token.
-      final light = await _tileDecoration(tester, false);
+      final tile = await _tileDecoration(tester, false);
+      final light = tile.rim;
       expect(
-        light.color,
-        isNot(AppSurfaces.trackLight),
+        _tileFillStops(tile.fill),
+        isNot(contains(AppSurfaces.trackLight)),
         reason: 'the light track is the darkest light surface in the app and '
             'fails AA with text on it; the tile needs input, the bars keep track',
       );

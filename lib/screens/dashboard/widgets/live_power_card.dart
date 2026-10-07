@@ -607,7 +607,26 @@ class _SocLine extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColoredBox(color: AppSurfaces.track(theme)),
+                  // A groove: the lip shades the top, the floor is the token.
+                  // The token is kept as a stop so the track is still exactly
+                  // `AppSurfaces.track` where it meets the fill — Dracula's is
+                  // the one darker than its own page, and the test pins that.
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color.lerp(
+                            AppSurfaces.track(theme),
+                            const Color(0xFF000000),
+                            0.18,
+                          )!,
+                          AppSurfaces.track(theme),
+                        ],
+                      ),
+                    ),
+                  ),
                   FractionallySizedBox(
                     alignment: Alignment.centerLeft,
                     // Absent means no fill at all, rather than a fill of zero

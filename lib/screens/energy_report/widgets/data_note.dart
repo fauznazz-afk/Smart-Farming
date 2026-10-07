@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme_of.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
 import '../../../services/energy_report_service.dart';
 
 class DataNote extends StatelessWidget {
@@ -16,7 +18,18 @@ class DataNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
+      child: Container(
+        decoration: BoxDecoration(
+          // The resolved theme, not `isDark`: a `bool` cannot tell Dracula from
+          // the app's own dark preset, and the hex pair this replaced had no
+          // Dracula branch at all.
+          gradient: AppSkeuo.fillGradient(
+            AppSurfaces.card(appThemeOf(context)),
+            foreground: AppSkeuo.textSide(appThemeOf(context)),
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,6 +53,7 @@ class DataNote extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -116,15 +116,27 @@ void main() {
       );
       final decoration = decorated.decoration! as BoxDecoration;
 
-      expect(decoration.color, AppSurfaces.card(AppTheme.dracula));
-      // Dracula's raised pair is three shadows with its own alphas, and its
-      // geometry is shared with the dark set — so the alphas are what a reader
-      // can check, and they are not the dark set's.
+      // **Read through the skeuomorphic layer, which is the only change here.**
+      // This used to assert `decoration.color`; the card is now a chamfered
+      // rim with the fill inset inside it (`AppSkeuo.rim`), so there is no flat
+      // colour to read. The claim is unchanged: the rim is mixed from Dracula's
+      // card token, which a card resolved to the app's dark preset would not be.
       expect(
-        decoration.boxShadow,
-        AppElevation.raised(AppTheme.dracula),
+        (decoration.gradient! as LinearGradient).colors,
+        AppSkeuo.rim(AppSurfaces.card(AppTheme.dracula), AppTheme.dracula)
+            .colors,
+        reason: 'the card must be painted from Dracula\'s surface token',
+      );
+      // Dracula's raised pair is three shadows with its own alphas, and its
+      // geometry is shared with the dark set - so the alphas are what a reader
+      // can check, and they are not the dark set's. The skeuomorphic layer adds
+      // one wider depth shadow *after* the pair, so the pair is the prefix.
+      final raised = AppElevation.raised(AppTheme.dracula);
+      expect(
+        decoration.boxShadow!.take(raised.length).toList(),
+        raised,
         reason: 'the card must be on Dracula\'s elevation ramp, not the app\'s '
-            'dark one — the page is 1.7x lighter and the alphas were solved for '
+            'dark one - the page is 1.7x lighter and the alphas were solved for '
             'it separately',
       );
     });

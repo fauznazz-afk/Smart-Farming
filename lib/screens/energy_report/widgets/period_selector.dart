@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/design_tokens.dart';
 import '../utils/format_helpers.dart';
 
 class PeriodSelector extends StatelessWidget {
@@ -32,11 +33,23 @@ class PeriodSelector extends StatelessWidget {
           },
         ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: onPickPeriod,
-          icon: const Icon(Icons.calendar_month_outlined),
-          label: Text(
-            monthly ? formatMonthLabel(selectedDate) : formatDateLabel(selectedDate),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.all(AppRadius.tile),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: OutlinedButton.icon(
+            onPressed: onPickPeriod,
+            icon: const Icon(Icons.calendar_month_outlined),
+            label: Text(
+              monthly ? formatMonthLabel(selectedDate) : formatDateLabel(selectedDate),
+            ),
           ),
         ),
       ],

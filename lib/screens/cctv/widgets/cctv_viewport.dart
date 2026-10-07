@@ -162,7 +162,14 @@ class CctvStandbyOverlay extends StatelessWidget {
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.09),
+                  gradient: RadialGradient(
+                    center: const Alignment(-0.3, -0.3),
+                    radius: 0.8,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.16),
+                      Colors.white.withValues(alpha: 0.06),
+                    ],
+                  ),
                   shape: BoxShape.circle,
                   // `boundaryEdge` rather than `controlEdge`. An accent tint
                   // cannot be measured against a video frame of unknown
@@ -183,6 +190,18 @@ class CctvStandbyOverlay extends StatelessWidget {
                   border: Border.all(
                     color: AppElevation.boundaryEdge(theme: AppTheme.dark),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.videocam_outlined,
@@ -345,14 +364,37 @@ class CctvRoundControl extends StatelessWidget {
     return Semantics(
       button: true,
       label: tooltip,
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.55),
-        shape: const CircleBorder(),
-        child: IconButton(
-          tooltip: tooltip,
-          onPressed: onPressed,
-          color: Colors.white,
-          icon: Icon(icon),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            center: const Alignment(-0.3, -0.3),
+            radius: 0.7,
+            colors: [
+              Colors.white.withValues(alpha: 0.12),
+              Colors.black.withValues(alpha: 0.55),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: IconButton(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            color: Colors.white,
+            icon: Icon(icon),
+          ),
         ),
       ),
     );

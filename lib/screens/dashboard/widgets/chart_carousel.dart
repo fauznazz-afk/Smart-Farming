@@ -167,8 +167,27 @@ class _ChartCarouselState extends State<ChartCarousel> {
                 width: i == _index ? 16 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _index ? accent : faint.withValues(alpha: 0.28),
+                  gradient: i == _index
+                      ? LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color.lerp(accent, Colors.white, 0.2)!,
+                            accent,
+                          ],
+                        )
+                      : null,
+                  color: i == _index ? null : faint.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(3),
+                  boxShadow: i == _index
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
                 ),
               ),
             const SizedBox(width: 10),

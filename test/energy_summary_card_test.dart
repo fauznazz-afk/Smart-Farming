@@ -477,35 +477,49 @@ void main() {
         );
         expect(washes, findsOneWidget);
 
-        // The fill that paints over it.
+        // What paints over it. **Two Containers now, and both have to be
+        // opaque.** The skeuomorphic tile is a chamfered rim (`AppSkeuo.rim`)
+        // with the fill inset inside it by one pixel, so the rim covers the
+        // tile's outer pixel and the fill covers the rest. Either one going
+        // translucent would let the wash show through it.
         final containers = find.descendant(
           of: find.byWidget(tile.widget),
           matching: find.byType(Container),
         );
-        expect(containers, findsOneWidget);
-        final decoration = tester.widget<Container>(containers).decoration;
-        expect(decoration, isA<BoxDecoration>());
-        final fill = (decoration! as BoxDecoration).color!;
+        expect(containers, findsNWidgets(2));
+        final layers = tester
+            .widgetList<Container>(containers)
+            .map((c) => c.decoration! as BoxDecoration)
+            .toList();
 
-        // Opaque. This one assertion is what makes the wash invisible.
-        // `a` is the 0..1 double, so 255 is 1.0.
+        // Opaque, every stop of both gradients. This is what makes the wash
+        // invisible. `a` is the 0..1 double, so 255 is 1.0.
+        for (final layer in layers) {
+          for (final stop in (layer.gradient! as LinearGradient).colors) {
+            expect(
+              stop.a,
+              1.0,
+              reason: 'the tile must stay opaque, or the accent wash behind '
+                  'it becomes visible and the delta caption needs remeasuring',
+            );
+          }
+        }
+        // The inner layer is the fill, and the token is one of its stops — the
+        // stop nearest the caption, by `AppSkeuo.fill`'s direction rule.
         expect(
-          fill.a,
-          1.0,
-          reason: 'the tile fill must stay opaque, or the accent wash behind '
-              'it becomes visible and the delta caption needs remeasuring',
-        );
-        expect(
-          fill,
-          AppSurfaces.input(AppTheme.light),
-          reason: 'the rendered tile surface is the input fill — the same one '
+          (layers.last.gradient! as LinearGradient).colors,
+          contains(AppSurfaces.input(AppTheme.light)),
+          reason: 'the rendered tile surface is the input fill - the same one '
               'color_helpers_test.dart measures faintColor against',
         );
 
         // And the wash really is behind rather than in front, so the opacity
         // above is the reason and not a coincidence of tree shape.
         expect(
-          find.descendant(of: containers, matching: find.byType(ColoredBox)),
+          find.descendant(
+            of: containers.first,
+            matching: find.byType(ColoredBox),
+          ),
           findsNothing,
           reason: 'if the wash became a child of the filled Container it would '
               'be visible, and this test would be asserting the wrong thing',

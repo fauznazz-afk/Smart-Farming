@@ -18,9 +18,18 @@ class BrandLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = accentColor ?? const Color(0xFFEFA13E);
     final secondary = secondaryColor ?? const Color(0xFF35A968);
-    final mark = SizedBox(
+    final mark = Container(
       width: size,
       height: size,
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: size * 0.12,
+            offset: Offset(0, size * 0.04),
+          ),
+        ],
+      ),
       child: Image.asset(
         'assets/energrow_logo.png',
         width: size,

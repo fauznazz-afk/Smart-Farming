@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme_controller.dart';
 import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
 import '../settings_controller.dart';
 
 /// Accent colours the user can pick from.
@@ -141,26 +142,50 @@ class AppearanceSection extends StatelessWidget {
             // screen.
             final selected =
                 settings.selectedSeed.toARGB32() == entry.value.toARGB32();
-            return ChoiceChip(
-              label: Text(entry.key),
-              selected: selected,
-              avatar: CircleAvatar(radius: 9, backgroundColor: entry.value),
-              // `onSelected: null` is what a `ChoiceChip` renders as disabled,
-              // and it is the same disabled treatment Material would give a
-              // disabled control from any other cause. A `IgnorePointer` over an
-              // enabled chip was the alternative and was rejected: it leaves the
-              // chip *looking* live, so the user discovers the rule by tapping
-              // something that silently does nothing — which is the "a control
-              // that looks like it works" failure the accent picker would
-              // otherwise be.
-              onSelected: presetOwnsAccent
-                  ? null
-                  : (_) {
-                      settings.update(() {
-                        settings.selectedSeed = entry.value;
-                        themeController.setSeedColor(entry.value);
-                      });
-                    },
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: AppRadius.all(AppRadius.pill),
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          entry.value.withValues(alpha: 0.25),
+                          entry.value.withValues(alpha: 0.12),
+                        ],
+                      )
+                    : null,
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: entry.value.withValues(alpha: 0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ChoiceChip(
+                label: Text(entry.key),
+                selected: selected,
+                avatar: CircleAvatar(radius: 9, backgroundColor: entry.value),
+                // `onSelected: null` is what a `ChoiceChip` renders as disabled,
+                // and it is the same disabled treatment Material would give a
+                // disabled control from any other cause. A `IgnorePointer` over an
+                // enabled chip was the alternative and was rejected: it leaves the
+                // chip *looking* live, so the user discovers the rule by tapping
+                // something that silently does nothing — which is the "a control
+                // that looks like it works" failure the accent picker would
+                // otherwise be.
+                onSelected: presetOwnsAccent
+                    ? null
+                    : (_) {
+                        settings.update(() {
+                          settings.selectedSeed = entry.value;
+                          themeController.setSeedColor(entry.value);
+                        });
+                      },
+              ),
             );
           }).toList(),
         ),

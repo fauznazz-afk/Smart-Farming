@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/cctv_url.dart';
 import '../services/secure_window.dart';
 import '../theme/app_theme_of.dart';
+import '../widgets/liquid_glass.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
 import 'dashboard/utils/design_tokens.dart';
@@ -101,7 +102,7 @@ class CctvScreen extends StatefulWidget {
   State<CctvScreen> createState() => _CctvScreenState();
 }
 
-class _CctvScreenState extends State<CctvScreen> {
+class _CctvScreenState extends State<CctvScreen> with RouteAware {
   /// The WebView's own background. See [cctvVideoGround]: the video's matte and
   /// the panel's fill have to be the same colour, because this is what the
   /// go2rtc page paints its letterbox in, and a mismatch would put a second
@@ -135,7 +136,49 @@ class _CctvScreenState extends State<CctvScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe here, not in `initState`: the `ModalRoute` is only available
+    // once the widget is in the tree, and `initState` runs before that.
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      SecureWindow.observer.subscribe(this, route);
+    }
+  }
+
+  // A route was pushed over this screen, so the camera is no longer visible and
+  // must not hold the flag. Without this the flag outlives the screen's
+  // visibility and the whole app becomes un-screenshottable -- measured on the
+  // Xiaomi on 7 October 2026, where opening Settings from the Hydroponics tab
+  // left `dumpsys window` reporting `SECURE` on the dashboard.
+  //
+  // **`didPushNext`, not `didPush`, and getting that wrong removed the
+  // protection entirely.** `didPush` means *this* route was pushed, and
+  // `RouteObserver.subscribe` calls it immediately — so releasing there dropped
+  // the flag the instant the camera appeared, leaving it photographable.
+  // `secure_window_test.dart` caught it on its first assertion. `didPush` is
+  // left to the default no-op: `initState` has already acquired.
+  @override
+  void didPushNext() => unawaited(SecureWindow.release());
+
+  // The route above was popped, so the camera is visible again and the flag
+  // comes back with it.
+  @override
+  void didPopNext() => unawaited(SecureWindow.acquire());
+
+  @override
   void dispose() {
+    // Unsubscribe before releasing, so a late `didPush` from the observer
+    // cannot touch a state that is already gone.
+    //
+    // **No `ModalRoute.of(context)` here.** A disposing widget cannot look up
+    // its ancestors ("Looking up a deactivated widget's ancestor is unsafe"),
+    // and the first version of this did exactly that — the throw landed before
+    // `SecureWindow.release()` and before the session scrub below, so it
+    // skipped both, which is the flag leak this observer exists to close.
+    // `cctv_test.dart` caught it. `unsubscribe` needs no route and is a no-op
+    // for a state that never subscribed.
+    SecureWindow.observer.unsubscribe(this);
     // Released, or the rest of the app inherits it: a flag left set is an app
     // the user cannot screenshot anywhere, including screens where that is the
     // wrong answer.
@@ -331,14 +374,26 @@ class _CctvScreenState extends State<CctvScreen> {
             children: [
               Row(
                 children: [
-                  Container(
+                  // A raised badge, mixed opaque from the 0.12 accent wash it
+                  // shipped with, so the icon keeps the contrast it had. The
+                  // first skeuomorphic pass raised the wash to 0.22 and drew a
+                  // four-colour `Border` with a radius, which does not paint.
+                  SizedBox(
                     width: 42,
                     height: 42,
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.12),
-                      borderRadius: AppRadius.all(AppRadius.tile),
+                    child: SkeuoSurface(
+                      theme: appTheme,
+                      base: Color.alphaBlend(
+                        primary.withValues(alpha: 0.12),
+                        AppSurfaces.page(appTheme),
+                      ),
+                      foreground: primary,
+                      radius: AppRadius.tile,
+                      shadows: AppElevation.raised(appTheme),
+                      child: Center(
+                        child: Icon(Icons.videocam_rounded, color: primary),
+                      ),
                     ),
-                    child: Icon(Icons.videocam_rounded, color: primary),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -532,7 +587,12 @@ class _InfoBar extends StatelessWidget {
         // light. `AppSurfaces.chrome` is the surface that has to separate from
         // the page by fill rather than by shadow, which is what this is: a bar
         // under the player, with a Reload button in it.
-        color: AppSurfaces.chrome(theme),
+        // Still `AppSurfaces.chrome`, now lit from above through `AppSkeuo`.
+        // The hex pair that briefly replaced it had no Dracula branch.
+        gradient: AppSkeuo.fillGradient(
+          AppSurfaces.chrome(theme),
+          foreground: AppSkeuo.textSide(theme),
+        ),
         borderRadius: AppRadius.all(AppRadius.card),
         // Was `white | black @ 0.06`, which measures 1.14:1 on the fill. The bar
         // sits under a viewport-sized video and holds a Reload button, so its
@@ -549,6 +609,18 @@ class _InfoBar extends StatelessWidget {
         // boundary has to hold on its own rather than being carried by a shared
         // fill.
         border: Border.all(color: AppElevation.boundaryEdge(theme: theme)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.06),
+            blurRadius: 4,
+            offset: const Offset(0, -1),
+          ),
+        ],
       ),
       child: Row(
         children: [

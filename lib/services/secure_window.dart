@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 /// Window-level screen capture control, for the screens that must not be
 /// photographable.
@@ -20,6 +21,16 @@ class SecureWindow {
 
   static int _holders = 0;
 
+  /// The single observer every secure screen subscribes to.
+  ///
+  /// **One instance, shared, and registered on `MaterialApp.navigatorObservers`.**
+  /// A screen that is covered by a pushed route is not visible, so it must not
+  /// hold a flag whose entire purpose is to prevent being photographed. Without
+  /// this, the flag outlives the screen's visibility and the app becomes
+  /// un-screenshottable everywhere.
+  static final RouteObserver<ModalRoute<void>> observer =
+      RouteObserver<ModalRoute<void>>();
+
   /// Block screenshots, screen recording and the Recents thumbnail.
   ///
   /// **Reference-counted, and that is not ceremony.** `FLAG_SECURE` belongs to
@@ -29,9 +40,27 @@ class SecureWindow {
   /// clear the flag while a camera is still visible, which is precisely the
   /// finding this exists to close. Found in review on 6 October 2026.
   ///
-  /// The count is per-process and is not restored across a hot restart, so the
-  /// worst case is a flag left set until the app is killed — which makes
-  /// screenshots fail elsewhere rather than exposing a camera.
+  /// **Counting alone was not enough, and the device said so.** Measured on the
+  /// Xiaomi on 7 October 2026: opening Settings from the Hydroponics tab, which
+  /// carries an inline camera panel, left `dumpsys window` reporting `SECURE` on
+  /// the *dashboard*. Pushing a route covers a screen without disposing it, so
+  /// `dispose` -- the only place [release] was called from -- never ran, the
+  /// count stayed at 1, and every later screenshot of every other screen in the
+  /// app was a black frame.
+  ///
+  /// The cost is not a security win. It is an app the user cannot screenshot
+  /// anywhere, cannot file a bug report from, and that the developer cannot
+  /// inspect -- and it is the same failure the count was introduced to prevent,
+  /// reached from the other side: not releasing early, but never releasing at
+  /// all. The previous comment here called the worst case "a flag left set until
+  /// the app is killed", which described the bug accurately and then declined to
+  /// treat it as one.
+  ///
+  /// **[observer] is what the count was missing.** A screen that is covered is
+  /// not visible, so it should not hold a flag that protects against being
+  /// photographed. `didPush` releases, `didPopNext` re-acquires, and `dispose`
+  /// releases for good. The count is unchanged, so two genuinely-visible
+  /// cameras still share one flag and neither can be cleared by the other.
   static Future<void> acquire() async {
     if (defaultTargetPlatform != TargetPlatform.android) return;
     _holders++;

@@ -50,10 +50,24 @@ class GreetingHeader extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppSurfaces.track(theme),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(AppSurfaces.track(theme), Colors.white, 0.08)!,
+                Color.lerp(AppSurfaces.track(theme), Colors.black, 0.05)!,
+              ],
+            ),
             border: Border.all(
               color: appDivider(theme: theme, opacity: 0.28),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),

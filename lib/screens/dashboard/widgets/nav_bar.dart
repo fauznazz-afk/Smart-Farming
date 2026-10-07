@@ -190,7 +190,12 @@ class GlassNavBar extends StatelessWidget {
                           // those alphas revealed was the page — which
                           // `AppSurfaces.chrome` already steps away from by one
                           // value, so the translucency bought nothing.
-                          color: AppSurfaces.chrome(theme),
+                          // Lit from above through `AppSkeuo`, which only ever
+                          // moves away from the labels on the bar.
+                          gradient: AppSkeuo.fillGradient(
+                            AppSurfaces.chrome(theme),
+                            foreground: AppSkeuo.textSide(theme),
+                          ),
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
                             color: AppElevation.hairline(
@@ -311,7 +316,13 @@ class _CollapsedNavItem extends StatelessWidget {
                 // surface: it is the only element in the bar that is not a
                 // neutral, and it is what tells the user where they are. The
                 // press flattens it into the bar, same as an expanded item.
-                color: primary,
+                // A white glyph on the accent, so the accent is lit by
+                // darkening its lower half rather than lightening the top.
+                gradient: AppSkeuo.fillGradient(
+                  primary,
+                  foreground: Colors.white,
+                  travel: AppSkeuo.controlTravel,
+                ),
                 boxShadow: pressed
                     ? AppElevation.pressed(theme)
                     : AppElevation.raised(theme),
@@ -482,7 +493,16 @@ class _NavDestination extends StatelessWidget {
           // are, and an accent-coloured glyph on a chrome fill is a much weaker
           // signal — a hue is easy to miss on a small icon, a 44dp disc is not.
           // What went wrong was the cross-fade, not the circle.
-          color: selected ? primary : Colors.transparent,
+          // Same white glyph on the accent as the expanded item, so the same
+          // direction: the lower half darkens, the top stays the accent.
+          gradient: selected
+              ? AppSkeuo.fillGradient(
+                  primary,
+                  foreground: Colors.white,
+                  travel: AppSkeuo.controlTravel,
+                )
+              : null,
+          color: selected ? null : Colors.transparent,
           boxShadow: selected
               // A block coming up off the page flattens into it.
               ? (pressed

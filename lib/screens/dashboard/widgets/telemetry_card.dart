@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/telemetry_model.dart';
+import '../../../theme/app_theme_of.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
 import '../utils/color_helpers.dart';
@@ -38,7 +39,17 @@ class GlassPageHeader extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: accent.withValues(alpha: 0.15),
+            // The shipped 0.15 accent wash, made opaque so it can be lit from
+            // above, and lit away from the icon — which *is* the accent. The
+            // first skeuomorphic pass put a near-opaque accent at the top of
+            // this circle, so the icon all but vanished into it.
+            gradient: AppSkeuo.fillGradient(
+              Color.alphaBlend(
+                accent.withValues(alpha: 0.15),
+                AppSurfaces.card(appThemeOf(context)),
+              ),
+              foreground: accent,
+            ),
           ),
           child: Icon(icon, size: 18, color: accent),
         ),

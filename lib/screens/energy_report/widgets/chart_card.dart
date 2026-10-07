@@ -39,7 +39,22 @@ class ChartCard extends StatelessWidget {
     return Semantics(
       label: 'Energy bar chart showing ${buckets.length} intervals',
       child: Card(
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              // Through `AppSkeuo`, which keeps the token the worst case for the
+              // axis text. Not literals: the hex pair this replaced had no
+              // Dracula branch.
+              colors: AppSkeuo.fill(
+                AppSurfaces.card(theme),
+                foreground: AppSkeuo.textSide(theme),
+              ),
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.card),
+          ),
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,6 +164,7 @@ class ChartCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

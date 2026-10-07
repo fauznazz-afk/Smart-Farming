@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme_of.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
 import '../utils/format_helpers.dart';
 import '../../../services/energy_report_service.dart';
 
@@ -17,7 +19,16 @@ class EmptyPeriodView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
+      child: Container(
+        decoration: BoxDecoration(
+          // The resolved theme, not `isDark`; see `data_note.dart`.
+          gradient: AppSkeuo.fillGradient(
+            AppSurfaces.card(appThemeOf(context)),
+            foreground: AppSkeuo.textSide(appThemeOf(context)),
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
@@ -35,6 +46,7 @@ class EmptyPeriodView extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -37,8 +37,17 @@ class AppBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppSurfaces.page(theme),
+    // Lit from above, through `AppSkeuo.fill`, so the page only ever moves away
+    // from the headings and captions drawn straight on it. The previous
+    // gradient darkened the bottom of the light page, which is the side the
+    // body text is on.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: AppSkeuo.fillGradient(
+          AppSurfaces.page(theme),
+          foreground: AppSkeuo.textSide(theme),
+        ),
+      ),
       child: child,
     );
   }
@@ -81,6 +90,92 @@ class AppBackground extends StatelessWidget {
 /// [AppTheme.dark] and Dracula renders as the app's dark mode — a visible,
 /// obvious failure rather than a subtle one, which is the right way round.
 AppTheme _appThemeOf(BuildContext context) => appThemeOf(context);
+
+/// A skeuomorphic surface: a chamfered rim, a fill lit from above, and
+/// optionally a shadow — for any shape, including a circle.
+///
+/// **This exists because the obvious way to draw it crashes.** A bevel written
+/// as a `Border` with a light top and a dark bottom cannot be combined with a
+/// radius or a circle (`A borderRadius can only be given on borders with
+/// uniform colors`), and four screens did exactly that in the first
+/// skeuomorphic pass. Any one-off bevelled control should be this widget
+/// rather than a hand-built `BoxDecoration`, so the rim, the contrast rule and
+/// the paint test all apply to it for free.
+class SkeuoSurface extends StatelessWidget {
+  const SkeuoSurface({
+    super.key,
+    required this.base,
+    required this.theme,
+    required this.child,
+    this.foreground,
+    this.radius,
+    this.circle = false,
+    this.inverted = false,
+    this.strength = 1,
+    this.travel = AppSkeuo.fillTravel,
+    this.shadows,
+    this.padding,
+  });
+
+  /// The surface token the fill and the rim are mixed from.
+  final Color base;
+  final AppTheme theme;
+  final Widget child;
+
+  /// The colour drawn on the surface, which decides the fill's direction.
+  /// Defaults to the theme's text side.
+  final Color? foreground;
+
+  /// Corner radius. Ignored when [circle] is set.
+  final double? radius;
+  final bool circle;
+
+  /// A well rather than a block: the rim is lit from inside.
+  final bool inverted;
+  final double strength;
+  final double travel;
+  final List<BoxShadow>? shadows;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = radius ?? AppRadius.tile;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: circle ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: circle ? null : BorderRadius.circular(r),
+        gradient: AppSkeuo.rim(
+          base,
+          theme,
+          inverted: inverted,
+          strength: strength,
+        ),
+        boxShadow: shadows,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSkeuo.rimWidth),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: circle ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: circle
+                ? null
+                : BorderRadius.circular(
+                    (r - AppSkeuo.rimWidth).clamp(0, double.infinity),
+                  ),
+            gradient: AppSkeuo.fillGradient(
+              base,
+              foreground: foreground ?? AppSkeuo.textSide(theme),
+              travel: travel,
+            ),
+          ),
+          child: padding == null
+              ? child
+              : Padding(padding: padding!, child: child),
+        ),
+      ),
+    );
+  }
+}
 
 // ── AppCard ──────────────────────────────────────────────────────────────────
 
@@ -147,7 +242,6 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = this.theme ?? _appThemeOf(context);
-    final resolvedAccent = accent ?? Theme.of(context).colorScheme.primary;
 
     final shadows = <BoxShadow>[
       if (pressed)
@@ -156,18 +250,47 @@ class AppCard extends StatelessWidget {
         ...AppElevation.raised(theme)
       else
         ...AppElevation.inset(theme),
+      // A third, wider shadow for the thickness skeuomorphism asks for. It is
+      // a shadow, so it paints outside the rect and costs no text contrast.
+      if (!pressed && !inset)
+        BoxShadow(
+          color: theme.isDark
+              ? const Color(0x1F000000)
+              : const Color(0x0F000000),
+          blurRadius: 32,
+          offset: const Offset(12, 12),
+        ),
     ];
 
+    // The skeuomorphic layer, all through `AppSkeuo` so the contrast rule is
+    // enforced in one tested place: the fill moves away from the text, the
+    // bevel is neutral, and the gloss exists only where it raises contrast.
+    final baseColor =
+        inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme);
+    final textSide = AppSkeuo.textSide(theme);
+    final gloss = (inset || pressed)
+        ? null
+        : AppSkeuo.gloss(baseColor, foreground: textSide);
+    // The outer box paints the shadows and the chamfered rim; the fill sits
+    // inside it, inset by the rim's width. See `AppSkeuo.rim` for why the
+    // bevel cannot be a `Border`.
+    //
+    // A well's rim is lit from the inside, so it is inverted, and halved,
+    // because a well is a smaller feature than a block standing on the page.
     final decoration = BoxDecoration(
-      color: inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme),
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      border: Border.all(
-        color: AppElevation.hairline(
-          accent: resolvedAccent,
-          theme: theme,
-        ),
+      gradient: AppSkeuo.rim(
+        baseColor,
+        theme,
+        inverted: inset || pressed,
+        strength: inset || pressed ? 0.5 : 1,
       ),
+      borderRadius: BorderRadius.circular(AppRadius.card),
       boxShadow: shadows,
+    );
+    final fillDecoration = BoxDecoration(
+      gradient: AppSkeuo.fillGradient(baseColor, foreground: textSide),
+      borderRadius:
+          BorderRadius.circular(AppRadius.card - AppSkeuo.rimWidth),
     );
 
     // The `Material` goes *between* the decorated box and the content, not
@@ -198,10 +321,48 @@ class AppCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: decoration,
-      padding: padding,
-      child: Material(
-        type: MaterialType.transparency,
-        child: child,
+      padding: const EdgeInsets.all(AppSkeuo.rimWidth),
+      child: DecoratedBox(
+        decoration: fillDecoration,
+        // **The gloss is a background layer, beneath the content.** An earlier
+        // version drew it over the child, which put a white wash over every
+        // card header's text. Beneath, it is a fill and obeys the same
+        // direction rule.
+        //
+        // `StackFit.passthrough` so the card keeps the constraints it had
+        // before the Stack existed: with the default loose fit, a card given a
+        // fixed width or height would let its content shrink inside it.
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            if (gloss != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 44,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: gloss,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(
+                          AppRadius.card - AppSkeuo.rimWidth,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: padding ?? EdgeInsets.zero,
+              child: Material(
+                type: MaterialType.transparency,
+                child: child,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -312,19 +473,41 @@ class AppTile extends StatelessWidget {
     // encodes "lighter than the page, shadow carries the inset". Both clear AA
     // comfortably and the gap is small: `faintColor` is 8.17:1 on the old dark
     // track and 7.16:1 on the new one, against 4.5.
+    final tileBaseColor =
+        inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme);
+    // Rim outside, fill inside, as on `AppCard`; see `AppSkeuo.rim` for why the
+    // bevel cannot be a `Border`. An inset tile is a well, so its rim is lit
+    // from inside.
     final tile = Container(
-      padding: padding,
+      padding: const EdgeInsets.all(AppSkeuo.rimWidth),
       decoration: BoxDecoration(
-        color: inset ? AppSurfaces.input(theme) : AppSurfaces.card(theme),
+        gradient: AppSkeuo.rim(
+          tileBaseColor,
+          theme,
+          inverted: inset,
+          strength: inset ? 0.6 : 0.8,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: Border.all(color: appDivider(theme: theme, opacity: 0.5)),
         // Without this the lighter fill simply flattens the tile. It was carrying
         // the whole inset read on its own, because a `BoxShadow` paints *outside*
-        // the decoration rect and so cannot darken a tile's own interior — the
+        // the decoration rect and so cannot darken a tile's own interior - the
         // interior is the fill's job, the depth around it is the shadow's.
         boxShadow: inset ? AppElevation.inset(theme) : null,
       ),
-      child: child,
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          // Through `AppSkeuo`, so the measured fills in the comment above stay
+          // the worst case: the gradient only moves away from the caption.
+          gradient: AppSkeuo.fillGradient(
+            tileBaseColor,
+            foreground: AppSkeuo.textSide(theme),
+          ),
+          borderRadius:
+              BorderRadius.circular(AppRadius.tile - AppSkeuo.rimWidth),
+        ),
+        child: child,
+      ),
     );
 
     // No wash by default, and that is a correction rather than an omission.
@@ -409,10 +592,19 @@ class AppBadge extends StatelessWidget {
     // under AA. The ramp is 0.08 -> 4.63, 0.10 -> 4.50, 0.12 -> 4.39. The
     // status colours are already at 4.5 on the surface with almost no margin,
     // so the wash has to be the shallowest one that still reads as a tint.
+    final baseAlpha = theme.isDark ? 0.18 : 0.08;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: theme.isDark ? 0.18 : 0.08),
+        // `baseAlpha` is the worst case and stays the worst case: the
+        // gradient is made by *weakening* one end. The version this replaced
+        // strengthened the top to `baseAlpha + 0.04`, which on the light page
+        // is the 0.12 that measures 4.39:1 above.
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: AppSkeuo.badgeWash(color, alpha: baseAlpha, theme: theme),
+        ),
         borderRadius: BorderRadius.circular(AppRadius.badge),
       ),
       child: child,
@@ -501,7 +693,15 @@ class DateStripChip extends StatelessWidget {
     BoxDecoration decorationFor({required bool pressed}) {
       if (isSelected) {
         return BoxDecoration(
-          color: accentColor,
+          // The chip's own ink decides the direction, not the theme: white ink
+          // on the light accent means the fill darkens toward the bottom. The
+          // gradient this replaced lightened the accent by 15%, which on the
+          // light theme is a lightened background behind white text.
+          gradient: AppSkeuo.fillGradient(
+            accentColor,
+            foreground: onAccent,
+            travel: AppSkeuo.controlTravel,
+          ),
           borderRadius: BorderRadius.circular(AppRadius.tile),
           border: Border.all(
             color: AppElevation.controlEdge(
@@ -515,8 +715,14 @@ class DateStripChip extends StatelessWidget {
         );
       }
       return BoxDecoration(
-        color: AppSurfaces.page(theme),
+        gradient: AppSkeuo.fillGradient(
+          AppSurfaces.page(theme),
+          foreground: AppSkeuo.textSide(theme),
+        ),
         borderRadius: BorderRadius.circular(AppRadius.tile),
+        // Still `Border.all` at `borderWidth`: `DateStrip` measures the chip
+        // from that constant, and a bevel with uneven sides would put the
+        // measurement off by exactly the difference.
         border: Border.all(color: appDivider(theme: theme)),
         boxShadow: pressed
             // A well that is being pressed is deeper than a well at rest, so it

@@ -20,6 +20,7 @@ import 'screens/dashboard/utils/color_helpers.dart';
 import 'widgets/liquid_glass.dart';
 import 'screens/dashboard/utils/design_tokens.dart';
 import 'services/alarm_notification_service.dart';
+import 'services/secure_window.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -423,6 +424,7 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
           title: 'EnerGrow',
           debugShowCheckedModeBanner: false,
           themeMode: _themeController.themeMode,
+          navigatorObservers: [SecureWindow.observer],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

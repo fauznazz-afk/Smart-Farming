@@ -275,13 +275,27 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: ringColor.withValues(alpha: 0.15),
+                        gradient: RadialGradient(
+                          center: const Alignment(-0.3, -0.3),
+                          radius: 0.7,
+                          colors: [
+                            ringColor.withValues(alpha: 0.28),
+                            ringColor.withValues(alpha: 0.10),
+                          ],
+                        ),
                         // The wash alone left the circle with no edge of its
                         // own; against the now-opaque card it read as a
                         // floating smudge rather than a badge.
                         border: Border.all(
                           color: ringColor.withValues(alpha: 0.28),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ringColor.withValues(alpha: 0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Icon(
                         _iconForType(alarm.type),
@@ -383,12 +397,40 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       ),
       child: Row(
         children: _AlarmFilter.values.map((filter) {
+          final isSelected = _filter == filter;
+          final appTheme = appThemeOf(context);
+          // A selected filter is pushed *in* — a well, lit from inside — and
+          // the others stand on the page. `SkeuoSurface` rather than a
+          // hand-built `Border`, which crashes with a pill radius; see there.
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(filter.label),
-              selected: _filter == filter,
-              onSelected: (_) => setState(() => _filter = filter),
+            child: SkeuoSurface(
+              theme: appTheme,
+              base: isSelected
+                  ? AppSurfaces.input(appTheme)
+                  : AppSurfaces.card(appTheme),
+              radius: AppRadius.pill,
+              inverted: isSelected,
+              strength: isSelected ? 0.6 : 1,
+              shadows: isSelected
+                  ? AppElevation.insetDeep(appTheme)
+                  : AppElevation.raised(appTheme),
+              child: Material(
+                color: Colors.transparent,
+                // The chip's own fill would paint over the surface and leave it
+                // flat, so it is made transparent and the surface carries the
+                // look. The selected state stays legible through the well and
+                // the checkmark, not through a colour change.
+                child: ChoiceChip(
+                  label: Text(filter.label),
+                  selected: isSelected,
+                  backgroundColor: Colors.transparent,
+                  selectedColor: Colors.transparent,
+                  side: BorderSide.none,
+                  shape: const StadiumBorder(),
+                  onSelected: (_) => setState(() => _filter = filter),
+                ),
+              ),
             ),
           );
         }).toList(),

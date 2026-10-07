@@ -152,6 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   AppCard(
                     theme: theme,
                     padding: const EdgeInsets.all(24),
+                    // No gloss of its own: `AppCard` paints one beneath its
+                    // content, and only where it raises contrast.
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -294,22 +296,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(
                           width: double.infinity,
                           height: 50,
-                          child: FilledButton(
-                            onPressed: _loading ? null : _handleLogin,
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadius.all(AppRadius.tile),
-                              ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadius.all(AppRadius.tile),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                            child: _loading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Login'),
+                            child: FilledButton(
+                              onPressed: _loading ? null : _handleLogin,
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadius.all(AppRadius.tile),
+                                ),
+                              ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Login'),
+                            ),
                           ),
                         ),
                       ],
