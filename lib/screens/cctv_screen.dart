@@ -216,7 +216,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     // and the first version of this did exactly that — the throw landed before
     // `SecureWindow.release()` and before the session scrub below, so it
     // skipped both, which is the flag leak this observer exists to close.
-    // `cctv_test.dart` caught it. `unsubscribe` needs no route and is a no-op
+    // `cctv_screen_test.dart` caught it. `unsubscribe` needs no route and is a no-op
     // for a state that never subscribed.
     SecureWindow.observer.unsubscribe(this);
     // Released, or the rest of the app inherits it: a flag left set is an app

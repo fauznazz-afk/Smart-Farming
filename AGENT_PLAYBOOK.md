@@ -261,6 +261,28 @@ Jadi aturan praktisnya:
 Konsekuensi untuk agen: **jangan pernah menjalankan dua `flutter test` bersamaan,
 dan jangan minta agen backgroundEQ menjalankan test.** A jalankan di akhir.
 
+### Diukur ulang 9 Oktober 2026: file yang dipisah bukan penyebabnya
+
+`test/cctv_test.dart` pecah menjadi tiga file pada 9 Oktober 2026 — allowlist,
+status, dan layar — karena 34 test di satu file disebut melampaui anggaran RAM.
+**Run penuh dicoba setelahnya, dan masih tidak selesai:** 805 test lolos, lalu
+`metric_grid_test.dart` mati dengan `did not complete` untuk 5 test sisanya.
+Dijalankan sendiri, file itu lulus 10/10 dalam satu detik. RAM bebas sebelum run
+adalah 1,25 GB dari 7,5 GB.
+
+Jadi dua kesimpulan, dan yang kedua lebih penting dari yang pertama:
+
+1. Memecah file yang terlalu besar **tidak** memperbaiki OOM suite. Yang hilang
+   adalah satu file yang terlalu besar, bukan penyebabnya.
+2. **`did not complete` tidak menunjuk ke file yang bermasalah.** Ia menunjuk ke
+   file yang kebetulan jadi korban saat memori habis — di sini `metric_grid`,
+   sebelumnya `live_power_card`, sebelumnya `cctv`. Kalau file yang dilaporkan itu
+   diperbaiki berdasarkan namanya, itu berputar ke arah yang salah; periksa
+   kebocoran yang sebenarnya, bukan file yang disebut di output.
+
+Karena itu `tool/run_tests_per_file.ps1` sekarang ada, dan itulah satu-satunya
+cara mendapatkan angka "N lulus di M file" yang jujur di mesin ini.
+
 ### Path yang perlu Anda export
 
 Windows — hampir tidak ada yang perlu, `flutter` dan `adb` sudah ada di `PATH`:

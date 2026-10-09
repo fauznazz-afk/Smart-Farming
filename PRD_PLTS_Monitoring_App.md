@@ -405,5 +405,9 @@ terbukti di layar**, dan tidak boleh dibaca sebagai beres hanya karena suite hij
   "receiver mati".
 - `flutter test` penuh tidak selesai di mesin 7 GB — gejala OOM yang sudah
   terdokumentasi di `dart_test.yaml`, bukan kegagalan baru. Karena itu tidak ada
-  klaim "suite penuh hijau" di dokumen ini, dan `test/cctv_test.dart` kini
-  melewati anggaran RAM untuk satu run penuh sehingga filenya yang perlu dipecah.
+  klaim "suite penuh hijau" di dokumen ini.
+- `test/cctv_test.dart` yang melewati anggaran RAM itu sendiri **sudah dipecah**
+  menjadi `cctv_allowlist_test.dart`, `cctv_status_test.dart` dan
+  `cctv_screen_test.dart` setelah rilis, tanpa mengubah jumlah test. Yang belum
+  selesai adalah memperoleh run penuh yang benar-benar selesai — pemecahan itu
+  menghilangkan satu file yang terlalu besar, bukan penyebab OOM-nya.

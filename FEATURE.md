@@ -19,14 +19,18 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 30 September 2026, pada `ce7a7a9`. Flutter 3.47.5 /
+**Status verifikasi:** 9 Oktober 2026, setelah `v1.8.0`. Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**507 lulus** di 36 file, `./gradlew :app:testDebugUnitTest` 11 lulus. Suite
-Dart dijalankan **per-file dengan upto 3 percobaan** karena mesin 7 GB ini OOM
-kalau sekali jalan — gejalanya `did not complete` tanpa stack trace, dan file
-yang gagal **berpindah-pindah antar run**. Sudah dikonfirmasi terhadap baseline
-yang di-`git stash`: suite yang sama gagal dengan cara yang sama tanpa perubahan
-kode apa pun.
+**810 lulus** di 52 file, `./gradlew :app:testDebugUnitTest` 11 lulus.
+
+Suite Dart **harus** dijalankan per-file lewat `tool/run_tests_per_file.ps1`,
+karena mesin 7 GB ini tidak menyelesaikan satu run penuh: pada 9 Oktober 2026 run
+penuh mencapai 805 test lalu mati di `metric_grid_test.dart`, yang lulus 10/10
+dalam satu detik kalau sendiri. Gejalanya `did not complete` tanpa stack trace,
+dan **file yang dilaporkan berubah-ubah antar run** — `metric_grid`, sebelum itu
+`live_power_card`, sebelum itu `cctv` — jadi nama file di output itu bukan
+petunjuk ke bugnya. Nomor di atas berasal dari run per-file dengan 2 percobaan,
+nol file gagal setelah percobaan.
 
 **Temuan 30 September sore yang menutup §18.2 butir 3.** `test/color_helpers_test.dart`
 mengukur AA terhadap daftar hex yang **semuanya basi** — enam dari enam tidak
@@ -1376,6 +1380,17 @@ Bukan bug, tapi mudah disalahpahami:
   shadow, single blur radius, pressed yang membesar, `insetDeep` yang dangkal,
   fill yang beda dari page. Kelimanya tertangkap. Guard yang tidak bisa gagal
   bukan guard.
+- ~~`test/cctv_test.dart` (34 test) melebihi anggaran RAM untuk satu run
+  penuh.~~ **Dipecah 9 Oktober 2026.** Jadi `cctv_allowlist_test.dart` (15,
+  Dart murni), `cctv_status_test.dart` (13, model status dan widget-nya) dan
+  `cctv_screen_test.dart` (6, layar dan state WebView). Jumlah test tidak berubah
+  dan tidak ada yang ditulis ulang. Yang ini sengaja **tidak** menghapus gap
+  run penuh di §18.0, dan itu sudah diukur: run penuh sesudah pemecahan mencapai
+  805 test lalu mati di `metric_grid_test.dart`, yang lulus 10/10 dalam satu detik
+  kalau dijalankan sendiri. Jadi `did not complete` menunjuk ke file yang jadi
+  korban saat memori habis, bukan ke file yang terlalu besar — sebelumnya korbannya
+  `live_power_card`, sebelumnya lagi `cctv`. `tool/run_tests_per_file.ps1` sekarang
+  yang dipakai untuk mendapatkan angka yang jujur.
 
 ### 18.5 Yang belum diverifikasi di perangkat
 
@@ -1621,7 +1636,7 @@ cd android && ./gradlew :app:testDebugUnitTest  # 11 test
 
 | Test | Pin yang dipegang |
 |---|---|
-| `cctv_test.dart` | allowlist host |
+| `cctv_allowlist_test.dart` | allowlist host |
 | `chart_bounds_test.dart` | pembulatan `niceStep` / `niceTimeStep` |
 | `dashboard_helpers_test.dart` | `describeHistoryRange` harus sepakat dengan `historyTimeWindow` |
 | `energy_forecast_service_test.dart` | konvensi tanda discharge baterai |

@@ -1,3 +1,48 @@
+# [Unreleased]
+
+### Changed
+
+- **Split `test/cctv_test.dart`, which had outgrown the RAM budget for a single
+  file on this 7 GB machine.** Three files by kind: `cctv_allowlist_test.dart`
+  (15, pure Dart, no widget), `cctv_status_test.dart` (13, the status model and
+  the two widgets that render it) and `cctv_screen_test.dart` (6, the screen and
+  the WebView session state).
+
+  **No test was rewritten and no assertion changed — 34 before, 34 after.** The
+  split is along the line that decides the cost: the allowlist file has no widget
+  and no Flutter binding, so it is a fraction of what the screen test costs.
+
+  **This does not fix the whole-suite OOM**, and saying so is the point — it was
+  measured rather than assumed. A full `flutter test` after the split reached 805
+  tests and then killed `metric_grid_test.dart` with `did not complete`, a file
+  that passes 10/10 in one second on its own. The symptom in `dart_test.yaml` is
+  the Dart compiler and the test isolate competing for RAM, and every one of these
+  groups already passed standalone, which is why the file being too big was
+  diagnosable at all. The split removes one file that lost that race on its own;
+  what it leaves is a suite with no single clean full run on this machine.
+
+### Added
+
+- **`tool/run_tests_per_file.ps1`, so the suite's number is honest.** Runs each
+  `test/*_test.dart` in its own `flutter test` with up to two retries and totals
+  the passes.
+
+  It exists because the file named in a `did not complete` failure is not the
+  broken one — the victim moves between runs (`metric_grid`, then
+  `live_power_card`, then `cctv`), so "the suite passed" has never been a claim
+  this machine could support. Last full per-file run on 9 October 2026: **810
+  passed across 52 files, 0 files failing after retries.**
+
+### Documentation
+
+- Recorded 1.8.0's post-publication verification in
+  `PRD_GitHub_Release_Process.md` and `PRD_PLTS_Monitoring_App.md`, and bumped
+  their version headers. Both were left at 1.7.2 and 1.6.0 on purpose: they record
+  published releases with their SHA-256 and tags, so writing 1.8.0 before the tag
+  existed would have asserted a release that did not.
+
+---
+
 # [1.8.0] - 2026-10-07
 
 Security review of the whole source, and a skeuomorphic interface layer.

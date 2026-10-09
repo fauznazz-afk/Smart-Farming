@@ -153,9 +153,15 @@ sini secara terbuka:
   gagal berbeda tiap run, dan setiap file lulus ketika dijalankan sendiri.
   Karena itu seluruh suite dijalankan **per-file dengan jeda**, dan tidak ada
   klaim "suite penuh hijau" di dokumen ini.
-- **`test/cctv_test.dart` kini melewati anggaran RAM** untuk satu run penuh
-  (34 test, dan akan bertambah). Tiap grup lulus sendiri; filenya yang perlu
-  dipecah, dan itu belum dikerjakan.
+- ~~**`test/cctv_test.dart` kini melewati anggaran RAM** untuk satu run penuh.~~
+  **Diperbaiki setelah rilis.** Dipisah menjadi tiga file menurut sifatnya:
+  `cctv_allowlist_test.dart` (15 test, Dart murni tanpa widget),
+  `cctv_status_test.dart` (13 test, model status dan widget-nya), dan
+  `cctv_screen_test.dart` (6 test, layar dan state WebView). Jumlah test
+  tidak berubah dan tidak ada yang ditulis ulang — hanya dipindah. Run penuh
+  sesudahnya dicoba dan **tetap tidak selesai** (805 test, lalu mati di
+  `metric_grid_test.dart` yang lulus sendiri 10/10 dalam satu detik), jadi yang
+  hilang hanyalah satu file yang terlalu besar, bukan penyebab OOM-nya.
 
 ---
 

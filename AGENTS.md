@@ -717,18 +717,27 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-flutter test                                             # 581 tests, jalankan per-file
+.\tool\run_tests_per_file.ps1                            # 810 tests in 52 files
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 
-All three were re-run green on Windows on 29 September 2026. On Windows the
-third command is `.\gradlew.bat` instead of `./gradlew`:
+All three were re-run green on Windows on 9 October 2026: 810 passed across 52
+files, 0 files failing after retries. On Windows the third command is
+`.\gradlew.bat` instead of `./gradlew`:
 
 ```powershell
 flutter analyze
-flutter test
+.\tool\run_tests_per_file.ps1
 cd android; .\gradlew.bat :app:testDebugUnitTest --console=plain
 ```
+
+**Do not use `flutter test` bare, and treat its output as unusable here.** A
+single full run does not finish on this machine: on 9 October 2026 it reached 805
+tests and then killed `metric_grid_test.dart` with `did not complete`, which
+passes 10/10 in one second on its own. The file named in that output is *not* the
+broken one — the victims move between runs (`metric_grid`, then
+`live_power_card`, then `cctv`). The script exists for that reason: it is the only
+way to get an honest "N passed in M files" number here.
 
 It resolves `JAVA_HOME` from `java` on `PATH` when the variable is unset, so on
 Windows it runs without any environment setup at all. On Linux both
@@ -792,7 +801,9 @@ minute while the sign is fixed, note which way it moves, and update
 
 ## Regression guards worth knowing about, all added because of a real bug:
 
-- `cctv_test.dart` — `parseAllowedCctvUrl` host allowlist
+- `cctv_allowlist_test.dart` — `parseAllowedCctvUrl` host allowlist. Was in
+  `cctv_test.dart` until that file outgrew the RAM budget and was split; see
+  §"Test suite"
 - `chart_bounds_test.dart` — `niceStep` / `niceTimeStep` axis rounding
 - `dashboard_helpers_test.dart` — `describeHistoryRange` must agree with
   `historyTimeWindow`
