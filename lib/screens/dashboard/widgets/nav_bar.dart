@@ -41,6 +41,56 @@ const List<NavDestination> kNavDestinations = [
   NavDestination(Icons.set_meal_outlined, Icons.set_meal, 'Fish'),
 ];
 
+/// Height of the pill itself, excluding everything below it.
+///
+/// **Public, and the reason is the reported defect.** The bar is a
+/// `Scaffold.bottomNavigationBar` with `extendBody: true`, so it is painted *over*
+/// the scrolling content rather than beside it, and the content has to reserve
+/// the space itself. That reserve was a literal `76` in `dashboard_screen.dart`,
+/// written when the bar was full-width and a different height, with nothing
+/// connecting it to the 52 the bar actually draws — so there was no way for a
+/// change to the bar to be caught. This constant is that connection: the widget
+/// below lays out with it, and `test/nav_bar_clearance_test.dart` measures the
+/// rendered bar against [glassNavBarReservedHeightFor] rather than against a
+/// restated number.
+///
+/// It is the same 52 in both places deliberately: [kGlassNavBarHeight] is what
+/// the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
+/// drift without the test failing.
+const double kGlassNavBarHeight = 52;
+
+/// The bar's own gap below the pill, and the floor for the safe-area inset.
+///
+/// The real bottom inset is `max(systemBottom, this)` — that is what the
+/// `SafeArea(minimum:)` below does — so this is the value the bar reserves when
+/// the device reports no inset at all, which is the case a test and a desktop
+/// window both hit.
+const double kGlassNavBarBottomGap = 10;
+
+/// The vertical space [GlassNavBar] takes from the bottom of the page.
+///
+/// Split out from [glassNavBarReservedHeight] so it can be tested without a
+/// `BuildContext`: this is the whole reservation rule, and it is the number the
+/// dashboard's scroll padding must be derived from.
+double glassNavBarReservedHeightFor(double systemBottomInset) {
+  return kGlassNavBarHeight + math.max(systemBottomInset, kGlassNavBarBottomGap);
+}
+
+/// [glassNavBarReservedHeightFor] for the inset this subtree actually has.
+///
+/// **Read this above the `Scaffold`, not below it.** `Scaffold` publishes its own
+/// `MediaQuery` to the body, and with `extendBody: true` that one already carries
+/// the bar's height in `padding.bottom` — so calling this from inside the body
+/// would measure the reservation against itself and return roughly double. The
+/// call site in `dashboard_screen.dart` is in the screen's `State`, whose context
+/// is above the `Scaffold`, which is the same MediaQuery the bar's own `SafeArea`
+/// reads. That the two agree is not an accident of the current tree shape: the
+/// `Scaffold` passes `removeBottomPadding: false` for the `bottomNavigationBar`
+/// slot precisely so the bar is handed the unmodified system inset.
+double glassNavBarReservedHeight(BuildContext context) {
+  return glassNavBarReservedHeightFor(MediaQuery.paddingOf(context).bottom);
+}
+
 /// Floating glass navigation bar that collapses to a single button when the
 /// user scrolls down, and expands again on scroll up or tap.
 class GlassNavBar extends StatelessWidget {
@@ -98,11 +148,11 @@ class GlassNavBar extends StatelessWidget {
           //
           // The 10 bottom is the gesture inset and is unrelated to the
           // horizontal question.
-          minimum: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+          minimum: EdgeInsets.fromLTRB(24, 0, 24, kGlassNavBarBottomGap),
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
-              height: 52,
+              height: kGlassNavBarHeight,
               child: Align(
                 // Centred, not left. The bar was left-aligned when it became
                 // content-sized, which was correct at the time and wrong on
@@ -145,12 +195,12 @@ class GlassNavBar extends StatelessWidget {
                     // times the icon with a 48dp target inside it, and the cap
                     // keeps it sane if a fifth tab ever arrives.
                     width: isCollapsed
-                        ? 52
+                        ? kGlassNavBarHeight
                         : math.min(
                             constraints.maxWidth,
                             kNavDestinations.length * 56.0,
                           ),
-                    height: 52,
+                    height: kGlassNavBarHeight,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       // The same dual-shadow pair every card in the app uses, so
@@ -400,7 +450,7 @@ class _NavItem extends StatelessWidget {
         // happened to match the old card radius.
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: SizedBox(
-          height: 52,
+          height: kGlassNavBarHeight,
           child: Center(
             // The `AnimatedSwitcher` is gone and this is the interesting part
             // of that. It existed to cross-fade the selected circle and the bare

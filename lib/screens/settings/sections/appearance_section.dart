@@ -74,21 +74,64 @@ class AppearanceSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Four segments rather than three plus a switch elsewhere. The control
-        // *is* "which of these appearances", and Dracula is one of them — a
-        // second control for it would say the other three are more fundamental,
-        // which is exactly backwards. A brightness-only caller cannot express
-        // the fourth option at all, which is the whole reason the enum exists.
+        // Five segments rather than three plus two switches elsewhere. The
+        // control *is* "which of these appearances", and both presets are one of
+        // them — a second control for either would say the other three are more
+        // fundamental, which is exactly backwards. A brightness-only caller
+        // cannot express the fourth or fifth option at all, which is the whole
+        // reason the enum exists.
         //
-        // The horizontal scroll is there because four icon-and-label segments do
-        // not fit the content column of a 360dp phone: the segments measure
-        // about 368dp together, and `SegmentedButton` has no scrolling of its
-        // own, so a `Row` of the four would overflow and Flutter would draw the
-        // striped box over the control the user is reaching for. The same
-        // treatment the alarm-history filter row uses for the same reason.
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+        // **Stacked, and the reason is arithmetic rather than taste.**
+        //
+        // `SegmentedButton` lays a horizontal row out by giving *every* segment
+        // the width of the *widest* one — `_calculateHorizontalChildSize` in
+        // `segmented_button.dart` takes a `max` over the children's intrinsic
+        // widths and then hands that single `childWidth` to all of them. It
+        // does not sum them. So the row is five times the widest segment, not
+        // the sum of the five, and on a 375dp phone the content column is
+        // 375 - 32 (the detail page's padding) - 28 (the card's) = 315dp.
+        //
+        // The widest segment here is Dracula, and at 14sp Roboto Medium the
+        // label measures 47.9dp, which with the icon, the 8dp icon gap and the
+        // framework's 12/16dp icon padding is about 103dp. Five of those is
+        // roughly 515dp against 315dp available: **three segments and a few dp
+        // of the fourth.**
+        //
+        // That is not a layout that can be tuned. Every segment also carries
+        // `Size(64, 40)` from `_TextButtonDefaultsM3.minimumSize`, and
+        // `segmentStyleFor` drops `minimumSize` on the way through, so a
+        // caller cannot lower it: **five segments cannot be narrower than
+        // 5 x 64 = 320dp**, which is already past 315dp with the labels set to
+        // zero width. There is no horizontal arrangement of five segments on a
+        // 375dp phone.
+        //
+        // The arrangement this replaces was a horizontal `SingleChildScrollView`
+        // — so the options *were* reachable, by a swipe nothing advertised.
+        // There is no scrollbar, no fade, and the clip lands 3dp into the fourth
+        // segment, so the control is pixel-for-pixel a three-option control with
+        // two options parked off the right edge. A user cannot find Skeuo, which
+        // is the headline of the release, and nothing on screen says it exists.
+        //
+        // `direction: Axis.vertical` is the framework's own answer to a
+        // segmented button that does not fit horizontally, and it is the only
+        // arrangement here that puts all five on screen at once at any text
+        // scale and any content width. It is not free: `MaterialTapTargetSize
+        // .padded` gives every row the 48dp minimum tap target, so the control
+        // is 5 x 48 = 240dp tall where it used to be one 48dp row. That is
+        // about 190dp of extra height in a page that already scrolls
+        // vertically, which is the cheap direction in which to overflow — a
+        // hidden option is not recoverable by scrolling, a tall one is.
+        //
+        // The `SizedBox(width: double.infinity)` is required and not cosmetic:
+        // `_calculateVerticalChildSize` only widens the control to its
+        // constraint when the width is *tight*, and a `Column` with
+        // `crossAxisAlignment: start` passes loose ones, so without it the
+        // button shrink-wraps to its widest segment and sits as a narrow stack
+        // in a wide card.
+        SizedBox(
+          width: double.infinity,
           child: SegmentedButton<ThemeOption>(
+            direction: Axis.vertical,
             showSelectedIcon: false,
             // No new colour for the selected state. The existing
             // `SegmentedButtonThemeData` in `main.dart` paints the selected
@@ -99,6 +142,35 @@ class AppearanceSection extends StatelessWidget {
             // accent, at a weight that does not compete with the numbers — and
             // it would be the second place the app decides a colour for the
             // user.
+            //
+            // `alignment: centerLeft` because a stacked segment is a full-width
+            // row: `TextButton`'s default `center` leaves the icon and the label
+            // marooned in the middle of 315dp, which reads as a button rather
+            // than as a choice out of five. The horizontal padding is the
+            // framework's own — it is overridden for any segment carrying an
+            // icon, which all five do — so this moves the content and changes
+            // nothing about the widths.
+            //
+            // `shape` is not cosmetic either, and it is a consequence of going
+            // vertical. The default is `StadiumBorder`, which is the right
+            // answer for a one-row pill and a very wrong one for a 240dp block:
+            // a stadium rounds by half the *shorter* side, so this would draw a
+            // 120dp radius at each end and turn the control into a lozenge.
+            // `resolve` reads `shape` off `widget.style` before the theme and
+            // the defaults, so this is the one place it can be set.
+            //
+            // `AppRadius.tile` and not a number written here: this is the same
+            // control surface as everything else interactive in the app, and
+            // the accent chips beside it use `AppRadius.pill`. Not `const`,
+            // because `AppRadius.all` is a function.
+            style: ButtonStyle(
+              alignment: Alignment.centerLeft,
+              shape: WidgetStatePropertyAll<OutlinedBorder>(
+                RoundedRectangleBorder(
+                  borderRadius: AppRadius.all(AppRadius.tile),
+                ),
+              ),
+            ),
             segments: const [
               ButtonSegment(
                 value: ThemeOption.system,

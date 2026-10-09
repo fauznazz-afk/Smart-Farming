@@ -87,14 +87,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Taps a control in the Appearance section, scrolling the horizontally
-  /// scrolling theme control first if the segment is off-screen.
+  /// Taps a segment of the theme control, scrolling it into view first.
   ///
-  /// The scroll is not incidental. Four icon-and-label segments measure about
-  /// 368dp together and the content column of a 360dp phone is about 315dp, so
-  /// the fourth segment genuinely does not fit — which is why the control scrolls
-  /// in the first place. A test that tapped by text without accounting for that
-  /// would be asserting against a layout the app does not ship.
+  /// **This helper is load-bearing, and it used to hide a release blocker.**
+  /// The control was a horizontal `SingleChildScrollView`, and `ensureVisible`
+  /// made every tap on Dracula and Skeuo succeed. Meanwhile the real device
+  /// showed three segments and about 3dp of the fourth, with no scrollbar, no
+  /// fade and no hint: the options were reachable only by a swipe nothing
+  /// advertised, so a user could not find Skeuo at all. Every assertion in this
+  /// file passed against a control that shipped two of its five options
+  /// off-screen.
+  ///
+  /// That is why `find.text(label)` is not enough on its own anywhere near this
+  /// control — a widget test finds a widget that is laid out, not one the user
+  /// can see — and why the group below asserts the geometry rather than the
+  /// presence of labels. The control is now stacked, so this only scrolls the
+  /// page vertically; it is kept because a test that taps by bare text would
+  /// break the moment the control is ever taller than the viewport again.
   Future<void> tapSegment(WidgetTester tester, String label) async {
     final target = find.descendant(
       of: find.byType(SegmentedButton<ThemeOption>),
@@ -146,6 +155,60 @@ void main() {
           ),
           findsOneWidget,
           reason: 'the theme control must offer $label',
+        );
+      }
+    });
+
+    testWidgets('every segment is on screen, with nothing to scroll',
+        (tester) async {
+      // The presence test above is the claim that hid the release blocker.
+      // `find.text` succeeds on a widget that is laid out *outside* the visible
+      // area, so a control that parks two of its five options off the right
+      // edge passes it — and then ships Skeuo, the headline of the release,
+      // where no user can reach it.
+      //
+      // The cause is a `SegmentedButton` implementation detail worth pinning
+      // here, because it is not obvious and it is not a padding problem:
+      // `_calculateHorizontalChildSize` takes a `max` over the segments'
+      // intrinsic widths and gives that one width to *every* segment, so a
+      // horizontal row of N segments is N times its widest segment. Five
+      // icon-and-label segments are about 515dp against 375dp of phone, and
+      // each segment additionally carries a 64dp `minimumSize` that
+      // `segmentStyleFor` drops on the way through, so no amount of tightening
+      // gets under 320dp. A horizontal five simply does not fit.
+      await pumpSettings(tester);
+
+      final screen =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+      final control = find.byType(SegmentedButton<ThemeOption>);
+
+      final controlRect = tester.getRect(control);
+      expect(
+        controlRect.right <= screen.width,
+        isTrue,
+        reason: 'the control measures ${controlRect.width}dp wide against a '
+            '${screen.width}dp screen, so it can only be showing part of '
+            'itself. Five segments in one horizontal row cannot fit a phone.',
+      );
+
+      for (final label in const [
+        'System',
+        'Light',
+        'Dark',
+        'Dracula',
+        'Skeuo',
+      ]) {
+        final rect = tester.getRect(
+          find.descendant(of: control, matching: find.text(label)),
+        );
+        expect(
+          rect.left >= 0 && rect.right <= screen.width,
+          isTrue,
+          reason: '$label is laid out from x=${rect.left} to x=${rect.right}, '
+              'which is off a ${screen.width}dp screen. It is laid out, so '
+              'every find.text in this file still passes — and the user cannot '
+              'see it. An option that has to be discovered by swiping is an '
+              'option they do not have.',
         );
       }
     });

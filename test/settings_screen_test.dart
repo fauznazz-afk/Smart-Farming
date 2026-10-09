@@ -24,10 +24,23 @@ bool _isAncestorOf(Element ancestor, Element descendant) {
   return found;
 }
 
-Future<void> _pumpSettings(WidgetTester tester) async {
+Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
   // A tall surface keeps all nine category tiles laid out at once, so the
   // lazily built ListView does not need scrolling in these assertions.
-  tester.view.physicalSize = const Size(900, 1600);
+  //
+  // [surface] overrides it for the subtitle tests. They need a phone *width* --
+  // at 900 logical px no subtitle wraps, so they would assert nothing about the
+  // thing they exist to check. 375dp is the test device's logical width (1220 at
+  // density 3.25).
+  //
+  // The height stays tall even there, and that is deliberate rather than an
+  // oversight: wrapping is decided by width alone, so 375 is what these tests
+  // are about, while `ListView.builder` lays out lazily and a real 812dp phone
+  // viewport (~692dp after app bar and save button) is not reliably enough to
+  // build all nine ~80dp tiles. `findsNWidgets(9)` would then fail on how many
+  // children the cache extent happened to reach, which has nothing to do with
+  // the bug.
+  tester.view.physicalSize = surface ?? const Size(900, 1600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
@@ -93,6 +106,88 @@ void main() {
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
     expect(find.byType(ListTile), findsNWidgets(9));
+  });
+
+  // The truncation regression. Eight of the nine category subtitles were
+  // clipped to one line with an ellipsis on a 375dp phone, so the only prose on
+  // the screen explaining what a category does was unreadable on every tile
+  // whose string was longer than one line -- all of them except "Application
+  // information."
+  //
+  // These assert the clamp itself rather than a rendered pixel count, so they
+  // are independent of font metrics, text scale and the exact strings: the bug
+  // was a property on the `Text`, and that is what has to stay gone.
+  testWidgets('does not clamp category subtitles to one line', (tester) async {
+    // Phone width, so this runs against the layout that actually truncated.
+    await _pumpSettings(tester, surface: const Size(375, 1600));
+
+    final tiles = find.byType(ListTile);
+    expect(tiles, findsNWidgets(9));
+    for (var i = 0; i < 9; i++) {
+      final tile = tester.widget<ListTile>(tiles.at(i));
+      final title = (tile.title! as Text).data;
+      final subtitle = tile.subtitle! as Text;
+      expect(
+        subtitle.maxLines,
+        anyOf(isNull, greaterThan(1)),
+        reason: 'tile $i ("$title") clamps its subtitle to one line, so the '
+            'text is ellipsized on a narrow phone',
+      );
+      expect(
+        subtitle.overflow,
+        isNot(TextOverflow.ellipsis),
+        reason: 'tile $i ("$title") ellipsizes its subtitle',
+      );
+    }
+  });
+
+  // The cost side of the same change, which is what makes removing the clamp
+  // acceptable rather than merely tidy: does the list get taller?
+  //
+  // Yes, and by more than the two lines it reveals -- measured, not derived.
+  // Two earlier versions of this comment predicted the tiles would come out
+  // *shorter* than the clamped 72 (arithmetic read out of `ListTile._computeSizes`
+  // predicting a "compact" mode) and then that every tile would measure 88.
+  // The renderer's actual heights at 375dp are:
+  //
+  //     72  88  88  128  128  88  128  72  88
+  //
+  // Three tiles are 128, which is a **four-line** subtitle, and one is the 72
+  // single-line tile ("Application information."). So the clamp was hiding two
+  // to four lines per tile, not reserving room for one.
+  //
+  // Both predictions were arithmetic derived from `list_tile.dart` and both were
+  // wrong -- the fourth and fifth times in this repo that a relationship derived
+  // from source has been the thing that was wrong, after the Dracula alphas, the
+  // stale surface list, and the shadow balance probe. Every number here is what
+  // the renderer printed.
+  //
+  // The cost is real: nine tiles at those heights rather than nine at 72 is about
+  // 200dp more scrolling. That is the cheap direction in which to be wrong,
+  // because a clipped subtitle cannot be recovered by scrolling and a taller
+  // tile can. The Save button is in `bottomNavigationBar`, so it is pinned by
+  // construction and cannot be pushed off screen.
+  testWidgets('no settings tile grows past a four-line subtitle', (
+    tester,
+  ) async {
+    // Phone width again -- a height measured at 900px would be the height of a
+    // list where nothing wrapped, i.e. the layout that was already fine.
+    await _pumpSettings(tester, surface: const Size(375, 1600));
+
+    final tiles = find.byType(ListTile);
+    expect(tiles, findsNWidgets(9));
+    for (var i = 0; i < 9; i++) {
+      final height = tester.getSize(tiles.at(i)).height;
+      expect(
+        height,
+        lessThanOrEqualTo(128.0),
+        reason: 'tile $i is ${height}dp, past the 128dp the longest wrapped '
+            'subtitle measures at this width. The three 128dp tiles are '
+            'four-line subtitles; a fifth line is what would show up here, and '
+            'it is the point at which the copy wants shortening rather than '
+            'more height.',
+      );
+    }
   });
 
   testWidgets('opens the background checks category', (tester) async {

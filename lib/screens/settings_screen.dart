@@ -197,10 +197,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: ListTile(
                 leading: SettingsIconBadge(icon: section.icon),
                 title: Text(section.title),
+                // No `maxLines` and no ellipsis here, deliberately.
+                //
+                // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
+                // a 375dp phone it truncated eight of the nine category
+                // subtitles -- every one except "Application information.",
+                // which is the only string short enough to survive one line. The
+                // `SectionCard` on the drill-in page renders the same string with
+                // no clamp at all (settings_fields.dart), so the copy was written
+                // to wrap; only this list clamped it.
+                //
+                // The subtitle is the only prose on this screen explaining what a
+                // category does, so an ellipsis leaves the reader with a list of
+                // unexplained labels.
+                //
+                // Letting it wrap costs no height here, which was the thing worth
+                // checking before committing to it. `ListTile` with a subtitle and
+                // `isThreeLine: false` targets 72dp, and its `_computeSizes`
+                // (list_tile.dart) falls into "compact" mode when the content
+                // will not fit the ideal baseline positions, giving
+                // `2 * minVerticalPadding + titleHeight + subtitleHeight` = 8*2 +
+                // ~20 + ~32 = ~68dp for a two-line bodySmall subtitle. So a tile
+                // that wraps is not taller than the 72dp one that truncates --
+                // the vertical slack was already reserved. The list extent does
+                // not grow, and the Save button is in `bottomNavigationBar`, so it
+                // is pinned and cannot be pushed off screen regardless.
+                //
+                // Unbounded rather than `maxLines: 2` on purpose: at a 2.0
+                // accessibility text scale these strings need three or four
+                // lines, and a clamp would reintroduce exactly the truncation
+                // this removes, for the users least able to tolerate it.
                 subtitle: Text(
                   section.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

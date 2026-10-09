@@ -114,6 +114,34 @@ const double _cardGap = 20;
 /// header look attached to the card above it.
 const double _chartHeaderGap = 28;
 
+/// The gap between the floating nav bar's top edge and the last card.
+///
+/// **This is the fix for the overlap, and the `76` it replaced was not a
+/// smaller version of the same number — it was an unrelated one.** The bar is
+/// the Scaffold's `bottomNavigationBar` with `extendBody: true`, so it is drawn
+/// *over* the page and the scrolling content has to reserve the space itself.
+/// The reserve was `MediaQuery.paddingOf(context).bottom + 76`, and the `76`
+/// was written when the bar was full-width; nothing tied it to the 52 the bar
+/// draws, so on the device the last line of the Energy analytics card sat under
+/// the pill with no way to scroll clear of it.
+///
+/// The reservation is now `glassNavBarReservedHeight(context)` — the bar's own
+/// height plus its own safe-area floor, from `nav_bar.dart` — and this gap on
+/// top of it.
+///
+/// **20 rather than something smaller, for the same reason [\_cardGap] is 20.**
+/// The nav bar carries the same `AppElevation.raised` pair as every card, so its
+/// ambient half reaches 20dp at 1 sigma. A gap below that lets the bar's shadow
+/// land on the last card, which is the same "there is something wrong here" look
+/// a clipped card shadow produces — so the content would be *uncovered* and still
+/// read as covered.
+///
+/// The `MediaQuery` is read from the State's context, which is above the
+/// `Scaffold`, and that matters: with `extendBody: true` the `Scaffold` republishes
+/// `padding.bottom` inside the body as the bar's height, so reading it from below
+/// would count the bar twice.
+const double _navBarClearance = 20;
+
 /// Main monitoring dashboard: overview, PV, AC, battery, and CCTV tabs.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -1655,7 +1683,9 @@ Future<void> _refreshCurrentPage() async {
               kDashboardPageMargin,
               MediaQuery.paddingOf(context).top + kToolbarHeight - 6,
               kDashboardPageMargin,
-              MediaQuery.paddingOf(context).bottom + 76,
+              // The bar's real height plus [_navBarClearance], not a literal.
+              // See that constant for why this was the wrong number before.
+              glassNavBarReservedHeight(context) + _navBarClearance,
             ),
             itemCount: items.length,
             itemBuilder: (context, itemIndex) => items[itemIndex](),
