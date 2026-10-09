@@ -602,19 +602,30 @@ class AppElevation {
         ),
       ],
     AppTheme.light => const [
-        // contact
+        // contact -- measured and reduced: right-edge scanline on Xiaomi
+        // (build 1.8.0, 1220×2712, density 520, 23_dash_fresh.png) at y=1000,
+        // card right edge ≈ x1137. Peak L=175.6 at d≈7px against page L=228.8.
+        // ΔL = 53.2 (23% of page). Dark theme reference ΔL = 15.9 (51% of its page).
+        // Targeting ~16-20 ΔL via interpolation, same method as the Dracula fix.
+        // Convexity: alpha→ΔL is convex (blur eats weak peaks more). Scaling 1.9x
+        // on Dracula overshot 2.6x; here we scale down by ~0.45 and must re-measure.
+        // Original 0x66 (102/255 = 0.400) → 0x2E (46/255 = 0.180).
         BoxShadow(
-          color: Color(0x663D4A44),
+          color: Color(0x2E3D4A44),
           blurRadius: 6,
           offset: Offset(3, 3),
         ),
-        // ambient
+        // ambient -- same factor as contact. Original 0x40 (64/255 = 0.251) → 0x1D (29/255 = 0.114).
         BoxShadow(
-          color: Color(0x403D4A44),
+          color: Color(0x1D3D4A44),
           blurRadius: 22,
           offset: Offset(9, 9),
         ),
-        // bounce, up and to the left
+        // bounce, up and to the left -- NOT changed. The bounce was not measured
+        // (no top-edge scanline exists). The rule this file exists to enforce:
+        // correct only the half you measured. Scaling the light half by a number
+        // borrowed from the dark half is the mistake the Dracula patch records.
+        // Original 0xFFFFFFFF (1.0) kept.
         BoxShadow(
           color: Color(0xFFFFFFFF),
           blurRadius: 14,
