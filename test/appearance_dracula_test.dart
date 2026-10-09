@@ -238,6 +238,91 @@ void main() {
       );
     });
 
+    // **Every** segment, not just Dracula, and this is the test that would have
+    // answered the question the device left open. There was a tap test for
+    // Dracula and none for Skeuo -- the headline option of 1.8.0 had 62 tests
+    // about how it *looks* and zero about whether tapping it does anything.
+    //
+    // Tapping by `find.text` through `ensureVisible` is not enough either: a
+    // widget test finds a widget that is laid out, not one the user's finger
+    // lands on. So each tap below aims at the segment's own center rect, which
+    // is what a finger does, and the assertion reads the controller rather than
+    // the highlight -- a control that renders "Skeuo" ticked while the
+    // controller still holds `dracula` is the defect this exists to catch.
+    testWidgets('tapping each of the five segments applies that option',
+        (tester) async {
+      // Pumped **once**, deliberately. An earlier draft re-called `pumpSettings`
+      // inside the loop, and that fails on the second pass with "Found 2 widgets
+      // with text Appearance": `tester.pumpWidget` does not reset a `Navigator`
+      // whose widget structure is unchanged, so the section page pushed by the
+      // first iteration is still on the stack and its AppBar title is the
+      // second match. Measured, not guessed -- the two rects were the category
+      // tile at y=83 and the pushed page's title at y=14.
+      //
+      // Pumping once is also the truer shape: a user opens Settings, opens
+      // Appearance, and then tries the options from there. It does mean the
+      // starting assertion below only guards the first tap, which is why each
+      // iteration asserts the option it *caused* rather than the state it
+      // began in.
+      await boot();
+      await pumpSettings(tester);
+      expect(
+        themeController.option,
+        ThemeOption.dark,
+        reason: 'the app defaults to dark, so the control starts there; '
+            'without this the first tap in the loop proves nothing',
+      );
+
+      const expectations = <String, ThemeOption>{
+        'System': ThemeOption.system,
+        'Light': ThemeOption.light,
+        'Dark': ThemeOption.dark,
+        'Dracula': ThemeOption.dracula,
+        'Skeuo': ThemeOption.skeuo,
+      };
+
+      for (final entry in expectations.entries) {
+        // The segment's own rect, center-tapped -- not the label widget, which
+        // can sit inside a segment without the segment being what receives the
+        // gesture. This is what a finger does, and it is the difference between
+        // this test and the four device taps that landed on the wrong row.
+        final segment = find.descendant(
+          of: find.byType(SegmentedButton<ThemeOption>),
+          matching: find.text(entry.key),
+        );
+        expect(
+          segment,
+          findsOneWidget,
+          reason: '"${entry.key}" must be uniquely findable inside the control, '
+              'or the tap below could be aimed at something else entirely',
+        );
+        await tester.ensureVisible(segment);
+        await tester.pumpAndSettle();
+        await tester.tapAt(tester.getCenter(segment));
+        await tester.pumpAndSettle();
+
+        expect(
+          themeController.option,
+          entry.value,
+          reason: 'tapping "${entry.key}" left the controller reading '
+              '${themeController.option}. On the device this is exactly what '
+              'was observed: four taps on the Skeuo row and the selection '
+              'never moved off Dracula, with no error and no crash -- a '
+              'silent no-op is the failure mode, so the reason string has to '
+              'name which segment refused.',
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(
+          prefs.getString(modeKey),
+          entry.value.stored,
+          reason: 'the store must carry ${entry.value.stored} too, or the next '
+              'launch comes back as something else and the tap only worked '
+              'once',
+        );
+      }
+    });
+
     testWidgets('the selected segment follows the stored option', (tester) async {
       // The other half of the same contract, and the one that fails silently: a
       // control whose `selected` set is built from `themeMode` shows "Dark"
