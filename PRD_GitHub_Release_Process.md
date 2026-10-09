@@ -2,9 +2,45 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
-**Dokumen:** 1.2
+**Dokumen:** 1.3
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.7.2 (build 16), tag `v1.7.2`
+**Rilis acuan:** 1.8.0 (build 17), tag `v1.8.0`
+
+**1.8.0 — 7 Oktober 2026.** Rilis fitur dan keamanan; sepuluh temuan dari audit
+sumber penuh, plus lapisan skeuomorfis dengan tema keempat, jadi nomornya minor
+dan build naik 16 → 17.
+
+Pemeriksaan fingerprint `apksigner` di §3 berjalan untuk 1.8.0 dan cocok dengan
+nilai yang diharapkan di Bagian 3, baik pada build lokal maupun pada APK yang
+diunduh ulang dari halaman rilis. Unduhan pasca-publikasi dengan pembandingan
+SHA-256 terhadap build lokal juga berjalan, untuk APK **dan** `CHANGELOG.md` yang
+terlampir:
+
+| | |
+|---|---|
+| SHA-256 APK lokal dan unduhan | `70C1A7BD34E01855D55AE04B398AA6992535EFA6C9736555E4AEF154F62F4FC6` |
+| SHA-256 `CHANGELOG.md` lokal dan unduhan | `7FA8C5F5BF746943418222C3179A125EE24DD3EFE4929130A54E05788143E169` |
+| Fingerprint sertifikat APK unduhan | `504d13ee0bbfa8df2a24c20ef3cc59bde4f35b69596a12ceabb709cf702564b5` |
+| `versionName` / `versionCode` APK | `1.8.0` / `17` |
+| Scheme v2 | `true` |
+| Release APK menyertakan `AlarmDebugReceiver`? | **tidak** — hanya `AlarmCheckReceiver` dan `AlarmBootReceiver` |
+| `flutter analyze` | bersih |
+| `flutter test` | 774 lulus di 50 file, per-file; 4 file gagal atau kosong pada percobaan pertama dan lulus sendiri |
+
+**Satu langkah §5 dilewati, dan itu karena perangkat tidak ada:** `adb install -r`
+untuk menguji upgrade antar-rilis, seperti pada 1.7.1 dan 1.7.2, sehingga **jalur
+upgrade yang terakhir benar-benar berjalan masih 1.5.0 dari 1.4.0**. Enam hal
+pada 1.8.0 sudah diuji dan belum terbukti di perangkat — kamera tidak diputar,
+tema Skeuo belum pernah difoto, ramp shadow-nya diturunkan bukan diukur,
+ketidakseimbangan shadow tema light belum diatasi, pemeriksaan alarm background
+belum pernah terlihat berjalan, dan `flutter test` penuh tidak selesai di mesin
+7 GB — semuanya dinyatakan terbuka di `RELEASE_NOTES_v1.8.0.md`.
+
+`.\gradlew.bat :app:testDebugUnitTest` **tidak dijalankan** pada 1.8.0: tidak
+ada aturan alarm atau `AlarmMessageFormat.kt` yang berubah, sehingga paritas
+Dart↔Kotlin tidak tersentuh.
+
+---
 
 **1.7.2 — 2 Oktober 2026.** Rilis perbaikan; tiga commit perbaikan dan tidak ada
 fitur baru, jadi nomornya patch dan build naik 15 → 16.

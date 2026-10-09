@@ -2,9 +2,13 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Platform:** Flutter (target utama Android)
-**Versi aplikasi saat ini:** 1.6.0 (build 12; sudah diterbitkan, tag `v1.6.0`)
-**Versi dokumen:** 1.6
-**Status:** Rilis 1.6.0 terbit 28 September 2026: halaman Hydroponics dan Fish
+**Versi aplikasi saat ini:** 1.8.0 (build 17; sudah diterbitkan, tag `v1.8.0`)
+**Versi dokumen:** 1.8
+**Status:** Rilis 1.8.0 terbit 7 Oktober 2026: audit keamanan penuh sumber
+(sepuluh temuan ditutup), lapisan skeuomorfis, dan tema keempat Skeuo yang
+membawa palet brief desain sendiri — amber `#F59E0B` dengan lime `#C4F042` pada
+halaman `#0A0A0C`, dapat dipilih di Settings → Appearance. Rilis 1.6.0 terbit
+28 September 2026: halaman Hydroponics dan Fish
 dari device ThingsBoard keempat, navigasi bawah 4 tab dengan tab Power
 terpadu, OpenWeatherMap dihapus beserta izin lokasinya, serta perbaikan
 performa (race cache offline, rebuild per frame) dan fix crash Save Settings.
@@ -366,3 +370,40 @@ tidak bisa memutuskan arah; hanya tren SOC yang bisa. Pemetaan terpusat di
 `battery_sign_convention_test.dart` — karena klaim versi lama tertulis di
 dokumen dan bertahan setelah hardware-nya berubah. Aturannya di `AGENTS.md`
 §"The battery sign convention".
+
+### 10.4 Rilis 1.8.0 — verifikasi pasca-publikasi
+
+**Otomatis, 9 Oktober 2026, pada APK yang diunduh ulang dari halaman rilis:**
+
+- SHA-256 APK lokal dan unduhan identik:
+  `70C1A7BD34E01855D55AE04B398AA6992535EFA6C9736555E4AEF154F62F4FC6`.
+- SHA-256 `CHANGELOG.md` lokal dan unduhan identik:
+  `7FA8C5F5BF746943418222C3179A125EE24DD3EFE4929130A54E05788143E169`.
+- `apksigner verify`: v2 scheme `true`, fingerprint sertifikat
+  `504d13ee0bbfa8df2a24c20ef3cc59bde4f35b69596a12ceabb709cf702564b5` — cocok
+  dengan `PRD_GitHub_Release_Process.md` §3.
+- `aapt2 dump badging`: `versionName=1.8.0`, `versionCode=17`.
+- Manifest APK release **tidak** memuat `AlarmDebugReceiver`; hanya
+  `AlarmCheckReceiver` dan `AlarmBootReceiver`, seperti yang diwajibkan `AGENTS.md`.
+- `flutter analyze` bersih; `flutter test` 774 lulus di 50 file, dijalankan
+  per-file — lihat catatan OOM di bawah.
+
+**Yang tidak diverifikasi di perangkat, dan tetap terbuka.** `adb install -r`
+dilewati karena tidak ada perangkat, jadi jalur upgrade yang terakhir benar-benar
+berjalan masih 1.5.0 dari 1.4.0. Enam hal berikut **sudah diuji dan belum
+terbukti di layar**, dan tidak boleh dibaca sebagai beres hanya karena suite hijau:
+
+- CCTV tidak diputar — nol aktivitas dekoder tercatat, dan apakah itu regresi dari
+  1.7.2 belum diketahui.
+- Tema Skeuo belum pernah difoto di layar.
+- Ramp shadow Skeuo diturunkan dari luminansi halaman, bukan diukur; scanline tepi
+  atas (`FEATURE.md` §18.5) belum diambil untuk tema mana pun.
+- Ketidakseimbangan shadow tema light belum diperbaiki.
+- Pemeriksaan alarm background belum pernah terlihat berjalan; nol log
+  `EnerGrowAlarm*` selama 80 detik, dan stand-down foreground sendiri tidak
+  menlog sehingga "berhenti karena aplikasi terbuka" tidak bisa dibedakan dari
+  "receiver mati".
+- `flutter test` penuh tidak selesai di mesin 7 GB — gejala OOM yang sudah
+  terdokumentasi di `dart_test.yaml`, bukan kegagalan baru. Karena itu tidak ada
+  klaim "suite penuh hijau" di dokumen ini, dan `test/cctv_test.dart` kini
+  melewati anggaran RAM untuk satu run penuh sehingga filenya yang perlu dipecah.
