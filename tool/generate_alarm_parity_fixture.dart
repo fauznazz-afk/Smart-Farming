@@ -35,6 +35,25 @@ Map<String, dynamic> reading(
   'lastUpdate': ago(age).toIso8601String(),
 };
 
+/// A reading that reported values but carries no timestamp at all.
+///
+/// Not the same as omitting the reading: `readings: []` covers a device that was
+/// never polled, which is silence and raises nothing, while this is a device that
+/// answered with data whose age cannot be established. Both evaluators treat the
+/// missing timestamp as stale immediately -- `AlarmReading.isStale` in Dart and
+/// `AlarmEvaluator.isStale` in Kotlin both return true before looking at the
+/// window -- so this is the case where the two disagreeing about *absent* would
+/// be invisible in the app until a device's clock or ThingsBoard's ts field
+/// stopped being written.
+Map<String, dynamic> undatedReading(
+  AlarmDevice device,
+  Map<String, double> values,
+) => {
+  'device': device.wireName,
+  'values': values,
+  'lastUpdate': null,
+};
+
 Map<String, dynamic> scenario(
   String name,
   String description,
@@ -50,7 +69,11 @@ Map<String, dynamic> scenario(
         AlarmReading(
           device: AlarmDevice.fromWireName(entry['device'] as String)!,
           values: (entry['values'] as Map).cast<String, double>(),
-          lastUpdate: DateTime.parse(entry['lastUpdate'] as String),
+          // Null rather than absent, because an undated reading is the case
+          // being pinned; `as String` would throw instead of describing it.
+          lastUpdate: entry['lastUpdate'] == null
+              ? null
+              : DateTime.parse(entry['lastUpdate'] as String),
         ),
     ],
     now: now,
@@ -495,6 +518,72 @@ void main() {
         reading(AlarmDevice.sensor, {'temp_dht': 26.5}, fresh),
       ],
       [],
+    ),
+    scenario(
+      'reading_without_a_timestamp_counts_as_stale_not_as_silence',
+      'An absent timestamp is treated as older than any window, so this device '
+          'escalates straight to critical on the first tick. Pinned because the '
+          'opposite -- treating no timestamp as no data -- is the more '
+          'defensible-looking reading of the same null, and both evaluators '
+          'agree on this instead: Dart returns true from AlarmReading.isStale '
+          'before comparing against minutes, and Kotlin does the same in '
+          'AlarmEvaluator.isStale. A change on one side alone shows up here as '
+          'a count mismatch rather than as a notification the user never got.',
+      energy,
+      [undatedReading(AlarmDevice.battery, {'soc': 88})],
+      [
+        {
+          'id': 'offline_battery',
+          'message': 'Battery has stopped reporting',
+        },
+        {
+          'id': 'stale_battery',
+          'message': 'No fresh data from Battery',
+        },
+      ],
+    ),
+    scenario(
+      'undated_sensor_is_not_fresh_enough_for_a_value_alarm',
+      'The freshness gate reads the same isStale, so a sensor with no timestamp '
+          'is not fresh even though it is reporting. This branch cannot be '
+          'reached with readings: [] at all, because there the reading is '
+          'missing and the rule is skipped one step earlier, before the gate is '
+          'consulted. Without it, an undated sensor could raise a limit breach '
+          'describing a reading of unknown age.',
+      energyWithEnvironment,
+      [
+        undatedReading(AlarmDevice.sensor, {'temp_dht': 31.2}),
+        reading(AlarmDevice.battery, {'soc': 88}, fresh),
+      ],
+      [
+        {
+          'id': 'offline_sensor',
+          'message': 'Environment sensor has stopped reporting',
+        },
+        {
+          'id': 'stale_sensor',
+          'message': 'No fresh data from Environment sensor',
+        },
+      ],
+    ),
+    scenario(
+      'undated_fish_tank_is_critical_for_the_same_reason',
+      'The fish device takes the same path as every other device, so its two '
+          'messages are pinned here too. The wording is the part that drifts: '
+          'it names a tank rather than a device id, and there is no third '
+          'language-side copy of these strings to catch it.',
+      energy,
+      [undatedReading(AlarmDevice.fish, {'ph': 7.2})],
+      [
+        {
+          'id': 'offline_fish',
+          'message': 'Fish tank has stopped reporting',
+        },
+        {
+          'id': 'stale_fish',
+          'message': 'No fresh data from Fish tank',
+        },
+      ],
     ),
     scenario(
       'fish_value_alarm_silenced_while_fish_is_stale',

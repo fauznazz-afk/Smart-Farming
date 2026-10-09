@@ -1361,15 +1361,43 @@ Bukan bug, tapi mudah disalahpahami:
 
 ### 18.4 Celah test
 
-- `EnergySummaryCard` belum punya widget test — dan tiga regresi label di sesi
-  27 Sep lolos seluruh gate tanpa ada satu pun widget test UI yang menangkapnya.
-  `LivePowerCard` dan `MetricGrid` kini sudah punya.
+- ~~`EnergySummaryCard` belum punya widget test - dan tiga regresi label di sesi
+  27 Sep lolos seluruh gate tanpa ada satu pun widget test UI yang menangkapnya.~~
+  **Perbaiki 7 Oktober 2026, dan test-nya langsung menemukan tiga defect** -
+  `test/energy_summary_card_test.dart`, 23 deklarasi / 32 test di runtime, commit
+  `475ada0`. Trombol yang paling relevance: untuk truncation ia memakai
+  `expectNothingClipped` dan **bukan** `find.text`, karena pohon widget masih
+  menyimpan string utuh setelah engine memotongnya - dan itulah alasan tiga
+  regresi label berturut-turut lolos. `LivePowerCard` dan `MetricGrid` juga sudah
+  punya.
 - `SettingsScreen` tidak punya widget test; `settings_screen_test.dart` memeriksa
   9 dari 10 judul kategori, tanpa `Background checks`.
 - `AlarmCheckRunner` tidak punya test JVM; butuh perangkat.
-- `AlarmParityTest.kt` tidak punya kasus `lastUpdate == null` (hanya
-  `readings: []`).
-- `ChartBounds.maxY` tidak punya test untuk cabang `maximum <= 0`.
+- ~~`AlarmParityTest.kt` tidak punya kasus `lastUpdate == null` (hanya
+  `readings: []`).~~ **Diperbaiki 9 Oktober 2026.** Tiga vektor baru di
+  `tool/generate_alarm_parity_fixture.dart` — di generator, bukan JSON yang
+  ditulis tangan. Battery, sensor, dan fish melaporkan nilai **tanpa**
+  timestamp. Ketiganya diperlakukan sebagai lebih tua dari jendela mana pun,
+  jadi langsung naik ke `offline_*` + `stale_*`: bukan diam, dan bukan juga
+  aturan nilai. Vektor sensor sekaligus menutup gerbang kesegaran, karena
+  `requireFreshSensor` membaca `isStale` yang sama — sensor tanpa timestamp
+  **tidak** segar meski sedang melapor.
+  Yang ini tidak bisa dijangkau `readings: []`: reading yang hilang di-skip di
+  `reading == null` satu langkah lebih awal, jadi keduanya cabang berbeda dan
+  bukan sekadar kurang ketat. Kedua sisi juga dapat guard "fixture punya minimal
+  satu `lastUpdate: null`", karena kedua suite dijalankan *oleh* fixture — hapus
+  vektor ini dan semua test lain tetap hijau tanpa ada yang melapor.
+- ~~`ChartBounds.maxY` tidak punya test untuk cabang `maximum <= 0`.~~ **Stale
+  sejak 29 September 2026, sudah tertutup.** Baris ini ditulis 27 Sep, dan
+  commit `a115f2f` (29 Sep) sudah menambah dua test di `chart_bounds_test.dart`:
+  "falls back to a flat maxY of 1.0 when the peak is zero or below" dan "pads an
+  all-negative series 10% below but a flat 1.0 above". Keduanya masuk ke
+  `maximum <= 0` dan meng-assert `maxY == 1.0`, yaitu cabang fallback di
+  `chart_data.dart:136`. Yang kedua sekaligus membuktikan angka itu **tidak**
+  disnap ke kelipatan `interval` (`chart_data.dart:168`) — itulah yang membedakan
+  cabang ini dari cabang atasnya, jadi ia tidak hanya menguji konstantanya.
+  Ditambah "keeps the y range increasing for every non-positive peak" yang menyapu
+  lima puncak. Reachability bukan masalahnya; yang basi adalah catatan §18.4.
 - ~~`test/color_helpers_test.dart` mengukur permukaan yang sudah tidak dipakai.~~
   Diperbaiki. Enam dari enam hex di list-nya basi, dan list basi itu lebih terang
   dari yang sebenarnya, jadi tiga warna di bawah AA lolos. Guard sekarang

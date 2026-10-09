@@ -30,6 +30,26 @@ void main() {
     expect(scenarios, isNotEmpty);
   });
 
+  test('the fixture covers a reading with no timestamp', () {
+    // Stated as a property of the fixture rather than left to the per-scenario
+    // loop, because that loop is driven by the fixture: if every undated vector
+    // were deleted, the remaining tests would still all pass and the coverage
+    // would be gone with nothing to report it. `readings: []` is not a substitute
+    // -- a missing reading is skipped one step earlier than a null timestamp is
+    // tested, so the two never reach the same branch.
+    final undated = [
+      for (final scenario in scenarios)
+        for (final reading in (scenario['readings'] as List).cast<Map>())
+          if (reading['lastUpdate'] == null) scenario['name'] as String,
+    ];
+    expect(
+      undated,
+      isNotEmpty,
+      reason: 'no vector has a null lastUpdate, so the stale-by-default path '
+          'in AlarmReading.isStale is no longer pinned on either side',
+    );
+  });
+
   for (final scenario in scenarios) {
     final name = scenario['name'] as String;
     test('evaluates "$name" the same way the native side will', () {
@@ -61,7 +81,13 @@ void main() {
             AlarmReading(
               device: AlarmDevice.fromWireName(raw['device'] as String)!,
               values: (raw['values'] as Map).cast<String, double>(),
-              lastUpdate: DateTime.parse(raw['lastUpdate'] as String),
+              // Null is a real case, not a malformed vector: a device can report
+              // values without a timestamp, and both evaluators call that stale
+              // immediately. `as String` would have thrown here and taken the
+              // whole Dart side of the parity check down with it.
+              lastUpdate: raw['lastUpdate'] == null
+                  ? null
+                  : DateTime.parse(raw['lastUpdate'] as String),
             ),
         ],
         now: DateTime.parse(scenario['now'] as String),

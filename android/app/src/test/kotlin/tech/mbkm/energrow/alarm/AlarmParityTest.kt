@@ -86,6 +86,30 @@ class AlarmParityTest {
     }
 
     @Test
+    fun `the fixture covers a reading with no timestamp`() {
+        // The Kotlin counterpart of the same guard in test/alarm_parity_test.dart.
+        // Both are needed because both suites are driven *by* the fixture: delete
+        // the undated vectors and every remaining test still passes, so nothing
+        // would report the loss. `readings: []` does not stand in for it -- a
+        // missing reading is skipped at the `reading == null` check, while a null
+        // timestamp reaches `AlarmEvaluator.isStale`, so the two exercise
+        // different branches.
+        val scenarios = fixture.getJSONArray("scenarios")
+        var undated = 0
+        for (index in 0 until scenarios.length()) {
+            val readings = scenarios.getJSONObject(index).getJSONArray("readings")
+            for (readingIndex in 0 until readings.length()) {
+                if (readings.getJSONObject(readingIndex).isNull("lastUpdate")) undated++
+            }
+        }
+        assertTrue(
+            "no vector has a null lastUpdate, so the stale-by-default path in " +
+                "AlarmEvaluator.isStale is no longer pinned",
+            undated > 0,
+        )
+    }
+
+    @Test
     fun `a config without a rule list is rejected instead of silently ignored`() {
         val failure = runCatching {
             parseAlarmConfig(
@@ -299,11 +323,18 @@ class AlarmParityTest {
                 val key = keys.next()
                 values[key] = valueJson.getDouble(key)
             }
-            readings[device] = AlarmReading(
-                device,
-                values,
-                Instant.parse(entry.getString("lastUpdate")).toEpochMilli(),
-            )
+            // Explicit null rather than a missing key, because org.json's
+            // `optString` returns the "" default for an absent key and
+            // `getString` throws on JSONObject.NULL -- so `isNull` is the only
+            // spelling that distinguishes "no timestamp" from a broken fixture.
+            // AlarmEvaluator.isStale treats that null as stale immediately, and
+            // the Dart side has to agree; the shared vectors are what pins it.
+            val lastUpdateMs = if (entry.isNull("lastUpdate")) {
+                null
+            } else {
+                Instant.parse(entry.getString("lastUpdate")).toEpochMilli()
+            }
+            readings[device] = AlarmReading(device, values, lastUpdateMs)
         }
         return readings
     }
