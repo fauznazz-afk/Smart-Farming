@@ -915,8 +915,14 @@ This project has a knowledge graph at graphify-out/ with god nodes, community st
 When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
 
 Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- **Never read `graphify-out/graph.json` (2.8 MB) or `graph.html` (2.4 MB) directly.** This is the single biggest token saving available here: `query`, `path` and `explain` read those files *inside the process* and return a scoped slice, so only the slice ever enters context. Reading either file directly is what blows up a session.
+- **Prefer `path` and `explain` over `query`.** Measured on 9 October 2026: "how are alarm rules evaluated in Dart and Kotlin" via `query` returned **553 nodes**, truncated to 59 inside the 2000-token default, mixed with `dart:math`, `String? get` and `return`. The same question as `graphify path "buildAlarmRules" "AlarmCheckRunner" --undirected` returned **five hops, all real**, crossing the Dart/Kotlin boundary. BFS widens; a path between two named symbols does not.
+- **`--undirected` is not optional.** The graph is built undirected, so a bare `path` reports "no directed path found" for paths that plainly exist.
+- **`query` widens into noise.** Use it last, with a small `--budget`, and treat the result as scoped context rather than as an answer.
+- Run `graphify update .` after modifying code (AST-only, no API cost). Without it the graph is stale, and a `path` can route through a file that no longer exists — after the 1.8.0 cctv split the manifest still pointed at the deleted `cctv_test.dart`.
+- **`graphify update .` only covers code.** Documents, papers and images need the full `/graphify --update`. So an edited `CHANGELOG.md` is *not* in the graph.
+- **`graphify-out/` is git-ignored** — ~2.8 MB of `graph.json` plus ~2.4 MB of `graph.html`, rebuilt by `update` with no API key. Committing it would carry a regenerated blob on every code change. The graph is therefore local and not shared.
 - Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- **The graph is a map, not a verdict.** It is built from AST plus inferred edges, and a confident-looking path is still not proof. The standing rule above applies: verify a "dead code" claim with a search before removing anything.
