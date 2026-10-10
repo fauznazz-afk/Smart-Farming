@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/app_log.dart';
 import '../widgets/liquid_glass.dart';
+import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
@@ -9,10 +10,7 @@ import 'settings/widgets/settings_fields.dart';
 
 /// Settings browser: a category list that drills into one section at a time.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({
-    super.key,
-    required this.onLogout,
-  });
+  const SettingsScreen({super.key, required this.onLogout});
 
   final Future<void> Function() onLogout;
 
@@ -59,7 +57,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmLogout() async {
@@ -126,7 +125,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         bottomNavigationBar: detail != null
             ? null
             : SafeArea(
-                minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                minimum: const EdgeInsets.fromLTRB(
+                  AppSpacing.gutter,
+                  AppSpacing.sm,
+                  AppSpacing.gutter,
+                  AppSpacing.md,
+                ),
                 child: ListenableBuilder(
                   listenable: _settings,
                   builder: (context, _) => SaveSettingsButton(
@@ -165,57 +169,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildCategoryList(BuildContext context) {
     return ListView.builder(
       key: const ValueKey('settings-list'),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       itemCount: _sections.length,
       itemBuilder: (context, index) {
         final section = _sections[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: AppCard(
-            child: ListTile(
-              leading: SettingsIconBadge(icon: section.icon),
-              title: Text(section.title),
-              // No `maxLines` and no ellipsis here, deliberately.
-              //
-              // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
-              // a 375dp phone it truncated eight of the nine category
-              // subtitles -- every one except "Application information.",
-              // which is the only string short enough to survive one line. The
-              // `SectionCard` on the drill-in page renders the same string with
-              // no clamp at all (settings_fields.dart), so the copy was written
-              // to wrap; only this list clamped it.
-              //
-              // The subtitle is the only prose on this screen explaining what a
-              // category does, so an ellipsis leaves the reader with a list of
-              // unexplained labels.
-              //
-              // Letting it wrap costs no height here, which was the thing worth
-              // checking before committing to it. `ListTile` with a subtitle and
-              // `isThreeLine: false` targets 72dp, and its `_computeSizes`
-              // (list_tile.dart) falls into "compact" mode when the content
-              // will not fit the ideal baseline positions, giving
-              // `2 * minVerticalPadding + titleHeight + subtitleHeight` = 8*2 +
-              // ~20 + ~32 = ~68dp for a two-line bodySmall subtitle. So a tile
-              // that wraps is not taller than the 72dp one that truncates --
-              // the vertical slack was already reserved. The list extent does
-              // not grow, and the Save button is in `bottomNavigationBar`, so it
-              // is pinned and cannot be pushed off screen regardless.
-              //
-              // Unbounded rather than `maxLines: 2` on purpose: at a 2.0
-              // accessibility text scale these strings need three or four
-              // lines, and a clamp would reintroduce exactly the truncation
-              // this removes, for the users least able to tolerate it.
-              subtitle: Text(
-                section.subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppSurfaces.onSurfaceVariant,
-                    ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          // **`AppSurface`, not `AppCard`, and the difference is the shadow.**
+          // The brief's `list-row` is `surface` + a 1px hairline + 8px radius +
+          // 16 padding + `boxShadow: none` — list rows are explicitly the *flat*
+          // tier, alongside the app bar and the chips. `AppCard` carries
+          // `AppShadows.stamped` by construction and has no way to decline it,
+          // so using it here would have stamped nine rows and contradicted the
+          // one tier the brief cares most about separating.
+          //
+          // The padding is passed in rather than left to the child so the
+          // layout is byte-identical to the card it replaced: `AppSurface` has
+          // no default, and `ListTile` brings its own insets on top.
+          //
+          // `RepaintBoundary`, because `AppCard` carries one and `AppSurface`
+          // does not: eight rows inside a `ListView.builder` would otherwise
+          // re-rasterise with every scroll frame.
+          child: RepaintBoundary(
+            child: AppSurface(
+              radius: AppRadius.card,
+              fill: AppSurfaces.surface,
+              border: AppBorders.hairlineBorder,
+              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              // The transparent `Material` is the same arrangement `AppCard`
+              // makes and for the same reason: a `Container`'s opaque fill
+              // paints over the ink layer of any `Material` placed outside it,
+              // and a `ListTile`'s splash and hover live on exactly that layer.
+              // `settings_screen_test.dart` asserts the paint order for the
+              // drill-in page; this row is the same hazard with no test.
+              child: Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  leading: SettingsIconBadge(icon: section.icon),
+                  title: Text(section.title, style: AppType.headlineMd),
+                  // No `maxLines` and no ellipsis here, deliberately.
+                  //
+                  // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
+                  // a 375dp phone it truncated eight of the nine category
+                  // subtitles -- every one except "Application information.",
+                  // which is the only string short enough to survive one line. The
+                  // `SectionCard` on the drill-in page renders the same string with
+                  // no clamp at all (settings_fields.dart), so the copy was written
+                  // to wrap; only this list clamped it.
+                  //
+                  // The subtitle is the only prose on this screen explaining what a
+                  // category does, so an ellipsis leaves the reader with a list of
+                  // unexplained labels.
+                  //
+                  // Letting it wrap costs no height here, which was the thing worth
+                  // checking before committing to it. `ListTile` with a subtitle and
+                  // `isThreeLine: false` targets 72dp, and its `_computeSizes`
+                  // (list_tile.dart) falls into "compact" mode when the content
+                  // will not fit the ideal baseline positions, giving
+                  // `2 * minVerticalPadding + titleHeight + subtitleHeight` = 8*2 +
+                  // ~20 + ~32 = ~68dp for a two-line bodySmall subtitle. So a tile
+                  // that wraps is not taller than the 72dp one that truncates --
+                  // the vertical slack was already reserved. The list extent does
+                  // not grow, and the Save button is in `bottomNavigationBar`, so it
+                  // is pinned and cannot be pushed off screen regardless.
+                  //
+                  // Unbounded rather than `maxLines: 2` on purpose: at a 2.0
+                  // accessibility text scale these strings need three or four
+                  // lines, and a clamp would reintroduce exactly the truncation
+                  // this removes, for the users least able to tolerate it.
+                  subtitle: Text(
+                    section.subtitle,
+                    style: AppType.bodySm.copyWith(color: faintColor),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: AppSurfaces.onSurfaceVariant,
+                  ),
+                  onTap: () => _openSection(index),
+                ),
               ),
-              trailing: Icon(
-                Icons.chevron_right,
-                color: AppSurfaces.onSurfaceVariant,
-              ),
-              onTap: () => _openSection(index),
             ),
           ),
         );
@@ -226,7 +261,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDetailPage(BuildContext context, SettingsSection section) {
     return ListView(
       key: ValueKey('settings-${section.title}'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.gutter,
+        AppSpacing.md,
+        AppSpacing.gutter,
+        AppSpacing.xl,
+      ),
       children: [
         SectionCard(
           title: section.title,

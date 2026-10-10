@@ -24,7 +24,16 @@ class ChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final chartWidth = calculateChartWidth(buckets, monthly);
     final axis = calculateMaxY(buckets);
-    final barGroups = createBarChartGroups(buckets: buckets, monthly: monthly);
+    // `maxY` is passed down, not read from the chart: it is what gives every
+    // bar its full-height `surfaceMuted` empty state
+    // (`backDrawRodData.toY`). `calculateMaxY` already snaps the axis to a
+    // whole number of intervals, so the empty column lands exactly on the top
+    // gridline rather than a few pixels off it.
+    final barGroups = createBarChartGroups(
+      buckets: buckets,
+      monthly: monthly,
+      maxY: axis.maxY,
+    );
     final pvColor = categoryColor(MetricCategory.pv);
     final acColor = categoryColor(MetricCategory.ac);
 
@@ -37,9 +46,30 @@ class ChartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Energy per interval',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            Text(
+              // **This was a raw 15sp w800, and the token it becomes is the
+              // dashboard chart card's own header, not the brief's `headline-md`.
+              // **
+              //
+              // `AppType.labelUppercase` is the brief's `label-uppercase-md`
+              // and `ChartSectionHeader` in the dashboard's chart card uses it
+              // for exactly this job, so the two chart cards now size a title
+              // the same way instead of each picking a number.
+              //
+              // `headline-md` was the obvious choice -- the brief says it is the
+              // uppercase card title -- and it is the wrong one here: at a 320dp
+              // viewport and a 2.0 text scale it is 40sp, and
+              // "ENERGY PER INTERVAL" at that size is wider than the 296dp
+              // column, so an over-ambitious title is what overflows.
+              // `label-uppercase-md` fits at both of the scales
+              // `energy_report_chart_card_test.dart` already pins.
+              //
+              // Uppercased at the string, because the brief's rule is that
+              // titles and metadata are uppercase, and a title that is uppercase
+              // only when the string happens to be written that way is a rule
+              // the caller has to keep.
+              'Energy per interval'.toUpperCase(),
+              style: AppType.labelUppercase.copyWith(color: appPrimaryText),
             ),
             const SizedBox(height: 10),
             _SelectedBucketReadout(
@@ -60,9 +90,25 @@ class ChartCard extends StatelessWidget {
                         maxY: axis.maxY,
                         minY: 0,
                         barGroups: barGroups,
-                        gridData: const FlGridData(
+                        // **The brief's grid, and this one was fl_chart's own
+                        // default.** `FlGridData(show: true, drawVerticalLine:
+                        // false)` with nothing else falls back to
+                        // `getDrawingHorizontalLine`, which returns a grey
+                        // `FlLine` with no alpha -- a colour and an opacity
+                        // that appear nowhere else in the app. Hairlines in
+                        // `AppSurfaces.border` at 15%, horizontal only: the
+                        // bar chart's vertical axis is a fence of columns and
+                        // there is nothing between them to align against, which
+                        // is the same reason `drawVerticalLine` is already
+                        // false here.
+                        gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
+                          horizontalInterval: axis.interval,
+                          getDrawingHorizontalLine: (_) => FlLine(
+                            color: AppSurfaces.border.withValues(alpha: 0.15),
+                            strokeWidth: 1,
+                          ),
                         ),
                         borderData: FlBorderData(show: false),
                         barTouchData: BarTouchData(
@@ -73,8 +119,7 @@ class ChartCard extends StatelessWidget {
                           ),
                           handleBuiltInTouches: false,
                           touchCallback: (_, response) {
-                            final index =
-                                response?.spot?.touchedBarGroupIndex;
+                            final index = response?.spot?.touchedBarGroupIndex;
                             if (index != null &&
                                 index >= 0 &&
                                 index < buckets.length &&
@@ -164,21 +209,12 @@ class _SelectedBucketReadout extends StatelessWidget {
                 monthly
                     ? formatDateLabel(bucket.hour)
                     : formatHourLabel(bucket.hour),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                style: AppType.labelUppercase.copyWith(
+                  color: AppSurfaces.onSurface,
                 ),
               ),
-              _LegendValue(
-                label: 'PV',
-                value: bucket.pvKwh,
-                color: pvColor,
-              ),
-              _LegendValue(
-                label: 'AC',
-                value: bucket.acKwh,
-                color: acColor,
-              ),
+              _LegendValue(label: 'PV', value: bucket.pvKwh, color: pvColor),
+              _LegendValue(label: 'AC', value: bucket.acKwh, color: acColor),
             ],
           ),
         );
@@ -260,7 +296,13 @@ class _Legend extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(label, style: const TextStyle(fontSize: 11)),
+        Text(
+          label,
+          // `labelMicro`, the brief's small-tag slot. This was a raw 11sp, which
+          // made the legend the only text in the card sized by a fourth
+          // arbitrary number.
+          style: AppType.labelMicro.copyWith(color: AppSurfaces.onSurface),
+        ),
       ],
     );
   }
@@ -290,7 +332,7 @@ class _LegendValue extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           '$label ${value.toStringAsFixed(2)}',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          style: AppType.labelMicro.copyWith(color: AppSurfaces.onSurface),
         ),
       ],
     );

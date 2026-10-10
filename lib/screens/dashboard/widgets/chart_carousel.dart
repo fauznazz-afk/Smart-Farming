@@ -39,7 +39,18 @@ class _ChartCarouselState extends State<ChartCarousel> {
   @override
   Widget build(BuildContext context) {
     final faint = faintColor;
-    final accent = AppPalette.accent;
+    // **Lime, not amber.** The active dot used to take `AppPalette.accent`,
+    // which is the app's *stale/warning* status colour — see
+    // `color_helpers.dart`, where `statusWarn` is exactly this value and the
+    // comment above it says amber is the caution hue. A page indicator is not a
+    // warning, and using the warning colour for "you are here" spends the one
+    // hue that has to mean something is wrong.
+    //
+    // The brief is the authority here: lime appears as "active tab text + icon,
+    // active chip fill, 'live' pulse dot", and this is the same job. It is a
+    // 16dp pill beside six-dp grey ones, so the active state was already
+    // carried by size and does not lose anything by also being the right colour.
+    final accent = AppPalette.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,9 +109,7 @@ class _ChartCarouselState extends State<ChartCarousel> {
                       itemCount: widget.itemCount,
                       onPageChanged: (i) => setState(() => _index = i),
                       itemBuilder: (context, i) => Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: widget.inset,
-                        ),
+                        padding: EdgeInsets.symmetric(horizontal: widget.inset),
                         child: widget.itemBuilder(context, i),
                       ),
                     ),

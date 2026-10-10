@@ -53,7 +53,7 @@ void main() {
     'success': AppPalette.success,
     'error': AppPalette.error,
     'chartViolet': AppPalette.chartViolet,
-    'chartCoral': AppPalette.chartCoral,
+    'chartCoral': AppPalette.chartCyan,
     for (final category in MetricCategory.values)
       category.name: categoryColor(category),
   };

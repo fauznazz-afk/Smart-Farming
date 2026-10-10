@@ -9,21 +9,38 @@ class ChartSeriesSpec {
     required this.key,
     required this.label,
     required this.unit,
-    this.category,
   });
 
   final String key;
   final String label;
   final String unit;
 
-  /// The metric category this series belongs to, determining its colour.
-  /// If null, the series uses the user's accent (for single-series groups).
-  final MetricCategory? category;
+  /// The metric category this series belongs to, derived from [key].
+  ///
+  /// **A getter, and that is the whole change.** The constructor field this
+  /// replaces was filled in by one of five tiny helper functions at the
+  /// declaration site (`_pv`, `_ac`, `_battery`, `_env`, `_water`), which made
+  /// it a second copy of a fact the key already determines — the same "a key in
+  /// one place and a label in another" shape this repo has already paid for
+  /// twice, with the chart storage key and with the hand-written surface list.
+  /// `MetricCategory.forKey` is the single resolution, and
+  /// `color_helpers_test.dart` pins it for every telemetry key below.
+  ///
+  /// The key is the source of truth, so a series whose key belongs to no
+  /// category resolves to `null` here and to the accent in [color] — visible on
+  /// a device rather than silently wrong.
+  MetricCategory? get category => MetricCategory.forKey(key);
 
-  Color color(Color fallbackAccent) {
-    if (category == null) return fallbackAccent;
-    return categoryColor(category!);
-  }
+  /// The series hue: its category's, or [fallbackAccent] for a value that
+  /// belongs to no category.
+  ///
+  /// `categoryColorForKey` rather than `categoryColor(category!)`, so there is
+  /// one path from key to hue in the app. Every series declared below already
+  /// resolves through it: the four PV keys are all `MetricCategory.pv`, the six
+  /// AC keys all `ac`, and so on, which is what "one hue per category" means
+  /// here.
+  Color color(Color fallbackAccent) =>
+      categoryColorForKey(key) ?? fallbackAccent;
 }
 
 /// The card height for a chart that draws one series on the greenhouse or the
@@ -51,106 +68,77 @@ class ChartGroup {
   List<String> get keys => [for (final s in series) s.key];
 }
 
-ChartSeriesSpec _pv(String key, String label, String unit) {
-  return ChartSeriesSpec(
-    key: key,
-    label: label,
-    unit: unit,
-    category: MetricCategory.pv,
-  );
-}
-
-ChartSeriesSpec _ac(String key, String label, String unit) {
-  return ChartSeriesSpec(
-    key: key,
-    label: label,
-    unit: unit,
-    category: MetricCategory.ac,
-  );
-}
-
-ChartSeriesSpec _battery(String key, String label, String unit) {
-  return ChartSeriesSpec(
-    key: key,
-    label: label,
-    unit: unit,
-    category: MetricCategory.battery,
-  );
-}
-
-ChartSeriesSpec _env(String key, String label, String unit) {
-  return ChartSeriesSpec(
-    key: key,
-    label: label,
-    unit: unit,
-    category: MetricCategory.environment,
-  );
-}
-
-ChartSeriesSpec _water(String key, String label, String unit) {
-  return ChartSeriesSpec(
-    key: key,
-    label: label,
-    unit: unit,
-    category: MetricCategory.water,
-  );
-}
-
 /// Every chart a page prefix can draw, in display order.
+///
+/// **No per-series helper functions.** They existed to stamp a `MetricCategory`
+/// onto each series, which the key already determines; see
+/// [ChartSeriesSpec.category]. The category of every series below is read from
+/// its key, exactly as every other colour in the app reads it.
 List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
   'pv' => [
     ChartGroup('PV', [
-      _pv('voltage_dc', 'Voltage', 'V'),
-      _pv('current_dc', 'Current', 'A'),
-      _pv('power_dc', 'Power', 'W'),
-      _pv('energy_dc', 'Energy', 'Wh'),
+      ChartSeriesSpec(key: 'voltage_dc', label: 'Voltage', unit: 'V'),
+      ChartSeriesSpec(key: 'current_dc', label: 'Current', unit: 'A'),
+      ChartSeriesSpec(key: 'power_dc', label: 'Power', unit: 'W'),
+      ChartSeriesSpec(key: 'energy_dc', label: 'Energy', unit: 'Wh'),
     ]),
   ],
   'ac' => [
     ChartGroup('AC', [
-      _ac('voltage_ac', 'Voltage', 'V'),
-      _ac('current_ac', 'Current', 'A'),
-      _ac('power_ac', 'Power', 'W'),
-      _ac('frequency_ac', 'Frequency', 'Hz'),
-      _ac('energy_ac', 'Energy', 'Wh'),
-      _ac('pf_ac', 'Power Factor', ''),
+      ChartSeriesSpec(key: 'voltage_ac', label: 'Voltage', unit: 'V'),
+      ChartSeriesSpec(key: 'current_ac', label: 'Current', unit: 'A'),
+      ChartSeriesSpec(key: 'power_ac', label: 'Power', unit: 'W'),
+      ChartSeriesSpec(key: 'frequency_ac', label: 'Frequency', unit: 'Hz'),
+      ChartSeriesSpec(key: 'energy_ac', label: 'Energy', unit: 'Wh'),
+      ChartSeriesSpec(key: 'pf_ac', label: 'Power Factor', unit: ''),
     ]),
   ],
   'battery' => [
     ChartGroup('Battery', [
-      _battery('voltage', 'Voltage', 'V'),
-      _battery('current', 'Current', 'A'),
-      _battery('power', 'Power', 'W'),
-      _battery('soc', 'State of Charge', '%'),
-      _battery('cycles', 'Cycles', ''),
-      _battery('remain_capacity_ah', 'Remaining Capacity', 'Ah'),
-      _battery('full_capacity_ah', 'Full Capacity', 'Ah'),
+      ChartSeriesSpec(key: 'voltage', label: 'Voltage', unit: 'V'),
+      ChartSeriesSpec(key: 'current', label: 'Current', unit: 'A'),
+      ChartSeriesSpec(key: 'power', label: 'Power', unit: 'W'),
+      ChartSeriesSpec(key: 'soc', label: 'State of Charge', unit: '%'),
+      ChartSeriesSpec(key: 'cycles', label: 'Cycles', unit: ''),
+      ChartSeriesSpec(
+        key: 'remain_capacity_ah',
+        label: 'Remaining Capacity',
+        unit: 'Ah',
+      ),
+      ChartSeriesSpec(
+        key: 'full_capacity_ah',
+        label: 'Full Capacity',
+        unit: 'Ah',
+      ),
     ]),
   ],
   'env' => [
     ChartGroup('Temperature', [
-      _env('temp_dht', 'Air', '°C'),
-      _env('temp_ds18b20', 'Panel', '°C'),
+      ChartSeriesSpec(key: 'temp_dht', label: 'Air', unit: '°C'),
+      ChartSeriesSpec(key: 'temp_ds18b20', label: 'Panel', unit: '°C'),
     ], height: _compactTwoSeriesHeight),
     ChartGroup('Humidity', [
-      _env('humidity_dht', 'Humidity', '%'),
+      ChartSeriesSpec(key: 'humidity_dht', label: 'Humidity', unit: '%'),
     ], height: _compactHeight),
     ChartGroup('Light', [
-      _env('lux', 'Light', 'lx'),
+      ChartSeriesSpec(key: 'lux', label: 'Light', unit: 'lx'),
     ], height: _compactHeight),
     ChartGroup('TDS', [
-      _env('tds_ppm', 'TDS', 'ppm'),
+      ChartSeriesSpec(key: 'tds_ppm', label: 'TDS', unit: 'ppm'),
     ], height: _compactHeight),
   ],
   'fish' => [
-    ChartGroup('pH', [
-      _water('ph', 'pH', ''),
-    ], zeroAnchored: false, height: _compactHeight),
+    ChartGroup(
+      'pH',
+      [ChartSeriesSpec(key: 'ph', label: 'pH', unit: '')],
+      zeroAnchored: false,
+      height: _compactHeight,
+    ),
     ChartGroup('Temperature', [
-      _water('suhu', 'Water', '°C'),
+      ChartSeriesSpec(key: 'suhu', label: 'Water', unit: '°C'),
     ], height: _compactHeight),
     ChartGroup('Turbidity', [
-      _water('turbidity_ntu', 'Turbidity', 'NTU'),
+      ChartSeriesSpec(key: 'turbidity_ntu', label: 'Turbidity', unit: 'NTU'),
     ], height: _compactHeight),
   ],
   _ => const [],
@@ -164,8 +152,23 @@ List<String> chartKeysForPrefix(String prefix) => [
 /// The keys each page requests, pinned.
 const Map<String, List<String>> kHistoryKeysByPrefix = {
   'pv': ['voltage_dc', 'current_dc', 'power_dc', 'energy_dc'],
-  'ac': ['voltage_ac', 'current_ac', 'power_ac', 'frequency_ac', 'energy_ac', 'pf_ac'],
-  'battery': ['voltage', 'current', 'power', 'soc', 'cycles', 'remain_capacity_ah', 'full_capacity_ah'],
+  'ac': [
+    'voltage_ac',
+    'current_ac',
+    'power_ac',
+    'frequency_ac',
+    'energy_ac',
+    'pf_ac',
+  ],
+  'battery': [
+    'voltage',
+    'current',
+    'power',
+    'soc',
+    'cycles',
+    'remain_capacity_ah',
+    'full_capacity_ah',
+  ],
   'env': ['temp_dht', 'temp_ds18b20', 'humidity_dht', 'lux', 'tds_ppm'],
   'fish': ['ph', 'suhu', 'turbidity_ntu'],
 };

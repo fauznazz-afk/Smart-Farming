@@ -44,10 +44,25 @@ extension CctvStatusDisplay on CctvStatus {
   ///
   /// The dot does not need text contrast — it sits beside a word that does, and
   /// WCAG 1.4.11 exempts it as part of a graphic that is not the sole carrier of
-  /// the information. It keeps its distinct hue for exactly that reason.
+  /// the information. It keeps its status hue for exactly that reason.
+  ///
+  /// **Offline now takes the measured ink, not the fill.** It used to take
+  /// [statusBadFill], whose own doc names "a dot" as one of its purposes, so
+  /// this looks like a step backwards. It is not, for one measured reason:
+  /// `statusBad` (`#FF5C5C`) and `statusBadFill` (`#FF6B6B`) are **0.4° apart**
+  /// — `color_helpers.dart` records the number — so the pill was drawing two
+  /// reds that are the same red. On a 7dp dot beside a word, the second red
+  /// reads as a rendering fault rather than as a distinction, and dropping it
+  /// costs nothing: [statusBad] clears AA on every caption surface, which the
+  /// fill variant does not.
+  ///
+  /// The two getters stay separate rather than collapsing into one, because
+  /// they describe different jobs and the day a dot needs to differ from its
+  /// label — a live-only dot that must not be read aloud, say — is the day this
+  /// split is the thing that makes it expressible.
   Color get color => switch (this) {
     CctvStatus.live => statusOk,
-    CctvStatus.offline => statusBadFill,
+    CctvStatus.offline => statusBad,
     CctvStatus.standby || CctvStatus.connecting => statusWarn,
   };
 

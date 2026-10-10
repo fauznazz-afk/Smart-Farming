@@ -6,24 +6,32 @@ import '../utils/design_tokens.dart';
 ///
 /// **This existed as a parameter and was never used.** `AppCard` has taken a
 /// `pressed` flag since the soft-UI migration, and nothing in the app ever
-/// passed it, so the app shipped a press vocabulary with no way to reach it. The
-/// flag added a small extra shadow; it did not invert the surface, which is the
-/// only thing that reads as a press in this style.
+/// passed it, so the app shipped a press vocabulary with no way to reach it.
+/// Under the previous system the flag only added a small extra shadow, which is
+/// not enough to read as a press; the flag now *drops* the stamped shadow,
+/// which is the geometry that makes it read as one.
 ///
-/// The old animation was a swap between the neumorphic [AppElevation.raised] and
-/// [AppElevation.pressed] shadow pairs, not a fade, because the light-source rule
-/// required the bounce to flip direction on press. Every surface in the app was lit from the top left. A press
+///
+/// The old animation was a swap between the neumorphic shadow pairs, not a
+/// fade, because the light-source rule required the bounce to flip direction on
+/// press. Every surface in the app was lit from the top left. A press
 /// put the light source *inside* the object, so the bounce that was up and to
 /// the left had to arrive from down and to the right instead. Cross-fading the
 /// two pairs spent the middle of the animation with a dark halo and a light
 /// halo in their old positions simultaneously, and that read as a rendering
 /// fault rather than as a button being held.
 ///
-/// **Under the new flat categorical system, press feedback is opacity and colour
-/// only (via [AppCard.pressed] which steps the fill darker), not geometry.** The
-/// shadow system is gone. The scale nudge is 1.5%, which is below the threshold
-/// where a control starts to look like it is shrinking, and it is on the *whole*
-/// widget rather than the shadow so the icon inside moves with it.
+/// **Under the brutalist system, press feedback is scale and the stamped
+/// shadow, and both are geometry.** A press flattens the surface into the page:
+/// [AppCard.pressed] drops its hard offset shadow, so the card moves *toward*
+/// the canvas rather than away from it, and the whole widget shrinks by 5% at
+/// the same time. That is the brief's `active:scale-95`, and it is a change of
+/// the same *kind* the old press was — the old one swapped a raised shadow pair
+/// for an inset one and relied on nothing but geometry to say "pushed".
+///
+/// The scale nudge is 5%, which is the figure the brief states outright rather
+/// than one tuned here. It is on the *whole* widget rather than on the shadow,
+/// so the icon inside moves with it.
 ///
 /// `AppMotion.press` is 150ms down. The release is deliberately faster at 120ms:
 /// a finger lifting should feel like release rather than like a slow settle, and
@@ -38,14 +46,14 @@ class Pressable extends StatefulWidget {
     this.onTapDown,
     this.onTapUp,
     this.onTapCancel,
-    this.pressedScale = 0.985,
+    this.pressedScale = 0.95,
     this.semanticLabel,
     this.selected,
     this.enabled = true,
   }) : assert(
-          child != null || builder != null,
-          'Pressable needs either a child or a builder',
-        );
+         child != null || builder != null,
+         'Pressable needs either a child or a builder',
+       );
 
   /// A fixed subtree, for the common case where only the scale should change.
   final Widget? child;

@@ -9,6 +9,7 @@ import '../widgets/liquid_glass.dart';
 import '../services/secure_window.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
+import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 
 /// The matte the video is seen against. **Not a themed surface, and never to
@@ -18,18 +19,18 @@ import 'dashboard/utils/design_tokens.dart';
 /// item 4 records it as undecided. It is decided, and the decision is that the
 /// *frame* changes and the *matte* does not.
 ///
-/// **Why the fill cannot be `AppSurfaces.page(isDark)`.** A dim image against a
+/// **Why the fill cannot be `AppSurfaces.page`.** A dim image against a
 /// light surround reads brighter and loses shadow detail, which is why
 /// broadcast and cinema put video on black. Measured rather than assumed, with
 /// a representative dim greenhouse frame as the content:
 ///
-/// | content            | on this ground | on the light page |
-/// |--------------------|----------------|-------------------|
-/// | `#202824`          | **1.30:1**     | 12.05:1           |
-/// | `#404844`          | 2.08:1         | 7.52:1            |
-/// | `#141816` (payload)| **1.09:1**     | 14.29:1           |
+/// | content            | on this ground | on the page |
+/// |--------------------|----------------|-------------|
+/// | `#202824`          | **1.30:1**     | 12.05:1     |
+/// | `#404844`          | 2.08:1         | 7.52:1      |
+/// | `#141816` (payload)| **1.09:1**     | 14.29:1     |
 ///
-/// On a light panel the surround is 12x brighter than the frame and 14x
+/// On a page-coloured panel the surround is 12x brighter than the frame and 14x
 /// brighter than the dark detail inside it. The eye adapts to the surround, the
 /// surround becomes the reference, and the image flattens into it. Daylight
 /// does not rescue this: ambient light changes neither number, because the ratio
@@ -39,9 +40,9 @@ import 'dashboard/utils/design_tokens.dart';
 /// is *is the equipment box open, is there water on the floor, did anything
 /// move* — a judgement about dark regions. Putting the brightest thing in the
 /// panel immediately outside the darkest thing the user is looking for is the
-/// wrong way round, and it is the same failure `AppElevation.inset` has
-/// documented all along: a well needs an interior darker than its surround, and
-/// this interior is already at the bottom of the range.
+/// wrong way round, and it is the same failure a well has documented all
+/// along: a well needs an interior darker than its surround, and this interior
+/// is already at the bottom of the range.
 ///
 /// **A light bezel was rejected for the same reason, more expensively.** Putting
 /// a themed band between the page and the video would make the panel a card
@@ -52,30 +53,32 @@ import 'dashboard/utils/design_tokens.dart';
 /// is the trade this comment exists to prevent.
 ///
 /// **What was actually wrong, then.** The fill was never the defect; the
-/// absence of a shadow was. This panel was the only surface in the app painted
-/// with no `boxShadow` at all, and in a style where depth is carried *entirely*
-/// by the dual shadow pair, a shape with no shadow whose fill is 15.62:1 from
-/// the page is a hole by definition. Adding [AppElevation.raised] costs no
+/// absence of a shadow was. This panel was once the only surface in the app
+/// painted with no `boxShadow` at all, and in a style where depth is carried
+/// *entirely* by the shadow, a shape with no shadow whose fill is 15.62:1 from
+/// the page is a hole by definition. `AppCard` now carries
+/// [AppShadows.stamped] — the brief's `4px 4px 0` hard offset — which costs no
 /// video area and puts the panel on the same footing as every card around it.
 ///
 /// **Dark mode: nothing to fix, and the same call is still correct.** Measured
-/// against `AppSurfaces.pageDark`, this ground is **1.19:1** — the panel is
-/// already effectively the page, so there is no hole and no cliff. The raised
-/// pair still applies, and does much less, because a black shadow on a near-black
+/// against the page, this ground is **1.19:1** — the panel is already
+/// effectively the page, so there is no hole and no cliff. The stamped shadow
+/// still applies, and does much less, because a black shadow on a near-black
 /// surface is a small relative move. Stated rather than left implicit, because
 /// "the dark-mode fix is the absence of a fix" is the kind of thing that gets
 /// read as an oversight.
 ///
-/// **No border.** WCAG 1.4.11 is already satisfied by the fill at 15.62:1,
-/// five times the 3:1 it asks for, and `AppElevation.hairline` cannot be reused
-/// here even if it were needed: that constant is `0x99FFFFFF`, tuned to be a
-/// 1.25:1 whisper on the page, and it measures **19.58:1** on this matte. The
-/// same constant means opposite things on the two fills, and the wrong one of
-/// those meanings is a drawn white rim, which is the failure
-/// `design_tokens.dart` says soft UI exists to remove.
+/// **No border on the panel.** WCAG 1.4.11 is already satisfied by the fill at
+/// 15.62:1, five times the 3:1 it asks for, and `AppBorders.hairline` cannot be
+/// reused here even if it were needed: that constant is `#333333`, tuned to be
+/// a whisper on the card, and it measures **19.58:1** on this matte. The same
+/// constant means opposite things on the two fills, and the wrong one of those
+/// meanings is a drawn white rim, which is the failure the flat system exists
+/// to remove. The *controls* that float over the video are a different matter
+/// and do take `AppBorders.boundary` — see `CctvRoundControl`.
 ///
 /// The value is already a very dark neutral carrying the page's own green
-/// cast — `g-r` is 5/255 here against 6/255 on `pageLight` — so "a very dark
+/// cast — `g-r` is 5/255 here against 6/255 on the page — so "a very dark
 /// neutral derived from the page's hue" was, in effect, already what shipped.
 /// Lifting it would cost the perceived contrast above and buy nothing.
 ///
@@ -201,7 +204,9 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     // Tab change. A camera on a hidden tab is not being photographed, so it
     // must not hold the flag — this is the whole of the `isVisible` contract.
     if (oldWidget.isVisible != widget.isVisible) {
-      unawaited(widget.isVisible ? SecureWindow.acquire() : SecureWindow.release());
+      unawaited(
+        widget.isVisible ? SecureWindow.acquire() : SecureWindow.release(),
+      );
     }
   }
 
@@ -293,14 +298,14 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
           // The stream page is the only host we allow, so the web view cannot
           // be navigated off the official camera origin.
           onNavigationRequest: (request) =>
-                  // The *loose* guard, not `parseAllowedCctvUrl`. These are the
-                  // page's own navigations, not the user's stored setting, and
-                  // go2rtc navigates internally -- pinning the path here refused
-                  // the player itself, which is what a strict guard on this
-                  // callback is for. Same origin, nothing else.
-                  isAllowedCctvNavigation(Uri.parse(request.url))
-                  ? NavigationDecision.navigate
-                  : NavigationDecision.prevent,
+              // The *loose* guard, not `parseAllowedCctvUrl`. These are the
+              // page's own navigations, not the user's stored setting, and
+              // go2rtc navigates internally -- pinning the path here refused
+              // the player itself, which is what a strict guard on this
+              // callback is for. Same origin, nothing else.
+              isAllowedCctvNavigation(Uri.parse(request.url))
+              ? NavigationDecision.navigate
+              : NavigationDecision.prevent,
           onWebResourceError: (error) {
             if (mounted && error.isForMainFrame == true) {
               setState(() {
@@ -361,8 +366,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             ),
           ),
           Positioned(
-            top: 16,
-            right: 16,
+            top: AppSpacing.gutter,
+            right: AppSpacing.gutter,
             child: CctvRoundControl(
               icon: Icons.close_rounded,
               tooltip: 'Exit full screen',
@@ -370,8 +375,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             ),
           ),
           Positioned(
-            top: 16,
-            left: 16,
+            top: AppSpacing.gutter,
+            left: AppSpacing.gutter,
             // Over the video, so the dark set regardless of the app's theme.
             // The pill uses the new status colors (no theme parameter needed).
             child: CctvStatusPill(status: _status),
@@ -382,41 +387,58 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
   }
 
   Widget _buildEmbedded(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
     final status = _status;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(2, 8, 2, 14),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xs,
+            AppSpacing.sm,
+            AppSpacing.xs,
+            AppSpacing.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  // Circular icon badge with primary color categorical wash.
-                  // Replaces the old SkeuoSurface with raised shadow.
+                  // Circular icon badge with a primary colour categorical wash.
+                  //
+                  // **Neutral now, and it was lime.** The brief reserves
+                  // primary for the CTA, the active tab, the active chip, the
+                  // live dot, the peak bar and the focus ring — it is not a
+                  // decorative icon colour. The screen already states its state
+                  // in the status pill two widgets to the right, so a second
+                  // lime glyph beside it was the hue meaning two things.
+                  //
+                  // The tone becomes the brief's `tab-item-inactive` ink on
+                  // `surfaceAlt` one step above the card, which is the same
+                  // treatment `SettingsIconBadge` takes for the same reason.
                   Container(
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: AppBorders.categoricalWash(primary),
+                      color: AppSurfaces.surfaceAlt,
                       borderRadius: BorderRadius.circular(AppRadius.tile),
-                      border: AppBorders.categoricalBorder(primary),
+                      border: AppBorders.hairlineBorder,
                     ),
                     child: Center(
-                      child: Icon(Icons.videocam_rounded, color: primary),
+                      child: Icon(
+                        Icons.videocam_rounded,
+                        color: AppSurfaces.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'CCTV Monitoring',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      // `headline-md` is already weight 900; the `w800` on top
+                      // of it was a third weight that is not in the brief's
+                      // scale of three.
+                      style: AppType.headlineMd,
                     ),
                   ),
                   CctvStatusPill(status: status),
@@ -426,23 +448,25 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                 padding: const EdgeInsets.only(left: 54, top: 4),
                 child: Text(
                   'Watch the area live',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withValues(
-                      alpha: 0.66,
-                    ),
-                  ),
+                  style: AppType.labelUppercase.copyWith(color: faintColor),
                 ),
               ),
             ],
           ),
         ),
-        // The panel's frame — flat card with hairline border.
-        // The video matte (cctvVideoGround) stays the same; depth is now via
-        // tonal step (page -> surface) + hairline, not shadows.
+        // The panel's frame — an `AppCard`: `surface` fill, hairline, 8px
+        // radius, and the stamped hard shadow `AppCard` now carries. The video
+        // matte (cctvVideoGround) stays the same.
         AppCard(
           padding: EdgeInsets.zero,
           child: ClipRRect(
-            borderRadius: AppRadius.all(AppRadius.pill),
+            // **8px, not a pill.** The previous system rounded this to 999;
+            // the brief's image rule is explicit — "photos always sit inside a
+            // `rounded.lg` (8px) container with a hairline and
+            // `overflow-hidden`" — and its shape rule says the *only*
+            // full-round things are filter pills, avatars and progress tracks.
+            // A video panel is none of those.
+            borderRadius: AppRadius.all(AppRadius.card),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: ColoredBox(
@@ -453,8 +477,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                     _buildViewport(context),
                     if (status == CctvStatus.live)
                       Positioned(
-                        top: 12,
-                        right: 12,
+                        top: AppSpacing.md,
+                        right: AppSpacing.md,
                         child: Row(
                           children: [
                             CctvRoundControl(
@@ -462,7 +486,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                               tooltip: 'Full screen',
                               onPressed: _openFullScreen,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             CctvRoundControl(
                               icon: Icons.stop_rounded,
                               tooltip: 'Stop stream',
@@ -496,12 +520,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
         // it is the Reload button's home, and a dropped HLS stream is the one
         // failure on this screen with no other recovery control.
         if (_playing) ...[
-          const SizedBox(height: 12),
-          _InfoBar(
-            primary: primary,
-            showReload: !_loading,
-            onReload: _controller?.reload,
-          ),
+          const SizedBox(height: AppSpacing.md),
+          _InfoBar(showReload: !_loading, onReload: _controller?.reload),
         ],
       ],
     );
@@ -524,13 +544,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
 /// the same thing better and offers its own control, so a second copy here was
 /// three renderings of one fact stacked vertically.
 class _InfoBar extends StatelessWidget {
-  const _InfoBar({
-    required this.primary,
-    required this.showReload,
-    required this.onReload,
-  });
-
-  final Color primary;
+  const _InfoBar({required this.showReload, required this.onReload});
 
   /// Reload is hidden while the stream page is loading, so the action cannot
   /// appear for a stream that is not up yet.
@@ -539,16 +553,29 @@ class _InfoBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context);
     return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      // **Kept, and it is the one border on this bar.** `AppBorders.boundary`
+      // is documented in `liquid_glass.dart` as existing for exactly two call
+      // sites and this is one of them. It is heavier than a hairline — 1.5px
+      // near-white — so it is worth saying that this bar sits *below* the
+      // video, not over it, and a hairline would clear 1.4.11 here. The reason
+      // it stays is that the bar is only ever built while a stream is running,
+      // so it reads as part of the player assembly; a second, weaker edge
+      // beside the panel's own hairline is two edge weights for one object.
       border: AppBorders.boundaryBorder,
       child: Row(
         children: [
+          // Neutral, not `primary`. The brief reserves the accent for the one
+          // CTA and the active states, and this glyph is neither — it annotates
+          // a bar whose state is already stated in the status pill above it.
           Icon(
             Icons.info_outline_rounded,
             size: 19,
-            color: primary.withValues(alpha: 0.9),
+            color: AppSurfaces.onSurfaceVariant,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -560,7 +587,7 @@ class _InfoBar extends StatelessWidget {
               // branch behind would invite someone to restore the bar and the
               // message together.
               'The stream is running on an internet connection.',
-              style: textTheme.textTheme.bodySmall,
+              style: AppType.bodySm.copyWith(color: faintColor),
             ),
           ),
           if (showReload && onReload != null)
@@ -575,5 +602,3 @@ class _InfoBar extends StatelessWidget {
     );
   }
 }
-
-

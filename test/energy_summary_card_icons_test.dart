@@ -66,16 +66,18 @@ String _hex(Color c) =>
 ///
 /// `AppTile` renders a bare `Container` with no key, so the first `Container`
 /// descending from it *is* the tile — nothing inside a tile can precede it.
-BoxDecoration _tileDecoration(WidgetTester tester, int index) => tester
-    .widget<Container>(
-      find
-          .descendant(
-            of: find.byType(AppTile).at(index),
-            matching: find.byType(Container),
-          )
-          .first,
-    )
-    .decoration! as BoxDecoration;
+BoxDecoration _tileDecoration(WidgetTester tester, int index) =>
+    tester
+            .widget<Container>(
+              find
+                  .descendant(
+                    of: find.byType(AppTile).at(index),
+                    matching: find.byType(Container),
+                  )
+                  .first,
+            )
+            .decoration!
+        as BoxDecoration;
 
 /// The surface each icon is painted on, read out of the rendered tile.
 ///
@@ -131,8 +133,9 @@ void main() {
   }
 
   group('EnergySummaryCard category colours, read from the painted card', () {
-    testWidgets('clear WCAG 1.4.11 3:1 on the fill they are painted on',
-        (tester) async {
+    testWidgets('clear WCAG 1.4.11 3:1 on the fill they are painted on', (
+      tester,
+    ) async {
       // 1.4.11 is non-text contrast: 3:1 for a graphical object. These are
       // icons on a tile, not body text, so the 4.5:1 floor that `faintColor` is
       // held to does not apply here and demanding it would be a different,
@@ -150,15 +153,17 @@ void main() {
         expect(
           measured,
           greaterThanOrEqualTo(3.0),
-          reason: 'the ${entry.value} icon #${_hex(colours[entry.key])} is '
+          reason:
+              'the ${entry.value} icon #${_hex(colours[entry.key])} is '
               '$measured:1 on its own tile fill #${_hex(fill)}; the old fixed '
               'HSL step measured 1.97:1 on Dracula and the icon was invisible',
         );
       }
     });
 
-    testWidgets('stay two different colours, labelling two quantities',
-        (tester) async {
+    testWidgets('stay two different colours, labelling two quantities', (
+      tester,
+    ) async {
       // The hue rule in this repo is fixed per category and deliberately does
       // not vary by index — `color_helpers_test.dart` fails if `categoryColor`
       // ever starts deriving from one. So the two tiles can only collapse onto
@@ -170,48 +175,74 @@ void main() {
       expect(
         colours.first,
         isNot(colours.last),
-        reason: 'the card paints both tiles in #${_hex(colours.first)}; '
+        reason:
+            'the card paints both tiles in #${_hex(colours.first)}; '
             'they label different quantities',
       );
     });
 
-    testWidgets('are the two category hues, not something derived per render',
-        (tester) async {
+    testWidgets('are the two category hues, not something derived per render', (
+      tester,
+    ) async {
       // Each category owns a fixed hue, reused everywhere that category
       // appears. If either tile were re-derived at paint time it would drift
       // from the one shown on the dashboard, and the two screens would stop
       // agreeing about what "PV" looks like.
       final colours = await painted(tester);
-      expect(
-        colours,
-        [
-          categoryColor(MetricCategory.pv),
-          categoryColor(MetricCategory.ac),
-        ],
-      );
+      expect(colours, [
+        categoryColor(MetricCategory.pv),
+        categoryColor(MetricCategory.ac),
+      ]);
     });
 
-    testWidgets('each tile frame carries its own category, not a shared one',
-        (tester) async {
+    testWidgets('each tile bottom border carries its own category', (
+      tester,
+    ) async {
       // The same claim as above, on the second surface the hue appears on.
-      // `AppTile` takes an `accent` and turns it into a categorical frame, so
-      // there are two places this could collapse and checking only the icon
-      // would leave the frame free to disagree with it.
+      //
+      // **The edge is a 2px BOTTOM border at full strength, and it used to be a
+      // 1px frame on all four sides at 20% alpha.** The old value was the tint
+      // chip recipe applied to a stat tile; the brief's stat tile colour-codes
+      // itself with `border-b-2` in the category hue. Full strength, because a
+      // 2px line is a shape rather than text — WCAG's 3:1 for a non-text
+      // boundary is what it is measured against, and 20% of the hue is nowhere
+      // near it. Reading `.top` here now returns transparent, which is exactly
+      // how this test caught the change.
       await painted(tester);
-      final frames = <Color>[];
+      final borders = <Color>[];
       for (var i = 0; i < 2; i++) {
-        frames.add((_tileDecoration(tester, i).border! as Border).top.color);
+        borders.add(
+          (_tileDecoration(tester, i).border! as Border).bottom.color,
+        );
       }
       expect(
-        frames,
-        [
-          categoryColor(MetricCategory.pv).withValues(alpha: 0.2),
-          categoryColor(MetricCategory.ac).withValues(alpha: 0.2),
-        ],
-        reason: 'the tile frames are #${frames.map(_hex).join(' and ')}; a '
-            'frame in the wrong category is a card claiming data it does not '
+        borders,
+        [categoryColor(MetricCategory.pv), categoryColor(MetricCategory.ac)],
+        reason:
+            'the tile bottom borders are #${borders.map(_hex).join(' and ')}; '
+            'an edge in the wrong category is a card claiming data it does not '
             'contain',
       );
+
+      // And it is the bottom edge only: a frame on all four sides at low alpha
+      // was the component this replaced, and the brief's stat tile has one
+      // coloured edge and three clean ones. `BorderSide.none` keeps an opaque
+      // black *colour* with width 0 and `BorderStyle.none`, so the honest
+      // assertion is that the other three edges are not drawn — not that they
+      // are transparent, which they are not.
+      for (var i = 0; i < 2; i++) {
+        final border = _tileDecoration(tester, i).border! as Border;
+        for (final side in [border.top, border.left, border.right]) {
+          expect(
+            side.style,
+            BorderStyle.none,
+            reason:
+                'the tile still draws a frame; the brief gives it one '
+                'coloured bottom edge',
+          );
+          expect(side.width, 0);
+        }
+      }
     });
   });
 }

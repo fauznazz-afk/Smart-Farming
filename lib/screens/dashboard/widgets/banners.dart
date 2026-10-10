@@ -6,6 +6,24 @@ import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/telemetry_helpers.dart';
 
+/// The outline a status banner wears: the status hue at 1px, nothing more.
+///
+/// **Why a hairline and not a wash.** These banners were built on `AppSurface`
+/// with `AppBorders.categoricalWash(status)` as the *fill* — a 20%-alpha block of
+/// the status colour the full width of the page, with a 20%-alpha border of the
+/// same hue stacked on top of it. That is the brief's badge-chip recipe applied
+/// to a banner, and it is the wrong size for it: the brief sanctions a 20% tint
+/// "behind small uppercase badges", and this repo has three previous design
+/// systems that lost caption contrast to a wash behind text.
+///
+/// A status colour here is now **ink and one hairline**. The brief is explicit
+/// that a status colour is "ink, a dot, or a hairline" and never a large fill,
+/// and the three banners becoming one component instead of three tints is the
+/// other half of that: the difference between them is now the hue and the word,
+/// which is the information, rather than the size of a coloured block.
+Border _statusBannerEdge(Color color) =>
+    Border.fromBorderSide(BorderSide(color: color, width: 1));
+
 /// Full-screen placeholder shown when the first telemetry fetch fails.
 class TelemetryErrorView extends StatelessWidget {
   const TelemetryErrorView({super.key, required this.message, this.onRetry});
@@ -21,16 +39,66 @@ class TelemetryErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off, size: 42),
+            // [statusBad] as ink, on the rule [_statusBannerEdge] documents: a
+            // condition is a glyph and a word, never a block of colour. It was
+            // inheriting the ambient default, which is not a colour the app
+            // chose.
+            const Icon(Icons.cloud_off, size: 42, color: statusBad),
             const SizedBox(height: 12),
-            const Text('Failed to fetch telemetry from ThingsBoard.'),
+            Text(
+              'Failed to fetch telemetry from ThingsBoard.',
+              textAlign: TextAlign.center,
+              style: AppType.headlineLg.copyWith(color: appPrimaryText),
+            ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
+            // The one lowercase line on the screen, and the brief's `body-sm`
+            // is for exactly this: descriptive print under a headline.
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppType.bodySm.copyWith(color: faintColor),
+            ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+            // **The brief's `button-primary`, and the only large lime fill
+            // allowed anywhere in the app.** Acid lime fill, black ink,
+            // `button-label` type, 8px radius, 56dp tall, with the tinted
+            // displacement `4px 4px 0 rgba(198,255,0,0.2)` in place of the
+            // black one.
+            //
+            // The shadow sits on a wrapping `DecoratedBox` rather than on the
+            // button's own style, because a `BoxShadow` in a `BoxDecoration`
+            // follows that decoration's `borderRadius` — the same trick
+            // `AppCard` uses, and what stops the lime displacement poking out
+            // of the button's rounded corners as a rectangle.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: AppRadius.all(AppRadius.card),
+                boxShadow: AppShadows.stampedIn(AppPalette.primary),
+              ),
+              child: FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(
+                  Icons.refresh,
+                  size: 20,
+                  color: AppPalette.onHue,
+                ),
+                label: Text(
+                  'Try again',
+                  style: AppType.buttonLabel.copyWith(color: AppPalette.onHue),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppPalette.primary,
+                  foregroundColor: AppPalette.onHue,
+                  disabledBackgroundColor: AppSurfaces.surfaceAlt,
+                  disabledForegroundColor: faintColor,
+                  minimumSize: const Size.fromHeight(56),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.all(AppRadius.card),
+                  ),
+                  elevation: 0,
+                ),
+              ),
             ),
           ],
         ),
@@ -51,11 +119,14 @@ class OfflineBanner extends StatelessWidget {
     final color = statusWarn;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: AppSurface(
-        radius: AppRadius.inset,
-        fill: AppBorders.categoricalWash(color),
-        border: AppBorders.categoricalBorder(color),
+      // **The stamped tier.** A banner is a card that happens to be transient,
+      // so it takes the brief's `4px 4px 0 rgba(0,0,0,0.3)` like any other —
+      // it was the one flat surface on the page that had no reason to be flat.
+      // `AppCard` rather than `AppSurface`, because `AppSurface` has no shadow
+      // parameter and adding one there is another agent's file.
+      child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: _statusBannerEdge(color),
         child: Row(
           children: [
             Icon(Icons.wifi_off_rounded, color: color, size: 18),
@@ -79,6 +150,13 @@ class RetryButton extends StatelessWidget {
   const RetryButton({super.key, required this.onRetry, required this.color});
 
   final VoidCallback? onRetry;
+
+  /// The banner's own status hue, drawn on the glyph.
+  ///
+  /// **This field was passed by every call site and read by none** — the icon
+  /// was rendered with no colour at all, so it took whatever the ambient
+  /// `DefaultTextStyle` happened to be, and two banners showed two different
+  /// retry glyphs. It is ink now, on the same rule as [_statusBannerEdge].
   final Color color;
 
   @override
@@ -93,9 +171,9 @@ class RetryButton extends StatelessWidget {
           child: InkWell(
             onTap: onRetry,
             borderRadius: BorderRadius.circular(AppRadius.tile),
-            child: const Padding(
-              padding: EdgeInsets.all(10),
-              child: Icon(Icons.refresh, size: 18),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Icon(Icons.refresh, size: 18, color: color),
             ),
           ),
         ),
@@ -112,11 +190,9 @@ class EnergyAlertBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSurface(
-      radius: AppRadius.inset,
-      fill: AppBorders.categoricalWash(statusAlert),
-      border: AppBorders.categoricalBorder(statusAlert),
+    return AppCard(
       padding: const EdgeInsets.all(12),
+      border: _statusBannerEdge(statusAlert),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -129,7 +205,10 @@ class EnergyAlertBanner extends StatelessWidget {
                   .map(
                     (message) => Padding(
                       padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(message, style: AppType.bodySm.copyWith(color: appPrimaryText)),
+                      child: Text(
+                        message,
+                        style: AppType.bodySm.copyWith(color: appPrimaryText),
+                      ),
                     ),
                   )
                   .toList(),
@@ -240,10 +319,18 @@ class ConnectionStatusBanner extends StatelessWidget {
         : health.statusMessage;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: AppSurface(
-        radius: 10,
-        fill: AppBorders.categoricalWash(color),
+      // **The radius, and why there is none left to name.** This used to be an
+      // `AppSurface(radius: 10, ...)` — a literal 10 in a system whose
+      // rectilinear radius is 8, which is 2px away from being right in a way
+      // nothing can see and nothing can catch. `AppCard` draws its own
+      // [AppRadius.card], so the second radius is simply gone rather than
+      // corrected.
+      //
+      // On `AppCard` rather than `AppSurface` for the stamped shadow; the hue
+      // goes through [_statusBannerEdge], on the rule that documents.
+      child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        border: _statusBannerEdge(color),
         child: Row(
           children: [
             ExcludeSemantics(
@@ -266,8 +353,7 @@ class ConnectionStatusBanner extends StatelessWidget {
                 style: AppType.labelUppercase.copyWith(color: color),
               ),
             ),
-            if (failed)
-              RetryButton(onRetry: onRetry, color: color),
+            if (failed) RetryButton(onRetry: onRetry, color: color),
           ],
         ),
       ),

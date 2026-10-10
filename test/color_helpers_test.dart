@@ -116,20 +116,22 @@ void main() {
     });
 
     test('the one hue collision the palette cannot avoid is still two roles', () {
-      // `primary` and `error` are both 0.0 degrees and `chartCoral` is 6.2 away,
-      // so battery and water sit in the same hue family as the breach colour.
-      // `color_helpers.dart` argues at length that this is legible because the
-      // two never take the same role: a category hue is a fill, `error` is ink.
-      // Asserting the facts here so the argument cannot quietly stop holding.
-      expect(hueOf(categoryColor(MetricCategory.battery)),
-          closeTo(hueOf(AppPalette.error), 1.0));
+      // `environment` *is* the breach hue — literally the same constant — and
+      // `statusBad` ink is a fraction of a degree from it. That is a property of
+      // a palette with one red, not a choice made here, and `color_helpers.dart`
+      // argues at length that the two stay legible because they never take the
+      // same role: a category hue is an icon, a border or a chart line, while a
+      // breach is always accompanied by its text. Asserting the facts here so
+      // the argument cannot quietly stop holding.
       expect(
-        (hueOf(categoryColor(MetricCategory.water)) -
-                hueOf(AppPalette.error))
-            .abs(),
-        lessThan(10.0),
-        reason: 'this is the documented collision; a reassignment that breaks it '
-            'should make this test fail so the doc note gets rewritten',
+        hueOf(categoryColor(MetricCategory.environment)),
+        closeTo(hueOf(AppPalette.error), 1.0),
+      );
+      expect(
+        categoryColor(MetricCategory.environment),
+        isNot(AppPalette.success),
+        reason: 'a category hue that is also the "nothing is wrong" colour is '
+            'the one assignment the palette refuses',
       );
       // And `success` is still refused as a category hue.
       expect(

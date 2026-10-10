@@ -69,27 +69,25 @@ class _LoginScreenState extends State<LoginScreen> {
             transitionDuration: const Duration(milliseconds: 420),
             reverseTransitionDuration: const Duration(milliseconds: 260),
             pageBuilder: (context, animation, secondaryAnimation) =>
-                DashboardScreen(
-              api: _api,
-            ),
+                DashboardScreen(api: _api),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-              final curved = CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-                reverseCurve: Curves.easeInCubic,
-              );
-              return FadeTransition(
-                opacity: curved,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.035),
-                    end: Offset.zero,
-                  ).animate(curved),
-                  child: child,
-                ),
-              );
-            },
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity: curved,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.035),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
           ),
         );
       } else {
@@ -110,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -119,9 +117,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(AppRadius.card),
                     child: const BrandLogo(size: 100, showName: false),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
+                  // `card-padding`, 16, not 24. The brief has one card inset and
+                  // this was a second one.
                   AppCard(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.cardPadding),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -130,15 +130,25 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             'EnerGrow',
                             textAlign: TextAlign.center,
-                            style: AppType.headlineMd,
+                            // `headline-lg`, the brief's "uppercase card title"
+                            // slot at 24/900. It was `headline-md`, which is the
+                            // *sub*-headline — and this is the screen's defining
+                            // line.
+                            style: AppType.headlineLg,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'PLTS & Smart Farming Monitoring',
-                          style: AppType.bodySm.copyWith(color: faintColor),
+                          // The brief's metadata line: uppercase, wide-tracked,
+                          // secondary ink. It was a lowercase 12px body line,
+                          // which is the brief's slot for *paragraphs*, and this
+                          // is a strapline.
+                          style: AppType.labelUppercase.copyWith(
+                            color: faintColor,
+                          ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.sectionGap),
                         TextField(
                           controller: _usernameCtrl,
                           textInputAction: TextInputAction.next,
@@ -159,12 +169,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         TextField(
                           controller: _passwordCtrl,
                           obscureText: _obscurePassword,
-                          onSubmitted:
-                              _loading ? null : (_) => _handleLogin(),
+                          onSubmitted: _loading ? null : (_) => _handleLogin(),
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
@@ -182,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.sectionGap),
                         if (_errorMsg != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -192,10 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: statusBad,
                                 child: Row(
                                   children: [
-                                    const Icon(
-                                      Icons.error_outline,
-                                      size: 16,
-                                    ),
+                                    const Icon(Icons.error_outline, size: 16),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -208,28 +214,44 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: FilledButton(
-                            onPressed: _loading ? null : _handleLogin,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppPalette.primary,
-                              foregroundColor: AppPalette.onHue,
-                              textStyle: AppType.labelUppercase,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadius.all(AppRadius.pill),
+                        // The brief's `button-primary`, and the tinted hard
+                        // shadow is what makes it the one electric object on the
+                        // page. Painted by the `DecoratedBox` behind the button
+                        // rather than by `FilledButton`'s own `elevation`,
+                        // because Material maps elevation through
+                        // `kElevationToShadow` and can only produce a blurred
+                        // halo — the one shadow language the brief bans
+                        // outright.
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadius.all(AppRadius.card),
+                            boxShadow: AppShadows.stampedIn(AppPalette.primary),
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: FilledButton(
+                              onPressed: _loading ? null : _handleLogin,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppPalette.primary,
+                                foregroundColor: AppPalette.onHue,
+                                disabledBackgroundColor: AppPalette.primary,
+                                disabledForegroundColor: AppPalette.onHue,
+                                textStyle: AppType.buttonLabel,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadius.all(AppRadius.card),
+                                ),
                               ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Login'),
                             ),
-                            child: _loading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Login'),
                           ),
                         ),
                       ],

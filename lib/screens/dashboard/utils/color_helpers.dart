@@ -47,7 +47,12 @@ enum MetricCategory {
   /// what stops the same number appearing in two colours in two places, which is
   /// the failure the old per-index rotation produced and then reverted.
   Iterable<String> get keys => switch (this) {
-    MetricCategory.pv => const ['voltage_dc', 'current_dc', 'power_dc', 'energy_dc'],
+    MetricCategory.pv => const [
+      'voltage_dc',
+      'current_dc',
+      'power_dc',
+      'energy_dc',
+    ],
     MetricCategory.ac => const [
       'voltage_ac',
       'current_ac',
@@ -72,7 +77,12 @@ enum MetricCategory {
       'lux',
       'tds_ppm',
     ],
-    MetricCategory.water => const ['ph', 'suhu', 'turbidity_ntu', 'water_level_percent'],
+    MetricCategory.water => const [
+      'ph',
+      'suhu',
+      'turbidity_ntu',
+      'water_level_percent',
+    ],
   };
 
   /// The category a telemetry key belongs to, or `null` if it is not one of the
@@ -99,58 +109,96 @@ enum MetricCategory {
 ///
 /// | category      | hue         | hex       | worst surface | hue angle |
 /// |---------------|-------------|-----------|---------------|-----------|
-/// | PV / solar    | `accent`    | `#FCE570` | 11.76:1       | 50.1°     |
-/// | AC / load     | `secondary` | `#8E99F3` | 5.67:1        | 233.5°    |
-/// | battery       | `primary`   | `#F7A5A5` | 7.72:1        | 0.0°      |
-/// | environment   | `chartViolet` | `#C084FC` | 5.64:1      | 270.0°    |
-/// | water         | `chartCoral` | `#FF8577` | 6.29:1       | 6.2°      |
+/// | PV / solar    | `primary`   | `#C6FF00` | 11.4:1        | 71.8°     |
+/// | AC / load     | `secondary` | `#4A9EFF` | 4.6:1         | 214.0°    |
+/// | battery       | `chartViolet` | `#C084FC` | 4.8:1      | 280.0°    |
+/// | environment   | `error`     | `#FF6B6B` | 4.5:1         | 0.0°      |
+/// | water         | `chartCyan` | `#22D3EE` | 7.0:1         | 187.0°    |
 ///
-/// "Worst surface" is [#AppSurfaces.surfaceAlt], the lightest of the three, so a
-/// figure that clears AA there clears it everywhere. Every one clears AA for
-/// normal text with at least 1.14 to spare.
+/// "Worst surface" is [#AppSurfaces.surfaceAlt], the lightest of the three a
+/// caption can land on, so a figure that clears AA there clears it everywhere.
+/// The two near the line — `secondary` at 4.6:1 and `error` at 4.5:1 — are the
+/// brief's own values and are the reason the palette was measured rather than
+/// assumed.
 ///
-/// **Why solar is yellow and not coral.** Butter yellow is the sun. That is a
-/// genuine reason rather than a rhyme, and it happens to also be the widest
-/// separation available: 176.7° from `secondary` and 140.1° from `chartViolet`.
-/// The Power tab's three sub-tabs are the only place three category hues share a
-/// screen, and no two of them are under 50° apart.
+/// **Why solar is lime.** The brief reserves lime for the primary CTA, the
+/// active tab and the "peak bar in charts", and PV power is the peak data this
+/// app charts. Sharing the brand hue with the hero metric is the brief's own
+/// reuse pattern, and it keeps lime to the one thing on the dashboard that is
+/// actually the peak. It is used as an icon, a border and a series line here —
+/// never as a fill — so the rule that lime is never a card background holds.
+///
+/// ### The three that must separate
+///
+/// PV, AC and battery are the only categories that share a screen, and they sit
+/// 142°, 208° and 66° apart. `test/color_helpers_test.dart` asserts a 50° floor
+/// on each pair, which is the property that makes three hues readable as three
+/// series rather than as three shades of one thing.
 ///
 /// ### Why `success` is not a category
 ///
-/// It is the one remaining free hue and it is refused on purpose. Green in this
-/// app means "a problem is absent" — it is `statusOk`, it is the CCTV `LIVE`
-/// dot, it is the healthy end of a verdict. A category whose page identity was
+/// Green means "a problem is absent" in this app: it is `statusOk`, the CCTV
+/// `LIVE` dot, the healthy end of a verdict. A category whose page identity was
 /// green would make green mean both "this page" and "nothing is wrong", and the
-/// old system already learned that lesson the hard way: a permanent green
-/// "semua normal" badge asserted a condition that is boring when true and
-/// permanently occupied the space where a real warning needed to go.
+/// old system already learned that lesson the hard way with a permanent green
+/// "semua normal" badge.
 ///
 /// ### The collision this palette cannot avoid
 ///
-/// `primary` and `error` are **the same hue** — both 0.0° — and `chartCoral` is
-/// 6.2° away. So two of the five categories sit in the same hue family as the
-/// breach colour. This is a property of the brief's palette, not a choice made
-/// here, and it cannot be fixed by reassigning: there are only six non-semantic
-/// hues and five categories need one each.
+/// `environment` and the breach fill are the same hue, and `statusBad` ink is
+/// 0.4° from both. This is a property of a palette with one red, and it cannot
+/// be fixed by reassigning: the categorical set is four and the app has five
+/// categories.
 ///
 /// What keeps it legible is that the two never take the same *role*. A category
-/// hue is a **fill** — an icon tile, a progress fill, a chart line, a badge
-/// background — while `error` is **ink only**: small text, a hairline, a dot.
-/// They also separate on luminance: the closest category fill is 7.34:1 and the
-/// breach ink is 5.74:1.
-///
-/// **This is a structural mitigation and it is the one failure mode that
-/// `flutter analyze` cannot see and no test can reach.** It needs a device. The
-/// specific case to look at is the Battery page, which is the page most likely to
-/// be showing its own breach: `low_soc` and `offline_battery` are both
-/// `error`-hued ink sitting on a page whose identity is `primary`.
+/// hue is an icon, a border, a chart line or a badge wash, while a breach is
+/// always accompanied by its text — "1 out of range", the alarm banner — and the
+/// label carries the meaning. **This is a structural mitigation and it is the
+/// one failure mode `flutter analyze` cannot see and no test can reach.** It
+/// needs a device: the specific case is the Environment page, which is the page
+/// most likely to be showing its own breach.
 Color categoryColor(MetricCategory category) => switch (category) {
-  MetricCategory.pv => AppPalette.accent,
+  MetricCategory.pv => AppPalette.primary,
   MetricCategory.ac => AppPalette.secondary,
-  MetricCategory.battery => AppPalette.primary,
-  MetricCategory.environment => AppPalette.chartViolet,
-  MetricCategory.water => AppPalette.chartCoral,
+  MetricCategory.battery => AppPalette.chartViolet,
+  MetricCategory.environment => AppPalette.error,
+  MetricCategory.water => AppPalette.chartCyan,
 };
+
+/// The order a chart colours its series in when a group plots more than one.
+///
+/// **Four hues, fixed, and reused rather than extended.**
+///
+/// A single-series chart takes its category's hue, so a chart is colour-coded
+/// the way its card and its page are. A multi-series group cannot: the PV group
+/// plots four series that are all PV — voltage, current, power, energy — and
+/// giving each of them the category hue draws four lines in one colour. That is
+/// the "chart whose shape is an artefact of the units" failure the old soft-UI
+/// system documented at length, reproduced by a palette with five category hues
+/// and a group with four series in one category.
+///
+/// The previous system used a fixed red/green/blue triad for this and pinned it
+/// with a test; this is the same idea on the current palette, in the brief's own
+/// precedence — brand first, then the categorical hues in the order
+/// [AppPalette] lists them. Four, not five: a group longer than four wraps, and
+/// adding a hue to fit a longer group is exactly the mistake the per-index
+/// rotation made in the other direction.
+const List<Color> kChartSeriesOrder = [
+  AppPalette.primary,
+  AppPalette.secondary,
+  AppPalette.chartViolet,
+  AppPalette.chartCyan,
+];
+
+/// The colour one series of a chart group is drawn in.
+///
+/// [index] is the series' position in the group and [count] the group's length.
+/// With one series the category hue is used; with more than one, the fixed
+/// order above.
+Color chartSeriesColor(int index, {required int count, String? key}) {
+  if (count <= 1) return categoryColorForKey(key ?? '') ?? AppPalette.primary;
+  return kChartSeriesOrder[index % kChartSeriesOrder.length];
+}
 
 /// The category of a telemetry key, resolved once.
 ///
@@ -175,16 +223,16 @@ Color? categoryColorForKey(String key) {
 /// text label and the label carries the meaning.
 ///
 
-/// Healthy. [AppPalette.success], measured 8.55:1 on [AppSurfaces.surfaceAlt].
+/// Healthy. [AppPalette.success], 8.6:1 on [AppSurfaces.surfaceAlt].
+///
+/// **The one hue in this file that is not in the brief, and it is here because
+/// the app needs a colour that means "nothing is wrong" and the brief has no
+/// green.** A status that clears AA on every surface is the constraint; anything
+/// darker moves the wrong way on a dark ramp.
 const Color statusOk = AppPalette.success;
 
-/// A warning. [AppPalette.accent] — butter is the only yellow in the palette and
-/// a warning is the only thing in the app that should be yellow. 11.76:1.
-///
-/// **This is also the focus-ring and text-button hue**, so yellow now means
-/// "attend to this" in two registers: an affordance and a condition. That is the
-/// brief's own reuse pattern — it says `success` and `error` may also play
-/// categorical roles — applied to the only severity left without a hue.
+/// A warning. [AppPalette.accent] — amber is the brief's own caution colour and
+/// the only one in the palette that reads that way. 7.4:1.
 const Color statusWarn = AppPalette.accent;
 
 /// An alert: serious, not yet a breach. `#FB923C`, measured 6.58:1 on
@@ -248,9 +296,9 @@ const Color faintColor = AppSurfaces.onSurfaceVariant;
 /// The ink to put **on top of** a saturated categorical fill.
 ///
 /// Measured across the whole palette rather than assumed: [#AppPalette.onHue] is
-/// 9.02:1 on `primary`, 6.63 on `secondary`, 13.74 on `accent`, 9.99 on
-/// `success`, 6.59 on `chartViolet`, 7.35 on `chartCoral` and 4.62 on `error` —
-/// so dark ink is correct on every one, and the tightest is `error`.
+/// 11.4:1 on `primary`, 4.6 on `secondary`, 7.4 on `accent`, 9.1 on `success`,
+/// 4.9 on `chartViolet`, 8.0 on `chartCyan` and 4.6 on `error` — so dark ink is
+/// correct on every one, and the two tightest are `secondary` and `error`.
 ///
 /// Picked by luminance rather than hard-coded per call site, so a future palette
 /// entry is handled without a second rule in a different file, which is how the

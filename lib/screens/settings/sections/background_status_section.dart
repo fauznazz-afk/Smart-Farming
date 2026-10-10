@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../../services/alarm_bridge.dart';
 import '../../dashboard/utils/color_helpers.dart';
+import '../../dashboard/utils/design_tokens.dart';
+import '../../../widgets/liquid_glass.dart';
+import '../widgets/settings_fields.dart';
+
 /// Live status of the background alarm check, plus the two things that can stop
 /// it working.
 ///
@@ -15,7 +19,8 @@ class BackgroundStatusSection extends StatefulWidget {
   const BackgroundStatusSection({super.key});
 
   @override
-  State<BackgroundStatusSection> createState() => _BackgroundStatusSectionState();
+  State<BackgroundStatusSection> createState() =>
+      _BackgroundStatusSectionState();
 }
 
 class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
@@ -35,7 +40,8 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     if (!mounted) return;
     setState(() => _loading = true);
     final status = await AlarmBridge.instance.status();
-    final exempt = await AlarmBridge.instance.isExemptFromBatteryOptimisations();
+    final exempt = await AlarmBridge.instance
+        .isExemptFromBatteryOptimisations();
     if (!mounted) return;
     setState(() {
       _status = status;
@@ -46,7 +52,8 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
   }
 
   Future<void> _requestExemption() async {
-    final opened = await AlarmBridge.instance.requestIgnoreBatteryOptimizations();
+    final opened = await AlarmBridge.instance
+        .requestIgnoreBatteryOptimizations();
     if (!mounted) return;
     // The user decides on a system screen, so the answer is only known once they
     // come back. Re-read rather than assume either outcome.
@@ -86,98 +93,100 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     // SettingsScreen already wraps every section in a SectionCard built from the
     // section descriptor, so this returns content only.
     if (unsupported) {
-      return const Text(
+      return Text(
         'This platform has no native background alarm module, so alarms are '
         'only reported while the app is open.',
+        style: AppType.bodySm.copyWith(color: faintColor),
       );
     }
 
     final scheduled = status?.scheduled ?? false;
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _row(
-            'Scheduled',
-            _loading && status == null
-                ? '…'
-                : scheduled
-                ? 'Every ${status!.intervalMinutes} min'
-                : 'Not armed',
-            ok: scheduled,
-          ),
-          _row(
-            'Credentials stored',
-            status?.hasCredentials == true ? 'Yes' : 'No',
-            ok: status?.hasCredentials == true,
-          ),
-          _row(
-            'Last check',
-            _describeAge(status?.lastCheckAt),
-            ok: status != null && status.lastCheckAt.millisecondsSinceEpoch > 0,
-          ),
-          _row(
-            'Last outcome',
-            status?.lastOutcome.isNotEmpty == true
-                ? status!.lastOutcome
-                : '—',
-            ok: status?.lastOutcome == 'ok, no alarms',
-            plain: true,
-          ),
-          _row(
-            'Battery optimisation',
-            _exempt ? 'Exempt' : 'Active',
-            ok: _exempt,
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                _error!,
-                style: TextStyle(
-                  color: statusBad,
-                ),
-              ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _row(
+          'Scheduled',
+          _loading && status == null
+              ? '…'
+              : scheduled
+              ? 'Every ${status!.intervalMinutes} min'
+              : 'Not armed',
+          ok: scheduled,
+        ),
+        _row(
+          'Credentials stored',
+          status?.hasCredentials == true ? 'Yes' : 'No',
+          ok: status?.hasCredentials == true,
+        ),
+        _row(
+          'Last check',
+          _describeAge(status?.lastCheckAt),
+          ok: status != null && status.lastCheckAt.millisecondsSinceEpoch > 0,
+        ),
+        _row(
+          'Last outcome',
+          status?.lastOutcome.isNotEmpty == true ? status!.lastOutcome : '—',
+          ok: status?.lastOutcome == 'ok, no alarms',
+          plain: true,
+        ),
+        _row(
+          'Battery optimisation',
+          _exempt ? 'Exempt' : 'Active',
+          ok: _exempt,
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _error!,
+              style: AppType.bodySm.copyWith(color: statusBad),
             ),
-          const SizedBox(height: 10),
-          // A Wrap, not a Row. "Check now" and "Battery settings" side by side with
-          // their icons are wider than the card on a narrow phone, and the second
-          // button only appears when the app is NOT exempt — so the overflow only
-          // shows up for exactly the user who has something to fix. A Row with
-          // neither child flexible overflows by a few pixels and Flutter draws the
-          // striped error box over the buttons. Wrapping lets the second button drop
-          // to its own line instead, which also reads better next to the hint text.
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _checking ? null : _checkNow,
-                icon: _checking
-                    ? const SizedBox.square(
-                        dimension: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh, size: 18),
-                label: Text(_checking ? 'Checking…' : 'Check now'),
+          ),
+        const SizedBox(height: 10),
+        // A Wrap, not a Row. "Check now" and "Battery settings" side by side with
+        // their icons are wider than the card on a narrow phone, and the second
+        // button only appears when the app is NOT exempt — so the overflow only
+        // shows up for exactly the user who has something to fix. A Row with
+        // neither child flexible overflows by a few pixels and Flutter draws the
+        // striped error box over the buttons. Wrapping lets the second button drop
+        // to its own line instead, which also reads better next to the hint text.
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            // The brief's `button-secondary`, and the icons are 20 per its
+            // `iconSize` rather than the 18 they were. Both buttons lose
+            // Material's own default pill and elevation, which the theme's
+            // `OutlinedButton` does not override for a call site this
+            // specific.
+            SecondaryButton(
+              onPressed: _checking ? null : _checkNow,
+              icon: _checking
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+              label: _checking ? 'Checking…' : 'Check now',
+            ),
+            if (!_exempt)
+              SecondaryButton(
+                onPressed: _requestExemption,
+                icon: const Icon(Icons.battery_saver, size: 20),
+                label: 'Battery settings',
               ),
-              if (!_exempt)
-                OutlinedButton.icon(
-                  onPressed: _requestExemption,
-                  icon: const Icon(Icons.battery_saver, size: 18),
-                  label: const Text('Battery settings'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _exempt
-                ? 'Android may still delay a check, but the app is not being '
-                      'put to sleep.'
-                : 'Without this, Android can put EnerGrow to sleep and stop '
-                      'delivering the background check entirely.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          _exempt
+              ? 'Android may still delay a check, but the app is not being '
+                    'put to sleep.'
+              : 'Without this, Android can put EnerGrow to sleep and stop '
+                    'delivering the background check entirely.',
+          style: AppType.bodySm.copyWith(color: faintColor),
+        ),
+      ],
     );
   }
 
@@ -187,12 +196,21 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     required bool ok,
     bool plain = false,
   }) {
-    final theme = Theme.of(context);
-    // The accent when the row is fine, the measured secondary text when it is
-    // not. `faintColor` is the pinned pair (const).
-    final color = ok
-        ? theme.colorScheme.primary
-        : faintColor;
+    // **Lime is gone from these rows, and that is the brief's doing, not a
+    // retune.** The value used to be painted in `colorScheme.primary` when the
+    // row was fine. The brief reserves primary for the CTA, the active tab, the
+    // active chip, the live dot, the focus ring and peak data, and says
+    // outright not to use it as a text colour on body copy. A diagnostic row is
+    // body copy.
+    //
+    // What carries the state instead is the weight, which the row already had
+    // and which the brief's type scale can express: 700 for a row that is
+    // reporting something affirmative, 400 for one that is not. The colour
+    // moves to the measured pair the rest of the app asserts against — ordinary
+    // ink when it is fine, `onSurfaceVariant` when it is not. Dropping the hue
+    // loses nothing that the weight does not already say, and it stops amber
+    // and lime both claiming "fine" on one card.
+    final color = ok ? appPrimaryText : AppSurfaces.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -209,7 +227,10 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
           // being clipped, which is why crossAxisAlignment is start.
           SizedBox(
             width: 150,
-            child: Text(label, style: theme.textTheme.bodyMedium),
+            child: Text(
+              label,
+              style: AppType.bodyMd.copyWith(color: faintColor),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -217,7 +238,7 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
               value,
               style: TextStyle(
                 color: plain ? null : color,
-                fontWeight: ok ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: ok ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ),

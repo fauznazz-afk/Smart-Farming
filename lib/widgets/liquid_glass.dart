@@ -131,13 +131,19 @@ class AppCard extends StatelessWidget {
 
   /// Override the outline outright.
   ///
-  /// **This exists for two call sites and they are real ones.** The CCTV info bar
-  /// and the standby play button sit over camera content, which is arbitrary
-  /// pixels of arbitrary brightness — so neither the tonal step from `page` to
-  /// `surface` nor the neutral hairline can promise the boundary is visible, and
-  /// those two controls have no other affordance. They take
-  /// [AppBorders.boundaryBorder], which clears WCAG 1.4.11's 3:1 against
-  /// arbitrary content.
+  /// **This exists for four call sites and they are real ones.**
+  ///
+  /// Two are about visibility over camera content — the CCTV info bar and the
+  /// standby play button sit over arbitrary pixels of arbitrary brightness, so
+  /// neither the tonal step from `page` to `surface` nor the neutral hairline
+  /// can promise the boundary is visible, and those controls have no other
+  /// affordance. They take [AppBorders.boundaryBorder], which clears WCAG
+  /// 1.4.11's 3:1 against arbitrary content.
+  ///
+  /// The other two are the brief's own recipes for a coloured edge: a stat
+  /// tile's 2px categorical *bottom* border, and a status banner's 1px hairline
+  /// in the severity's hue. A `BoxBorder` rather than a colour, because both of
+  /// them draw one edge and not four.
   ///
   /// A parameter rather than a bool, because a bool named after the *reason*
   /// rather than the effect is how you end up with `overVideo: true` on a card
@@ -200,8 +206,16 @@ class AppCard extends StatelessWidget {
         color: fill,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: edge,
+        // **The stamped shadow, and it is the brief's signature move.**
+        // `4px 4px 0` with no blur and no spread — a solid displaced rectangle,
+        // not a soft Material halo. It only reads as a displacement because the
+        // card is lighter than the page; on a fill identical to the page the
+        // same shadow reads as a second border. The pressed state drops it,
+        // which is what makes a press read as the card being pushed *into* the
+        // page rather than lifted off it.
+        boxShadow: pressed ? null : AppShadows.stamped,
       ),
-      padding: padding ?? const EdgeInsets.all(20),
+      padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
       child: Material(type: MaterialType.transparency, child: child),
     );
 
@@ -270,8 +284,8 @@ class AppTile extends StatelessWidget {
         // **`inset` is a real branch, and it has to stay one.** This line once
         // read `inset ? AppSurfaces.surface : AppSurfaces.input`, and because
         // `input` is *declared* as the same value as `surface` that collapsed
-        // both arms onto one colour: every tile in the app drew in the card's own
-        // fill, and the only thing left to tell a metric tile from the card
+        // both arms onto one colour: every tile in the app drew in the card's
+        // own fill, and the only thing left to tell a metric tile from the card
         // behind it was the 20%-alpha categorical border. The `inset` parameter
         // was still threaded through two call sites and still documented as
         // making them distinct, so nothing failed — it just quietly stopped
@@ -279,7 +293,19 @@ class AppTile extends StatelessWidget {
         // the token file already says a tile inside a card is for.
         color: inset ? AppSurfaces.surfaceAlt : AppSurfaces.input,
         borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: accent == null ? null : AppBorders.categoricalBorder(accent!),
+        // **The stat-tile edge, and it is a 2px BOTTOM border, not a frame.**
+        // The brief's stat tile colour-codes itself with `border-b-2` in the
+        // categorical hue; this was a 1px frame on all four sides at 20% alpha,
+        // which is the *tint chip* recipe applied to the wrong component. A
+        // bottom border reads as a colour code and keeps the other three sides
+        // clean; a full frame at low alpha reads as a box inside a box.
+        //
+        // Full strength, because a 2px line is a shape and not text: WCAG's 3:1
+        // for a non-text boundary is what it is measured against, and 20% of the
+        // hue is nowhere near it.
+        border: accent == null
+            ? null
+            : Border(bottom: BorderSide(color: accent!, width: 2)),
       ),
       child: child,
     );
@@ -379,7 +405,12 @@ class DateStripChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = isSelected ? AppPalette.accent : AppSurfaces.surface;
+    // **Selected is the acid lime, not an amber.** The brief's `chip-active` is
+    // a `primary` fill with `on-primary` ink, and the date strip is the only
+    // filter chip on the dashboard — so the selected day is the one place on
+    // the page allowed to carry the accent fill. That is why the selected day
+    // label is the one the brief asks to lean: italic at 900 weight.
+    final fill = isSelected ? AppPalette.primary : AppSurfaces.surface;
     final ink = isSelected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
     final numberInk = isSelected ? AppPalette.onHue : AppSurfaces.onSurface;
 
@@ -399,7 +430,9 @@ class DateStripChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
             color: fill,
-            borderRadius: BorderRadius.circular(AppRadius.tile),
+            // A day cell is the brief's `rounded.sm`, not the card radius: the
+            // grid of them reads as a calendar rather than as a row of cards.
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             // The active chip has no border, per the brief. An outline round a
             // solid fill reads as a second, competing edge.
             border: isSelected ? null : AppBorders.hairlineBorder,
@@ -409,7 +442,13 @@ class DateStripChip extends StatelessWidget {
             children: [
               Text(
                 dayName.toUpperCase(),
-                style: AppType.labelMicro.copyWith(color: ink),
+                style: AppType.labelMicro.copyWith(
+                  color: ink,
+                  // Italic at the label's own weight: the brief's "leaning the
+                  // type forward to imply motion", applied to the one chip that
+                  // is selected.
+                  fontStyle: isSelected ? FontStyle.italic : null,
+                ),
               ),
               const SizedBox(height: 6),
               FittedBox(

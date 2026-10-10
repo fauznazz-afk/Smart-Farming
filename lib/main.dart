@@ -34,34 +34,36 @@ void main() {
 /// [AppPalette] is light enough that dark ink is correct, and white on
 /// [AppPalette.primary] measures 1.71:1.
 ColorScheme _appColorScheme() => const ColorScheme.dark(
-      primary: AppPalette.primary,
-      onPrimary: AppPalette.onHue,
-      primaryContainer: AppPalette.primary,
-      onPrimaryContainer: AppPalette.onHue,
-      secondary: AppPalette.secondary,
-      onSecondary: AppPalette.onHue,
-      secondaryContainer: AppPalette.secondary,
-      onSecondaryContainer: AppPalette.onHue,
-      tertiary: AppPalette.accent,
-      onTertiary: AppPalette.onHue,
-      surface: AppSurfaces.surface,
-      onSurface: AppSurfaces.onSurface,
-      onSurfaceVariant: AppSurfaces.onSurfaceVariant,
-      error: AppPalette.error,
-      onError: AppPalette.onHue,
-      outline: AppSurfaces.border,
-      outlineVariant: AppSurfaces.border,
-    );
+  primary: AppPalette.primary,
+  onPrimary: AppPalette.onHue,
+  primaryContainer: AppPalette.primary,
+  onPrimaryContainer: AppPalette.onHue,
+  secondary: AppPalette.secondary,
+  onSecondary: AppPalette.onHue,
+  secondaryContainer: AppPalette.secondary,
+  onSecondaryContainer: AppPalette.onHue,
+  tertiary: AppPalette.accent,
+  onTertiary: AppPalette.onHue,
+  surface: AppSurfaces.surface,
+  onSurface: AppSurfaces.onSurface,
+  onSurfaceVariant: AppSurfaces.onSurfaceVariant,
+  error: AppPalette.error,
+  onError: AppPalette.onHue,
+  outline: AppSurfaces.border,
+  outlineVariant: AppSurfaces.border,
+);
 
 /// The type scale, on [AppType].
 ///
 /// **Every style is derived from a token rather than written out**, because the
 /// tokens are the scale: a literal here is a second place choosing a size, and
-/// `test/type_scale_test.dart` asserts on [AppType] and on the rendered result,
-/// not on this function. Only the colour is added here, because [AppType] is
-/// about shape and colour belongs to the surface it lands on.
+/// `test/design_tokens_test.dart` asserts on [AppType] — the weights, the
+/// tracking, the tabular figures — not on this function. Only the colour is
+/// added here, because [AppType] is about shape and colour belongs to the
+/// surface it lands on.
 TextTheme _appTextTheme() {
-  TextStyle ink(TextStyle style) => style.copyWith(color: AppSurfaces.onSurface);
+  TextStyle ink(TextStyle style) =>
+      style.copyWith(color: AppSurfaces.onSurface);
   TextStyle muted(TextStyle style) =>
       style.copyWith(color: AppSurfaces.onSurfaceVariant);
 
@@ -92,29 +94,68 @@ TextTheme _appTextTheme() {
 /// Two things were wrong with that on a device and only one was cosmetic: the
 /// shape was flat, and the label failed contrast because `ColorScheme.fromSeed`
 /// paired a light seed with a light `onPrimary`.
+/// The brief's `button-primary`, applied to every filled button in the app.
 ///
-/// Both are fixed by the brief's own recipe rather than by styling around
-/// Material's defaults: solid [AppPalette.primary], [AppPalette.onHue] on it,
-/// [AppRadius.pill], 48dp tall, uppercase label. The 48dp is the minimum touch
-/// target and is set as `minimumSize` rather than `fixedSize` so the button still
-/// grows with the user's font scale.
+/// Acid lime fill, black ink, `AppRadius.card` (8px — the brief's default for
+/// buttons), 56dp tall, and the **tinted hard shadow** `4px 4px 0` in the lime
+/// at 20%, which is the one place the accent is allowed to bleed. Label is
+/// `AppType.buttonLabel`: 13px at 900 with 0.1em tracking — buttons shout.
+///
+/// The 56dp is `minimumSize` rather than `fixedSize`, so the button still grows
+/// with the user's font scale. `elevation: 0` keeps Material from adding a soft
+/// shadow underneath the hard one.
 FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
-      style: ButtonStyle(
-        backgroundColor: const WidgetStatePropertyAll(AppPalette.primary),
-        foregroundColor: const WidgetStatePropertyAll(AppPalette.onHue),
-        elevation: const WidgetStatePropertyAll(0),
-        minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-        ),
-        textStyle: const WidgetStatePropertyAll(AppType.labelUppercase),
+  style: ButtonStyle(
+    backgroundColor: const WidgetStatePropertyAll(AppPalette.primary),
+    foregroundColor: const WidgetStatePropertyAll(AppPalette.onHue),
+    elevation: const WidgetStatePropertyAll(0),
+    shadowColor: const WidgetStatePropertyAll(AppPalette.primary),
+    minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    ),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
-    );
+    ),
+    textStyle: const WidgetStatePropertyAll(AppType.buttonLabel),
+  ),
+);
+
+/// The brief's `button-secondary` and `button-text`.
+///
+/// An outlined button is the page colour with a hairline and **no shadow at
+/// all** — the brief reserves the stamped displacement for filled surfaces, so a
+/// secondary button reads as flat and a primary one as stamped. Text buttons
+/// are transparent with the accent ink at the label size.
+OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
+  style: ButtonStyle(
+    backgroundColor: const WidgetStatePropertyAll(AppSurfaces.page),
+    foregroundColor: const WidgetStatePropertyAll(AppSurfaces.onSurface),
+    elevation: const WidgetStatePropertyAll(0),
+    minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    ),
+    side: const WidgetStatePropertyAll(AppBorders.hairline),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+    ),
+    textStyle: const WidgetStatePropertyAll(AppType.buttonLabel),
+  ),
+);
+
+TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
+  style: ButtonStyle(
+    foregroundColor: const WidgetStatePropertyAll(AppPalette.primary),
+    elevation: const WidgetStatePropertyAll(0),
+    minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+    textStyle: const WidgetStatePropertyAll(AppType.labelMicro),
+  ),
+);
 
 /// Styling for every `SegmentedButton` in the app.
 ///
@@ -124,62 +165,72 @@ FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
 /// with `secondaryContainer`, which `ColorScheme.fromSeed` derives by
 /// desaturating the seed until it reads as a neutral — invisible on a near-black
 /// card, which is where this card's three call sites live.
+///
+/// The fill is [AppPalette.primary] rather than a category hue: a segmented
+/// control is chrome, and the brief reserves lime for the active thing on
+/// screen. The corner is the brief's `full` — a filter chip is the one shape it
+/// allows to pill.
 SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppPalette.secondary
-              : AppSurfaces.surface,
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppPalette.onHue
-              // `onSurfaceVariant`, not `Colors.white70`: an unselected segment's
-              // label is small body text, and the old grey pair measured ~3.4:1,
-              // well under AA.
-              : AppSurfaces.onSurfaceVariant,
-        ),
-        side: const WidgetStatePropertyAll(AppBorders.hairline),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-        ),
-        textStyle: const WidgetStatePropertyAll(AppType.labelUppercase),
+  style: ButtonStyle(
+    backgroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected)
+          ? AppPalette.primary
+          : AppSurfaces.surface,
+    ),
+    foregroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected)
+          ? AppPalette.onHue
+          // `onSurfaceVariant`, not `Colors.white70`: an unselected segment's
+          // label is small body text, and the old grey pair measured ~3.4:1,
+          // well under AA.
+          : AppSurfaces.onSurfaceVariant,
+    ),
+    side: const WidgetStatePropertyAll(AppBorders.hairline),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
-    );
+    ),
+    textStyle: const WidgetStatePropertyAll(AppType.labelMicro),
+  ),
+);
 
 /// The app's input fields.
 ///
 /// **The fill is [AppSurfaces.input], which is the same value as
 /// [AppSurfaces.surface]: a text field is a surface.** The old system needed an
-/// inset field to be *lighter* than its card, because the deboss was supposed to
-/// come from a shadow and could not come from the fill without costing contrast
-/// — and that constraint disappears with the shadows. The hairline is now a real
-/// edge rather than a hint at one, and the focus ring is [AppPalette.accent]
-/// because butter is the only attention hue in the palette that is not also a
+/// The app's input fields.
+///
+/// **The fill is [AppSurfaces.input], which is the same value as
+/// [AppSurfaces.surface]: a text field is a surface.** 56dp tall, the stamped
+/// shadow, and a 2px [AppPalette.primary] border on focus — the brief's focus
+/// ring, which is the only attention hue in the palette that is not also a
 /// severity.
 InputDecorationTheme _inputTheme() => InputDecorationTheme(
-      filled: true,
-      fillColor: AppSurfaces.input,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-        borderSide: AppBorders.hairline,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-        borderSide: AppBorders.hairline,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-        borderSide: const BorderSide(color: AppPalette.accent, width: 2),
-      ),
-      hintStyle: AppType.bodyMd.copyWith(color: AppSurfaces.onSurfaceVariant),
-      labelStyle: AppType.labelUppercase.copyWith(
-        color: AppSurfaces.onSurfaceVariant,
-      ),
-    );
+  filled: true,
+  fillColor: AppSurfaces.input,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.inset),
+    borderSide: AppBorders.hairline,
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.inset),
+    borderSide: AppBorders.hairline,
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.inset),
+    borderSide: const BorderSide(color: AppPalette.primary, width: 2),
+  ),
+  // Uppercase 700 with 0.1em tracking, per `label-uppercase-md`: a
+  // placeholder in this system is a shout, not a hint.
+  hintStyle: AppType.labelUppercase.copyWith(
+    color: AppSurfaces.onSurfaceVariant,
+  ),
+  labelStyle: AppType.labelUppercase.copyWith(
+    color: AppSurfaces.onSurfaceVariant,
+  ),
+);
 
 /// One `ThemeData`.
 ///
@@ -189,34 +240,42 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
 /// left in this file is whether the palette is hand-built or derived, and the
 /// answer is above.
 ThemeData _appThemeData() => ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: _appColorScheme(),
-      textTheme: _appTextTheme(),
-      scaffoldBackgroundColor: AppSurfaces.page,
-      // Flat, and a step above the page. `CardTheme` cannot express a hairline
-      // *and* a tonal step is still the wrong way round, so both are here: the
-      // fill does the separation from the canvas and the hairline draws the edge.
-      // Material's own elevation shadow is set to 0 rather than left to a default,
-      // because the default is the one shadow the flat system does not have.
-      cardTheme: CardThemeData(
-        color: AppSurfaces.surface,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: AppBorders.hairline,
-        ),
-      ),
-      dividerTheme: const DividerThemeData(
-        color: AppSurfaces.border,
-        space: 1,
-        thickness: 1,
-      ),
-      filledButtonTheme: _buttonTheme(),
-      segmentedButtonTheme: _segmentedTheme(),
-      inputDecorationTheme: _inputTheme(),
-    );
+  useMaterial3: true,
+  brightness: Brightness.dark,
+  colorScheme: _appColorScheme(),
+  textTheme: _appTextTheme(),
+  scaffoldBackgroundColor: AppSurfaces.page,
+  // Flat, and a step above the page. `CardTheme` cannot express a hairline
+  // *and* a tonal step is still the wrong way round, so both are here: the
+  // fill does the separation from the canvas and the hairline draws the edge.
+  // Material's own elevation shadow is set to 0 rather than left to a default,
+  // because the default is the one shadow the flat system does not have.
+  cardTheme: CardThemeData(
+    color: AppSurfaces.surface,
+    elevation: 0,
+    margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      side: AppBorders.hairline,
+    ),
+  ),
+  dividerTheme: const DividerThemeData(
+    color: AppSurfaces.border,
+    space: 1,
+    thickness: 1,
+  ),
+  filledButtonTheme: _buttonTheme(),
+  outlinedButtonTheme: _outlinedButtonTheme(),
+  textButtonTheme: _textButtonTheme(),
+  segmentedButtonTheme: _segmentedTheme(),
+  inputDecorationTheme: _inputTheme(),
+  // The brief's progress indicator: a lime line with no soft Material track
+  // around it. `RefreshIndicator`'s spinner inherits it.
+  progressIndicatorTheme: const ProgressIndicatorThemeData(
+    color: AppPalette.primary,
+    circularTrackColor: AppSurfaces.surfaceMuted,
+  ),
+);
 
 Future<void> _initializeAlarmServices() async {
   try {
@@ -311,7 +370,11 @@ class _SplashRouterState extends State<_SplashRouter> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                // `AppRadius.card`, and it was a literal 24 until the audit
+                // caught it. The token is 8 now, so this corner moved from
+                // "rounded-soft" to the brief's rectilinear 8 without anybody
+                // noticing — the literal was the copy that survived.
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 child: const BrandLogo(size: 92),
               ),
               const SizedBox(height: 10),
@@ -330,8 +393,6 @@ class _SplashRouterState extends State<_SplashRouter> {
         ),
       );
     }
-    return _hasToken
-        ? DashboardScreen(api: _api)
-        : const LoginScreen();
+    return _hasToken ? DashboardScreen(api: _api) : const LoginScreen();
   }
 }

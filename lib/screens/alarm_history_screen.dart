@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
+import '../widgets/liquid_glass.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
-import '../widgets/liquid_glass.dart';
 
 class AlarmHistoryScreen extends StatefulWidget {
   const AlarmHistoryScreen({super.key});
@@ -149,18 +149,11 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.notifications_off_outlined,
-            size: 56,
-            color: faintColor,
-          ),
-          const SizedBox(height: 16),
+          Icon(Icons.notifications_off_outlined, size: 56, color: faintColor),
+          const SizedBox(height: AppSpacing.lg),
           Text(
             'No alarms recorded',
-            style: AppType.bodyMd.copyWith(
-              fontWeight: FontWeight.w600,
-              color: faintColor,
-            ),
+            style: AppType.labelUppercase.copyWith(color: faintColor),
           ),
         ],
       ),
@@ -173,16 +166,16 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       return Center(
         child: Text(
           'No alarms match this filter',
-          style: TextStyle(color: faintColor),
+          style: AppType.labelUppercase.copyWith(color: faintColor),
         ),
       );
     }
     return ListView.separated(
       padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        MediaQuery.of(context).padding.bottom + 24,
+        AppSpacing.gutter,
+        AppSpacing.sm,
+        AppSpacing.gutter,
+        MediaQuery.of(context).padding.bottom + AppSpacing.xl,
       ),
       itemCount: alarms.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -220,107 +213,136 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         final ringColor = isResolved
             ? appPrimaryText
             : _colorForSeverity(alarm.severity);
-        return AppCard(
-          padding: EdgeInsets.zero,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              onTap: () {
-                setState(() {
-                  if (isExpanded) {
-                    _expandedIds.remove(alarm.id);
-                  } else {
-                    _expandedIds.add(alarm.id);
-                  }
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppSurfaces.surface,
-                        border: AppBorders.categoricalBorder(ringColor),
+        // **The brief's `list-row`, and the shadow is the change.** `AppCard`
+        // carries `AppShadows.stamped` by construction and cannot decline it;
+        // the brief puts list rows in the *flat* tier — "top app bar, tab bar,
+        // badges, chips: no shadow" — so a row that is stamped is a row one
+        // tier too loud, and nine of them stacked is a page that reads as nine
+        // cards rather than as one list.
+        //
+        // `AppSurface` is the same surface kit without the shadow, and the
+        // transparent `Material` is kept for the same reason `AppCard` keeps
+        // one: the row's `InkWell` and `PopupMenuButton` need an ink layer the
+        // opaque fill does not paint over.
+        return RepaintBoundary(
+          child: AppSurface(
+            radius: AppRadius.card,
+            fill: AppSurfaces.surface,
+            border: AppBorders.hairlineBorder,
+            padding: EdgeInsets.zero,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedIds.remove(alarm.id);
+                    } else {
+                      _expandedIds.add(alarm.id);
+                    }
+                  });
+                },
+                // 16dp, the brief's `list-row` padding and its `spacing.lg`. The
+                // row was 14/12, which is neither the card inset nor the list-row
+                // inset.
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // The brief's list-row leading: the hue as a wash behind
+                      // the glyph, not as a second outline around a circle that
+                      // already has a fill. `categoricalWash` is the one
+                      // sanctioned way to put a hue behind anything.
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppBorders.categoricalWash(ringColor),
+                        ),
+                        child: Icon(
+                          _iconForType(alarm.type),
+                          size: 20,
+                          color: ringColor,
+                        ),
                       ),
-                      child: Icon(
-                        _iconForType(alarm.type),
-                        size: 20,
-                        color: ringColor,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            alarm.message,
-                            style: AppType.bodyMd.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: appPrimaryText,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatTimestamp(alarm.timestamp),
-                            style: AppType.bodySm.copyWith(color: faintColor),
-                          ),
-                          if (isExpanded && alarm.value != null) ...[
-                            const SizedBox(height: 8),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              'Value: ${alarm.value!.toStringAsFixed(2)}',
-                              style: AppType.bodySm.copyWith(color: faintColor),
+                              alarm.message,
+                              // 700, not 600. The brief has three weights and
+                              // 600 is not one of them; a row title takes the
+                              // bold end of the scale, which is also what the
+                              // brief's list-row HTML uses for `[Row title]`.
+                              style: AppType.bodyMd.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: appPrimaryText,
+                              ),
                             ),
                             const SizedBox(height: 4),
-                          ],
-                          if (isExpanded) ...[
-                            const SizedBox(height: 4),
                             Text(
-                              'Type: ${alarm.type.label}',
-                              style: AppType.bodySm.copyWith(color: faintColor),
+                              _formatTimestamp(alarm.timestamp),
+                              style: AppType.labelMicro.copyWith(
+                                color: faintColor,
+                              ),
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _statusBadge(alarm, ringColor),
-                        PopupMenuButton<_AlarmAction>(
-                          tooltip: 'Alarm actions',
-                          onSelected: (action) => _applyAction(action, alarm),
-                          itemBuilder: (context) => [
-                            if (!alarm.acknowledged)
-                              const PopupMenuItem(
-                                value: _AlarmAction.acknowledge,
-                                child: Text('Acknowledge'),
+                            if (isExpanded && alarm.value != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Value: ${alarm.value!.toStringAsFixed(2)}',
+                                style: AppType.labelMicro.copyWith(
+                                  color: faintColor,
+                                ),
                               ),
-                            if (!alarm.resolved)
-                              const PopupMenuItem(
-                                value: _AlarmAction.resolve,
-                                child: Text('Resolve'),
+                              const SizedBox(height: 4),
+                            ],
+                            if (isExpanded) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Type: ${alarm.type.label}',
+                                style: AppType.labelMicro.copyWith(
+                                  color: faintColor,
+                                ),
                               ),
-                            if (alarm.acknowledged || alarm.resolved)
-                              const PopupMenuItem(
-                                value: _AlarmAction.reopen,
-                                child: Text('Reopen'),
-                              ),
+                            ],
                           ],
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _statusBadge(alarm, ringColor),
+                          PopupMenuButton<_AlarmAction>(
+                            tooltip: 'Alarm actions',
+                            onSelected: (action) => _applyAction(action, alarm),
+                            itemBuilder: (context) => [
+                              if (!alarm.acknowledged)
+                                const PopupMenuItem(
+                                  value: _AlarmAction.acknowledge,
+                                  child: Text('Acknowledge'),
+                                ),
+                              if (!alarm.resolved)
+                                const PopupMenuItem(
+                                  value: _AlarmAction.resolve,
+                                  child: Text('Resolve'),
+                                ),
+                              if (alarm.acknowledged || alarm.resolved)
+                                const PopupMenuItem(
+                                  value: _AlarmAction.reopen,
+                                  child: Text('Reopen'),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -334,32 +356,56 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.fromLTRB(
-        12,
-        MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-        12,
-        8,
+        AppSpacing.md,
+        MediaQuery.of(context).padding.top + kToolbarHeight + AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
       ),
       child: Row(
         children: _AlarmFilter.values.map((filter) {
           final isSelected = _filter == filter;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: AppSurface(
-              radius: AppRadius.pill,
-              fill: isSelected ? AppSurfaces.surfaceAlt : AppSurfaces.surface,
-              border: isSelected
-                  ? AppBorders.categoricalBorder(AppPalette.accent)
-                  : AppBorders.hairlineBorder,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ChoiceChip(
-                label: Text(filter.label, style: AppType.labelMicro),
-                selected: isSelected,
-                backgroundColor: Colors.transparent,
-                selectedColor: Colors.transparent,
-                side: BorderSide.none,
-                shape: const StadiumBorder(),
-                onSelected: (_) => setState(() => _filter = filter),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            // The brief's `chip`: a full-round 40dp pill, `surface` behind a
+            // hairline in `label-uppercase-sm`, and — when selected — a solid
+            // [AppPalette.primary] fill with [AppPalette.onHue] ink and *no*
+            // border. An outline round a solid fill is a second, competing edge,
+            // which is the same argument `DateStripChip` already makes.
+            //
+            // What went away is the 20%-alpha categorical outline the previous
+            // system used for the selected state: that is the *badge* recipe (a
+            // tint chip behind a full-strength foreground) applied to a control,
+            // and it read as a low-contrast outline rather than as the one
+            // active thing on the bar.
+            //
+            // **No `SizedBox(height: 40)`, and the reason is in `chip.dart`.**
+            // A `ChoiceChip` is `Center(heightFactor: 1.0)` inside a hit-test
+            // box, so an outer fixed height would *force* the chip to 40dp by
+            // stretching its ink rather than by giving it a real one — and with
+            // `materialTapTargetSize: shrinkWrap` (no 48dp floor) the padding
+            // below is what actually sets the height. 40 is the brief's
+            // `chip.height` and 12px of vertical padding on a 10px label lands
+            // within a pixel of it at any text scale the user can pick.
+            child: ChoiceChip(
+              label: Text(
+                filter.label,
+                style: AppType.labelMicro.copyWith(
+                  color: isSelected
+                      ? AppPalette.onHue
+                      : AppSurfaces.onSurfaceVariant,
+                ),
               ),
+              selected: isSelected,
+              backgroundColor: AppSurfaces.surface,
+              selectedColor: AppPalette.primary,
+              side: isSelected ? BorderSide.none : AppBorders.hairline,
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.md,
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onSelected: (_) => setState(() => _filter = filter),
             ),
           );
         }).toList(),
@@ -439,10 +485,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     // caller only substitutes the neutral for a resolved row, and this branch is
     // reached only when the row is not resolved.
     final color = alarm.acknowledged ? statusAlert : ringColor;
-    return AppBadge(
-      color: color,
-      child: Text(label),
-    );
+    return AppBadge(color: color, child: Text(label));
   }
 
   Future<void> _applyAction(_AlarmAction action, AlarmRecord alarm) async {

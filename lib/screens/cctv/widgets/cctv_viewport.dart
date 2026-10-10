@@ -23,6 +23,11 @@ class CctvStatusPill extends StatelessWidget {
       liveRegion: true,
       child: AppBadge(
         color: textColor,
+        // `AppBadge`'s own default padding *is* the brief's `badge-pill`
+        // padding (8 x 4) and its default text style *is*
+        // `label-uppercase-sm`, so neither is restated here. The label used to
+        // carry a hand-written 9px/800/0.7 style that overrode both — a third
+        // and fourth place choosing a size and a tracking.
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -37,17 +42,7 @@ class CctvStatusPill extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            ExcludeSemantics(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.7,
-                ),
-              ),
-            ),
+            ExcludeSemantics(child: Text(label)),
           ],
         ),
       ),
@@ -123,7 +118,16 @@ class CctvStandbyOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Solid primary circle with onHue ink (FAB-circle style)
+                // Solid primary circle with onHue ink (FAB-circle style).
+                //
+                // **Flat, and the two blurred shadows are gone.** They were a
+                // black 10px-blur offset plus a white 4px-blur highlight — the
+                // soft-UI vocabulary the brief bans outright ("don't apply
+                // blurred/soft shadows; the shadow language is hard, offset,
+                // no-blur"). What gives this control its edge over arbitrary
+                // camera pixels is `AppBorders.boundary`, which is the one edge
+                // in the system that carries a 3:1 claim and the reason it is
+                // kept here rather than swapped for a hairline.
                 Container(
                   width: 68,
                   height: 68,
@@ -131,18 +135,6 @@ class CctvStandbyOverlay extends StatelessWidget {
                     color: AppPalette.primary,
                     shape: BoxShape.circle,
                     border: AppBorders.boundaryBorder,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
                   ),
                   child: Material(
                     color: Colors.transparent,
@@ -161,31 +153,56 @@ class CctvStandbyOverlay extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                // The state headline, in the brief's `headline-md` slot — the
+                // same treatment the error overlay's title takes, so the two
+                // overlays read as one component rather than as two ad-hoc
+                // captions. The hand-written 15px/700 it replaces was a fifth
+                // size chosen in a widget.
+                //
+                // 20px inside a 16:9 panel is tight, and that is exactly what
+                // the `FittedBox` guard is for: the overlay scales into the
+                // panel rather than overflowing it.
+                Text(
                   'Camera ready',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                  style: AppType.headlineMd.copyWith(
+                    color: AppSurfaces.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'The stream does not run until you press Play',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+                  // 70% of white rather than the `0xB3FFFFFF` literal it was —
+                  // the same colour, expressed through the token it is made of.
+                  style: AppType.labelMicro.copyWith(
+                    color: AppSurfaces.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: onStart,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Play camera'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: onPrimaryInk(primary),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                // The brief's `button-primary`, with `primary` taken from the
+                // theme rather than from the palette so a test host can still
+                // drive this widget with a colour of its own.
+                // `onPrimaryInk(primary)` rather than a hard-coded ink.
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadius.all(AppRadius.card),
+                    boxShadow: AppShadows.stampedIn(primary),
+                  ),
+                  child: FilledButton.icon(
+                    onPressed: onStart,
+                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                    label: const Text('Play camera'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: onPrimaryInk(primary),
+                      textStyle: AppType.buttonLabel,
+                      minimumSize: const Size(0, 56),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.all(AppRadius.card),
+                      ),
                     ),
                   ),
                 ),
@@ -248,24 +265,64 @@ class CctvErrorOverlay extends StatelessWidget {
           children: [
             const Icon(
               Icons.videocam_off_rounded,
-              color: Colors.white70,
+              color: AppSurfaces.onSurface,
               size: 34,
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Camera could not be loaded',
-              style: TextStyle(color: Colors.white),
+              // `headline-md`, the same slot the standby overlay's title takes.
+              // The bare `TextStyle(color: white)` it replaces inherited the
+              // framework's 14px body default, which is a label size for what
+              // is the whole point of this state.
+              style: AppType.headlineMd.copyWith(color: AppSurfaces.onSurface),
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               children: [
+                // The brief's `button-secondary`. Over video the page fill is
+                // still the right one — it is darker than the surrounding
+                // chrome and it reads as a control rather than as a second
+                // panel.
                 OutlinedButton.icon(
                   onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
                   label: const Text('Retry'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppSurfaces.page,
+                    foregroundColor: AppSurfaces.onSurface,
+                    side: AppBorders.hairline,
+                    textStyle: AppType.buttonLabel,
+                    minimumSize: const Size(0, 56),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xl,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.all(AppRadius.card),
+                    ),
+                  ),
                 ),
-                TextButton(onPressed: onBack, child: const Text('Back')),
+                // The brief's `button-text`: transparent, primary ink,
+                // `label-uppercase-sm`. Inlined rather than shared, because
+                // reaching into `settings/widgets/settings_fields.dart` for a
+                // button style would make the CCTV module depend on the
+                // settings one, and the two have nothing to do with each other.
+                TextButton(
+                  onPressed: onBack,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppPalette.primary,
+                    textStyle: AppType.labelMicro,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.sm,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.all(AppRadius.card),
+                    ),
+                  ),
+                  child: const Text('Back'),
+                ),
               ],
             ),
           ],
@@ -296,22 +353,27 @@ class CctvRoundControl extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
+          // A scrim, not a shadow: this control floats over arbitrary camera
+          // pixels, so the gradient is there to give the white glyph a floor to
+          // sit on regardless of what is behind it.
           gradient: RadialGradient(
             center: const Alignment(-0.3, -0.3),
             radius: 0.7,
             colors: [
-              Colors.white.withValues(alpha: 0.12),
+              AppSurfaces.onSurface.withValues(alpha: 0.12),
               Colors.black.withValues(alpha: 0.55),
             ],
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          // **`AppBorders.boundary`, not white at 15%.** A 1.5px near-white
+          // edge is the one border in the system that carries WCAG 1.4.11's 3:1
+          // for a UI component boundary, and this is exactly the case it exists
+          // for: nothing tonal can promise a visible edge over a bright frame.
+          // The 15% white it replaced measured nowhere near that, so this is
+          // strengthening the claim rather than changing it.
+          border: AppBorders.boundaryBorder,
+          // The blurred 8px drop shadow is gone with the brief's ban on blur.
+          // What separates the control from the video is the radial gradient
+          // plus this boundary; a soft halo over a live feed reads as a smudge.
         ),
         child: Material(
           color: Colors.transparent,
@@ -319,7 +381,7 @@ class CctvRoundControl extends StatelessWidget {
           child: IconButton(
             tooltip: tooltip,
             onPressed: onPressed,
-            color: Colors.white,
+            color: AppSurfaces.onSurface,
             icon: Icon(icon),
           ),
         ),

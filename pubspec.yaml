@@ -96,33 +96,23 @@ flutter:
   # Typefaces are bundled as STATIC instances, not the upstream variable
   # fonts. Flutter resolves fontWeight against a declared asset, and on older
   # Android the variable wght axis is not applied reliably, so a variable file
-  # declared once would render every weight at its default. Each weight below
-  # is a real baked instance (no fvar table) produced with fontTools from the
-  # google/fonts variable master. The weight is in the filename.
+  # declared once would render every weight at its default.
   #
-  # Space Grotesk has no 900: the upstream variable font's wght axis spans
-  # 300-700, so 700 (Bold) is its heaviest available weight and is what the
-  # numerals and headlines use. Do not declare a 900 asset that is not here.
+  # Inter is the entire system per the Neon Brutalist brief: 400 for the rare
+  # lowercase body line, 700 for the uppercase labels, 900 (Black) for displays,
+  # numerals and button labels. The weight is in the filename.
   #
-  # The OFL requires the licence to travel with the font; the three licence
-  # files sit beside the TTFs in this directory.
+  # The OFL requires the licence to travel with the font, so it is committed
+  # next to the instances.
   fonts:
-    - family: SpaceGrotesk
+    - family: Inter
       fonts:
-        - asset: assets/fonts/SpaceGrotesk-Medium-500.ttf
-          weight: 500
-        - asset: assets/fonts/SpaceGrotesk-Bold-700.ttf
+        - asset: assets/fonts/Inter-Regular-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Bold-700.ttf
           weight: 700
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans-Medium-500.ttf
-          weight: 500
-        - asset: assets/fonts/PlusJakartaSans-Bold-700.ttf
-          weight: 700
-    - family: JetBrainsMono
-      fonts:
-        - asset: assets/fonts/JetBrainsMono-Medium-500.ttf
-          weight: 500
+        - asset: assets/fonts/Inter-Black-900.ttf
+          weight: 900
 
   # To add assets to your application, add an assets section, like this:
   # assets:

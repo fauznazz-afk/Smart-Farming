@@ -134,10 +134,12 @@ class EnergySummaryCard extends StatelessWidget {
                     '${_formatEnergy(value)} kWh',
                     maxLines: 1,
                     softWrap: false,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    // `numeralLg`, and it was a hand-written 17sp/800. The brief
+                    // has no 800 — it jumps from 900 to 700 — and a numeral is
+                    // display copy in this system, so this is the 24sp/900 token
+                    // as written. It is the whole point of the scale that the
+                    // figure shouts.
+                    style: AppType.numeralLg.copyWith(color: appPrimaryText),
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -232,9 +234,11 @@ class EnergySummaryCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             runSpacing: 6,
             children: [
-              const Text(
+              Text(
                 'Energy analytics',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                // Not `const`: `.copyWith` is a method call, and the brief's
+                // headline is a token rather than a literal.
+                style: AppType.headlineMd.copyWith(color: appPrimaryText),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -381,10 +385,31 @@ class EnergySummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           if (progress != null)
-            LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0).toDouble(),
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(AppRadius.bar),
+            // The brief's progress bar: a 12dp depressed track in the *page*
+            // colour with a 1px hairline, and a lime fill that glows. The track
+            // has to be darker than the card it sits in for the fill to lift off
+            // it, which is why `LinearProgressIndicator`'s own background is set
+            // rather than left to its default (a tinted version of the fill).
+            Container(
+              height: 12,
+              decoration: BoxDecoration(
+                color: AppSurfaces.track,
+                borderRadius: BorderRadius.circular(AppRadius.bar),
+                border: AppBorders.hairlineBorder,
+              ),
+              padding: const EdgeInsets.all(2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.bar),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0).toDouble(),
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(AppRadius.bar),
+                  backgroundColor: Colors.transparent,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppPalette.primary,
+                  ),
+                ),
+              ),
             ),
           const SizedBox(height: 5),
           Text(
@@ -423,7 +448,7 @@ class EnergySummaryCard extends StatelessWidget {
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: AppType.numeralLg.copyWith(color: appPrimaryText),
               ),
             ],
           ),

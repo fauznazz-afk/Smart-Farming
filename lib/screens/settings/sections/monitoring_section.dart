@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/design_tokens.dart';
 import '../settings_controller.dart';
 
 /// Selectable refresh intervals, in seconds.
@@ -11,6 +12,13 @@ class MonitoringSection extends StatelessWidget {
 
   final SettingsController settings;
 
+  /// The switch row's title, in the app's uppercase label face.
+  ///
+  /// `label-uppercase-md` is the brief's workhorse line and it is what the
+  /// theme's `labelLarge` already resolves to; reading the token directly means
+  /// the row does not change shape when the text theme is retuned.
+  static final _toggleTitle = AppType.labelUppercase;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -18,20 +26,22 @@ class MonitoringSection extends StatelessWidget {
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Auto refresh telemetry'),
+          title: Text('Auto refresh telemetry', style: _toggleTitle),
           value: settings.autoRefresh,
           onChanged: (value) =>
               settings.update(() => settings.autoRefresh = value),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<int>(
           initialValue: settings.refreshSeconds,
           decoration: const InputDecoration(labelText: 'Refresh interval'),
           items: kRefreshIntervalOptions
-              .map((option) => DropdownMenuItem(
-                    value: option,
-                    child: Text('$option seconds'),
-                  ))
+              .map(
+                (option) => DropdownMenuItem(
+                  value: option,
+                  child: Text('$option seconds'),
+                ),
+              )
               .toList(),
           onChanged: (value) {
             if (value != null) {
@@ -68,7 +78,7 @@ class CctvSection extends StatelessWidget {
             prefixIcon: Icon(Icons.link),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         TextField(
           controller: settings.fishCctvUrl,
           keyboardType: TextInputType.url,

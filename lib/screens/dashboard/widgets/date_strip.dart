@@ -1,4 +1,5 @@
 import '../utils/color_helpers.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../../widgets/liquid_glass.dart';
@@ -6,6 +7,20 @@ import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
 
 /// Seven-day quick-pick strip with a calendar button for custom ranges.
+///
+/// **The chip itself is not in this file.** It is `DateStripChip` in
+/// `liquid_glass.dart`, and the brief's recipe for it lives there too: 4px
+/// corners (`AppRadius.sm`), unselected = [AppSurfaces.surface] with the neutral
+/// hairline, selected = a solid [AppPalette.primary] fill with
+/// [AppPalette.onHue] ink — the brief's `chip-active`, with no border and no
+/// shadow of its own. The selected day label is also the one place in the brief
+/// that sets **italic at 900 weight**, on the theory that leaning the type
+/// forward implies motion.
+///
+/// This file owns the strip: the row geometry, the width the chips are given,
+/// and the measurement that decides that width. The width probe below is the
+/// part that has to agree with the chip, and [_widestDayNameWidth] is where it
+/// does.
 class DateStrip extends StatelessWidget {
   const DateStrip({
     super.key,
@@ -28,14 +43,33 @@ class DateStrip extends StatelessWidget {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   double _widestDayNameWidth(BuildContext context) {
-    final style = DefaultTextStyle.of(context).style.merge(
-      const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-    );
+    // **The style the chip actually draws, not a hand-written near-miss.**
+    //
+    // This used to merge `DefaultTextStyle.of(context).style` with
+    // `fontSize: 10, fontWeight: w600` — a *measurement* style that disagreed
+    // with the *drawing* style on two of the three properties that decide a
+    // label's width. `DateStripChip` sets the day name in `AppType.labelMicro`:
+    // 10sp at **w700**, with `letterSpacing: 0.12em`, which on a three-letter
+    // day name is another 3.6dp the probe never asked for. So the strip measured
+    // every chip against a style narrower than the one it rendered, and the
+    // chips were laid out a few dp too tight for their own contents.
+    //
+    // **It worked, and it worked by accident.** `date_strip_test.dart` sweeps
+    // eight font scales across four viewports and asserts no day name is
+    // clipped, and it is green — the `+ 16 + 1` slack below happened to cover the
+    // shortfall at every one of those 32 combinations. A shortfall that only has
+    // to be covered by slack is a shortfall that a future change to the slack
+    // will uncover with the suite still green. Measuring with the real style is
+    // the fix; the padding arithmetic is untouched.
+    final style = AppType.labelMicro;
     final scaler = MediaQuery.textScalerOf(context);
     var widest = 0.0;
     for (final day in days) {
       final painter = TextPainter(
-        text: TextSpan(text: dayNameShort(day.weekday), style: style),
+        text: TextSpan(
+          text: dayNameShort(day.weekday).toUpperCase(),
+          style: style,
+        ),
         textDirection: Directionality.of(context),
         textScaler: scaler,
         maxLines: 1,
@@ -120,7 +154,8 @@ class DateStrip extends StatelessWidget {
                       dayName: dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
                       isSelected:
-                          rangeStart == null && _isSameDay(days[i], selectedDate),
+                          rangeStart == null &&
+                          _isSameDay(days[i], selectedDate),
                       onTap: () => onSelectDate(days[i]),
                     ),
                   ),

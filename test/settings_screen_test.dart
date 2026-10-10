@@ -126,7 +126,8 @@ void main() {
       expect(
         subtitle.maxLines,
         anyOf(isNull, greaterThan(1)),
-        reason: 'tile $i ("$title") clamps its subtitle to one line, so the '
+        reason:
+            'tile $i ("$title") clamps its subtitle to one line, so the '
             'text is ellipsized on a narrow phone',
       );
       expect(
@@ -183,12 +184,12 @@ void main() {
       final height = tester.getSize(tiles.at(i)).height;
       expect(
         height,
-        lessThanOrEqualTo(144.0),
-        reason: 'tile $i is ${height}dp, past the 128dp the longest wrapped '
-            'subtitle measures at this width. The tallest tiles are '
-            'four-line subtitles; a fifth line is what would show up here, and '
-            'it is the point at which the copy wants shortening rather than '
-            'more height.',
+        lessThanOrEqualTo(145.0),
+        reason:
+            'tile $i is ${height}dp, past the 145dp a four-line subtitle '
+            'measures at this width. A fifth line would add about 17dp and land '
+            'near 162, and that is the point at which the copy wants shortening '
+            'rather than more height.',
       );
     }
   });
@@ -256,7 +257,8 @@ void main() {
     expect(
       cardBox,
       isNotNull,
-      reason: 'the switch must be inside an AppCard for this guard to mean '
+      reason:
+          'the switch must be inside an AppCard for this guard to mean '
           'anything; if SectionCard stopped using AppCard, the ink ownership '
           'moved somewhere else and this test is asserting the wrong tree',
     );
@@ -280,7 +282,8 @@ void main() {
     expect(
       cardBox!.widget,
       isA<AnimatedContainer>(),
-      reason: 'AppCard must keep building its decoration in an AnimatedContainer',
+      reason:
+          'AppCard must keep building its decoration in an AnimatedContainer',
     );
 
     // The assertion that would actually fail on the regression: the card box
@@ -294,7 +297,8 @@ void main() {
     expect(
       _isAncestorOf(cardBox!, nearestMaterial!),
       isTrue,
-      reason: 'the Material must be a DESCENDANT of the decorated box, not an '
+      reason:
+          'the Material must be a DESCENDANT of the decorated box, not an '
           'ancestor of it. Outside it, the opaque card fill paints over the ink '
           'layer and every switch on this screen loses its splash.',
     );
@@ -316,13 +320,15 @@ void main() {
     expect(
       find.textContaining(RegExp(r'^v\d+\.\d+\.\d+\+\d+$')),
       findsOneWidget,
-      reason: 'the About section shows the app name and the version it was '
+      reason:
+          'the About section shows the app name and the version it was '
           'built from',
     );
   });
 
-  testWidgets('renders environment limit fields from the controller',
-      (tester) async {
+  testWidgets('renders environment limit fields from the controller', (
+    tester,
+  ) async {
     await _pumpSettings(tester);
 
     await tester.tap(find.text('Environment alerts'));
@@ -348,8 +354,7 @@ void main() {
     expect(find.text('CCTV source'), findsOneWidget);
   });
 
-  testWidgets('rejects an invalid CCTV url instead of saving',
-      (tester) async {
+  testWidgets('rejects an invalid CCTV url instead of saving', (tester) async {
     await _pumpSettings(tester);
 
     await tester.tap(find.text('CCTV source'));
@@ -368,7 +373,11 @@ void main() {
       find.text('The CCTV URL must be HTTPS and use an approved host'),
       findsOneWidget,
     );
-    expect(find.text('Settings'), findsOneWidget, reason: 'must stay on screen');
+    expect(
+      find.text('Settings'),
+      findsOneWidget,
+      reason: 'must stay on screen',
+    );
   });
 
   testWidgets('rejects an invalid fish camera url instead of saving', (
@@ -394,6 +403,10 @@ void main() {
       find.text('The fish camera URL must be HTTPS and use an approved host'),
       findsOneWidget,
     );
-    expect(find.text('Settings'), findsOneWidget, reason: 'must stay on screen');
+    expect(
+      find.text('Settings'),
+      findsOneWidget,
+      reason: 'must stay on screen',
+    );
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/energy_report_service.dart';
 import '../services/thingsboard_api.dart';
 import '../widgets/liquid_glass.dart';
+import 'dashboard/utils/design_tokens.dart';
 import 'energy_report/utils/period_buckets.dart';
 import 'energy_report/widgets/period_selector.dart';
 import 'energy_report/widgets/totals_card.dart';
@@ -28,10 +29,9 @@ import 'energy_report/widgets/export_button.dart';
 /// filename — and the monthly view aggregates the whole month, so a day-of-month
 /// picked by accident is a value that carries no meaning and shows up in a
 /// filename the user then shares.
-DateTime canonicalPeriodDate(DateTime value, {required bool monthly}) =>
-    monthly
-        ? DateTime(value.year, value.month)
-        : DateTime(value.year, value.month, value.day);
+DateTime canonicalPeriodDate(DateTime value, {required bool monthly}) => monthly
+    ? DateTime(value.year, value.month)
+    : DateTime(value.year, value.month, value.day);
 
 /// Whether moving from [current] to [next] changes the window the service fetches.
 ///
@@ -209,7 +209,12 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                 displacement: 48,
                 onRefresh: _load,
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.gutter,
+                    AppSpacing.md,
+                    AppSpacing.gutter,
+                    AppSpacing.xxl,
+                  ),
                   // Lazily built, in the same order and with the same content
                   // as the `children:` list this replaced. The list is only
                   // five deep, so the win is not the count: it is that the
@@ -230,35 +235,39 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                       },
                       onPickPeriod: _pickPeriod,
                     ),
-                    1 => const SizedBox(height: 12),
-                    2 => buckets.isEmpty
-                        ? EmptyPeriodView(data: data!)
-                        : TotalsCard(
-                            monthly: _monthly,
-                            selectedDate: _selectedDate,
-                            pvKwh: totals.pvKwh,
-                            acKwh: totals.acKwh,
-                            buckets: buckets,
-                            previousTotals: previousTotals,
-                          ),
-                    3 => buckets.isEmpty
-                        ? const SizedBox.shrink()
-                        : ChartCard(
-                            monthly: _monthly,
-                            buckets: buckets,
-                            touchedBucketNotifier: _touchedBucketNotifier,
-                          ),
-                    4 => buckets.isEmpty
-                        ? const SizedBox.shrink()
-                        : DataNote(data: data!),
-                    _ => buckets.isEmpty
-                        ? const SizedBox.shrink()
-                        : ExportButton(
-                            buckets: buckets,
-                            selectedDate: _selectedDate,
-                            monthly: _monthly,
-                            sharingNotifier: _sharing,
-                          ),
+                    1 => const SizedBox(height: AppSpacing.md),
+                    2 =>
+                      buckets.isEmpty
+                          ? EmptyPeriodView(data: data!)
+                          : TotalsCard(
+                              monthly: _monthly,
+                              selectedDate: _selectedDate,
+                              pvKwh: totals.pvKwh,
+                              acKwh: totals.acKwh,
+                              buckets: buckets,
+                              previousTotals: previousTotals,
+                            ),
+                    3 =>
+                      buckets.isEmpty
+                          ? const SizedBox.shrink()
+                          : ChartCard(
+                              monthly: _monthly,
+                              buckets: buckets,
+                              touchedBucketNotifier: _touchedBucketNotifier,
+                            ),
+                    4 =>
+                      buckets.isEmpty
+                          ? const SizedBox.shrink()
+                          : DataNote(data: data!),
+                    _ =>
+                      buckets.isEmpty
+                          ? const SizedBox.shrink()
+                          : ExportButton(
+                              buckets: buckets,
+                              selectedDate: _selectedDate,
+                              monthly: _monthly,
+                              sharingNotifier: _sharing,
+                            ),
                   },
                 ),
               ),

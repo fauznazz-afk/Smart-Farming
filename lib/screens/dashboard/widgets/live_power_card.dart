@@ -7,6 +7,48 @@ import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 
+/// Height of a progress bar in this card.
+///
+/// **The brief's `progress-bar.height`, and it is one value for both bars here
+/// on purpose.** It was 8 for the split bar and 6 for the SOC gauge — two
+/// different heights for the same component, which is how you end up with a card
+/// whose two bars disagree about what a bar is. `AppShadows.glow` is the fill's,
+/// not the track's, and it is derived from the fill hue rather than hard-coded
+/// lime: see `AppShadows.glow`'s contract and the note on [_SocLine].
+const double _kBarHeight = 12;
+
+/// The brief's progress track: the page colour, a 1px `border` hairline,
+/// full-round ends.
+///
+/// **One function, because the brief has one `progress-bar` component.** Both
+/// bars in this card read it, so they cannot drift apart again.
+///
+/// The track is [AppSurfaces.track] — *the page colour*, one step below the card
+/// — and not [AppSurfaces.surfaceAlt]. A track carries no text and a tile does;
+/// collapsing the two onto one value is how this app's metric tiles once became
+/// invisible against the card. The gradient is the "depressed" read: the token is
+/// the floor stop and the shading goes one step further from it at the top,
+/// which is what makes a well read as a hole rather than as a flat stripe.
+///
+/// The `0xFF000000` is the one literal in here and it is **inherited, not
+/// invented** — it was the top stop of the SOC track's gradient before this was
+/// extracted, and it is unchanged. The token file has no pure black to point at:
+/// the darkest value it defines is [AppSurfaces.track] itself, and
+/// [AppPalette.onHue] means "ink on a saturated fill" rather than "black", so
+/// naming it here would be a lie about what the value is for.
+BoxDecoration _trackBarDecoration() => BoxDecoration(
+  gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color.lerp(AppSurfaces.track, const Color(0xFF000000), 0.18)!,
+      AppSurfaces.track,
+    ],
+  ),
+  borderRadius: AppRadius.all(AppRadius.bar),
+  border: AppBorders.hairlineBorder,
+);
+
 /// Hero card: live PV power, battery SOC gauge, and where the power is going.
 class LivePowerCard extends StatelessWidget {
   const LivePowerCard({
@@ -20,6 +62,7 @@ class LivePowerCard extends StatelessWidget {
   });
 
   final double? pvPower;
+
   /// The house draw in watts, or `null` if the meter has not reported.
   final double? acPower;
 
@@ -42,10 +85,7 @@ class LivePowerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(
-            pzemStale: pzemStale,
-            ageLabel: pzemAgeLabel,
-          ),
+          _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel),
           const SizedBox(height: 14),
           _PowerFlow(
             pvPower: pvPower,
@@ -94,13 +134,15 @@ class _PowerFlow extends StatelessWidget {
 
     final solarForBar = solar.clamp(0.0, double.infinity);
     final loadForBar = acPower?.clamp(0.0, double.infinity);
-    final chargeState =
-        batteryPower == null ? null : batteryChargeState(batteryPower!);
+    final chargeState = batteryPower == null
+        ? null
+        : batteryChargeState(batteryPower!);
     final charging = chargeState == BatteryChargeState.charging;
     final discharging = chargeState == BatteryChargeState.discharging;
     final knownShare = loadForBar != null && solarForBar > 0;
-    final loadShare =
-        knownShare ? (loadForBar / solarForBar).clamp(0.0, 1.0) : 0.0;
+    final loadShare = knownShare
+        ? (loadForBar / solarForBar).clamp(0.0, 1.0)
+        : 0.0;
     final coversLoad = knownShare && solarForBar >= loadForBar;
     final spareWatts = knownShare ? solarForBar - loadForBar : 0.0;
     final batterySupplies = discharging && batteryPower!.abs() > spareWatts;
@@ -207,7 +249,11 @@ class _PowerFlow extends StatelessWidget {
                     ),
                     if (i < terms.length - 1)
                       Padding(
-                        padding: const EdgeInsets.only(left: 2, top: 6, bottom: 6),
+                        padding: const EdgeInsets.only(
+                          left: 2,
+                          top: 6,
+                          bottom: 6,
+                        ),
                         child: Icon(
                           Icons.arrow_downward_rounded,
                           size: 15,
@@ -222,7 +268,10 @@ class _PowerFlow extends StatelessWidget {
             final totalWidth = plan.widths.fold(0.0, (a, b) => a + b);
 
             Widget slot(int index) => Flexible(
-              flex: (plan.widths[index] / totalWidth * 1000).round().clamp(1, 1000),
+              flex: (plan.widths[index] / totalWidth * 1000).round().clamp(
+                1,
+                1000,
+              ),
               child: terms[index],
             );
 
@@ -243,27 +292,50 @@ class _PowerFlow extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        // **The brief's bar, and the height is the recipe.**
+        // `progress-bar` is 12px tall on the page colour with a 1px `border`
+        // hairline and full-round ends — a stadium, not a stripe of paint. This
+        // was 8px with no track and no border: two coloured rectangles on the
+        // card's own fill, which meant the *empty* half of the bar was the same
+        // colour as the card behind it and only the two segments were visible.
+        // See [_kBarHeight] and [_trackBarDecoration].
         SizedBox(
           width: double.infinity,
-          child: ClipRRect(
-            borderRadius: AppRadius.all(AppRadius.bar),
-            child: SizedBox(
-              height: 8,
-              child: solarForBar > 0
-                  ? Row(
-                      children: [
-                        Expanded(
-                          flex: (loadShare * 1000).round().clamp(1, 1000),
-                          child: ColoredBox(color: houseHue),
-                        ),
-                        if (loadShare < 1)
+          height: _kBarHeight,
+          child: DecoratedBox(
+            decoration: _trackBarDecoration(),
+            // **1px on every side, and it is what keeps the hairline visible.**
+            // A `DecoratedBox` paints its decoration *behind* its child, so a
+            // full-bleed child would paint over the border that is supposed to
+            // define the silhouette. Insetting the fill by the border's own
+            // width is the Flutter equivalent of the brief's `h-full` fill
+            // sitting inside the track's content box.
+            child: Padding(
+              padding: const EdgeInsets.all(1),
+              child: ClipRRect(
+                borderRadius: AppRadius.all(AppRadius.bar),
+                child: solarForBar > 0
+                    ? Row(
+                        children: [
                           Expanded(
-                            flex: ((1 - loadShare) * 1000).round().clamp(1, 1000),
-                            child: ColoredBox(color: solarHue),
+                            flex: (loadShare * 1000).round().clamp(1, 1000),
+                            child: ColoredBox(color: houseHue),
                           ),
-                      ],
-                    )
-                  : ColoredBox(color: AppSurfaces.track),
+                          if (loadShare < 1)
+                            Expanded(
+                              flex: ((1 - loadShare) * 1000).round().clamp(
+                                1,
+                                1000,
+                              ),
+                              child: ColoredBox(color: solarHue),
+                            ),
+                        ],
+                      )
+                    // Nothing to show: the track's own fill is the empty state,
+                    // exactly as the brief sets `backgroundColor` on the track
+                    // rather than on a separate bar.
+                    : const SizedBox.expand(),
+              ),
             ),
           ),
         ),
@@ -298,9 +370,7 @@ class _PowerFlow extends StatelessWidget {
 
 /// The state of charge, as a label, a track and a percentage.
 class _SocLine extends StatelessWidget {
-  const _SocLine({
-    required this.soc,
-  });
+  const _SocLine({required this.soc});
 
   final double? soc;
 
@@ -320,36 +390,56 @@ class _SocLine extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: ClipRRect(
-            borderRadius: AppRadius.all(AppRadius.bar),
-            child: SizedBox(
-              height: 6,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color.lerp(
-                            AppSurfaces.track,
-                            const Color(0xFF000000),
-                            0.18,
-                          )!,
-                          AppSurfaces.track,
-                        ],
+          // **The battery SOC gauge, and the one element in this card that
+          // emits.**
+          //
+          // The brief's `progress-bar`: 12px tall, track on the page colour with
+          // a 1px `border` hairline, full-round ends, and the fill carrying the
+          // glow — `shadow-[0_0_10px_rgba(198,255,0,0.5)]` in the brief's own
+          // example. See [_kBarHeight] and [_trackBarDecoration].
+          //
+          // **The glow is derived from the fill hue rather than written as
+          // lime, and that is a deliberate divergence from the brief's example
+          // value.** `AppShadows.glow` takes the hue it should be lit with, and
+          // `design_tokens_test.dart` exercises it for all five categories — so
+          // a violet battery fill glowing violet is the token's own contract,
+          // and hard-coding the lime from the example would make the glow mean
+          // "lime" on a bar that is not lime. What is preserved is the property
+          // the brief actually cares about: the glow's colour *is* the fill's
+          // colour, so it reads as the bar emitting rather than as a coloured
+          // halo borrowed from somewhere else.
+          child: SizedBox(
+            height: _kBarHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                DecoratedBox(decoration: _trackBarDecoration()),
+                // The same 1px inset as the split bar, for the same reason: a
+                // `DecoratedBox` paints behind its child, so the fill has to
+                // sit inside the hairline it shares a box with.
+                Padding(
+                  padding: const EdgeInsets.all(1),
+                  child: ClipRRect(
+                    borderRadius: AppRadius.all(AppRadius.bar),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: (clamped ?? 0) / 100,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: accent,
+                          boxShadow: AppShadows.glow(accent),
+                        ),
+                        // `SizedBox.expand` rather than a bare `DecoratedBox`:
+                        // a decoration with no child collapses to
+                        // `constraints.smallest` unless the constraints are
+                        // tight, and reasoning about whether they are is not
+                        // worth the saving.
+                        child: const SizedBox.expand(),
                       ),
                     ),
                   ),
-                  FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: (clamped ?? 0) / 100,
-                    child: ColoredBox(color: accent),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -386,9 +476,8 @@ class _SocLine extends StatelessWidget {
 ///
 /// The three terms all share one height so a wrapped label cannot push its figure
 /// below the other two.
-TextStyle _termLabelStyle(BuildContext context) => DefaultTextStyle.of(context)
-    .style
-    .copyWith(fontSize: 11);
+TextStyle _termLabelStyle(BuildContext context) =>
+    DefaultTextStyle.of(context).style.copyWith(fontSize: 11);
 
 double _naturalWidth(BuildContext context, String text, TextStyle style) {
   final painter = TextPainter(
@@ -504,7 +593,10 @@ _LabelPlan _planLabelSlots(
   required double available,
 }) {
   if (available <= 0) {
-    return _LabelPlan(_kMaxLabelLineProbe, List<double>.filled(labels.length, 0));
+    return _LabelPlan(
+      _kMaxLabelLineProbe,
+      List<double>.filled(labels.length, 0),
+    );
   }
 
   final total = natural.fold(0.0, (a, b) => a + b);
@@ -566,7 +658,11 @@ double _minWidthForLines(
   // and the boundary is a step, so rounding can leave the probe on the wrong
   // side of it. Widen until it measures true rather than trust the search.
   var width = hi;
-  for (var i = 0; i < 4 && _labelLineCount(context, label, slotWidth: width) > lines; i++) {
+  for (
+    var i = 0;
+    i < 4 && _labelLineCount(context, label, slotWidth: width) > lines;
+    i++
+  ) {
     width = math.min(natural, width + math.max(1.0, width * 0.05));
   }
   return math.min(natural, width + 0.5);
@@ -666,9 +762,8 @@ class _Term extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   _figureText(watts)!,
-                  style: _termFigureStyle(
-                    color: watts == null ? faint : color,
-                  ).copyWith(fontSize: 24 * figureScale),
+                  style: _termFigureStyle(color: watts == null ? faint : color)
+                      .copyWith(fontSize: 24 * figureScale),
                 ),
               ),
             ),
@@ -679,9 +774,8 @@ class _Term extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'W',
-                  style: _termUnitStyle(
-                    color: faint,
-                  ).copyWith(fontSize: 11 * figureScale),
+                  style: _termUnitStyle(color: faint)
+                      .copyWith(fontSize: 11 * figureScale),
                 ),
               ),
             ),
@@ -693,10 +787,7 @@ class _Term extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.pzemStale,
-    required this.ageLabel,
-  });
+  const _Header({required this.pzemStale, required this.ageLabel});
 
   final bool pzemStale;
   final String? ageLabel;

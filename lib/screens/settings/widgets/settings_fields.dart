@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
@@ -21,29 +22,48 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: AppCard(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+        // The brief's `card-padding`, 16. It was 14/8, which is neither the
+        // card scale nor anything else — the previous system had no 16.
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.cardPadding,
+          AppSpacing.cardPadding,
+          AppSpacing.cardPadding,
+          AppSpacing.sm,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 SettingsIconBadge(icon: icon),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 2),
+                      // `headline-md`: the brief gives card titles inside list
+                      // rows the display weight at 20px. `titleMedium` already
+                      // resolved to this token through the text theme, so the
+                      // change is that the value is now read rather than
+                      // inherited — a card title that survives a theme edit.
+                      Text(title, style: AppType.headlineMd),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        // Left in the body face on purpose, and this is the
+                        // one place the brief's "prefer uppercase even for
+                        // body" is not followed. These nine strings are the
+                        // only *sentences* on the screen, and `body-sm` is the
+                        // brief's own slot for exactly that — "the rare
+                        // lowercase line for descriptive paragraphs".
+                        // `label-uppercase-md` would be a second thing to
+                        // check against the tile-height ceiling
+                        // `settings_screen_test.dart` pins, and it has not
+                        // been measured here.
+                        style: AppType.bodySm.copyWith(color: faintColor),
                       ),
                     ],
                   ),
@@ -51,10 +71,12 @@ class SectionCard extends StatelessWidget {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 44, top: 8),
+              // 34 badge + 12 gap, matching the row above rather than a second
+              // hand-picked number.
+              padding: const EdgeInsets.only(left: 46, top: AppSpacing.sm),
               child: AppDivider(opacity: 0.12),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             child,
           ],
         ),
@@ -65,8 +87,15 @@ class SectionCard extends StatelessWidget {
 
 /// Circular accent icon container used as a section/list leading.
 ///
-/// Flat circle with [AppSurfaces.surface] fill, [AppBorders.control] border,
-/// and [AppPalette.accent] icon.
+/// **Neutral on purpose, and the accent it used to take was amber.**
+/// [AppPalette.accent] is `statusWarn` in `color_helpers.dart` — it is the
+/// "telemetry is stale" hue. Painting every settings icon in it gave a warning
+/// colour a decorative job, which is the same defect as the permanent green
+/// "semua normal" badge: a hue means one thing or the reader cannot rely on it.
+///
+/// So the badge is tonal instead: `surfaceAlt` one step above the card it sits
+/// on, a hairline for the silhouette, and `onSurfaceVariant` ink — the brief's
+/// `tab-item-inactive` colour, which is what an inactive chrome glyph takes.
 class SettingsIconBadge extends StatelessWidget {
   const SettingsIconBadge({super.key, required this.icon});
 
@@ -78,11 +107,11 @@ class SettingsIconBadge extends StatelessWidget {
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: AppSurfaces.surface,
+        color: AppSurfaces.surfaceAlt,
         shape: BoxShape.circle,
         border: AppBorders.controlBorder,
       ),
-      child: Icon(icon, color: AppPalette.accent, size: 19),
+      child: Icon(icon, color: AppSurfaces.onSurfaceVariant, size: 19),
     );
   }
 }
@@ -110,19 +139,24 @@ class NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(
         decimal: true,
         signed: true,
       ),
+      // `label-uppercase-md`, the brief's `input-text` typography: every glyph
+      // the user types is uppercase bold and wide-tracked, placeholder
+      // included. Set here rather than only in the theme because this field is
+      // the one that carries a *second* style for the unsaved-default case,
+      // and that case has to derive from the same token rather than from a
+      // third literal.
       style: inactive
-          ? theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          ? AppType.labelUppercase.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
               fontStyle: FontStyle.italic,
             )
-          : null,
+          : AppType.labelUppercase,
       decoration: InputDecoration(
         labelText: label,
         helperText: inactive ? 'Not saved yet' : null,
@@ -144,8 +178,15 @@ class EnvRangeField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(setting.label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
+          Text(
+            setting.label,
+            // The brief's placeholder/label slot: uppercase, wide-tracked, in
+            // `on-surface-variant`.
+            style: AppType.labelUppercase.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -191,43 +232,44 @@ class UnsavedDefaultsNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // **Counting fields, not ranges. This said "3 limits" while the screen showed
-    // five.** It counted the ranges that had at least one prefilled side, and the
-    // Environment screen has three of those -- temperature, humidity, TDS -- with
-    // five prefilled *fields* between them, because temperature and humidity
-    // prefill both ends and TDS prefills only its minimum.
+    // **Counting fields, not ranges. This said "3 limits" while the screen
+    // showed five.** It counted the ranges that had at least one prefilled
+    // side, and the Environment screen has three of those -- temperature,
+    // humidity, TDS -- with five prefilled *fields* between them, because
+    // temperature and humidity prefill both ends and TDS prefills only its
+    // minimum.
     //
-    // Found on an emulator: the sentence at the bottom of the card read "3 limits
-    // are shown as defaults" directly under five fields each captioned "Not saved
-    // yet". A count that contradicts the thing it is counting is worse than no
-    // count, and it is exactly the failure `FEATURE.md` records for
-    // `_history` being reported dead: a number that looks authoritative and is not.
+    // Found on an emulator: the sentence at the bottom of the card read
+    // "3 limits are shown as defaults" directly under five fields each captioned
+    // "Not saved yet". A count that contradicts the thing it is counting is
+    // worse than no count, and it is exactly the failure `FEATURE.md` records
+    // for `_history` being reported dead: a number that looks authoritative and
+    // is not.
     final count = ranges.fold<int>(
       0,
       (sum, r) => sum + (r.minIsPrefill ? 1 : 0) + (r.maxIsPrefill ? 1 : 0),
     );
     if (count == 0) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             Icons.info_outline,
             size: 15,
-            color: theme.colorScheme.onSurfaceVariant,
+            color: AppSurfaces.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               count == 1
                   ? '1 limit is shown as a default. It is not monitored until '
-                      'you save.'
+                        'you save.'
                   : '$count limits are shown as defaults. They are not '
-                      'monitored until you save.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                        'monitored until you save.',
+              style: AppType.bodySm.copyWith(
+                color: AppSurfaces.onSurfaceVariant,
               ),
             ),
           ),
@@ -265,10 +307,10 @@ class LabeledDropdown extends StatelessWidget {
         suffixText: suffix.isEmpty ? null : suffix,
       ),
       items: options
-          .map((option) => DropdownMenuItem(
-                value: option,
-                child: Text('$option$suffix'),
-              ))
+          .map(
+            (option) =>
+                DropdownMenuItem(value: option, child: Text('$option$suffix')),
+          )
           .toList(),
       onChanged: enabled ? onChanged : null,
     );
@@ -276,6 +318,28 @@ class LabeledDropdown extends StatelessWidget {
 }
 
 /// Primary save action shown while browsing the settings list.
+///
+/// The brief's `button-primary`, and four of its values changed here.
+///
+/// * **56dp, not 48.** The brief's `height: 56px`. It is set as `minimumSize`
+///   rather than as a fixed `SizedBox` height so the button still grows with the
+///   user's font scale — 48 was the accessibility floor and this is above it.
+/// * **8px, not a pill.** `AppRadius.card`. The pill came from the previous
+///   system's rounded-soft look; the brief is explicit that "filter chips are
+///   full-pill, everything else is 8px".
+/// * **`AppType.buttonLabel`, not `label-uppercase`.** 13px at weight 900 with
+///   0.1em tracking. Buttons shout; the brief gives them the display weight at
+///   label size, which is not the same as a 12px/700 metadata line.
+/// * **The tinted hard shadow**, `AppShadows.stampedIn(AppPalette.primary)`.
+///   That is the brief's signature move for the one button allowed to be
+///   electric: a solid offset rectangle in the brand hue at 20%, no blur, so
+///   the displacement itself bleeds lime.
+///
+/// The shadow is painted by a [DecoratedBox] *behind* the button rather than by
+/// `FilledButton.styleFrom`, because Material's `elevation` maps through
+/// `kElevationToShadow` and can only ever produce a blurred halo — the exact
+/// thing the brief bans. `DecoratedBox` paints its decoration first and then its
+/// child, so only the 4px offset strip is visible around the opaque lime fill.
 class SaveSettingsButton extends StatelessWidget {
   const SaveSettingsButton({
     super.key,
@@ -288,26 +352,84 @@ class SaveSettingsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: FilledButton.icon(
-        onPressed: saving ? null : onPressed,
-        icon: saving
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.save),
-        label: Text(saving ? 'Saving...' : 'Save settings'),
-        style: FilledButton.styleFrom(
-          backgroundColor: AppPalette.primary,
-          foregroundColor: AppPalette.onHue,
-          textStyle: AppType.labelUppercase,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.all(AppRadius.pill),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.all(AppRadius.card),
+        boxShadow: AppShadows.stampedIn(AppPalette.primary),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: saving ? null : onPressed,
+          icon: saving
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save, size: 20),
+          label: Text(saving ? 'Saving...' : 'Save settings'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppPalette.primary,
+            foregroundColor: AppPalette.onHue,
+            // Both disabled colours keep the fill and the ink, so the button
+            // does not grey out behind the spinner mid-write. It is still
+            // disabled — `onPressed` is null — it just says so with its label
+            // rather than by turning into a different button.
+            disabledBackgroundColor: AppPalette.primary,
+            disabledForegroundColor: AppPalette.onHue,
+            textStyle: AppType.buttonLabel,
+            minimumSize: const Size(0, 56),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.all(AppRadius.card),
+            ),
           ),
-          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+}
+
+/// The brief's `button-secondary`: the page fill behind a hairline, 56dp, no
+/// shadow.
+///
+/// Used by the two actions inside the Background checks card. It sits on the
+/// card rather than on the page, so its fill is *darker* than its surround —
+/// which is the brief's own relationship (`background` below `surface`) applied
+/// one level down, and it reads as an action set into the card without needing
+/// a second outline colour.
+class SecondaryButton extends StatelessWidget {
+  const SecondaryButton({
+    super.key,
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  final VoidCallback? onPressed;
+
+  /// Sized at the brief's `iconSize` (20) by the caller, the same way
+  /// [SaveSettingsButton] sizes its own.
+  final Widget icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: icon,
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: AppSurfaces.page,
+        foregroundColor: AppSurfaces.onSurface,
+        disabledBackgroundColor: AppSurfaces.page,
+        disabledForegroundColor: AppSurfaces.onSurfaceVariant,
+        side: AppBorders.hairline,
+        textStyle: AppType.buttonLabel,
+        minimumSize: const Size(0, 56),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.all(AppRadius.card),
         ),
       ),
     );

@@ -42,7 +42,8 @@ void main() {
         expect(
           entry.value.width,
           lessThanOrEqualTo(1.5),
-          reason: '${entry.key} is ${entry.value.width}px, which is a frame '
+          reason:
+              '${entry.key} is ${entry.value.width}px, which is a frame '
               'rather than a hairline',
         );
       }
@@ -67,20 +68,28 @@ void main() {
         expect(
           side.color,
           isNot(AppSurfaces.border),
-          reason: '${category.name} drew a neutral frame, so the wash behind it '
+          reason:
+              '${category.name} drew a neutral frame, so the wash behind it '
               'has nothing to belong to',
         );
         expect(
           side.width,
           AppBorders.hairline.width,
-          reason: 'a categorical frame must not be heavier than the neutral '
+          reason:
+              'a categorical frame must not be heavier than the neutral '
               'one, or carrying a category costs more visually than it explains',
         );
-        for (final edge in [border.top, border.bottom, border.left, border.right]) {
+        for (final edge in [
+          border.top,
+          border.bottom,
+          border.left,
+          border.right,
+        ]) {
           expect(
             edge,
             side,
-            reason: 'a four-sided frame with one odd edge out reads as a bug, '
+            reason:
+                'a four-sided frame with one odd edge out reads as a bug, '
                 'not as a design',
           );
         }
@@ -88,25 +97,35 @@ void main() {
     });
 
     test('the wash is faint enough that its own hue stays the subject', () {
-      // `categoricalWash` is 10% of the hue. The pairing — faint wash behind,
-      // full-strength foreground — is the whole reason the wash is safe, and the
-      // 10% is what makes "faint" true. A wash that is not faint puts a
-      // saturated block behind a 12px caption, which is the mistake this repo
-      // has made in three previous design systems.
+      // `categoricalWash` is 20% of the hue — the brief's own recipe for a
+      // categorical chip. The pairing — faint wash behind, full-strength
+      // foreground — is the whole reason the wash is safe. A wash that is not
+      // faint puts a saturated block behind a 12px caption, which is the mistake
+      // this repo has made in three previous design systems. The floor moved
+      // from 15% to 20% with the brief; the property being protected did not.
       for (final category in MetricCategory.values) {
         final hue = categoryColor(category);
         expect(
           AppBorders.categoricalWash(hue).a,
-          lessThanOrEqualTo(0.15),
-          reason: '${category.name} wash is at '
+          greaterThanOrEqualTo(0.15),
+          reason:
+              '${category.name} wash is at '
               '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
-              'alpha',
+              'alpha, which is below the brief\'s 20%',
+        );
+        expect(
+          AppBorders.categoricalWash(hue).a,
+          lessThanOrEqualTo(0.25),
+          reason:
+              '${category.name} wash is at '
+              '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
+              'alpha — a block, not a wash',
         );
         // Same hue, so the wash and the foreground are recognisably one thing.
         expect(
-          HSLColor.fromColor(hue.withValues(
-            alpha: AppBorders.categoricalWash(hue).a,
-          )).hue,
+          HSLColor.fromColor(
+            hue.withValues(alpha: AppBorders.categoricalWash(hue).a),
+          ).hue,
           closeTo(HSLColor.fromColor(hue).hue, 0.5),
         );
       }
@@ -124,8 +143,7 @@ void main() {
       expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.surface)));
     });
 
-    test('the binding caption surface is the top of the ramp, and is listed',
-        () {
+    test('the binding caption surface is the top of the ramp, and is listed', () {
       // `surfaceAlt` is the hardest surface for a caption because it is the
       // lightest. A reader scanning `captionSurfaces()` should see that the
       // hardest one is listed, and it is listed last, and a consumer that takes
@@ -156,7 +174,8 @@ void main() {
       expect(
         surfaces.length,
         3,
-        reason: 'a fourth entry means a new surface exists and whoever added it '
+        reason:
+            'a fourth entry means a new surface exists and whoever added it '
             'has to decide whether a caption can land on it',
       );
     });
@@ -172,27 +191,34 @@ void main() {
       expect(AppRadius.bar, AppRadius.round);
     });
 
-    test('the card is the largest corner on the scale', () {
-      // The order is the design brief's own scale, read bottom-up:
-      // `rounded.sm 4 -> md 12 -> lg 16 -> xl 24`, mapped onto
-      // `badge -> tile -> inset -> card`.
+    test('one rectilinear radius: 8, and nothing else', () {
+      // The Neon Brutalist brief gives the design system exactly one radius for
+      // rectilinear shapes: `rounded.lg` 8px on cards, inputs, buttons and list
+      // rows. Badges are 2px, filter pills and progress tracks are fully round.
+      // There is no 16 and no 24 anywhere.
       //
-      // **`inset` sits above `tile` and that is not a mistake.** `inset` is the
-      // radius on text inputs and `tile` is the radius on icon tiles and chips,
-      // and the brief gives inputs the *larger* of the two. An earlier revision of
-      // this test asserted the opposite order on the assumption that the two were
-      // nested shapes, but they are not nested -- an input is not inside a card
-      // tile -- so there was nothing for that ordering to protect.
-      //
-      // What does have to hold is that a nested pair differs. A tile inside a
-      // card matching the card's radius would make the two read as one block.
-      expect(
-        AppRadius.card,
-        greaterThan(AppRadius.inset),
-        reason: 'card ${AppRadius.card} vs inset ${AppRadius.inset}',
-      );
-      expect(AppRadius.inset, greaterThan(AppRadius.tile));
-      expect(AppRadius.tile, greaterThan(AppRadius.badge));
+      // The previous system's claim was the opposite one — a scale read bottom-up
+      // from `badge` to `card` — and the test that encoded it asserted an
+      // ordering that the brief's single radius makes false. What has to hold
+      // instead is that *no* rectilinear radius sits between the badge and the
+      // pill: everything is either nearly square or stamped at 8.
+      for (final entry in {
+        'card': AppRadius.card,
+        'tile': AppRadius.tile,
+        'inset': AppRadius.inset,
+      }.entries) {
+        expect(
+          entry.value,
+          AppRadius.card,
+          reason: '${entry.key} is ${entry.value} — the brief has one '
+              'rectilinear radius and this is a second one',
+        );
+      }
+      expect(AppRadius.card, 8);
+      expect(AppRadius.badge, lessThan(AppRadius.card),
+          reason: 'a badge is nearly square');
+      expect(AppRadius.badge, greaterThan(0));
+      expect(AppRadius.card, lessThan(AppRadius.bar));
     });
 
     test('a bar at the bar radius is a stadium, not a rectangle', () {
@@ -235,7 +261,8 @@ void main() {
         expect(
           entry.value,
           isNot(Duration.zero),
-          reason: '${entry.key} is zero, which is a forgotten value rather '
+          reason:
+              '${entry.key} is zero, which is a forgotten value rather '
               'than a chosen one',
         );
       }
@@ -243,18 +270,37 @@ void main() {
   });
 
   group('type', () {
-    test('the three families are distinct', () {
-      // A heading set in the body font is not a hierarchy, it is a font-size
-      // difference — and it is invisible on a card until somebody measures it.
-      final families = {AppType.heading, AppType.sans, AppType.mono};
-      expect(families, hasLength(3));
+    test('one family, three weights — not three families', () {
+      // The brief allows exactly one typeface and puts the whole hierarchy in the
+      // weight. The previous system carried three families and a test asserting
+      // they were distinct; that assertion is now the opposite claim, because a
+      // heading set in a second family is a deviation from the brief rather than a
+      // hierarchy.
+      // A list rather than a set literal, because a set literal with three
+      // equal strings is itself a lint and the point here is that they *are*
+      // equal.
+      final families = [AppType.heading, AppType.sans, AppType.mono];
+      expect(families.toSet(), hasLength(1), reason: 'Inter is the entire system');
+      expect(families, everyElement('Inter'));
+      final weights = [
+        AppType.numeralXl.fontWeight,
+        AppType.labelUppercase.fontWeight,
+        AppType.bodyMd.fontWeight,
+      ];
+      expect(
+        weights,
+        {FontWeight.w900, FontWeight.w700, FontWeight.w400},
+        reason:
+            '900 for displays and numerals, 700 for the uppercase labels, '
+            '400 for the rare lowercase body line',
+      );
     });
 
-    test('figures are set in a font with tabular figures, or a column jitters', () {
-      // The numeral styles are the ones that matter here: a live value that
-      // changes width as it changes digit count makes the whole card twitch on
-      // every poll. That is why they are a separate family from the captions
-      // around them.
+    test('figures are tabular, or a column jitters', () {
+      // A live value that changes width as it changes digit count makes the whole
+      // card twitch on every poll. The previous system solved this by setting
+      // numerals in a different family; the brief allows one, so the fix is the
+      // feature that actually causes it.
       for (final entry in {
         'numeralXl': AppType.numeralXl,
         'numeralLg': AppType.numeralLg,
@@ -263,10 +309,11 @@ void main() {
         'numeralMono': AppType.numeralMono,
       }.entries) {
         expect(
-          entry.value.fontFamily,
-          isNotNull,
-          reason: '${entry.key} inherits the platform default, so its width '
-              'depends on the device rather than on the design',
+          entry.value.fontFeatures,
+          contains(const FontFeature.tabularFigures()),
+          reason:
+              '${entry.key} sets proportional figures, so a card that reads '
+              '1080 W and then 980 W moves underneath the user',
         );
       }
     });
@@ -285,18 +332,21 @@ void main() {
         expect(
           entry.value.fontWeight,
           FontWeight.w700,
-          reason: '${entry.key} is ${entry.value.fontWeight}; the motif is bold',
+          reason:
+              '${entry.key} is ${entry.value.fontWeight}; the motif is bold',
         );
         expect(
           (entry.value.letterSpacing ?? 0) / entry.value.fontSize!,
           greaterThanOrEqualTo(0.09),
-          reason: '${entry.key} tracks at '
+          reason:
+              '${entry.key} tracks at '
               '${((entry.value.letterSpacing ?? 0) / entry.value.fontSize!).toStringAsFixed(3)}em',
         );
         expect(
           entry.value.fontSize!,
           lessThanOrEqualTo(12),
-          reason: '${entry.key} is a caption; at 14sp and all-caps it stops '
+          reason:
+              '${entry.key} is a caption; at 14sp and all-caps it stops '
               'being connective tissue and starts being a heading',
         );
       }
@@ -316,7 +366,8 @@ void main() {
           expect(
             shadow.color.computeLuminance(),
             closeTo(hue.computeLuminance(), 0.05),
-            reason: '${category.name} aura is lit with a colour that is not '
+            reason:
+                '${category.name} aura is lit with a colour that is not '
                 'its own hue',
           );
         }

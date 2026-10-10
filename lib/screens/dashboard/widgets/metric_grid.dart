@@ -180,10 +180,14 @@ class _Tag extends StatelessWidget {
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
-      style: AppType.labelMicro.copyWith(
-        fontWeight: FontWeight.w600,
-        color: color,
-      ),
+      // **No `fontWeight` override, and that is the change.** This used to set
+      // `w600`, which is a weight the brief does not have: the type scale is 900
+      // for what matters, 700 for the uppercase labels, 400 for the rare body
+      // line. A semibold tag sat between the two and read as neither — it had the
+      // tracking of a label and the presence of a numeral, so it looked like a
+      // heading that had been shrunk. [AppType.labelMicro] is the brief's
+      // micro-metadata style and it already carries the weight this wanted.
+      style: AppType.labelMicro.copyWith(color: color),
     );
   }
 }
@@ -210,6 +214,35 @@ class _MetricCard extends StatelessWidget {
     final breached = verdict == false;
     final status = (breached && showGridColors) ? statusBad : null;
 
+    // **The brief's stat tile, and the edge is the whole recipe.**
+    //
+    // `card` + a leading icon in the category's own hue + a `numeral-lg` value +
+    // a `label-uppercase-sm` unit, with a **2px categorical bottom border** to
+    // colour-code the metric. What this replaces is the 1px categorical frame
+    // drawn all the way round the tile: a frame is a *drawn edge*, and it put the
+    // hue on four sides where the brief puts it on one. One coloured edge under
+    // the value reads as the tile's own colour-code; four coloured edges read as
+    // an outline, which is the thing this style exists to replace.
+    //
+    // The other three sides stay the neutral hairline, because the brief's card
+    // is explicit that "a 1px border hairline always accompanies the stamped
+    // shadow — the border defines the silhouette, the shadow displaces it."
+    // Dropping the hairline entirely would leave the stamped shadow with nothing
+    // to be the silhouette of. So the silhouette is neutral and exactly one edge
+    // carries the category.
+    //
+    // The category edge is **not part of the Border**. A `BoxDecoration` with a
+    // `borderRadius` throws at paint time if its border is not uniform —
+    // "A borderRadius can only be given on borders with uniform colors" — and a
+    // hairline on three sides with a 2px hue on the fourth is not. It was drawn
+    // that way for one afternoon and `metric_grid_test.dart` caught it. The edge
+    // is therefore a bar inside the card's content, flush to its bottom, which
+    // is also what the brief's recipe is: a colour under the value, not a frame
+    // around it.
+    //
+    // The border is always drawn, `showGridColors` or not: it is a *category*
+    // marker, not a status, and switching alerts off in Settings must not
+    // recolour which sensor is which. Only the breach caption below is gated.
     return AppCard(
       padding: const EdgeInsets.all(8),
       child: Column(
@@ -272,6 +305,20 @@ class _MetricCard extends StatelessWidget {
               style: AppType.labelMicro.copyWith(color: status ?? faint),
             ),
           ],
+          // **The 2px categorical bottom edge, drawn inside the card.**
+          //
+          // It has to be a child rather than a `Border` side, and the reason is
+          // a runtime error rather than a preference: `BoxDecoration` throws
+          // "A borderRadius can only be given on borders with uniform colors"
+          // the moment a hairline on three sides shares a border with a 2px hue
+          // on the fourth. `test/metric_grid_test.dart` is what found it — the
+          // widget built, analyzed clean, and threw on the first paint.
+          //
+          // The card's padding is 0 for this one child so the bar sits flush
+          // with the rounded box's bottom edge, and it is drawn above the
+          // card's own border rather than outside it.
+          const SizedBox(height: 6),
+          Container(height: 2, color: accent),
         ],
       ),
     );

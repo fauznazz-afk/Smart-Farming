@@ -170,9 +170,7 @@ class TelemetryChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final specs = _specsFor(group);
-    final accent =
-        categoryColorForKey(specs.first.series.key) ?? AppPalette.primary;
-    final scaled = _buildSeries(specs, accent);
+    final scaled = _buildSeries(specs);
     final bounds = boundsCache.putIfAbsent(
       '$prefix/${group.title}',
       () => ChartBounds.fromSeries(
@@ -209,7 +207,7 @@ class TelemetryChartCard extends StatelessWidget {
             )
           : Column(
               children: [
-                _SeriesLegend(series: scaled, accent: accent),
+                _SeriesLegend(series: scaled),
                 const SizedBox(height: 10),
                 Expanded(
                   child: Listener(
@@ -241,11 +239,29 @@ class TelemetryChartCard extends StatelessWidget {
     );
   }
 
-  List<_Scaled> _buildSeries(List<_MetricSpec> specs, Color accent) {
-    return [for (final spec in specs) _seriesFor(spec, accent)];
+  List<_Scaled> _buildSeries(List<_MetricSpec> specs) {
+    // One series takes its category hue; more than one cannot, because the PV,
+    // AC, battery and greenhouse-temperature groups each plot several series
+    // that all belong to *one* category. See [kChartSeriesOrder].
+    final multi = specs.length > 1;
+    return [
+      for (var i = 0; i < specs.length; i++)
+        _seriesFor(
+          specs[i],
+          multi ? kChartSeriesOrder[i % kChartSeriesOrder.length] : null,
+        ),
+    ];
   }
 
-  _Scaled _seriesFor(_MetricSpec spec, Color accent) {
+  // **No `accent` parameter.** It used to be threaded from `build` through here
+  // and into `_SeriesLegend`, and read by nobody: every series resolved its hue
+  // from `categoryColorForKey` one line below, and the legend did the same. The
+  // parameter was verified unused before removal rather than removed on a
+  // hunch — this repo has already had a `_history` field deleted on a
+  /// well-argued and wrong dead-code claim. [override] replaces it, and unlike
+  /// it, it is read: a multi-series group's colour comes from the fixed order
+  /// rather than from the category.
+  _Scaled _seriesFor(_MetricSpec spec, Color? override) {
     final key = spec.series.key;
     final seriesPoints = points[key] ?? const <TelemetryPoint>[];
     return _Scaled(
@@ -254,7 +270,7 @@ class TelemetryChartCard extends StatelessWidget {
         spec.unit,
         seriesPoints,
         spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        spec.color(),
+        override ?? spec.color(),
         stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,
@@ -271,6 +287,18 @@ class TelemetryChartCard extends StatelessWidget {
       titlesData: _titlesData(bounds),
       borderData: FlBorderData(show: false),
       lineTouchData: LineTouchData(
+        // **The tooltip is opaque, on the brief's own tokens.**
+        //
+        // `AppSurfaces.tooltip` rather than a translucent fill: a tooltip sits
+        // over an arbitrary run of the series, and over a crossing it covers
+        // both of them. Anything you can see through it is a number you cannot
+        // read. `AppRadius.tile` for the corners, and a 1px edge in
+        // `AppSurfaces.border` at 24% — enough to separate the fill from the
+        // card behind it without drawing a second outline.
+        //
+        // `fitInsideHorizontally` and `fitInsideVertically` are load-bearing and
+        // not padding: they are what stop a tooltip at the far right of the plot
+        // from being painted off the edge of the card.
         touchTooltipData: LineTouchTooltipData(
           tooltipRoundedRadius: AppRadius.tile,
           tooltipPadding: const EdgeInsets.symmetric(
@@ -314,6 +342,17 @@ class TelemetryChartCard extends StatelessWidget {
             spots: item.series.spots,
             isCurved: false,
             barWidth: 2.5,
+            // **The category hue, and 0.85 is about crossings, not shade.**
+            //
+            // The battery page plots current and power on one axis and both go
+            // negative while the pack discharges, so two lines cross each other
+            // repeatedly. Full opacity would make the later-drawn line erase the
+            // earlier one at every crossing and the reader would lose a series
+            // without any indication that it had gone. This is *not* a lightness
+            // ramp and must never become one: the hue itself comes from
+            // `categoryColorForKey` and the alpha is 0.85 for every series
+            // equally, so two series in different categories still read as two
+            // categories and two in the same category still read as one.
             color: item.series.color.withValues(alpha: 0.85),
             dotData: const FlDotData(show: false),
           ),
@@ -321,6 +360,17 @@ class TelemetryChartCard extends StatelessWidget {
     );
   }
 
+  // **Hairlines, and no gradient and no glow — the brief's grid, in full.**
+  //
+  // `AppSurfaces.border` at 15% on the horizontal lines and 10% on the vertical
+  // ones, both `strokeWidth: 1`. The vertical pair is the weaker of the two on
+  // purpose: a vertical rule on a time axis is a fence, while a horizontal rule
+  // is a scale you read against, and the two do not have to be equally loud for
+  // the reader to get the same amount out of each.
+  //
+  // fl_chart's own default is a grey line with no alpha at all, which is how the
+  // energy report's grid still gets its colour — see
+  // `energy_report/utils/chart_helpers.dart`.
   FlGridData _gridData(ChartBounds bounds) {
     return FlGridData(
       show: true,
@@ -339,14 +389,18 @@ class TelemetryChartCard extends StatelessWidget {
   }
 
   FlTitlesData _titlesData(ChartBounds bounds) {
-    final labelStyle = AppType.labelMicro.copyWith(color: faintColor);
+    final labelStyle = AppType.labelMicro.copyWith(
+      color: AppSurfaces.onSurfaceVariant,
+    );
     return FlTitlesData(
       // `showTitles: false` with **no `reservedSize`**. A `reservedSize: 44`
-      // sat here once and did nothing at all: fl_chart only inserts a side's
-      // `SideTitlesWidget` when that side's `showTitles` is true, so the value
-      // was read by nobody. It reads like it buys room for the top-side labels
-      // the left axis draws for its maximum value — those really are drawn at
-      // `AxisSide.top` inside the left widget — and it does not buy any.
+      // sat here once and did nothing at all: `AxisTitles.totalReservedSize`
+      // only adds `sideTitles.reservedSize` when `showSideTitles` is true, and
+      // that getter requires `sideTitles.showTitles`. So a reserved size on a
+      // hidden side is read by nobody, and it genuinely does not buy room for
+      // the top label. That comment was checked against fl_chart 0.68 before
+      // being kept: it is still true. See the note on `leftTitles` for what does
+      // work instead.
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       leftTitles: AxisTitles(
@@ -354,13 +408,84 @@ class TelemetryChartCard extends StatelessWidget {
           showTitles: true,
           reservedSize: 40,
           interval: bounds.chartInterval,
-          getTitlesWidget: (value, meta) => SideTitleWidget(
-            axisSide: value >= bounds.maxY - bounds.chartInterval / 2
-                ? AxisSide.top
-                : meta.axisSide,
-            space: 4,
-            child: Text(formatAxisNumber(value), style: labelStyle),
-          ),
+          getTitlesWidget: (value, meta) {
+            // **The top label is pulled *inside* the plot by `fitInside`, and
+            // measured this is the only option that survives a text scale.**
+            //
+            // The old code switched the maximum-value label to `AxisSide.top`,
+            // which reads like it moves that label above the gridline so it
+            // cannot be clipped. It does the opposite of what it reads like:
+            // `SideTitlesFlex` centres every child on its own gridline (the
+            // offset is `axisPixelLocation - size / 2`), and the `Container`
+            // inside `SideTitleWidget` shrink-wraps to its child with no size
+            // factor, so the widget's own `alignment` and `margin` cancel out
+            // vertically and the child ends up centred whatever side is asked
+            // for. All `AxisSide.top` actually changes is *which* side the
+            // `space` margin goes on, and a bottom margin under a
+            // shrink-wrapped box lifts the label by `space / 2` -- three pixels
+            // the wrong way. It also re-centres the text in the 40dp reserved
+            // column instead of right-aligning it with the other Y labels.
+            //
+            // Measured on the unmodified build at 381dp (`test/zz_probe_test`,
+            // deleted), against the `LineChart`'s own painted rect:
+            //
+            // | scale | label hangs above the chart | overlaps the legend |
+            // |---|---|---|
+            // | 1.0  | 8dp  | none (2dp clear) |
+            // | 2.0  | 26dp | 16dp |
+            // | 3.0  | 38dp | 28dp |
+            //
+            // And the same measurement after this change, same probe:
+            //
+            // | scale | label top vs chart top | label top vs legend bottom |
+            // |---|---|---|
+            // | 1.0  | +4dp inside | +14dp clear |
+            // | 2.0  | +4dp inside | +14dp clear |
+            // | 3.0  | +4dp inside | +14dp clear |
+            //
+            // The chart's own height is byte-identical before and after at
+            // every scale (178 / 148 / 116 dp for a 260dp card), so the plot
+            // gives up nothing. What moves is the label: it now sits inside the
+            // plot instead of taking a strip off the top of it.
+            //
+            // Two alternatives were measured and rejected:
+            //
+            //  * **Reserve real space.** A `topTitles` reservation does reach
+            //    the plot through `FlTitlesData.allSidesPadding`, but it needs
+            //    `showTitles: true` on that side to do anything, and `reservedSize`
+            //    is not text-scaled -- the 10dp that fits at scale 1 is 22dp
+            //    short at scale 3. A fixed reservation is wrong at every scale
+            //    but one, and every chart would pay it.
+            //  * **Clamp it by hand.** A `Transform.translate` of half the label
+            //    height works, but deriving that height from
+            //    `fontSize * height * textScaler` is an arithmetic claim about
+            //    text metrics rather than a measured one.
+            //
+            // `fitInside` is fl_chart's own answer to this and it measures the
+            // label in a post-frame callback, so it is correct at any scale and
+            // the plot loses no height at all -- the label goes *into* the plot
+            // rather than taking a strip off it. It stays on
+            // `meta.axisSide`, so the top label is right-aligned with the rest.
+            //
+            // One cost, stated honestly: the child is measured after the first
+            // frame, so the very first paint of a card still shows it centred on
+            // the top gridline. Nothing re-triggers it afterwards -- the cached
+            // height is only read once and a label's height does not change when
+            // its number does.
+            final isMax = value >= bounds.maxY - bounds.chartInterval / 2;
+            return SideTitleWidget(
+              axisSide: meta.axisSide,
+              space: 4,
+              fitInside: SideTitleFitInsideData.fromTitleMeta(
+                meta,
+                enabled: isMax,
+                // A hair inside the painted edge rather than flush with it, so
+                // a rounding pixel cannot put half a label back outside.
+                distanceFromEdge: AppSpacing.xs,
+              ),
+              child: Text(formatAxisNumber(value), style: labelStyle),
+            );
+          },
         ),
       ),
       bottomTitles: AxisTitles(
@@ -503,10 +628,9 @@ class _SeriesStatistics extends StatelessWidget {
 
 /// One row per series: swatch, name, and the live value in its own unit.
 class _SeriesLegend extends StatelessWidget {
-  const _SeriesLegend({required this.series, required this.accent});
+  const _SeriesLegend({required this.series});
 
   final List<_Scaled> series;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {

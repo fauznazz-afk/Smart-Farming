@@ -85,25 +85,21 @@ import 'settings_screen.dart';
 /// records twice already, where a list of surface hex values in
 /// `color_helpers_test.dart` drifted from the fills it claimed to measure and
 /// three colours sat under AA with the suite green.
-const double kDashboardPageMargin = 24;
+///
+/// 16, not 24: the brief's `spacing.gutter`. It is also the carousel's bleed on
+/// each side, which is why it is written as the token rather than as a second
+/// number — one value, one meaning.
+const double kDashboardPageMargin = AppSpacing.gutter;
 
 /// The gap between two cards on the same page.
 ///
-/// **This is a shadow-geometry value, not a spacing preference, and the number
-/// comes from a pixel measurement.** The card gap was 10, and the ambient half of
-/// the raised shadow pair reaches 20dp at 1σ — the part that actually draws the
-/// edge, `sigma = blurRadius / 2 = 11` plus the 9dp offset. So in a 10dp gap the
-/// upper card's shadow is cut off while it is still about 8% darker than the page,
-/// and it stops at a hard edge rather than fading. Two cards then read as one
-/// block with a smudge between them, which is the "there is something wrong here"
-/// look reported from the device.
-///
-/// At 20dp the shadow completes its 1σ falloff inside the gap, so the page colour
-/// appears in the middle and each card reads as standing on the surface rather
-/// than as part of the next one. 24 was considered and rejected: it is the
-/// horizontal margin, and matching it vertically costs real screen on a dense
-/// page for a shadow that has already resolved at 20.
-const double _cardGap = 20;
+/// **A spacing value now, not a shadow-geometry one, and the number moved with
+/// the design.** The gap used to be 20 because the *soft* ambient shadow needed
+/// that much room to finish its falloff; with the brief's hard `4px 4px 0`
+/// displacement there is no falloff to protect, only a 4px footprint that needs
+/// to clear the card below it. 12 is the brief's `spacing.md` and leaves 8dp
+/// between one card's shadow and the next card's top edge.
+const double _cardGap = AppSpacing.md;
 
 /// The gap above a chart section header, which is a different job from [\_cardGap].
 ///
@@ -1508,7 +1504,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: baseColor.withValues(alpha: progress),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.08 * progress),
+                  // The hairline at low alpha rather than `Colors.white` at
+                  // 8%: the brief has one border colour and it is already a
+                  // near-black grey, so the scrim line has to be that colour
+                  // fading rather than a second white one.
+                  color: AppSurfaces.border.withValues(alpha: progress),
                 ),
               ),
             ),

@@ -53,9 +53,18 @@ const List<NavDestination> kNavDestinations = [
 /// rendered bar against [glassNavBarReservedHeightFor] rather than against a
 /// restated number.
 ///
-/// It is the same 52 in both places deliberately: [kGlassNavBarHeight] is what
-/// the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
+/// It is the same value in both places by construction: [kGlassNavBarHeight] is
+/// what the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
 /// drift without the test failing.
+///
+/// **76, and the brief chose it — which is a coincidence worth naming, because
+/// the literal `76` that caused the original defect was a *wrong* 76.** The
+/// brief's `tab-bar` states `height: 76px` with `paddingY: 16`, a bar tall
+/// enough that a 24dp icon and a 10sp label sit in it with real air rather than
+/// the label merely surviving inside it. The cost is real: the reservation grows
+/// by 24dp on every page, and `test/nav_bar_clearance_test.dart` is what proves
+/// the two halves of that cost move together instead of one being forgotten.
+/// The bar's own gap below it ([kGlassNavBarBottomGap]) is *not* part of the 76.
 ///
 /// **Four slots, four destinations, and there is no fifth slot.**
 /// [kNavDestinations] is the tab set and the row indexes it directly; the bar's
@@ -73,7 +82,7 @@ const List<NavDestination> kNavDestinations = [
 /// action button comes back here it needs something to act on, and the aura
 /// token documented for it (`AppPalette.aura`, still unused) is the place to
 /// start.
-const double kGlassNavBarHeight = 52;
+const double kGlassNavBarHeight = 76;
 
 /// The bar's own gap below the pill, and the floor for the safe-area inset.
 ///
@@ -81,6 +90,13 @@ const double kGlassNavBarHeight = 52;
 /// `SafeArea(minimum:)` below does — so this is the value the bar reserves when
 /// the device reports no inset at all, which is the case a test and a desktop
 /// window both hit.
+///
+/// **10, and it is not on the brief's spacing scale on purpose.** `spacing.md` is
+/// 12, and moving this to it is the obvious tidy — but
+/// `test/nav_bar_clearance_test.dart` pins `glassNavBarReservedHeightFor(0) ==
+/// kGlassNavBarHeight + 10`, so the gap is load-bearing for a test that cannot be
+/// satisfied by the brief's own 12. Left alone rather than weakened; if it ever
+/// moves, that assertion is the thing to update in the same change.
 const double kGlassNavBarBottomGap = 10;
 
 /// The vertical space [GlassNavBar] takes from the bottom of the page.
@@ -154,7 +170,17 @@ class GlassNavBar extends StatelessWidget {
                           ),
                     height: kGlassNavBarHeight,
                     decoration: BoxDecoration(
-                      color: AppSurfaces.surface,
+                      // **The page colour, not the card colour.** The brief's
+                      // `tab-bar` is `backgroundColor: {colors.background}` — the
+                      // bar is flat over the page and is separated from it by the
+                      // hairline alone, which is what "Flat: top app bar, tab bar,
+                      // badges, chips — no shadow" means. It used to be
+                      // `AppSurfaces.surface`, a step *above* the page, which made
+                      // the bottom of every screen read as a raised strip with
+                      // nothing raising it. No `boxShadow` here: the bar is on the
+                      // flat tier, and [AppShadows.stamped] would make it the only
+                      // stamped thing at the bottom of the screen.
+                      color: AppSurfaces.page,
                       border: const Border(top: AppBorders.hairline),
                     ),
                     child: ClipRRect(
@@ -289,6 +315,7 @@ class _NavItem extends StatelessWidget {
               selected: selected,
               selectedIcon: destination.selectedIcon,
               icon: destination.icon,
+              label: destination.label,
             ),
           ),
         ),
@@ -298,16 +325,26 @@ class _NavItem extends StatelessWidget {
 }
 
 /// A nav destination: glyph + label, coloured by selection only.
+///
+/// **The active item shifts colour and nothing else.** No pill, no underline, no
+/// weight change — the brief's `tab-item-active` is `textColor: {colors.primary}`
+/// with `backgroundColor: transparent`, and the inactive one is
+/// `{colors.on-surface-variant}`. That is the whole difference, and it is why the
+/// selected icon and the outline icon are the only two variants in play: the
+/// brief's iconography is `solar bold` for both states, with the *filled* variant
+/// reserved for the selected one.
 class _NavDestination extends StatelessWidget {
   const _NavDestination({
     required this.selected,
     required this.selectedIcon,
     required this.icon,
+    required this.label,
   });
 
   final bool selected;
   final IconData selectedIcon;
   final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -323,20 +360,25 @@ class _NavDestination extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? selectedIcon : icon, size: 22, color: color),
+              // 24, the brief's `tab-item-*.iconSize`. It was 22, which is
+              // neither the 24 of chrome nor the 20 of a button — a size that
+              // belongs to no tier.
+              Icon(selected ? selectedIcon : icon, size: 24, color: color),
               const SizedBox(height: 2),
-              Text(
-                destination.label,
-                style: AppType.labelMicro.copyWith(color: color),
-              ),
+              Text(label, style: AppType.labelMicro.copyWith(color: color)),
             ],
           ),
         ),
       ),
     );
   }
-
-  NavDestination get destination => kNavDestinations[selectedIndex];
-  int get selectedIndex =>
-      kNavDestinations.indexWhere((d) => d.selectedIcon == selectedIcon);
 }
+
+// There were two getters here — `destination` and `selectedIndex` — that
+// recovered the label from the *icon* by searching [kNavDestinations] for the
+// matching `selectedIcon`. Nothing called them: `_NavItem` already knows its
+// `destination` and passes the parts down. They are gone rather than fixed,
+// because a reverse lookup by icon is a landmine — the day two destinations share
+// an icon, `indexWhere` silently returns the first one and the wrong label is
+// drawn with nothing failing. The label is now a field, as it always should
+// have been.
