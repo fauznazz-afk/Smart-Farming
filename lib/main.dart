@@ -8,7 +8,6 @@ import 'services/thingsboard_api.dart';
 import 'utils/app_log.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
-import 'theme/app_theme_controller.dart';
 import 'widgets/brand_logo.dart';
 import 'screens/dashboard/utils/design_tokens.dart';
 import 'services/alarm_notification_service.dart';
@@ -176,7 +175,6 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
         borderRadius: BorderRadius.circular(AppRadius.inset),
         borderSide: const BorderSide(color: AppPalette.accent, width: 2),
       ),
-      cursorColor: AppPalette.accent,
       hintStyle: AppType.bodyMd.copyWith(color: AppSurfaces.onSurfaceVariant),
       labelStyle: AppType.labelUppercase.copyWith(
         color: AppSurfaces.onSurfaceVariant,

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
-import '../services/alarm_bridge.dart'
+import '../services/alarm_bridge.dart';
 import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
 import '../services/alarm_settings.dart';
@@ -335,28 +335,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   // offers the switch and a stored value should not be silently discarded; the
   // switch itself is being relabelled to match what it now does, which is
   // nothing on this screen.
-  /// The accent every widget on this screen derives its colour from.
-  ///
-  /// **This is `AppThemeController.accent` and not `seedColor`, and the
-  /// difference is the whole preset.** For light and dark, `accent` *is*
-  /// `seedColor` — `presetAccent` returns `null` for both — so nothing about the
-  /// existing two modes changes. Under Dracula it is the palette's purple,
-  /// which is what makes this screen agree with the page it is drawn on: passing
-  /// the raw seed here would have put the user's green through
-  /// `metricColor(theme: AppTheme.dracula)` and produced light *green* numbers
-  /// on a purple page, at Dracula's accent lightness and therefore at Dracula's
-  /// contrast.
-  ///
-  /// The stored seed is untouched underneath, which is why switching back to
-  /// light or dark restores whatever the user last picked.
-  Color get _accent => widget.themeController.accent;
-
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    widget.themeController.addListener(_onThemeChanged);
     _fetchAll();
     unawaited(_realtimeService.start());
     _fetchEnergyHistory();
@@ -382,7 +365,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
-    widget.themeController.removeListener(_onThemeChanged);
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _selectedPage.dispose();
@@ -422,10 +404,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       _refreshTimer?.cancel();
       unawaited(AlarmBridge.instance.setForeground(false));
     }
-  }
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
   }
 
   // ── Scroll-driven chrome ─────────────────────────────────────────────────────
@@ -1421,9 +1399,7 @@ Future<void> _refreshCurrentPage() async {
   void _goToLogin() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(themeController: widget.themeController),
-      ),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
     );
   }
@@ -1446,7 +1422,6 @@ Future<void> _refreshCurrentPage() async {
       context,
       MaterialPageRoute(
         builder: (_) => SettingsScreen(
-          themeController: widget.themeController,
           onLogout: _logout,
         ),
       ),
@@ -1611,7 +1586,7 @@ Future<void> _refreshCurrentPage() async {
       ),
       itemCount: 4,
       onPageChanged: _onPageChanged,
-      itemBuilder: (context, index) => _buildPage(index, theme),
+      itemBuilder: (context, index) => _buildPage(index),
     );
   }
 
@@ -1700,7 +1675,6 @@ Future<void> _refreshCurrentPage() async {
 
   // ── Banners ──────────────────────────────────────────────────────────────────
   Object get _visualToken => Object.hash(
-    _accent,
     _selectedDate,
     _displayName,
     // **The connection flag, and this was the gap that froze the Live/Polling
@@ -1854,7 +1828,7 @@ Future<void> _refreshCurrentPage() async {
   // ── Overview page ────────────────────────────────────────────────────────────
   List<Widget Function()> _overviewPage() {
     return [
-      () => const GreetingHeader(displayName: _displayName),
+      () => GreetingHeader(displayName: _displayName),
       () => const SizedBox(height: 8),
       () => _dateStrip(),
       () => const SizedBox(height: 8),
@@ -2017,7 +1991,7 @@ Future<void> _refreshCurrentPage() async {
         builder: (context, sub, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _powerSelector(theme, sub),
+            _powerSelector(sub),
             const SizedBox(height: 12),
             // The page builders hand back lazily-invoked closures so the outer
             // ListView only realises visible items. Inside this one Column they
@@ -2025,9 +1999,9 @@ Future<void> _refreshCurrentPage() async {
             // child is the chart, and that is a `Bound` whose child is cached and
             // only rebuilt when the chart revision actually bumps.
             ...switch (sub) {
-              0 => _pvPage(theme),
-              1 => _acPage(theme),
-              _ => _batteryPage(theme),
+              0 => _pvPage(),
+              1 => _acPage(),
+              _ => _batteryPage(),
             }.map((make) => make()),
           ],
         ),
@@ -2150,7 +2124,6 @@ Future<void> _refreshCurrentPage() async {
       _batteryRevision,
       () => _telemetryCard(
         _battery,
-        theme,
         const [
           MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
           MetricDef('current', 'Current', 'A', Icons.swap_horiz),
@@ -2172,7 +2145,7 @@ Future<void> _refreshCurrentPage() async {
       ),
     ),
     // `_chartSections`, for the reason on the PV page.
-    ..._chartSectionThunks('battery', theme),
+    ..._chartSectionThunks('battery'),
   ];
 
   // ── Hydroponics page ──────────────────────────────────────────────────────────

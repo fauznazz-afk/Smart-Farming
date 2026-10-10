@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../utils/battery_sign.dart';
 import '../../../widgets/liquid_glass.dart';
-import '../utils/color_helpers.dart'
+import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import 'shortcut.dart';
 

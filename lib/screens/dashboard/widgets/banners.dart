@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/connection_health_service.dart';
+import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/telemetry_helpers.dart';
@@ -53,7 +54,7 @@ class OfflineBanner extends StatelessWidget {
       child: AppSurface(
         radius: AppRadius.inset,
         fill: AppBorders.categoricalWash(color),
-        border: BorderSide(color: color.withValues(alpha: 0.40), width: 1),
+        border: AppBorders.categoricalBorder(color),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
@@ -114,7 +115,7 @@ class EnergyAlertBanner extends StatelessWidget {
     return AppSurface(
       radius: AppRadius.inset,
       fill: AppBorders.categoricalWash(statusAlert),
-      border: BorderSide(color: statusAlert.withValues(alpha: 0.4), width: 1),
+      border: AppBorders.categoricalBorder(statusAlert),
       padding: const EdgeInsets.all(12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

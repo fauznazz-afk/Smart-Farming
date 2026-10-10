@@ -5,11 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
+import '../widgets/liquid_glass.dart';
 import '../services/secure_window.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
-import '../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius, AppPalette, AppCard, AppBadge;
+import 'dashboard/utils/design_tokens.dart';
 
 /// The matte the video is seen against. **Not a themed surface, and never to
 /// become one.**
@@ -404,7 +404,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                     decoration: BoxDecoration(
                       color: AppBorders.categoricalWash(primary),
                       borderRadius: BorderRadius.circular(AppRadius.tile),
-                      border: Border.fromBorderSide(AppBorders.categoricalBorder(primary)),
+                      border: AppBorders.categoricalBorder(primary),
                     ),
                     child: Center(
                       child: Icon(Icons.videocam_rounded, color: primary),
@@ -542,7 +542,7 @@ class _InfoBar extends StatelessWidget {
     final textTheme = Theme.of(context);
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: AppBorders.boundary,
+      border: AppBorders.boundaryBorder,
       child: Row(
         children: [
           Icon(

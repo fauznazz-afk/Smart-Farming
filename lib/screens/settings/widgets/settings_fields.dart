@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/design_tokens.dart';
-import '../../dashboard/utils/color_helpers.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
 
@@ -81,7 +80,7 @@ class SettingsIconBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppSurfaces.surface,
         shape: BoxShape.circle,
-        border: Border.fromBorderSide(AppBorders.control),
+        border: AppBorders.controlBorder,
       ),
       child: Icon(icon, color: AppPalette.accent, size: 19),
     );

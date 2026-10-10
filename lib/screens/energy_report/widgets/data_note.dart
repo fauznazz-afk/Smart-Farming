@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius, AppCard;
+import '../../../widgets/liquid_glass.dart';
 import '../../../services/energy_report_service.dart';
 
 class DataNote extends StatelessWidget {

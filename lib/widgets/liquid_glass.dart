@@ -1,8 +1,3 @@
-import 'package:flutter/material.dart';
-
-import '../screens/dashboard/utils/color_helpers.dart';
-import '../screens/dashboard/utils/design_tokens.dart';
-
 /// The shared surface kit: the four primitives every screen is built from.
 ///
 /// **This file replaced a soft-UI / skeuomorphic layer on 9 October 2026.** The
@@ -17,6 +12,10 @@ import '../screens/dashboard/utils/design_tokens.dart';
 /// whole depth system. See `design_tokens.dart` for why the three-shadow pair is
 /// gone rather than reduced, and `AppBorders` for the hairline that replaced it.
 library;
+
+import 'package:flutter/material.dart';
+
+import '../screens/dashboard/utils/design_tokens.dart';
 
 // ── AppBackground ──────────────────────────────────────────────────────────────
 
@@ -57,7 +56,7 @@ class AppSurface extends StatelessWidget {
     this.radius = AppRadius.card,
     this.circle = false,
     this.fill,
-    this.border = AppBorders.hairline,
+    this.border = AppBorders.hairlineBorder,
     this.padding,
   });
 
@@ -70,9 +69,11 @@ class AppSurface extends StatelessWidget {
   /// Defaults to [AppSurfaces.surface].
   final Color? fill;
 
-  /// Pass `BorderSide.none` for a surface that should not be outlined — a dot,
-  /// a swatch, anything whose fill is the whole point.
-  final BorderSide border;
+  /// A [BoxBorder], not a [BorderSide] — this feeds `BoxDecoration.border`
+  /// directly and there is no call site that wants one edge of it. Pass `null`
+  /// for a surface that should not be outlined: a dot, a swatch, anything whose
+  /// fill is the whole point.
+  final BoxBorder? border;
 
   final EdgeInsetsGeometry? padding;
 
@@ -86,7 +87,7 @@ class AppSurface extends StatelessWidget {
         shape: circle ? BoxShape.circle : BoxShape.rectangle,
         borderRadius:
             circle ? null : BorderRadius.circular(radius),
-        border: border == BorderSide.none ? null : Border.fromBorderSide(border),
+        border: border,
       ),
       child: child,
     );
@@ -112,6 +113,7 @@ class AppCard extends StatelessWidget {
     this.height,
     this.semanticLabel,
     this.accent,
+    this.border,
     this.inset = false,
     this.pressed = false,
   });
@@ -127,6 +129,21 @@ class AppCard extends StatelessWidget {
   /// drawn with an accent that disagreed with the theme — and under a
   /// categorical system a card may legitimately carry its category's hue.
   final Color? accent;
+
+  /// Override the outline outright.
+  ///
+  /// **This exists for two call sites and they are real ones.** The CCTV info bar
+  /// and the standby play button sit over camera content, which is arbitrary
+  /// pixels of arbitrary brightness — so neither the tonal step from `page` to
+  /// `surface` nor the neutral hairline can promise the boundary is visible, and
+  /// those two controls have no other affordance. They take
+  /// [AppBorders.boundaryBorder], which clears WCAG 1.4.11's 3:1 against
+  /// arbitrary content.
+  ///
+  /// A parameter rather than a bool, because a bool named after the *reason*
+  /// rather than the effect is how you end up with `overVideo: true` on a card
+  /// that is not over video.
+  final BoxBorder? border;
 
   /// Cut the surface into the page instead of raising it off it. Input fields,
   /// and chips that are not selected.
@@ -154,8 +171,10 @@ class AppCard extends StatelessWidget {
       fill = AppSurfaces.surface;
     }
 
-    final edge =
-        (inset || accent == null) ? AppBorders.hairline : AppBorders.categoricalBorder(accent!);
+    final edge = border ??
+        (inset || accent == null
+            ? AppBorders.hairlineBorder
+            : AppBorders.categoricalBorder(accent!));
 
     // The `Material` goes *between* the decorated box and the content, not
     // around the decorated box.
@@ -180,7 +199,7 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.fromBorderSide(edge),
+        border: edge,
       ),
       padding: padding ?? const EdgeInsets.all(20),
       child: Material(
@@ -243,7 +262,7 @@ class AppTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.tile),
         border: accent == null
             ? null
-            : Border.fromBorderSide(AppBorders.categoricalBorder(accent!)),
+            : AppBorders.categoricalBorder(accent!),
       ),
       child: child,
     );
@@ -328,7 +347,10 @@ class DateStripChip extends StatelessWidget {
   });
 
   final String dayName;
-  final String dayNumber;
+  /// The day of the month, 1-31. An `int` rather than a `String` because that is
+  /// what it is: the call site has a `DateTime.day` and a `String` here would be
+  /// a conversion done at the call site, where nothing else needs one.
+  final int dayNumber;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -364,7 +386,7 @@ class DateStripChip extends StatelessWidget {
             // solid fill reads as a second, competing edge.
             border: isSelected
                 ? null
-                : Border.fromBorderSide(AppBorders.hairline),
+                : AppBorders.hairlineBorder,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -374,7 +396,7 @@ class DateStripChip extends StatelessWidget {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  dayNumber,
+                  '$dayNumber',
                   style: AppType.numeralLg.copyWith(color: numberInk),
                 ),
               ),

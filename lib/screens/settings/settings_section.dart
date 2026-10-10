@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'sections/about_section.dart';
 import 'sections/alerts_section.dart';
 import 'sections/background_status_section.dart';
-import 'sections/appearance_section.dart';
 import 'sections/monitoring_section.dart';
 import 'settings_controller.dart';
 
@@ -30,12 +29,6 @@ List<SettingsSection> buildSettingsSections({
   required Future<void> Function() onLogout,
 }) =>
     [
-      SettingsSection(
-        title: 'Appearance',
-        subtitle: 'Choose the app theme and accent color.',
-        icon: Icons.palette_outlined,
-        builder: (_, settings) => AppearanceSection(settings: settings),
-      ),
       SettingsSection(
         title: 'Monitoring',
         subtitle: 'Set how often live telemetry updates.',

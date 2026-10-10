@@ -3,8 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../widgets/liquid_glass.dart';
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius, AppPalette, AppBadge;
+import '../../dashboard/utils/design_tokens.dart';
 import '../utils/cctv_status.dart';
 
 /// Small status badge shown next to the CCTV header and in full screen.
@@ -128,7 +127,7 @@ class CctvStandbyOverlay extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppPalette.primary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppBorders.boundary),
+                  border: AppBorders.boundaryBorder,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.4),

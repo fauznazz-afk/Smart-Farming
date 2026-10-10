@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// Every surface, radius, edge, type and motion value in the app.
 ///
 /// **This file replaced a soft-UI token layer on 9 October 2026, and the change
@@ -41,6 +39,8 @@ import 'package:flutter/material.dart';
 /// sanctioned version — a wash paired with a full-strength foreground — is one
 /// named function rather than something each call site reinvents.
 library;
+
+import 'package:flutter/material.dart';
 
 /// The three-layer dark stack.
 ///
@@ -235,6 +235,24 @@ class AppBorders {
   static const BorderSide boundary =
       BorderSide(color: Color(0xFFFAFAFA), width: 1.5);
 
+  // ── The same three, as a `BoxBorder` ─────────────────────────────────────────
+  //
+  // **These exist because `BorderSide` and `BoxBorder` are not interchangeable,
+  // and the mistake is silent at the call site and loud in the analyzer.**
+  // `BoxDecoration.border` takes a `BoxBorder`, so a decoration that wants a
+  // hairline has to write `Border.fromBorderSide(AppBorders.hairline)` — which is
+  // correct but wordy, and it appears at roughly forty decoration sites. A
+  // `Border.all(color: AppBorders.hairline)` does not compile, because that
+  // parameter wants a `Color`, not a side.
+  //
+  // Rather than pick one shape and force every call site to convert, both are
+  // named: the `BorderSide` for a single edge (`Border.fromBorderSide`, or
+  // `.color` when you want just the colour) and the `*Border` for a
+  // `BoxDecoration`.
+  static const BoxBorder hairlineBorder = Border.fromBorderSide(hairline);
+  static const BoxBorder controlBorder = Border.fromBorderSide(control);
+  static const BoxBorder boundaryBorder = Border.fromBorderSide(boundary);
+
   /// The brief's categorical recipe: a 10%-alpha wash of the category's own hue
   /// behind a full-strength foreground of the same hue.
   ///
@@ -252,8 +270,14 @@ class AppBorders {
   static Color categoricalWash(Color hue) => hue.withValues(alpha: 0.10);
 
   /// The 20%-alpha hairline that goes with [categoricalWash].
-  static BorderSide categoricalBorder(Color hue) =>
-      BorderSide(color: hue.withValues(alpha: 0.20), width: 1);
+  ///
+  /// **Returned as a [Border] rather than a [BorderSide]**, because its only
+  /// callers are `BoxDecoration`s and there is no call site that wants one edge of
+  /// it. See the note on [hairlineBorder] for why both shapes exist.
+  static Border categoricalBorder(Color hue) =>
+      Border.fromBorderSide(
+        BorderSide(color: hue.withValues(alpha: 0.20), width: 1),
+      );
 }
 
 /// The two typefaces, on one scale.

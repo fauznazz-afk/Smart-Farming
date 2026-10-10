@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius, AppCard;
+import '../../dashboard/utils/design_tokens.dart';
+import '../../../widgets/liquid_glass.dart';
 import '../utils/format_helpers.dart';
 
 class PeriodSelector extends StatelessWidget {

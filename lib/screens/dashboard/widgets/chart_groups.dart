@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../utils/color_helpers.dart';
-import '../utils/design_tokens.dart';
 
 /// What a chart plots, declared once and used by the request builder, the
 /// legend, the statistics row and the axis.
@@ -52,7 +51,7 @@ class ChartGroup {
   List<String> get keys => [for (final s in series) s.key];
 }
 
-ChartSeriesSpec _pv(int index, String key, String label, String unit) {
+ChartSeriesSpec _pv(String key, String label, String unit) {
   return ChartSeriesSpec(
     key: key,
     label: label,
@@ -61,7 +60,7 @@ ChartSeriesSpec _pv(int index, String key, String label, String unit) {
   );
 }
 
-ChartSeriesSpec _ac(int index, String key, String label, String unit) {
+ChartSeriesSpec _ac(String key, String label, String unit) {
   return ChartSeriesSpec(
     key: key,
     label: label,
@@ -70,7 +69,7 @@ ChartSeriesSpec _ac(int index, String key, String label, String unit) {
   );
 }
 
-ChartSeriesSpec _battery(int index, String key, String label, String unit) {
+ChartSeriesSpec _battery(String key, String label, String unit) {
   return ChartSeriesSpec(
     key: key,
     label: label,
@@ -101,34 +100,34 @@ ChartSeriesSpec _water(String key, String label, String unit) {
 List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
   'pv' => [
     ChartGroup('PV', [
-      _pv(0, 'voltage_dc', 'Voltage', 'V'),
-      _pv(1, 'current_dc', 'Current', 'A'),
-      _pv(2, 'power_dc', 'Power', 'W'),
-      _pv(3, 'energy_dc', 'Energy', 'Wh'),
+      _pv('voltage_dc', 'Voltage', 'V'),
+      _pv('current_dc', 'Current', 'A'),
+      _pv('power_dc', 'Power', 'W'),
+      _pv('energy_dc', 'Energy', 'Wh'),
     ]),
   ],
   'ac' => [
     ChartGroup('AC', [
-      _ac(0, 'voltage_ac', 'Voltage', 'V'),
-      _ac(1, 'current_ac', 'Current', 'A'),
-      _ac(2, 'power_ac', 'Power', 'W'),
-      _ac(3, 'frequency_ac', 'Frequency', 'Hz'),
-      _ac(4, 'energy_ac', 'Energy', 'Wh'),
-      _ac(5, 'pf_ac', 'Power Factor', ''),
+      _ac('voltage_ac', 'Voltage', 'V'),
+      _ac('current_ac', 'Current', 'A'),
+      _ac('power_ac', 'Power', 'W'),
+      _ac('frequency_ac', 'Frequency', 'Hz'),
+      _ac('energy_ac', 'Energy', 'Wh'),
+      _ac('pf_ac', 'Power Factor', ''),
     ]),
   ],
   'battery' => [
     ChartGroup('Battery', [
-      _battery(0, 'voltage', 'Voltage', 'V'),
-      _battery(1, 'current', 'Current', 'A'),
-      _battery(2, 'power', 'Power', 'W'),
-      _battery(3, 'soc', 'State of Charge', '%'),
-      _battery(4, 'cycles', 'Cycles', ''),
-      _battery(5, 'remain_capacity_ah', 'Remaining Capacity', 'Ah'),
-      _battery(6, 'full_capacity_ah', 'Full Capacity', 'Ah'),
+      _battery('voltage', 'Voltage', 'V'),
+      _battery('current', 'Current', 'A'),
+      _battery('power', 'Power', 'W'),
+      _battery('soc', 'State of Charge', '%'),
+      _battery('cycles', 'Cycles', ''),
+      _battery('remain_capacity_ah', 'Remaining Capacity', 'Ah'),
+      _battery('full_capacity_ah', 'Full Capacity', 'Ah'),
     ]),
   ],
-  'env' => const [
+  'env' => [
     ChartGroup('Temperature', [
       _env('temp_dht', 'Air', '°C'),
       _env('temp_ds18b20', 'Panel', '°C'),
@@ -143,7 +142,7 @@ List<ChartGroup> chartGroupsForPrefix(String prefix) => switch (prefix) {
       _env('tds_ppm', 'TDS', 'ppm'),
     ], height: _compactHeight),
   ],
-  'fish' => const [
+  'fish' => [
     ChartGroup('pH', [
       _water('ph', 'pH', ''),
     ], zeroAnchored: false, height: _compactHeight),

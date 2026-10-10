@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/alarm_rules.dart';
-import '../../../widgets/liquid_glass.dart'
+import '../../../widgets/liquid_glass.dart';
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 
@@ -36,7 +36,6 @@ class MetricGrid extends StatelessWidget {
     required this.title,
     required this.specs,
     required this.values,
-    required this.seedColor,
     this.columns = 3,
     this.thresholds,
     this.limitLabelFor,
@@ -48,7 +47,6 @@ class MetricGrid extends StatelessWidget {
   final String title;
   final List<MetricSpec> specs;
   final Map<String, double>? values;
-  final Color seedColor;
   final int columns;
   final AlarmThresholds? thresholds;
   final int staleMinutes;
@@ -111,7 +109,6 @@ class MetricGrid extends StatelessWidget {
                     value: values?[rows[rowIndex][i].key],
                     verdict: verdicts.verdictFor(rows[rowIndex][i]),
                     limit: limitLabelFor?.call(rows[rowIndex][i]),
-                    seedColor: seedColor,
                     showGridColors: showGridColors,
                   ),
                 ),
@@ -191,7 +188,6 @@ class _MetricCard extends StatelessWidget {
     required this.value,
     required this.verdict,
     required this.limit,
-    required this.seedColor,
     required this.showGridColors,
   });
 
@@ -199,7 +195,6 @@ class _MetricCard extends StatelessWidget {
   final double? value;
   final bool? verdict;
   final String? limit;
-  final Color seedColor;
   final bool showGridColors;
 
   @override

@@ -102,12 +102,11 @@ class DateStrip extends StatelessWidget {
             final fairShare =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
 
-            final needed =
-                _widestDayNameWidth(context) +
-                2 *
-                    (DateStripChip.horizontalPadding +
-                        DateStripChip.borderWidth) +
-                1;
+            // The chip's own padding is 8 per side. There is no border width to
+            // add any more: the unselected chip draws a 1px hairline, which sits
+            // *inside* the padding rather than outside it, so it changes the visual
+            // weight of the edge and not the box.
+            final needed = _widestDayNameWidth(context) + 16 + 1;
             final chipWidth = needed > fairShare ? needed : fairShare;
             final scrolls = chipWidth > fairShare + 0.5;
 
@@ -122,8 +121,8 @@ class DateStrip extends StatelessWidget {
                       width: chipWidth,
                       dayName: dayNameShort(days[i].weekday),
                       dayNumber: days[i].day,
-                      isSelected: rangeStart == null && _isSameDay(days[i], selectedDate),
-                      accentColor: accentColor,
+                      isSelected:
+                          rangeStart == null && _isSameDay(days[i], selectedDate),
                       onTap: () => onSelectDate(days[i]),
                     ),
                   ),

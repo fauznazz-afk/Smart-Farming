@@ -23,7 +23,6 @@ class ChartSectionHeader extends StatelessWidget {
     required this.rangeEnd,
     required this.realtimeConnected,
     required this.onPickRange,
-    required this.seedColor,
     this.refreshing = false,
   });
 
@@ -33,7 +32,6 @@ class ChartSectionHeader extends StatelessWidget {
   final DateTime? rangeEnd;
   final bool realtimeConnected;
   final VoidCallback onPickRange;
-  final Color seedColor;
   final bool refreshing;
 
   @override
@@ -109,7 +107,8 @@ class _MetricSpec {
   String get label => series.label;
   String get unit => series.unit;
 
-  Color color(bool isDark, Color accent) => series.color(isDark, accent);
+  Color color() =>
+      categoryColorForKey(series.key) ?? AppPalette.primary;
 }
 
 IconData _iconForSeries(ChartSeriesSpec spec) => switch (spec.key) {
@@ -157,12 +156,10 @@ class TelemetryChartCard extends StatelessWidget {
     required this.rangeStart,
     required this.rangeEnd,
     required this.onPointerActive,
-    required this.seedColor,
   });
 
   final String prefix;
   final ChartGroup group;
-  final Color seedColor;
   final Map<String, List<TelemetryPoint>> points;
   final Map<String, List<FlSpot>> spots;
   final Map<String, SeriesStats?> stats;
@@ -255,7 +252,7 @@ class TelemetryChartCard extends StatelessWidget {
         spec.unit,
         seriesPoints,
         spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        spec.color(false, accent),
+        spec.color(),
         stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,

@@ -249,9 +249,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppSurfaces.surface,
-                        border: Border.fromBorderSide(
-                          AppBorders.categoricalBorder(ringColor),
-                        ),
+                        border: AppBorders.categoricalBorder(ringColor),
                       ),
                       child: Icon(
                         _iconForType(alarm.type),
@@ -349,7 +347,9 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             child: AppSurface(
               radius: AppRadius.pill,
               fill: isSelected ? AppSurfaces.surfaceAlt : AppSurfaces.surface,
-              border: isSelected ? AppBorders.categoricalBorder(AppPalette.accent) : AppBorders.hairline,
+              border: isSelected
+                  ? AppBorders.categoricalBorder(AppPalette.accent)
+                  : AppBorders.hairlineBorder,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ChoiceChip(
                 label: Text(filter.label, style: AppType.labelMicro),
