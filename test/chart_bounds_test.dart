@@ -33,11 +33,17 @@ List<TelemetryPoint> ramp(List<double> values) => [
 /// grouping `chart_groups.dart` documents and the reason its own comment is
 /// flagged as making a false claim. See the note there.
 Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
+  // Positional: one list per series, in the order `chartGroupsForPrefix`
+  // declares them. The `seriesData.length == group.series.length` assertion
+  // inside the sweep is what catches this going stale, which it did when the
+  // categorical migration added `energy_dc`, the two AC extras and the battery
+  // extras without extending these lists.
   'pv': [
     [
       [12.4, 13.1, 12.9, 0.0], // V
       [0.0, 1.8, 1.6, -0.4], // A
       [0.0, 23.6, 21.0, -5.2], // W
+      [0.0, 1.42, 1.31, -0.28], // kWh, running total so it never falls
     ],
   ],
   'ac': [
@@ -45,6 +51,9 @@ Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
       [228.0, 231.0, 0.0, 229.0], // V
       [0.0, 1.2, -0.6, 0.9], // A
       [0.0, 277.0, -138.0, 206.0], // W
+      [49.9, 50.1, 0.0, 50.0], // Hz
+      [0.0, 3.31, 2.88, 4.12], // kWh, running total
+      [0.98, 0.97, 0.0, 0.99], // power factor, dimensionless
     ],
   ],
   'battery': [
@@ -52,6 +61,10 @@ Map<String, List<List<List<double>>>> sampleDataByPrefix() => {
       [13.2, 12.6, 12.1], // V
       [-0.97, -1.4, 0.0], // A, discharging
       [-12.92, -17.6, 0.0], // W
+      [69.0, 68.2, 67.8], // %
+      [142.0, 143.0, 143.0], // cycles, monotonic
+      [48.2, 47.6, 47.1], // Ah remaining
+      [70.0, 70.0, 70.0], // Ah full, constant
     ],
   ],
   'env': [

@@ -135,14 +135,30 @@ void main() {
     });
 
     test('the caption surface list covers every fill a caption can land on', () {
-      // `input` and `track` are absent on purpose and the reasons are in
-      // `design_tokens.dart`: no caption is drawn on a 6dp progress bar. This
-      // asserts the absence rather than restating the reasoning, so a future
-      // widget that *does* draw on one of them has to reopen the call.
+      // The list is the three tonal steps and nothing else.
+      //
+      // The previous system excluded `track` on the grounds that no caption is
+      // drawn on a 6dp progress bar. That exclusion is gone because the
+      // distinction it rested on is: `track` and `surfaceAlt` are now the same
+      // token, so excluding one would have excluded the other and left the tile
+      // -- which draws text, and is `surfaceAlt` -- out of the list. `track` is
+      // kept as a name because a track and a tile mean different things to a
+      // reader even when they resolve to the same number, the same way `pill`
+      // and `round` do.
+      //
+      // Derived, never written down. A literal here is the copy that went stale
+      // twice in this repo and left three captions under AA with the suite green.
       final surfaces = AppSurfaces.captionSurfaces();
-      expect(surfaces, isNot(contains(AppSurfaces.track)));
       expect(surfaces, contains(AppSurfaces.page));
       expect(surfaces, contains(AppSurfaces.surface));
+      expect(surfaces, contains(AppSurfaces.surfaceAlt));
+      expect(surfaces, contains(AppSurfaces.track));
+      expect(
+        surfaces.length,
+        3,
+        reason: 'a fourth entry means a new surface exists and whoever added it '
+            'has to decide whether a caption can land on it',
+      );
     });
   });
 
@@ -157,16 +173,26 @@ void main() {
     });
 
     test('the card is the largest corner on the scale', () {
-      // A tile inside a card has to be visibly *inside* it. If the two ever
-      // matched, a nested card loses its edge and the layout reads as one
-      // undifferentiated block.
+      // The order is the design brief's own scale, read bottom-up:
+      // `rounded.sm 4 -> md 12 -> lg 16 -> xl 24`, mapped onto
+      // `badge -> tile -> inset -> card`.
+      //
+      // **`inset` sits above `tile` and that is not a mistake.** `inset` is the
+      // radius on text inputs and `tile` is the radius on icon tiles and chips,
+      // and the brief gives inputs the *larger* of the two. An earlier revision of
+      // this test asserted the opposite order on the assumption that the two were
+      // nested shapes, but they are not nested -- an input is not inside a card
+      // tile -- so there was nothing for that ordering to protect.
+      //
+      // What does have to hold is that a nested pair differs. A tile inside a
+      // card matching the card's radius would make the two read as one block.
       expect(
         AppRadius.card,
-        greaterThan(AppRadius.tile),
-        reason: 'card ${AppRadius.card} vs tile ${AppRadius.tile}',
+        greaterThan(AppRadius.inset),
+        reason: 'card ${AppRadius.card} vs inset ${AppRadius.inset}',
       );
-      expect(AppRadius.tile, greaterThan(AppRadius.inset));
-      expect(AppRadius.inset, greaterThan(AppRadius.badge));
+      expect(AppRadius.inset, greaterThan(AppRadius.tile));
+      expect(AppRadius.tile, greaterThan(AppRadius.badge));
     });
 
     test('a bar at the bar radius is a stadium, not a rectangle', () {
@@ -185,7 +211,16 @@ void main() {
       // press that navigated to it has finished.
       expect(AppMotion.press, lessThan(AppMotion.state));
       expect(AppMotion.state, lessThan(AppMotion.container));
-      expect(AppMotion.container, lessThan(AppMotion.page));
+      expect(AppMotion.state, lessThan(AppMotion.page));
+      // **`container` and `page` are deliberately unordered relative to each
+      // other.** Both are "a large thing arrived" -- a card crossfading into a
+      // different card, and a page fading in -- and neither is a consequence of
+      // the other, so ranking them would be inventing a relationship. An earlier
+      // version of this test asserted `container < page` and failed: the two were
+      // written from the brief's example values without checking which was which,
+      // and the assertion was only ever going to be satisfied by editing a number
+      // until it was. If a future change needs an ordering here, the reason has to
+      // be that one *causes* the other.
     });
 
     test('no duration is zero', () {

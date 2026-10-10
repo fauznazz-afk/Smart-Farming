@@ -350,6 +350,21 @@ class _SocLine extends StatelessWidget {
   }
 }
 
+/// The style for a flow-row label.
+///
+/// **Left inheriting from `DefaultTextStyle` deliberately, and the reason is a
+/// failed hypothesis worth recording.** Setting every field here was tried,
+/// because the ambient style now carries [AppType]'s `letterSpacing: 0.12em` and
+/// an eleven-character `Discharging` at a 3.0 system scale plausibly gains 40 dp
+/// from that tracking -- enough to force a third line past `maxLines: 2`.
+///
+/// It made the symptom *worse*, not better: `Solar` went from `S…` to `…`, which
+/// means the slot collapsed rather than the text overran. So the tracking is not
+/// the cause and the width allocation is. Recorded because the next reader will
+/// have the same idea, and the measurement that refutes it is not free.
+///
+/// The three terms all share one height so a wrapped label cannot push its figure
+/// below the other two.
 TextStyle _termLabelStyle(BuildContext context) => DefaultTextStyle.of(context)
     .style
     .copyWith(fontSize: 11);

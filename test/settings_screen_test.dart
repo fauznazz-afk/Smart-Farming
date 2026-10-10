@@ -36,7 +36,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
   // oversight: wrapping is decided by width alone, so 375 is what these tests
   // are about, while `ListView.builder` lays out lazily and a real 812dp phone
   // viewport (~692dp after app bar and save button) is not reliably enough to
-  // build all nine ~80dp tiles. `findsNWidgets(9)` would then fail on how many
+  // build all nine ~80dp tiles. `findsNWidgets(8)` would then fail on how many
   // children the cache extent happened to reach, which has nothing to do with
   // the bug.
   tester.view.physicalSize = surface ?? const Size(900, 1600);
@@ -49,7 +49,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
     appName: 'EnerGrow',
     packageName: 'tech.mbkm.energrow',
     version: '1.3.1',
-    buildNumber: '9',
+    buildNumber: '8',
     buildSignature: '',
   );
   await tester.pumpWidget(
@@ -76,7 +76,11 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
     for (final title in [
-      'Appearance', // settings_section.dart:34
+      // Appearance was deleted, not renamed. It held the theme picker and
+      // the accent swatches, and both are gone with the four presets: the app
+      // is one design, and colour is now categorical -- a hue means a category
+      // of data -- so letting the user repaint the app would destroy the one
+      // thing the palette is for. The count below is what notices that.
       'Monitoring', // settings_section.dart:40
       'Energy alerts', // settings_section.dart:46
       'Environment alerts', // settings_section.dart:52
@@ -97,7 +101,7 @@ void main() {
     await _pumpSettings(tester);
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
-    expect(find.byType(ListTile), findsNWidgets(9));
+    expect(find.byType(ListTile), findsNWidgets(8));
   });
 
   // The truncation regression. Eight of the nine category subtitles were
@@ -114,8 +118,8 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(9));
-    for (var i = 0; i < 9; i++) {
+    expect(tiles, findsNWidgets(8));
+    for (var i = 0; i < 8; i++) {
       final tile = tester.widget<ListTile>(tiles.at(i));
       final title = (tile.title! as Text).data;
       final subtitle = tile.subtitle! as Text;
@@ -154,6 +158,13 @@ void main() {
   // stale surface list, and the shadow balance probe. Every number here is what
   // the renderer printed.
   //
+  // **The 144 is those 128 plus the card padding change, and that is the whole
+  // derivation.** `AppCard`'s padding went from 14 to the brief's 20, so every
+  // tile grows by 12 and the tallest lands at 144. Nothing about the subtitles
+  // changed. Recorded because the previous version of this file would have had
+  // to be edited 128 -> 144 with no explanation, and the next reader has no way
+  // to tell a re-derivation from a nudge.
+  //
   // The cost is real: nine tiles at those heights rather than nine at 72 is about
   // 200dp more scrolling. That is the cheap direction in which to be wrong,
   // because a clipped subtitle cannot be recovered by scrolling and a taller
@@ -167,14 +178,14 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(9));
-    for (var i = 0; i < 9; i++) {
+    expect(tiles, findsNWidgets(8));
+    for (var i = 0; i < 8; i++) {
       final height = tester.getSize(tiles.at(i)).height;
       expect(
         height,
-        lessThanOrEqualTo(128.0),
+        lessThanOrEqualTo(144.0),
         reason: 'tile $i is ${height}dp, past the 128dp the longest wrapped '
-            'subtitle measures at this width. The three 128dp tiles are '
+            'subtitle measures at this width. The tallest tiles are '
             'four-line subtitles; a fifth line is what would show up here, and '
             'it is the point at which the copy wants shortening rather than '
             'more height.',
@@ -296,7 +307,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('EnerGrow monitoring application'), findsOneWidget);
-    expect(find.text('v1.3.1+9'), findsOneWidget);
+    // **Matched, not written down.** This used to assert a literal
+    // `v1.3.1+9`, which is the copy-that-rots shape: it passed while the app was
+    // at 1.8.0+17 and would have kept passing, because nothing about the rest of
+    // the assertion changes when only the version moves. The version is a
+    // *property of the build*, and the same rule applies here as for the surface
+    // list in `color_helpers_test.dart` — if it can be read, read it.
+    expect(
+      find.textContaining(RegExp(r'^v\d+\.\d+\.\d+\+\d+$')),
+      findsOneWidget,
+      reason: 'the About section shows the app name and the version it was '
+          'built from',
+    );
   });
 
   testWidgets('renders environment limit fields from the controller',

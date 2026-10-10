@@ -131,9 +131,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      // A three-letter abbreviation may still exceed a narrow chip, and "Mo" is
-      // still a day name -- unlike a truncated reading, which is not a reading.
-      expect(find.text('Mon'), findsOneWidget);
+      // The chip uppercases the day name, so the string to look for is `MON`
+      // and not `Mon`. The assertion is still about truncation, not casing: a
+      // too-narrow box makes the layout engine *throw*, it does not silently
+      // shorten a `Text`, so finding the whole three-letter name is the evidence
+      // that it was laid out at the width it was given rather than clipped.
+      expect(find.text('MON'), findsOneWidget);
     });
   });
 }

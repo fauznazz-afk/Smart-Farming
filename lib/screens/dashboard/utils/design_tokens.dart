@@ -280,13 +280,26 @@ class AppBorders {
       );
 }
 
-/// The two typefaces, on one scale.
+/// The three typefaces, on one scale.
 ///
-/// **Three weights, no middle.** The brief is emphatic about this and it is the
-/// rule most likely to be quietly broken: numerals and headlines are 900, labels
-/// are 700, body is 500. There is no 400 and no 600 anywhere in the app, and
-/// `test/type_scale_test.dart` asserts that on the actual rendered styles rather
-/// than on this file.
+/// **Two weights per family, no middle.** Numerals and headlines are 700, labels
+/// are 700, body is 500. There is no 400 and no 600 anywhere in the app.
+///
+/// **The ceiling is 700 and that is the typeface's, not the design's.** The brief
+/// asks for weight 900 on every numeral and headline, and this file originally
+/// said `FontWeight.w900` in four places. Space Grotesk's variable axis stops at
+/// 700 — that is the family's genuine maximum, read from the `fvar` table of the
+/// master, not inferred — so no 900 exists to bundle. Declaring 900 anyway does
+/// not fail: `flutter analyze` is clean, the release APK builds, and every test
+/// passes, because Flutter synthesises the extra weight by smearing the 700
+/// outlines. The result is a heading that looks slightly smeared at 36px and is
+/// slightly wrong everywhere. It is recorded here because "900" is the number in
+/// the brief and the next reader should find out why it is not in the file.
+///
+/// The reference screen settles it: its display weight is a heavy grotesque, not
+/// a black, and 700 reproduces it. Choosing a different family to reach a 900
+/// would have been the larger deviation — a different typeface is a visible
+/// change on every screen, a weight ceiling is invisible.
 ///
 /// Space Grotesk carries every numeral, which is the load-bearing choice: the
 /// data is the hero on every card, and a humanist sans at tabular figures does
@@ -307,38 +320,39 @@ class AppType {
 
   // ── Numerals ────────────────────────────────────────────────────────────────
 
-  /// The hero figure on a card. 36px, black, tight.
+  /// The hero figure on a card. 36px, bold, tight. See the note on [AppType] for why
+  /// this is 700 and not the 900 the brief asks for.
   static const TextStyle numeralXl = TextStyle(
     fontFamily: heading,
     fontSize: 36,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     height: 1,
     letterSpacing: -0.02 * 36,
   );
 
-  /// A secondary figure, or a screen title. 24px, black.
+  /// A secondary figure, or a screen title. 24px, bold.
   static const TextStyle numeralLg = TextStyle(
     fontFamily: heading,
     fontSize: 24,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     height: 1.1,
     letterSpacing: -0.01 * 24,
   );
 
-  /// A screen title. 30px, black, uppercase.
+  /// A screen title. 30px, bold, uppercase.
   static const TextStyle displayLg = TextStyle(
     fontFamily: heading,
     fontSize: 30,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     height: 1,
     letterSpacing: -0.025 * 30,
   );
 
-  /// A secondary screen title. 24px, black.
+  /// A secondary screen title. 24px, bold.
   static const TextStyle displayMd = TextStyle(
     fontFamily: heading,
     fontSize: 24,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     height: 1.1,
     letterSpacing: -0.02 * 24,
   );
