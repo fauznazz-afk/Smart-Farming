@@ -91,31 +91,21 @@ double glassNavBarReservedHeight(BuildContext context) {
   return glassNavBarReservedHeightFor(MediaQuery.paddingOf(context).bottom);
 }
 
-/// Floating glass navigation bar that collapses to a single button when the
-/// user scrolls down, and expands again on scroll up or tap.
+/// Flat bottom navigation bar.
+///
+/// The brief's tab bar: a flat dark bar with a hairline top border, active item
+/// = `primary` with no pill background and no underline, inactive = muted,
+/// labels `AppType.labelMicro`. No shadow pair, no gradient, no glass.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
     required this.selectedIndex,
-    required this.theme,
-    required this.seedColor,
     required this.collapsed,
     required this.onSelect,
     required this.onExpand,
   });
 
   final int selectedIndex;
-
-  /// The appearance to paint, as an `AppTheme`.
-  ///
-  /// Required rather than a `bool`, because this bar draws a shadow pair and a
-  /// chrome fill and *all four* `AppElevation` pairs have their own Dracula set —
-  /// a boolean would silently put the app's dark alphas on Dracula's lighter
-  /// page. Threaded down from the dashboard like every other card in the frame,
-  /// so the bar and the cards above it cannot disagree.
-  final AppTheme theme;
-
-  final Color seedColor;
   final ValueNotifier<bool> collapsed;
   final ValueChanged<int> onSelect;
   final VoidCallback onExpand;
@@ -125,75 +115,20 @@ class GlassNavBar extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: collapsed,
       builder: (context, isCollapsed, _) {
-        final primary = strongMetricColor(
-          seedColor: seedColor,
-          index: selectedIndex,
-          theme: theme,
-        );
         return SafeArea(
           top: false,
-          // 24, not 14, and not 10.
-          //
-          // This has to equal the page's horizontal margin
-          // (`_pageHorizontalMargin` in `dashboard_screen.dart`) or the pill sits
-          // proud of the content column and every page shows a 10dp step at the
-          // bottom. It was 14 against a 16dp page, which was a 2dp step nobody
-          // could see, and became a 10dp one when the page went to 24 to make
-          // room for the ambient shadow.
-          //
-          // It was not raised when the page margin was, because the two look
-          // independent and are not. The nav bar suffers the identical clipped
-          // ambient at 14dp that the cards suffered at 16, so this fixes its
-          // own shadow at the same time.
-          //
-          // The 10 bottom is the gesture inset and is unrelated to the
-          // horizontal question.
           minimum: EdgeInsets.fromLTRB(24, 0, 24, kGlassNavBarBottomGap),
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
               height: kGlassNavBarHeight,
               child: Align(
-                // Centred, not left. The bar was left-aligned when it became
-                // content-sized, which was correct at the time and wrong on
-                // screen: four icons hard against the left edge with a third of
-                // a phone empty on the right reads as an accident rather than as
-                // a deliberate floating control. Centring it puts the empty space
-                // on both sides, where it reads as the margin it is.
                 alignment: Alignment.bottomCenter,
                 child: LayoutBuilder(
                   builder: (context, constraints) => AnimatedContainer(
                     duration: AppMotion.container,
                     curve: AppMotion.both,
-                    // The width animation stays. It is a layout animation, so a
-                    // collapse re-lays out this subtree once per frame, and a
-                    // transform-only replacement was evaluated and rejected:
-                    //
-                    //  * `Transform.scale` on the bar squashes the row, the
-                    //    labels and the pill's own radius, so the pill stops
-                    //    being a circle and "Hydroponics" deforms with it.
-                    //  * Scaling only the shadow layer leaves the fill running
-                    //    the full width underneath it.
-                    //  * Clipping to the 64dp window with an opaque mask drawn
-                    //    over the right-hand side cuts the bar's own drop shadow
-                    //    off mid-blur. A hard shadow edge is visible in a way the
-                    //    layout cost is not, and no test in the suite would have
-                    //    caught it.
-                    //
-                    // What is true is that this is the only layout animation in
-                    // the bar, that the whole bar sits inside the `RepaintBoundary`
-                    // above, and that the shadows are interpolated per frame
-                    // rather than rebuilt: `AnimatedContainer` lerps a
-                    // `Decoration`, and `BoxDecoration.lerp` lerps `BoxShadow`.
                     alignment: Alignment.centerLeft,
-                    // Sized to its contents, not to the screen.
-                    //
-                    // A full-width bar for four icons leaves a third of a phone
-                    // with nothing in it, and the destinations are already
-                    // named by the header of the page each one opens -- so the
-                    // width was carrying no information. 56dp a slot is four
-                    // times the icon with a 48dp target inside it, and the cap
-                    // keeps it sane if a fifth tab ever arrives.
                     width: isCollapsed
                         ? kGlassNavBarHeight
                         : math.min(
@@ -202,58 +137,12 @@ class GlassNavBar extends StatelessWidget {
                           ),
                     height: kGlassNavBarHeight,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      // The same dual-shadow pair every card in the app uses, so
-                      // the bar is lit from the same place as the content above
-                      // it. It had one `black @ 0.40` drop shadow and nothing
-                      // catching light on the other side, which is the old
-                      // glass model rather than the current one.
-                      //
-                      // The theme's own pair, not the dark one reached through
-                      // `isDark`: Dracula solves its own alphas, and this bar sits
-                      // over the page margin where its ambient shadow is at its
-                      // most visible.
-                      boxShadow: AppElevation.raised(theme),
+                      color: AppSurfaces.surface,
+                      border: const Border(top: AppBorders.hairline),
                     ),
-                    // A `Material` here, before the `InkWell`s below, and not
-                    // only at the Scaffold.
-                    //
-                    // The bar's own fill is opaque, and the nearest Material
-                    // above it belongs to the Scaffold, whose ink layer paints
-                    // *below* this Container. So the tap ripple on a nav item
-                    // was drawn and then immediately covered: pressing a tab
-                    // gave no feedback at all. It used to leak a trace because
-                    // the fill was `0xEE101412` at 92% alpha, which is not a
-                    // reason to keep a translucent bar.
-                    //
-                    // `MaterialType.transparency` rather than a real Material
-                    // because the fill is already painted by the Container
-                    // below; this one exists only to own the ink.
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       child: Material(
                         type: MaterialType.transparency,
-                        child: Container(
-                        decoration: BoxDecoration(
-                          // Opaque, like every other surface. It was
-                          // `0xEE101412` and `white @ 0.92`, and the only thing
-                          // those alphas revealed was the page — which
-                          // `AppSurfaces.chrome` already steps away from by one
-                          // value, so the translucency bought nothing.
-                          // Lit from above through `AppSkeuo`, which only ever
-                          // moves away from the labels on the bar.
-                          gradient: AppSkeuo.fillGradient(
-                            AppSurfaces.chrome(theme),
-                            foreground: AppSkeuo.textSide(theme),
-                          ),
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(
-                            color: AppElevation.hairline(
-                              accent: primary,
-                              theme: theme,
-                            ),
-                          ),
-                        ),
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
@@ -270,23 +159,12 @@ class GlassNavBar extends StatelessWidget {
                                     for (var i = 0;
                                         i < kNavDestinations.length;
                                         i++)
-                                      // Sized rather than `Expanded`, because
-                                      // the bar is now as wide as its contents and
-                                      // an `Expanded` inside an unbounded-looking
-                                      // row would just re-inflate it back to the
-                                      // full width. The 48 box is still the tap
-                                      // target; the padding around it is the
-                                      // breathing room that used to come from the
-                                      // extra width.
                                       SizedBox(
                                         width: 48,
                                         child: _NavItem(
                                           index: i,
                                           destination: kNavDestinations[i],
                                           selectedIndex: selectedIndex,
-                                          theme: theme,
-                                          seedColor: seedColor,
-                                          primary: primary,
                                           onTap: () => onSelect(i),
                                         ),
                                       ),
@@ -302,8 +180,6 @@ class GlassNavBar extends StatelessWidget {
                                 curve: AppMotion.both,
                                 child: _CollapsedNavItem(
                                   selectedIndex: selectedIndex,
-                                  theme: theme,
-                                  primary: primary,
                                   onTap: onExpand,
                                 ),
                               ),
@@ -317,7 +193,6 @@ class GlassNavBar extends StatelessWidget {
               ),
             ),
           ),
-        ),
         );
       },
     );
@@ -327,19 +202,10 @@ class GlassNavBar extends StatelessWidget {
 class _CollapsedNavItem extends StatelessWidget {
   const _CollapsedNavItem({
     required this.selectedIndex,
-    required this.theme,
-    required this.primary,
     required this.onTap,
   });
 
   final int selectedIndex;
-
-  /// See [GlassNavBar.theme]. The collapsed circle is a raised block in the
-  /// accent that flattens into the bar when pressed, so it needs both the
-  /// `raised` and the `pressed` pair, and both are per-theme.
-  final AppTheme theme;
-
-  final Color primary;
   final VoidCallback onTap;
 
   @override
@@ -362,25 +228,12 @@ class _CollapsedNavItem extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                // The accent fill, and the one place a nav item is a *coloured*
-                // surface: it is the only element in the bar that is not a
-                // neutral, and it is what tells the user where they are. The
-                // press flattens it into the bar, same as an expanded item.
-                // A white glyph on the accent, so the accent is lit by
-                // darkening its lower half rather than lightening the top.
-                gradient: AppSkeuo.fillGradient(
-                  primary,
-                  foreground: Colors.white,
-                  travel: AppSkeuo.controlTravel,
-                ),
-                boxShadow: pressed
-                    ? AppElevation.pressed(theme)
-                    : AppElevation.raised(theme),
+                color: AppPalette.primary,
               ),
               child: Icon(
                 destination.selectedIcon,
                 size: 22,
-                color: Colors.white,
+                color: AppPalette.onHue,
               ),
             ),
           ),
@@ -395,82 +248,29 @@ class _NavItem extends StatelessWidget {
     required this.index,
     required this.destination,
     required this.selectedIndex,
-    required this.theme,
-    required this.seedColor,
-    required this.primary,
     required this.onTap,
   });
 
   final int index;
   final NavDestination destination;
-
-  /// The bar's selected tab, as the `int` it always was.
-  ///
-  /// This used to arrive as a `double page` and be compared with
-  /// `page.round() == index`, which is a value converted to a double and
-  /// rounded straight back to the integer it was created from. The round trip
-  /// was for a sliding indicator that was never built, and it cost nothing to
-  /// read and something to trust: any future non-integral value would have
-  /// silently selected the nearest tab instead of none.
   final int selectedIndex;
-
-  /// See [GlassNavBar.theme].
-  final AppTheme theme;
-
-  final Color seedColor;
-  final Color primary;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final selected = selectedIndex == index;
-    // This colour is used for the icon AND the 11sp w600 label, so it is text,
-    // not decoration. It was the accent at alpha 0.72, which composites the
-    // saturated accent over the chrome surface and lands near 3:1 in light mode
-    // — under the 4.5:1 that applies below the 18.66px large-text floor.
-    // `metricColor` is the measured accent at full strength; the alpha existed
-    // to soften the icon, and softening is what cost the contrast.
-    final tint = metricColor(
-      seedColor: seedColor,
-      index: index,
-      theme: theme,
-    );
-    // Not `Expanded`. The bar is sized to its contents now, so an `Expanded`
-    // here would ask for all the remaining width and put the bar straight back
-    // to full screen -- which is exactly what it was before. The caller wraps
-    // this in a fixed 48 box, so the tap target is unchanged.
     return Semantics(
       button: true,
       selected: selected,
       label: destination.label,
       child: InkWell(
         onTap: onTap,
-        // The bar's own pill radius, so a ripple on one item follows the
-        // shape of the container it sits in rather than a bare 20 that
-        // happened to match the old card radius.
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: SizedBox(
           height: kGlassNavBarHeight,
           child: Center(
-            // The `AnimatedSwitcher` is gone and this is the interesting part
-            // of that. It existed to cross-fade the selected circle and the bare
-            // icon, which is right for a *selection change* — but it also
-            // re-ran on every press, because selecting is a press. So tapping
-            // the tab you are already on started a 200ms cross-fade between
-            // two copies of the same circle, and the old shadow list did not
-            // match the new one, so the circle flickered through an
-            // interpolated pair on the way.
-            //
-            // The icon is now always the same widget and only its colour and
-            // glyph change, which is an `AnimatedDefaultTextStyle`-sized
-            // problem rather than a subtree swap. Selection still animates --
-            // through the shadow pair, which is the thing that actually carries
-            // the difference.
             child: _NavDestination(
               selected: selected,
-              primary: primary,
-              tint: tint,
-              theme: theme,
               selectedIcon: destination.selectedIcon,
               icon: destination.icon,
             ),
@@ -481,96 +281,50 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-/// The pressed state of a nav destination.
-///
-/// **The bar had a ripple and nothing else, and on this surface a ripple is
-/// close to invisible** — the icon is a flat 22dp glyph on a flat chrome fill,
-/// the splash is a low-alpha wash of the same hue, and both sit inside a
-/// transparent `Material` over an opaque fill. A pressed tab looked like the app
-/// had dropped a frame.
-///
-/// What it needed was a *geometric* change, not a colour one, and it is the same
-/// distinction the date chips make: the selected circle is a raised block, so
-/// pressing it flattens it into the bar, while an unselected icon has nothing to
-/// flatten, so pressing it cuts a well around itself. Using one pair for both
-/// would mean either a block that sinks or a well that pops out, and only one of
-/// those is what the finger asked for.
+/// A nav destination: glyph + label, coloured by selection only.
 class _NavDestination extends StatelessWidget {
   const _NavDestination({
     required this.selected,
-    required this.primary,
-    required this.tint,
-    required this.theme,
     required this.selectedIcon,
     required this.icon,
   });
 
   final bool selected;
-  final Color primary;
-  final Color tint;
-
-  /// See [GlassNavBar.theme].
-  ///
-  /// This one draws **three** different pairs from the same widget: `raised` and
-  /// `pressed` for the selected block, and `insetDeep` for an unselected glyph
-  /// being pressed. Each has its own Dracula set, and the sign of every offset
-  /// differs between the two branches — which is the mistake the comment below
-  /// warns about, and the reason this cannot be collapsed to one lookup.
-  final AppTheme theme;
-
   final IconData selectedIcon;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
+    final color = selected ? AppPalette.primary : AppSurfaces.onSurfaceVariant;
     return Pressable(
-      // 0.90 rather than the 0.985 default: this is the smallest tap target in
-      // the app's chrome and it is already flush inside a 52dp pill, so it has
-      // to give noticeably for the press to register at all.
       pressedScale: 0.90,
       builder: (pressed) => AnimatedContainer(
         duration: AppMotion.press,
         curve: AppMotion.enter,
         width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          // The selected destination is a raised block in the accent; an
-          // unselected one is nothing at all, just a glyph on the bar.
-          //
-          // The filled circle was removed with the `AnimatedSwitcher` and should
-          // not have been: it was the only thing telling the user where they
-          // are, and an accent-coloured glyph on a chrome fill is a much weaker
-          // signal — a hue is easy to miss on a small icon, a 44dp disc is not.
-          // What went wrong was the cross-fade, not the circle.
-          // Same white glyph on the accent as the expanded item, so the same
-          // direction: the lower half darkens, the top stays the accent.
-          gradient: selected
-              ? AppSkeuo.fillGradient(
-                  primary,
-                  foreground: Colors.white,
-                  travel: AppSkeuo.controlTravel,
-                )
-              : null,
-          color: selected ? null : Colors.transparent,
-          boxShadow: selected
-              // A block coming up off the page flattens into it.
-              ? (pressed
-                  ? AppElevation.pressed(theme)
-                  : AppElevation.raised(theme))
-              // An icon with no block of its own gains a well around it.
-              : (pressed ? AppElevation.insetDeep(theme) : null),
-        ),
-        child: Icon(
-          selected ? selectedIcon : icon,
-          size: 22,
-          // White on the accent, which is the one place the app puts light text
-          // on a saturated fill. `filledButtonTheme` in `main.dart` measures this
-          // pair for the same reason and lands on the same answer.
-          color: selected ? Colors.white : tint,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? selectedIcon : icon,
+              size: 22,
+              color: color,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              destination.label,
+              style: AppType.labelMicro.copyWith(color: color),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
+  NavDestination get destination =>
+      kNavDestinations[selectedIndex];
+  int get selectedIndex =>
+      kNavDestinations.indexWhere(
+        (d) => d.selectedIcon == selectedIcon,
+      );
+}

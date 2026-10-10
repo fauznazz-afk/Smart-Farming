@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/charts/chart_data.dart';
-import '../../dashboard/utils/design_tokens.dart';
+import '../../dashboard/utils/design_tokens.dart'
+    show AppRadius;
 import '../../../services/energy_report_service.dart';
 
 /// The Y axis interval for the energy report, and the maximum it implies.
@@ -55,26 +56,23 @@ List<BarChartGroupData> createBarChartGroups({
   required List<EnergyBucket> buckets,
   required bool monthly,
 }) {
+  final pvColor = categoryColor(MetricCategory.pv);
+  final acColor = categoryColor(MetricCategory.ac);
   return [
     for (var i = 0; i < buckets.length; i++)
       BarChartGroupData(
         x: i,
         barsSpace: 2,
         barRods: [
-          // The amber and blue are the documented device-series exception in
-          // AGENTS.md, not the app accent, so they are left as literals. Only
-          // the radius moves onto the scale: a 3dp radius on a 6dp-wide rod is
-          // effectively square, which is why the same object was written with
-          // five different values elsewhere in the app.
           BarChartRodData(
             toY: buckets[i].pvKwh,
-            color: const Color(0xFFFFC857),
+            color: pvColor,
             width: monthly ? 6 : 8,
             borderRadius: BorderRadius.circular(AppRadius.bar),
           ),
           BarChartRodData(
             toY: buckets[i].acKwh,
-            color: const Color(0xFF69B7FF),
+            color: acColor,
             width: monthly ? 6 : 8,
             borderRadius: BorderRadius.circular(AppRadius.bar),
           ),
@@ -98,7 +96,6 @@ List<BarChartGroupData> createBarChartGroups({
 AxisTitles createLeftTitles({
   required double maxY,
   required double interval,
-  required bool isDark,
 }) {
   return AxisTitles(
     sideTitles: SideTitles(
@@ -117,7 +114,7 @@ AxisTitles createLeftTitles({
           value.toStringAsFixed(2),
           style: TextStyle(
             fontSize: 9,
-            color: faintColor(isDark),
+            color: faintColor,
           ),
         ),
       ),
@@ -129,7 +126,6 @@ AxisTitles createLeftTitles({
 AxisTitles createBottomTitles({
   required List<EnergyBucket> buckets,
   required bool monthly,
-  required bool isDark,
 }) {
   return AxisTitles(
     sideTitles: SideTitles(
@@ -151,7 +147,7 @@ AxisTitles createBottomTitles({
             text,
             style: TextStyle(
               fontSize: 9,
-              color: faintColor(isDark),
+              color: faintColor,
             ),
           ),
         );

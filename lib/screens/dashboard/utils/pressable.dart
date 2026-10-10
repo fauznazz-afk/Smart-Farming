@@ -10,27 +10,20 @@ import '../utils/design_tokens.dart';
 /// flag added a small extra shadow; it did not invert the surface, which is the
 /// only thing that reads as a press in this style.
 ///
-/// The animation is a swap between [AppElevation.raised] and
-/// [AppElevation.pressed], not a fade between them, and the reason is the
-/// light-source rule. Every surface in the app is lit from the top left. A press
-/// puts the light source *inside* the object, so the bounce that was up and to
-/// the left has to arrive from down and to the right instead. Cross-fading the
-/// two pairs spends the middle of the animation with a dark halo and a light
-/// halo in their old positions simultaneously, and that reads as a rendering
+/// The old animation was a swap between the neumorphic [AppElevation.raised] and
+/// [AppElevation.pressed] shadow pairs, not a fade, because the light-source rule
+/// required the bounce to flip direction on press. Every surface in the app was lit from the top left. A press
+/// put the light source *inside* the object, so the bounce that was up and to
+/// the left had to arrive from down and to the right instead. Cross-fading the
+/// two pairs spent the middle of the animation with a dark halo and a light
+/// halo in their old positions simultaneously, and that read as a rendering
 /// fault rather than as a button being held.
 ///
-/// So this animates the whole decoration. The two pairs have different lengths
-/// — three shadows raised, two pressed — and `BoxDecoration.lerp` pads the
-/// shorter one with transparent shadows rather than matching them up positionally,
-/// which is the correct behaviour here: a transparent shadow contributes
-/// nothing, so the contact shadow simply fades out on its own.
-///
-/// The scale nudge is 1.5%, which is below the threshold where a control starts
-/// to look like it is shrinking, and it is on the *whole* widget rather than the
-/// shadow so the icon inside moves with it. Without the nudge the shadow change
-/// alone is easy to miss on a surface that is the same colour as its
-/// background — which is the defining constraint of this style and the reason
-/// the shadow pair cannot be the only cue.
+/// **Under the new flat categorical system, press feedback is opacity and colour
+/// only (via [AppCard.pressed] which steps the fill darker), not geometry.** The
+/// shadow system is gone. The scale nudge is 1.5%, which is below the threshold
+/// where a control starts to look like it is shrinking, and it is on the *whole*
+/// widget rather than the shadow so the icon inside moves with it.
 ///
 /// `AppMotion.press` is 150ms down. The release is deliberately faster at 120ms:
 /// a finger lifting should feel like release rather than like a slow settle, and

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/design_tokens.dart';
-import '../../../theme/app_theme_of.dart';
+import '../../dashboard/utils/color_helpers.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
 
@@ -23,25 +23,9 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // `appThemeOf` rather than `theme.brightness == Brightness.dark`, and the
-    // difference is three modes rather than two: Dracula hands `MaterialApp`
-    // [ThemeMode.dark], so a brightness comparison here would put a Dracula
-    // card on the app's dark ramp. Neither this widget nor `SettingsIconBadge`
-    // has the `SettingsController` — they are built by `SettingsScreen` from a
-    // title and an icon — so the context is the only thing they can read, and
-    // `appThemeOf` is the resolver that can answer the question. See that file
-    // for the contract on `main.dart` it depends on.
-    final appTheme = appThemeOf(context);
-    // Was a `Material` in `surfaceContainerLow` with a 16dp radius and no
-    // border at all. `AppCard` is the page colour with the dual-shadow pair and
-    // the accent hairline, which is how every other card in the app is drawn.
-    // It also brings its own `RepaintBoundary`, so a section that repaints
-    // (a dropdown opening, a value changing) no longer repaints the list
-    // behind it.
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(
-        theme: appTheme,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +53,7 @@ class SectionCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.only(left: 44, top: 8),
-              child: AppDivider(theme: appTheme, opacity: 0.12),
+              child: AppDivider(opacity: 0.12),
             ),
             const SizedBox(height: 4),
             child,
@@ -82,21 +66,8 @@ class SectionCard extends StatelessWidget {
 
 /// Circular accent icon container used as a section/list leading.
 ///
-/// It was a solid `primary` circle, which put a saturated block of the accent
-/// immediately left of neutral grey text in every row. That is the "two
-/// palettes on screen at once" failure described in AGENTS.md: a user who
-/// picked "Ocean cyan" got a cyan badge that no other icon badge in the app
-/// draws that way. It is now the same wash-and-edge treatment every other
-/// leading icon uses, at the same 34dp.
-///
-/// 34dp is deliberate and below the 48dp target size, which is fine: this is a
-/// `ListTile.leading` beside a whole-row tap target, not a control in its own
-/// right. A screen reader never focuses it separately.
-///
-/// The `controlEdge` border measures 1.54:1 on the light page, not the 3:1
-/// WCAG 1.4.11 wants, because an alpha tint of a light accent cannot reach it
-/// on a light background. It is the strongest edge the token layer has. Raised
-/// in the report as a token-level decision.
+/// Flat circle with [AppSurfaces.surface] fill, [AppBorders.control] border,
+/// and [AppPalette.accent] icon.
 class SettingsIconBadge extends StatelessWidget {
   const SettingsIconBadge({super.key, required this.icon});
 
@@ -104,34 +75,15 @@ class SettingsIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final appTheme = appThemeOf(context);
-    final accent = theme.colorScheme.primary;
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(-0.3, -0.3),
-          radius: 0.7,
-          colors: [
-            accent.withValues(alpha: appTheme.isDark ? 0.30 : 0.20),
-            accent.withValues(alpha: appTheme.isDark ? 0.15 : 0.06),
-          ],
-        ),
+        color: AppSurfaces.surface,
         shape: BoxShape.circle,
-        border: Border.all(
-          color: AppElevation.controlEdge(accent: accent, theme: appTheme),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.15),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.fromBorderSide(AppBorders.control),
       ),
-      child: Icon(icon, color: accent, size: 19),
+      child: Icon(icon, color: AppPalette.accent, size: 19),
     );
   }
 }
@@ -337,25 +289,9 @@ class SaveSettingsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: AppRadius.all(AppRadius.pill),
-        boxShadow: saving
-            ? null
-            : [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-      ),
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
       child: FilledButton.icon(
         onPressed: saving ? null : onPressed,
         icon: saving
@@ -365,6 +301,15 @@ class SaveSettingsButton extends StatelessWidget {
               )
             : const Icon(Icons.save),
         label: Text(saving ? 'Saving...' : 'Save settings'),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppPalette.primary,
+          foregroundColor: AppPalette.onHue,
+          textStyle: AppType.labelUppercase,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.all(AppRadius.pill),
+          ),
+          padding: EdgeInsets.zero,
+        ),
       ),
     );
   }

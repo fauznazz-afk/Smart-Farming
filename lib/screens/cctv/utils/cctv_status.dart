@@ -46,9 +46,9 @@ extension CctvStatusDisplay on CctvStatus {
   /// WCAG 1.4.11 exempts it as part of a graphic that is not the sole carrier of
   /// the information. It keeps its distinct hue for exactly that reason.
   Color get color => switch (this) {
-    CctvStatus.live => const Color(0xFF58D68D),
-    CctvStatus.offline => const Color(0xFFFF765E),
-    CctvStatus.standby || CctvStatus.connecting => const Color(0xFFFFC857),
+    CctvStatus.live => statusOk,
+    CctvStatus.offline => statusBadFill,
+    CctvStatus.standby || CctvStatus.connecting => statusWarn,
   };
 
   /// The status colour to draw the *label* in.
@@ -68,10 +68,10 @@ extension CctvStatusDisplay on CctvStatus {
   /// on screen. That is reported rather than fixed here: inventing a fourth hue
   /// to separate them would be the automatic hue variation AGENTS.md forbids,
   /// and a deliberate alternative has to be a choice the lead makes.
-  Color textColor(bool isDark) => switch (this) {
-    CctvStatus.live => statusOk(isDark),
-    CctvStatus.offline => statusBad(isDark),
-    CctvStatus.standby || CctvStatus.connecting => statusWarn(isDark),
+  Color get textColor => switch (this) {
+    CctvStatus.live => statusOk,
+    CctvStatus.offline => statusBad,
+    CctvStatus.standby || CctvStatus.connecting => statusWarn,
   };
 
   /// Whether the video surface should be mounted behind the overlays.

@@ -2,383 +2,258 @@ import 'package:flutter/material.dart';
 
 import 'design_tokens.dart';
 
-/// Dracula's purple, `#BD93F9`, and the seed the Dracula preset is built on.
+/// The categories of data this app shows, and the hue each one owns.
 ///
-/// **Dracula's own purple already clears AA on every surface in the theme, and
-/// that is the finding that makes the preset affordable.** Measured against the
-/// Dracula ramp, at full opacity:
+/// **This replaces an accent seed, and that is the single biggest reversal in
+/// the app.** The previous system let the user pick one accent from four
+/// swatches, and `metricColor` accepted an `index` that it *deliberately
+/// ignored* — there was a test that failed loudly if it ever started using it,
+/// because "a colour the user did not choose is a colour they cannot predict".
+/// That reasoning was sound for a single-accent app. It does not survive a
+/// design whose entire premise is that a category of data owns a hue and every
+/// appearance of that category reuses it. The rule has been inverted on
+/// purpose, and `test/color_helpers_test.dart` has been rewritten to assert the
+/// inversion rather than forbid it.
 ///
-/// | surface            | ratio  | | surface      | ratio  |
-/// |--------------------|--------|-|--------------|--------|
-/// | page `#282A36`     | 5.90:1 | | input `#21222C` | 6.55:1 |
-/// | chrome `#343746`   | 4.89:1 | | track `#1E1F29` | 6.78:1 |
-///
-/// 4.89 on the chrome step is the binding one, because chrome is the lightest
-/// surface in the ramp — 0.0390 of relative luminance against the page's
-/// 0.0237 — so anything that clears it clears the rest. So the seed is
-/// Dracula's palette value verbatim and is not re-derived.
-///
-/// **The pipeline is what breaks it, not the colour.** Carried through the
-/// existing accent functions as a plain dark-mode seed it comes out as
-/// `#A479E2` at **4.35:1** on the page and 3.60:1 on chrome, and
-/// `strongMetricColor` gives `#975CEB` at 3.42:1, which is under AA by a mile.
-/// Through `ColorScheme.fromSeed` it is worse still — primary lands on
-/// `#6B538C`, a colour that is both far too dark and visibly not Dracula
-/// purple, and the reason is that Material's tonal mapping darkens a seed to
-/// stay legible on a *light* surface, which is exactly the wrong direction here.
-///
-/// The other Dracula hues were measured on `#282A36` for the same comparison:
-/// green 8.90:1, cyan 8.03:1, orange 7.22:1, pink 5.18:1 — all compliant, and
-/// all rejected as the accent anyway. Purple is what people mean when they say
-/// "Dracula", and picking green would be a second place where the app decides a
-/// colour on the user's behalf.
-const Color draculaAccent = Color(0xFFBD93F9);
+/// What did **not** reverse is the other half of that rule, which is the one
+/// that actually mattered: a hue is never assigned to something that has no
+/// category, and a hue never means two things. See [categoryColor] for the
+/// collision analysis and the two places where the palette made that hard.
+enum MetricCategory {
+  /// Solar generation. `voltage_dc`, `current_dc`, `power_dc`, `energy_dc`.
+  pv,
 
-/// Skeuo's two accents, exactly as the design brief states them.
-///
-/// **Amber is the accent and lime is the "power on" colour**, which is the
-/// inverse of the usual reading of the pair — a lime accent on a near-black page
-/// is the higher-contrast of the two and would have been the obvious primary,
-/// but the brief names amber `primary` and reserves lime as `accent`, and this
-/// app already uses the word accent for the colour that colours controls.
-///
-/// Lime is therefore [skeuoSignal] and is used where a *condition* is being
-/// reported rather than a control being offered — the same role the app's
-/// `statusOk` plays, and deliberately not the same colour, because green already
-/// means "nothing is wrong" in this app and a lime that also meant it would be a
-/// second green.
-///
-/// Both are measured, not assumed: on `pageSkeuo` `#0A0A0C`, amber measures
-/// **9.06:1** and lime **15.32:1** against white text's 20.4:1 — both far above
-/// AA, which is what a near-black page buys.
-const Color skeuoAccent = Color(0xFFF59E0B);
+  /// House consumption. `voltage_ac`, `current_ac`, `power_ac`, `frequency_ac`,
+  /// `energy_ac`, `pf_ac`.
+  ac,
 
-/// The brief's `accent #C4F042`. See [skeuoAccent] for why it is a signal
-/// colour rather than the accent.
-const Color skeuoSignal = Color(0xFFC4F042);
+  /// Storage. `voltage`, `current`, `power`, `soc`, `cycles`,
+  /// `remain_capacity_ah`, `full_capacity_ah`.
+  battery,
 
-/// The HSL lightness Dracula's accent needs, and why it is not `0.68`.
-///
-/// **HSL lightness is not perceptual across hues, and this is the whole reason
-/// a Dracula accent has to be derived at all.** At the dark theme's lightness of
-/// 0.68 the app's default green measures 8.98:1 on Dracula's page while
-/// Dracula's purple measures 4.35:1 — the same number, a factor of two apart,
-/// because green carries far more luminance than purple does at equal HSL
-/// lightness. Any single lightness that satisfies one hue breaks another, which
-/// is the same trap as the per-index hue rotation this file already reverted:
-/// a formula that is right on average and wrong for the colour in front of it.
-///
-/// So the lightness is per theme and the *ratio* is asserted rather than the
-/// hex. `0.78` is the lowest Dracula purple lightness whose worst surface is
-/// comfortably clear of AA; at `0.74` it is 4.62 on chrome, a margin of 0.12,
-/// and this repo has a documented history of values that cleared AA by less
-/// than 0.2 and then failed the next time a surface moved.
-const double _draculaMetricLightness = 0.78;
+  /// Greenhouse environment. `temp_dht`, `humidity_dht`, `temp_ds18b20`, `lux`,
+  /// `tds_ppm`.
+  environment,
 
-/// `0.82` for the strong variant, and the relationship inverts here.
-///
-/// The dark theme makes `strongMetricColor` *darker* than `metricColor` (0.64
-/// against 0.68) on the reasoning that a more saturated colour of lower
-/// lightness reads heavier. That does not work in Dracula, because purple is
-/// already at the bottom of the useful range: the strongest purple that still
-/// clears AA on chrome at the metric's saturation is `#BF9BF3` at 5.16:1,
-/// which is *less* contrasty than the metric colour's 5.45 and would make a
-/// hero value quieter than an ordinary one. So the strong variant goes up in
-/// lightness instead, and it is pinned on the property that actually matters —
-/// greater worst-case contrast than the metric colour, not a lightness
-/// relationship that only holds for two of the three themes. `0.82` at
-/// saturation 0.90 is `#CAA8FA`: 7.12:1 on the page, **5.89:1 on chrome**, the
-/// best clearance of the pair, against AA's 4.5.
-const double _draculaStrongLightness = 0.82;
+  /// Water quality. `ph`, `suhu`, `turbidity_ntu`, `water_level_percent`.
+  water;
 
-/// Creates a theme color with adjusted lightness and saturation.
-Color themeColor({
-  required Color seedColor,
-  required double lightness,
-  double saturation = 0.62,
-}) {
-  final hsl = HSLColor.fromColor(seedColor);
-  return hsl
-      .withSaturation(saturation.clamp(0.0, 1.0))
-      .withLightness(lightness.clamp(0.0, 1.0))
-      .toColor();
-}
+  const MetricCategory();
 
-/// The accent for a **graphical object** — an icon, a dot, a bar, an indicator —
-/// as opposed to text or a value.
-///
-/// **This exists because 1.4.11 and 1.4.3 ask for different things.** Text needs
-/// 4.5:1; a graphical object that carries meaning needs 3:1. [metricColor] is
-/// built for text, and measured against the light page it does not reach 3:1 for
-/// three of the four accents the user can pick:
-///
-/// | accent | `metricColor` on the light card | first lightness that clears 3:1 |
-/// |---|---|---|
-/// | EnerGrow green | 2.28:1 | 0.34 |
-/// | Solar amber | 2.88:1 | 0.39 |
-/// | Ocean cyan | 2.16:1 | 0.33 |
-/// | Forest teal | 2.21:1 | 0.33 |
-///
-/// **Why not just darken `metricColor`.** Two reasons, and the second is the
-/// one that decides it. First, a fixed HSL lightness cannot serve all hues —
-/// amber needs 0.39 and cyan needs 0.33, so any single value that clears one
-/// overshoots the other, which is the same non-perceptual-lightness trap
-/// [metricColor] already documents for Dracula. Second, and more decisively:
-/// darkening `metricColor` would change every metric *value* in the app, which
-/// is a visible restyle of the whole product dressed up as a contrast fix. The
-/// defect is in the graphical uses; the surgical fix is in the graphical uses.
-///
-/// Dark and Dracula reuse their existing steps, measured: light-dark `metricColor`
-/// is 10.3:1 to 10.7:1 and Dracula's is 5.45:1, so both clear 3:1 with room and
-/// re-stepping them would be changing values that are already correct.
-const double _graphicLightness = 0.32;
+  /// The telemetry keys this category owns.
+  ///
+  /// **One list, and it is the whole answer to "what colour is this reading".**
+  /// Deriving the category from the key rather than from a widget's position is
+  /// what stops the same number appearing in two colours in two places, which is
+  /// the failure the old per-index rotation produced and then reverted.
+  Iterable<String> get keys => switch (this) {
+    MetricCategory.pv => const ['voltage_dc', 'current_dc', 'power_dc', 'energy_dc'],
+    MetricCategory.ac => const [
+      'voltage_ac',
+      'current_ac',
+      'power_ac',
+      'frequency_ac',
+      'energy_ac',
+      'pf_ac',
+    ],
+    MetricCategory.battery => const [
+      'voltage',
+      'current',
+      'power',
+      'soc',
+      'cycles',
+      'remain_capacity_ah',
+      'full_capacity_ah',
+    ],
+    MetricCategory.environment => const [
+      'temp_dht',
+      'humidity_dht',
+      'temp_ds18b20',
+      'lux',
+      'tds_ppm',
+    ],
+    MetricCategory.water => const ['ph', 'suhu', 'turbidity_ntu', 'water_level_percent'],
+  };
 
-Color metricGraphic({
-  required Color seedColor,
-  required int index,
-  required AppTheme theme,
-}) {
-  if (!theme.isDark) {
-    return HSLColor.fromColor(seedColor)
-        .withSaturation(0.72)
-        .withLightness(_graphicLightness)
-        .toColor();
+  /// The category a telemetry key belongs to, or `null` if it is not one of the
+  /// app's readings — which is the answer for a derived value like a forecast.
+  ///
+  /// Built from [keys] rather than written out a second time, because two lists
+  /// of the same 26 strings is the exact shape that produced the stale-surface
+  /// bug this repo has already paid for once.
+  static MetricCategory? forKey(String key) {
+    for (final c in MetricCategory.values) {
+      if (c.keys.contains(key)) return c;
+    }
+    return null;
   }
-  return metricColor(seedColor: seedColor, index: index, theme: theme);
 }
 
-/// The ink to put **on top of** an accent fill, chosen so it clears WCAG AA.
+/// The hue a category owns.
 ///
-/// **Why this is a function and not a constant.** The app's accent fills are
-/// light in every dark theme and the Dracula preset's is lighter still, so
-/// `Colors.white` — the obvious choice and the one this button used — measures
-/// 2.16:1 on Dracula's `#C1A3EB` and is under the 3:1 that WCAG 1.4.11 asks of
-/// a control. A dark ink measures 7.81:1 on the same fill. But a constant dark
-/// ink is wrong too: `main.dart`'s `filledButtonTheme` derives its own label
-/// colour from the fill's lightness for exactly this reason, and a second,
-/// independent rule in a different file is how the two drift.
+/// **Five hues for five categories, and the palette has seven entries because
+/// two of them are semantic.** [AppPalette.success] and [AppPalette.error] are
+/// not available to a category, which is a deliberate refusal to use colours
+/// that are available — see below for why `success` in particular had to stay
+/// out.
 ///
-/// So this picks by luminance rather than by theme, which means it stays correct
-/// if a fourth accent or a fourth theme lands. The 0.5 pivot is the point where
-/// white and this ink give the same ratio, so either choice is at least as good
-/// as the other at the crossover.
-const Color _darkInkOnAccent = Color(0xFF10201A);
-
-Color onPrimaryInk(Color fill) =>
-    fill.computeLuminance() > 0.18 ? _darkInkOnAccent : Colors.white;
-
-/// Creates the accent color for a metric, in the same hue as the theme.
+/// | category      | hue         | hex       | worst surface | hue angle |
+/// |---------------|-------------|-----------|---------------|-----------|
+/// | PV / solar    | `accent`    | `#FCE570` | 11.76:1       | 50.1°     |
+/// | AC / load     | `secondary` | `#8E99F3` | 5.67:1        | 233.5°    |
+/// | battery       | `primary`   | `#F7A5A5` | 7.72:1        | 0.0°      |
+/// | environment   | `chartViolet` | `#C084FC` | 5.64:1      | 270.0°    |
+/// | water         | `chartCoral` | `#FF8577` | 6.29:1       | 6.2°      |
 ///
-/// [index] is accepted and deliberately ignored. It used to rotate the hue by
-/// 40 degrees per index, so the PV, AC and battery pages each got a different
-/// colour for the same accent. That was tried because the pages were hard to
-/// tell apart, and it was reverted: a colour the user did not choose is a
-/// colour they cannot predict, and the app looked arbitrary rather than themed.
+/// "Worst surface" is [#AppSurfaces.surfaceAlt], the lightest of the three, so a
+/// figure that clears AA there clears it everywhere. Every one clears AA for
+/// normal text with at least 1.14 to spare.
 ///
-/// The pages are told apart by their title and icon, which is unambiguous. If
-/// per-page colour is ever wanted, it should be a setting the user picks, not a
-/// default that silently changes what "Ocean cyan" means.
+/// **Why solar is yellow and not coral.** Butter yellow is the sun. That is a
+/// genuine reason rather than a rhyme, and it happens to also be the widest
+/// separation available: 176.7° from `secondary` and 140.1° from `chartViolet`.
+/// The Power tab's three sub-tabs are the only place three category hues share a
+/// screen, and no two of them are under 50° apart.
 ///
-/// **The brightness parameter is an [AppTheme] and not a `bool`, and the accent
-/// is the one reason that change was needed.** The text and status colours in
-/// this file still take a `bool isDark`, because they are genuinely shared
-/// between the two dark themes and duplicating them would protect nothing — see
-/// [AppTheme.isDark] for the measurement. The accent is not shared: Dracula
-/// needs a different HSL lightness for purple than dark does for any hue, and
-/// a boolean has nowhere to put that. Taking [AppTheme] here also means a call
-/// site cannot reach for `isDark: true` and silently get a colour that measures
-/// 4.35:1, which is what the boolean version would have let it do the first
-/// time somebody turned the preset on.
-Color metricColor({
-  required Color seedColor,
-  required int index,
-  required AppTheme theme,
-}) {
-  final hsl = HSLColor.fromColor(seedColor);
-  return switch (theme) {
-    // 0.64 saturation is the dark theme's own value, reused so that a Dracula
-    // accent differs from a dark one in lightness alone and the hue
-    // round-trip can be asserted at the same 0.5 degree tolerance.
-    AppTheme.dracula => hsl
-        .withSaturation(0.64)
-        .withLightness(_draculaMetricLightness)
-        .toColor(),
-    // Lighter than the dark theme's 0.68, because `pageSkeuo` is darker than
-    // `pageDark` and a metric at 0.68 on a near-black page is the first thing
-    // that would stop clearing AA on this ramp.
-    AppTheme.skeuo =>
-      hsl.withSaturation(0.72).withLightness(0.74).toColor(),
-    AppTheme.dark => hsl.withSaturation(0.64).withLightness(0.68).toColor(),
-    AppTheme.light => hsl.withSaturation(0.72).withLightness(0.40).toColor(),
-  };
-}
-
-/// The stronger sibling of [metricColor], for values that need to carry weight.
+/// ### Why `success` is not a category
 ///
-/// Takes an [AppTheme] for the same reason and with the same caveat: read
-/// [_draculaStrongLightness] before changing anything, because the ordering
-/// relative to `metricColor` is deliberately different in Dracula and asserting
-/// it as a lightness comparison would be asserting a property of two themes and
-/// not the third.
-Color strongMetricColor({
-  required Color seedColor,
-  required int index,
-  required AppTheme theme,
-}) {
-  final hsl = HSLColor.fromColor(seedColor);
-  return switch (theme) {
-    AppTheme.dracula => hsl
-        .withSaturation(0.90)
-        .withLightness(_draculaStrongLightness)
-        .toColor(),
-    AppTheme.skeuo =>
-      hsl.withSaturation(0.84).withLightness(0.70).toColor(),
-    AppTheme.dark => hsl.withSaturation(0.78).withLightness(0.64).toColor(),
-    AppTheme.light => hsl.withSaturation(0.86).withLightness(0.36).toColor(),
-  };
-}
-
-/// The accent a preset theme paints with, or `null` when the user's own seed
-/// applies.
+/// It is the one remaining free hue and it is refused on purpose. Green in this
+/// app means "a problem is absent" — it is `statusOk`, it is the CCTV `LIVE`
+/// dot, it is the healthy end of a verdict. A category whose page identity was
+/// green would make green mean both "this page" and "nothing is wrong", and the
+/// old system already learned that lesson the hard way: a permanent green
+/// "semua normal" badge asserted a condition that is boring when true and
+/// permanently occupied the space where a real warning needed to go.
 ///
-/// Returning `null` rather than a colour is what keeps the two cases from being
-/// confusable: `presetAccent(theme) ?? seedColor` cannot disagree with itself,
-/// whereas storing an accent alongside a preset would allow a Dracula theme with
-/// a green accent, which is not a preset and not the app's dark mode either.
+/// ### The collision this palette cannot avoid
 ///
-/// **A switch and no longer `usesPresetAccent ? draculaAccent : null`**, because
-/// there are now two presets. The old form would have handed skeuo Dracula's
-/// purple — and it compiled, because `usesPresetAccent` was true for it. This is
-/// the second time in this file that a predicate quietly answered for a value it
-/// knew nothing about; the first was `AppTheme.isDark`, whose `this != light` is
-/// correct precisely because it is written as a *negation* rather than an
-/// enumeration.
-Color? presetAccent(AppTheme theme) => switch (theme) {
-  AppTheme.dracula => draculaAccent,
-  AppTheme.skeuo => skeuoAccent,
-  AppTheme.light || AppTheme.dark => null,
+/// `primary` and `error` are **the same hue** — both 0.0° — and `chartCoral` is
+/// 6.2° away. So two of the five categories sit in the same hue family as the
+/// breach colour. This is a property of the brief's palette, not a choice made
+/// here, and it cannot be fixed by reassigning: there are only six non-semantic
+/// hues and five categories need one each.
+///
+/// What keeps it legible is that the two never take the same *role*. A category
+/// hue is a **fill** — an icon tile, a progress fill, a chart line, a badge
+/// background — while `error` is **ink only**: small text, a hairline, a dot.
+/// They also separate on luminance: the closest category fill is 7.34:1 and the
+/// breach ink is 5.74:1.
+///
+/// **This is a structural mitigation and it is the one failure mode that
+/// `flutter analyze` cannot see and no test can reach.** It needs a device. The
+/// specific case to look at is the Battery page, which is the page most likely to
+/// be showing its own breach: `low_soc` and `offline_battery` are both
+/// `error`-hued ink sitting on a page whose identity is `primary`.
+Color categoryColor(MetricCategory category) => switch (category) {
+  MetricCategory.pv => AppPalette.accent,
+  MetricCategory.ac => AppPalette.secondary,
+  MetricCategory.battery => AppPalette.primary,
+  MetricCategory.environment => AppPalette.chartViolet,
+  MetricCategory.water => AppPalette.chartCoral,
 };
 
-/// Returns the hairline divider color for glass surfaces.
-Color glassDividerColor({required bool isDark, double opacity = 0.08}) =>
-    isDark
-    ? Colors.white.withValues(alpha: opacity)
-    : Colors.black.withValues(alpha: opacity);
+/// The category of a telemetry key, resolved once.
+///
+/// Convenience for the very common `categoryColor(MetricCategory.forKey(key)!)`
+/// at a call site that already holds a key. Returns `null` for a derived value,
+/// which a caller must handle — a forecast is not a sensor reading and has no
+/// category hue of its own.
+Color? categoryColorForKey(String key) {
+  final c = MetricCategory.forKey(key);
+  return c == null ? null : categoryColor(c);
+}
 
-/// The outline around a glass card, tinted with the theme accent.
+// ── Status ─────────────────────────────────────────────────────────────────────
+
+/// A severity ramp, ordered by hue: green, yellow, orange, red.
 ///
-/// It was a neutral white or black hairline, so a card's contents followed the
-/// accent the user picked while its edge did not: in an amber theme a card held
-/// amber numbers inside a cold grey frame, which is what made the palette read
-/// as two systems rather than one.
+/// Four levels because the app has four: healthy, `stale_*` warnings, energy
+/// alerts, and critical `offline_*` and battery breaches. Hue is monotonic
+/// across the four, which is what makes it read as a scale rather than as four
+/// unrelated colours, and the steps are 24° and 23° apart — too close to
+/// separate as *categories*, which is fine, because these always ship with a
+/// text label and the label carries the meaning.
 ///
-/// [accent] is the theme's `colorScheme.primary`, not the raw seed. That matters,
-/// because `ColorScheme.fromSeed` maps the seed to a tonal colour chosen to stay
-/// legible on the surface, so the border cannot drift out of contrast the way a
-/// bare seed would at the darker and lighter ends of the palette. It is also why
-/// the card needs no new parameter: the accent is already in the theme, and
-/// threading a `seedColor` through every call site would only let the two
-/// disagree later.
-Color glassBorderColor({required Color accent, required bool isDark}) =>
-    accent.withValues(alpha: isDark ? 0.30 : 0.28);
+
+/// Healthy. [AppPalette.success], measured 8.55:1 on [AppSurfaces.surfaceAlt].
+const Color statusOk = AppPalette.success;
+
+/// A warning. [AppPalette.accent] — butter is the only yellow in the palette and
+/// a warning is the only thing in the app that should be yellow. 11.76:1.
+///
+/// **This is also the focus-ring and text-button hue**, so yellow now means
+/// "attend to this" in two registers: an affordance and a condition. That is the
+/// brief's own reuse pattern — it says `success` and `error` may also play
+/// categorical roles — applied to the only severity left without a hue.
+const Color statusWarn = AppPalette.accent;
+
+/// An alert: serious, not yet a breach. `#FB923C`, measured 6.58:1 on
+/// [AppSurfaces.surfaceAlt].
+///
+/// **The one colour in this file that is not in the brief's palette, and it is
+/// here because the brief has two semantic hues and the app has four
+/// severities.** Collapsing alert into `error` would have been the alternative
+/// and it loses information the alarm history actually carries. If a future
+/// palette revision supplies an amber-orange, this is the value to replace —
+/// and the replacement has to clear 4.5:1 on `surfaceAlt`, which is the
+/// constraint that decides it.
+const Color statusAlert = Color(0xFFFB923C);
+
+/// A breach, as a **fill**. [AppPalette.error], 3.96:1 on
+/// [AppSurfaces.surfaceAlt].
+///
+/// **Below AA for text, which is why [statusBad] exists.** This value is for a
+/// solid block, a dot or a ring — somewhere the thing is a shape, not a
+/// sentence. Anything the user reads goes through [statusBad].
+const Color statusBadFill = AppPalette.error;
+
+/// A breach, as **ink**. `#FF5C5C` at 4.92:1 on [AppSurfaces.surfaceAlt].
+///
+/// **Derived by scaling every channel of `#EF4444` by 1.35, and the direction is
+/// the whole point.** The obvious fix for a colour that fails contrast on a dark
+/// surface is to darken it, and that is exactly backwards: it takes the red
+/// *further* from white. Measured, on `surfaceAlt`: 1.00× gives 3.96:1, 0.92×
+/// gives 3.42:1, 0.88× gives 3.16:1. Going up, 1.15× gives 4.58:1 and 1.35×
+/// gives **4.92:1**.
+///
+/// Scaled per channel rather than stepped in HSL, so hue is preserved exactly —
+/// measured 0.00° before and after. The old file recorded this lesson already:
+/// stepping HSL lightness on a saturated colour moved `faintColor` from 150.00°
+/// to 146.67° at a 0.6% darkening, and a caption that shifts hue when you
+/// change it reads warm beside a green theme.
+const Color statusBad = Color(0xFFFF5C5C);
 
 /// Alarm severity, for the alarm history list.
 ///
-/// These were a second, unpinned red and amber living one file away from
-/// [statusBad] and [statusWarn], and both light values failed WCAG AA as the
-/// 11 to 13dp text they are used at: `0xFFF57C00` measured 2.44:1 and
-/// `0xFFD32F2F` measured 4.50:1. The AA work was done once, in this file, and
-/// four call sites outside it did not adopt it. Duplicating the palette is what
-/// let the two drift, so these now resolve to the pinned values instead of
-/// carrying their own.
-///
-/// The icon circle behind each row still uses a wash of the same colour, so the
-/// critical row reads red and the warning row reads amber exactly as before.
-Color alarmCritical(bool isDark) => statusBad(isDark);
+/// These were a second, unpinned red and amber living one file away from the
+/// status colours, and both light values failed WCAG AA as the 11 to 13dp text
+/// they are used at. Duplicating the palette is what let the two drift, so these
+/// resolve to the pinned values instead of carrying their own.
+Color alarmCritical() => statusBad;
 
-Color alarmWarning(bool isDark) => statusWarn(isDark);
+Color alarmWarning() => statusWarn;
 
-/// The color for secondary text: units, captions, timestamps.
+/// The colour for secondary text: units, captions, timestamps.
 ///
-/// The pair this replaces, `Colors.white54` on dark and `Colors.black45` on
-/// light, fails WCAG AA on the surfaces actually used here — about 3.4:1 in light
-/// mode against white, for text as small as 9dp.
+/// This is [#AppSurfaces.onSurfaceVariant] and it is no longer a function. The
+/// version this replaces had a light/dark pair whose light value was re-measured
+/// twice against a page colour that had itself been restyled once, and the test
+/// that should have caught it measured against a hand-written surface list that
+/// had gone stale in the opposite direction. With one surface ramp there is one
+/// value and it is the same constant the surfaces are measured against.
 ///
-/// The light value was `0xFF6B7671` and was still wrong: measured against the
-/// glass card fill `#F2F5F3` it is 4.29:1, and these captions really are 9 to
-/// 11dp. The dark value clears 6.4:1 and was already fine.
-///
-/// **The light value moved a second time, and the reason is worth recording
-/// because the test that should have caught it did not.** `0xFF606A65` was
-/// measured against `0xFFF1F4F2`, which is the *pre-restyle* page colour. The
-/// soft-UI work darkened the page to `0xFFE1E7E4` so the light half of every
-/// shadow pair would have somewhere to be lighter to, and this value was not
-/// re-measured against the new one. On the page that actually renders it is
-/// **4.47:1** — under AA for the 9 to 11dp text it is used at. It is now
-/// `0xFF5F6964`, which is 4.56:1 on the real page.
-///
-/// The change is 1.3% darker and was found by scaling every channel by 0.987,
-/// not by moving HSL lightness. HSL is the obvious tool here and it is the
-/// wrong one: stepping lightness on this desaturated green moved its hue from
-/// 150.00° to 146.67°, and a caption colour that shifts hue when you darken it
-/// is a caption colour that will read warm next to a green theme.
-///
-/// **There is deliberately no Dracula variant, and the reason is measured.** The
-/// dark value `0xFFA8B3AC` reads 6.58:1 on Dracula's page `#282A36` and 5.45:1
-/// on its chrome step, so it clears AA on the whole ramp unchanged and a second
-/// copy would be protecting nothing. This function therefore still takes a
-/// `bool isDark`, and a Dracula call site passes `theme.isDark` — the enum, not
-/// a literal. If a Dracula-specific caption colour is ever added, the
-/// measurement that justified it belongs here first, because a duplicated
-/// palette is precisely what let the light values drift for two commits while
-/// every test stayed green.
-const Color _faintDark = Color(0xFFA8B3AC);
-const Color _faintLight = Color(0xFF5F6964);
+/// 7.47:1 on the page, 6.78:1 on a card, 5.81:1 on a well.
+const Color faintColor = AppSurfaces.onSurfaceVariant;
 
-Color faintColor(bool isDark) => isDark ? _faintDark : _faintLight;
-
-/// Status colors, used instead of the raw Material `green`/`orange`/`red`.
+/// The ink to put **on top of** a saturated categorical fill.
 ///
-/// Those are tuned for large fills, not for small text on a near-white
-/// surface: `Colors.green` at 9dp measures about 2.3:1. These clear AA.
+/// Measured across the whole palette rather than assumed: [#AppPalette.onHue] is
+/// 9.02:1 on `primary`, 6.63 on `secondary`, 13.74 on `accent`, 9.99 on
+/// `success`, 6.59 on `chartViolet`, 7.35 on `chartCoral` and 4.62 on `error` —
+/// so dark ink is correct on every one, and the tightest is `error`.
 ///
-/// The light values were originally `0xFF2E7D32` and `0xFFB26500`, and the amber
-/// one was the worst thing in this file: 4.02:1 on the glass card fill, well
-/// under the 4.5:1 that WCAG AA requires for text this small. `0xFF9A5500`
-/// still reads as amber rather than brown. Green was raised to `0xFF2A7530` for
-/// margin.
-///
-/// **Red and orange were re-measured for the same reason as [faintColor] and
-/// moved for the same reason.** They were tuned against `0xFFF1F4F2`; the page
-/// is now `0xFFE1E7E4`, and on it they measured 4.48:1 and 4.47:1. Both are now
-/// channel-scaled rather than lightness-stepped — see the note on
-/// [_faintLight] for why that distinction is not pedantic — which is a 1.1% and
-/// 1.3% darkening and lands them at 4.56:1. Green and amber already cleared on
-/// the real page (4.55 and 4.56) and are untouched.
-///
-/// These are measured, and a value tuned against a surface the app no longer
-/// paints is not tuned at all. `test/color_helpers_test.dart` now reads its
-/// surface list out of `AppSurfaces`, so that mistake cannot be made a third
-/// time.
-///
-/// **No Dracula variants either, and this is the one place where the choice was
-/// closest.** Dracula's own palette has a red `#FF5555` and a comment `#6272A4`
-/// that were measured at 4.53:1 and 3.03:1 on `#282A36`, so the first instinct —
-/// take the palette's own colours — fails for the red on chrome (3.75:1) and
-/// fails badly for the comment. The app's own `statusBad` `#FF8A80` is 6.24:1 on
-/// the page and 5.17:1 on chrome, and `statusOk` 7.83 and 6.48, so every status
-/// colour already beats both of the Dracula values it would have replaced. That
-/// is a second, independent reason not to swap the palette wholesale: Dracula
-/// is a *surface* theme, and its text palette is the app's, not its own.
-Color statusOk(bool isDark) =>
-    isDark ? const Color(0xFF6DD58C) : const Color(0xFF2A7530);
-
-Color statusWarn(bool isDark) =>
-    isDark ? const Color(0xFFFFCA6B) : const Color(0xFF9A5500);
-
-Color statusBad(bool isDark) =>
-    isDark ? const Color(0xFFFF8A80) : const Color(0xFFC42828);
-
-/// A status color for an alert accent that is neither clearly good nor bad.
-Color statusAlert(bool isDark) =>
-    isDark ? const Color(0xFFFFAB80) : const Color(0xFFBD350C);
+/// Picked by luminance rather than hard-coded per call site, so a future palette
+/// entry is handled without a second rule in a different file, which is how the
+/// previous version's two independent ink rules drifted apart.
+Color onPrimaryInk(Color fill) =>
+    fill.computeLuminance() > 0.18 ? AppPalette.onHue : Colors.white;

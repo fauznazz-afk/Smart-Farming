@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/settings_keys.dart';
 import '../../services/alarm_settings.dart';
 import '../../services/cctv_url.dart';
-import '../../theme/app_theme_controller.dart';
 import '../../utils/alarm_rules.dart';
 import 'utils/settings_validation.dart';
 
@@ -15,9 +14,7 @@ import 'utils/settings_validation.dart';
 /// Extracted from `SettingsScreen` so the UI only has to bind controls and the
 /// storage contract lives in one place.
 class SettingsController extends ChangeNotifier {
-  SettingsController({required this.themeController});
-
-  final AppThemeController themeController;
+  SettingsController();
 
   // ── Text-backed values ──────────────────────────────────────────────────────
   final cctvUrl = TextEditingController(text: defaultAllowedCctvUrl);
@@ -120,7 +117,6 @@ class SettingsController extends ChangeNotifier {
   int lowSoc = AlarmThresholds.defaultLowSoc;
   int staleMinutes = AlarmThresholds.defaultStaleMinutes;
   int offlineMinutes = AlarmThresholds.defaultOfflineMinutes;
-  Color selectedSeed = AppThemeController.defaultSeed;
 
   // ── Transient status ────────────────────────────────────────────────────────
   bool saving = false;
@@ -184,7 +180,6 @@ class SettingsController extends ChangeNotifier {
         }
       }
     }
-    selectedSeed = themeController.seedColor;
     notifyListeners();
   }
 

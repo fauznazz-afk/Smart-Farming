@@ -5,14 +5,6 @@ import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/telemetry_helpers.dart';
 
-/// The energy alert banner's accent.
-///
-/// This is a one-off literal with no dark-mode variant, and it sits next to the
-/// banner in `banners.dart` that now uses `statusWarn`. Left alone it would be
-/// the third amber in the same file. It is a warning that is not a measurement,
-/// so it is the alert tone rather than the measured one.
-const Color _alertAccent = Color(0xFFD2542B);
-
 /// Full-screen placeholder shown when the first telemetry fetch fails.
 class TelemetryErrorView extends StatelessWidget {
   const TelemetryErrorView({super.key, required this.message, this.onRetry});
@@ -55,31 +47,14 @@ class OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Was `Colors.orange.shade700`, which is `0xFFF57C00` — the same value the
-    // alarm history used for a warning, and 2.44:1 on the page at 12dp. The
-    // offline banner is a warning, so it uses the measured one.
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = statusWarn(isDark);
-    final baseAlpha = isDark ? 0.14 : 0.10;
+    final color = statusWarn;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
+      child: AppSurface(
+        radius: AppRadius.inset,
+        fill: AppBorders.categoricalWash(color),
+        border: BorderSide(color: color.withValues(alpha: 0.40), width: 1),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          // `baseAlpha` is the measured wash and stays the strongest stop; see
-          // `AppSkeuo.badgeWash`. The top stop used to be `baseAlpha + 0.03`.
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: AppSkeuo.badgeWash(
-              color,
-              alpha: baseAlpha,
-              theme: isDark ? AppTheme.dark : AppTheme.light,
-            ),
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.inset),
-          border: Border.all(color: color.withValues(alpha: 0.40)),
-        ),
         child: Row(
           children: [
             Icon(Icons.wifi_off_rounded, color: color, size: 18),
@@ -87,11 +62,7 @@ class OfflineBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 'Offline - showing the last data from ${describeCacheAge(cacheTime)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+                style: AppType.labelUppercase.copyWith(color: color),
               ),
             ),
             RetryButton(onRetry: onRetry, color: color),
@@ -103,31 +74,9 @@ class OfflineBanner extends StatelessWidget {
 }
 
 /// The retry button both banners share.
-///
-/// **It exists as its own widget because of an ink defect, not for tidiness.**
-///
-/// `Scaffold` wraps the page in one `Material`, and a `Material` paints its own
-/// ink features *above* its own colour but *below* its entire child subtree. The
-/// dashboard body is `AppBackground` -> `ColoredBox(AppSurfaces.page(theme))`,
-/// which is opaque, so a bare `InkWell` in the body with no nearer `Material` has
-/// its splash painted underneath that `ColoredBox`. The ripple is not faint, it
-/// is invisible.
-///
-/// That matters more than usual here, because this app's whole vocabulary is
-/// "no ripple, geometric press instead" -- the nav bar presses by changing its
-/// decoration. So a control with no visible ink was not "a subtler ripple than
-/// the others"; it was the only control in the app with no feedback of either
-/// kind, and the user had no way to know the tap registered.
-///
-/// This is the same defect `AGENTS.md` records for `AppCard`, and the same fix:
-/// a transparent `Material` between the decorated box and the content so the ink
-/// has a surface to live on. `MaterialType.transparency` rather than a coloured
-/// one, because the banner's own fill must show through.
 class RetryButton extends StatelessWidget {
   const RetryButton({super.key, required this.onRetry, required this.color});
 
-  /// Nullable because both banners can be built without a retry action, in which
-  /// case the button is not shown at all.
   final VoidCallback? onRetry;
   final Color color;
 
@@ -142,11 +91,7 @@ class RetryButton extends StatelessWidget {
           label: 'Try again',
           child: InkWell(
             onTap: onRetry,
-            borderRadius: BorderRadius.circular(16),
-            // 40 dp, not the 26 that `Icon` + `EdgeInsets.all(4)` gives. Still
-            // under the 48 floor because the banner is a fixed height, but it is
-            // a deliberate number rather than an accident of padding, and it is
-            // recorded here so the next person can see it was a choice.
+            borderRadius: BorderRadius.circular(AppRadius.tile),
             child: const Padding(
               padding: EdgeInsets.all(10),
               child: Icon(Icons.refresh, size: 18),
@@ -159,10 +104,6 @@ class RetryButton extends StatelessWidget {
 }
 
 /// Inline list of currently active energy/environment alerts.
-///
-/// It draws no animation of its own. [CollapsibleBanner] wraps it so that it
-/// arrives and leaves by growing and shrinking, which is what stops the whole
-/// Overview jumping down a card-height the instant a reading returns to range.
 class EnergyAlertBanner extends StatelessWidget {
   const EnergyAlertBanner({super.key, required this.messages});
 
@@ -170,29 +111,15 @@ class EnergyAlertBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+    return AppSurface(
+      radius: AppRadius.inset,
+      fill: AppBorders.categoricalWash(statusAlert),
+      border: BorderSide(color: statusAlert.withValues(alpha: 0.4), width: 1),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        // 0.16 was the shipped wash; the strongest stop stays there rather than
-        // the 0.19 this briefly had, because every point of wash behind the
-        // alarm text is a point of contrast taken from it.
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: AppSkeuo.badgeWash(
-            _alertAccent,
-            alpha: 0.16,
-            theme: isDark ? AppTheme.dark : AppTheme.light,
-          ),
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _alertAccent.withValues(alpha: 0.4)),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.notifications_active_outlined, color: _alertAccent),
+          const Icon(Icons.notifications_active_outlined, color: statusAlert),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -201,7 +128,7 @@ class EnergyAlertBanner extends StatelessWidget {
                   .map(
                     (message) => Padding(
                       padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(message),
+                      child: Text(message, style: AppType.bodySm.copyWith(color: appPrimaryText)),
                     ),
                   )
                   .toList(),
@@ -214,24 +141,6 @@ class EnergyAlertBanner extends StatelessWidget {
 }
 
 /// Grows a banner in and collapses it away instead of popping it.
-///
-/// A plain conditional render is the obvious implementation and it is what this
-/// replaced, and on a dashboard it is genuinely bad: an alarm clearing made the
-/// entire page below it jump up by the banner's full height in a single frame.
-/// Nothing indicates that anything happened, so it reads as a glitch rather than
-/// as a condition ending.
-///
-/// Three properties together make the disappearance legible:
-///
-/// - the outgoing child is kept alive for the length of the exit and stacked
-///   under the incoming one, so the height shrinks continuously instead of the
-///   whole strip vanishing on one frame;
-/// - the opacity fades, drawing the eye to the thing that is leaving;
-/// - the banner lifts slightly as it goes, which is the direction a dismissed
-///   thing is expected to move in.
-///
-/// The exit is longer than the entrance. An alarm appearing is worth noticing
-/// quickly; one clearing is information too, but it does not need to interrupt.
 class BannerSwitcher extends StatelessWidget {
   const BannerSwitcher({
     super.key,
@@ -249,7 +158,7 @@ class BannerSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
+      duration: AppMotion.container,
       reverseDuration: const Duration(milliseconds: 420),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
@@ -270,13 +179,6 @@ class BannerSwitcher extends StatelessWidget {
               begin: const Offset(0, -0.25),
               end: Offset.zero,
             ).animate(curved),
-            // This is what makes the banner actually collapse. The Stack in
-            // `layoutBuilder` takes the largest of its children, so a banner
-            // that only faded would keep the full card height reserved for the
-            // whole exit and then snap to zero on the final frame — worse than
-            // no animation. An AnimatedSwitcher runs its transition animation
-            // forwards for the incoming child and backwards for the outgoing
-            // one, so the same SizeTransition shrinks as it leaves.
             child: SizeTransition(
               sizeFactor: curved,
               axis: Axis.vertical,
@@ -312,7 +214,6 @@ class ConnectionStatusBanner extends StatelessWidget {
     required this.health,
     required this.lastSuccessfulAt,
     required this.errorMessage,
-    required this.isDark,
     this.onRetry,
   });
 
@@ -321,17 +222,16 @@ class ConnectionStatusBanner extends StatelessWidget {
   final ConnectionHealth health;
   final DateTime? lastSuccessfulAt;
   final String? errorMessage;
-  final bool isDark;
   final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final stale = !failed && staleNames.isNotEmpty;
     final color = failed
-        ? statusBad(isDark)
+        ? statusBad
         : stale
-        ? statusWarn(isDark)
-        : statusOk(isDark);
+        ? statusWarn
+        : statusOk;
     final label = failed
         ? 'ThingsBoard unreachable'
         : stale
@@ -339,22 +239,10 @@ class ConnectionStatusBanner extends StatelessWidget {
         : health.statusMessage;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 36),
+      child: AppSurface(
+        radius: 10,
+        fill: AppBorders.categoricalWash(color),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          // 0.08 was the shipped wash and stays the strongest stop.
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: AppSkeuo.badgeWash(
-              color,
-              alpha: 0.08,
-              theme: isDark ? AppTheme.dark : AppTheme.light,
-            ),
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
         child: Row(
           children: [
             ExcludeSemantics(
@@ -374,11 +262,7 @@ class ConnectionStatusBanner extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+                style: AppType.labelUppercase.copyWith(color: color),
               ),
             ),
             if (failed)
@@ -391,9 +275,6 @@ class ConnectionStatusBanner extends StatelessWidget {
 }
 
 /// Wraps a tooltip around [ConnectionStatusBanner] and animates it in and out.
-///
-/// The banner draws itself; this exists because a connection state change and a
-/// banner appearing are the same event and should look the same way.
 class ConnectionStatusBannerSwitcher extends StatelessWidget {
   const ConnectionStatusBannerSwitcher({
     super.key,
@@ -402,7 +283,6 @@ class ConnectionStatusBannerSwitcher extends StatelessWidget {
     required this.health,
     required this.lastSuccessfulAt,
     required this.errorMessage,
-    required this.isDark,
     required this.visible,
     this.onRetry,
   });
@@ -412,7 +292,6 @@ class ConnectionStatusBannerSwitcher extends StatelessWidget {
   final ConnectionHealth health;
   final DateTime? lastSuccessfulAt;
   final String? errorMessage;
-  final bool isDark;
   final bool visible;
   final VoidCallback? onRetry;
 
@@ -441,7 +320,6 @@ class ConnectionStatusBannerSwitcher extends StatelessWidget {
             health: health,
             lastSuccessfulAt: lastSuccessfulAt,
             errorMessage: errorMessage,
-            isDark: isDark,
             onRetry: onRetry,
           ),
         ),

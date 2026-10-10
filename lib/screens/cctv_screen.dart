@@ -6,11 +6,10 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
 import '../services/secure_window.dart';
-import '../theme/app_theme_of.dart';
-import '../widgets/liquid_glass.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
-import 'dashboard/utils/design_tokens.dart';
+import '../dashboard/utils/design_tokens.dart'
+    show AppSurfaces, AppBorders, AppRadius, AppPalette, AppCard, AppBadge;
 
 /// The matte the video is seen against. **Not a themed surface, and never to
 /// become one.**
@@ -374,10 +373,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             top: 16,
             left: 16,
             // Over the video, so the dark set regardless of the app's theme.
-            // `AppTheme.dark` rather than the resolved theme: what matters to a
-            // pill floating over camera frames is that it is on the dark half of
-            // the ramp, and the frames have nothing to do with Dracula's palette.
-            child: CctvStatusPill(status: _status, theme: AppTheme.dark),
+            // The pill uses the new status colors (no theme parameter needed).
+            child: CctvStatusPill(status: _status),
           ),
         ],
       ),
@@ -386,13 +383,6 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
 
   Widget _buildEmbedded(BuildContext context) {
     final theme = Theme.of(context);
-    // `appThemeOf` rather than a brightness comparison. The panel's shadow and
-    // the info bar's fill are both ramp-dependent, and Dracula hands
-    // `MaterialApp` [ThemeMode.dark], so `isDark` here would be identical for
-    // Dracula and for the app's own dark theme and the panel would be lit by
-    // the wrong shadow pair. This screen has no controller, so the context is
-    // what it has.
-    final appTheme = appThemeOf(context);
     final primary = theme.colorScheme.primary;
     final status = _status;
 
@@ -406,25 +396,18 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             children: [
               Row(
                 children: [
-                  // A raised badge, mixed opaque from the 0.12 accent wash it
-                  // shipped with, so the icon keeps the contrast it had. The
-                  // first skeuomorphic pass raised the wash to 0.22 and drew a
-                  // four-colour `Border` with a radius, which does not paint.
-                  SizedBox(
+                  // Circular icon badge with primary color categorical wash.
+                  // Replaces the old SkeuoSurface with raised shadow.
+                  Container(
                     width: 42,
                     height: 42,
-                    child: SkeuoSurface(
-                      theme: appTheme,
-                      base: Color.alphaBlend(
-                        primary.withValues(alpha: 0.12),
-                        AppSurfaces.page(appTheme),
-                      ),
-                      foreground: primary,
-                      radius: AppRadius.tile,
-                      shadows: AppElevation.raised(appTheme),
-                      child: Center(
-                        child: Icon(Icons.videocam_rounded, color: primary),
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppBorders.categoricalWash(primary),
+                      borderRadius: BorderRadius.circular(AppRadius.tile),
+                      border: Border.fromBorderSide(AppBorders.categoricalBorder(primary)),
+                    ),
+                    child: Center(
+                      child: Icon(Icons.videocam_rounded, color: primary),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -453,53 +436,11 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             ],
           ),
         ),
-        // The panel's frame, and the whole of the fix.
-        //
-        // It was a bare `ClipRRect` around a `ColoredBox` with **no shadow at
-        // all**, which made it the only surface in the app that carried no depth
-        // cue. On the light page that reads as a hole rather than as an object,
-        // and the reason is the missing shadow rather than the fill: this app
-        // expresses depth exclusively through the dual shadow pair, so a shape
-        // with no shadow is by definition a cut in the page and not a block on
-        // it. `cctvVideoGround` documents why the fill stays what it is and why
-        // the naive alternative (make the panel the page colour) was rejected
-        // with measurements — the short version is that a light surround puts
-        // the page 12x brighter than the frame and 14x brighter than the dark
-        // detail the user opened this screen to look at.
-        //
-        // `raised`, not `inset`, and the choice is forced by the fill rather than
-        // preferred: an inset well is expressed by darkening its interior below
-        // its surround, and there is nothing left to give — the strongest value
-        // the light inset pair can put on this matte measures 1.20:1. A well here
-        // would collapse, so the panel is a block standing on the page, which is
-        // also what a monitor on a desk is.
-        //
-        // The shadow is painted on the *page*, outside this rect, which is the
-        // only part of it the matte does not swallow: light mode drops the page
-        // from luminance 0.788 to 0.381 at the contact shadow, and dark mode
-        // gets the same pair over `#1A211F`.
-        //
-        // `AppRadius.pill`, not a literal `22`. The value is unchanged — 22 is
-        // what shipped, and it is also the pill radius — so this is a
-        // de-duplication rather than a restyle, and the panel keeps the one
-        // radius in the scale meant to read as a separate physical object.
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.all(AppRadius.pill),
-            boxShadow: AppElevation.raised(appTheme),
-          ),
-          // The clip stays *inside* the decorated box rather than outside it.
-          // `ClipRRect` would cut the shadow off at the rect it clips, so a
-          // single outer `ClipRRect` — which is what this used to be — cannot
-          // carry a `boxShadow` at all. Nesting is the only arrangement where
-          // both survive.
-          //
-          // The platform view is untouched by this: the same `ClipRRect` ->
-          // `AspectRatio` -> `ColoredBox` -> `Stack` chain still wraps
-          // `CctvViewport`, and `CctvViewport` still owns the `RepaintBoundary`
-          // around the `WebViewWidget`. Nothing here is animated, blended or
-          // clipped per frame, so video frames continue to re-rasterise only
-          // the boundary that already isolated them.
+        // The panel's frame — flat card with hairline border.
+        // The video matte (cctvVideoGround) stays the same; depth is now via
+        // tonal step (page -> surface) + hairline, not shadows.
+        AppCard(
+          padding: EdgeInsets.zero,
           child: ClipRRect(
             borderRadius: AppRadius.all(AppRadius.pill),
             child: AspectRatio(
@@ -557,7 +498,6 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
         if (_playing) ...[
           const SizedBox(height: 12),
           _InfoBar(
-            theme: appTheme,
             primary: primary,
             showReload: !_loading,
             onReload: _controller?.reload,
@@ -585,19 +525,11 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
 /// three renderings of one fact stacked vertically.
 class _InfoBar extends StatelessWidget {
   const _InfoBar({
-    required this.theme,
     required this.primary,
     required this.showReload,
     required this.onReload,
   });
 
-  /// The appearance to paint. An [AppTheme] rather than a `bool` because the
-  /// bar's fill is [AppSurfaces.chrome], which has a Dracula step of its own —
-  /// Dracula's "current line" is a *lighter* surface than the app's dark chrome,
-  /// and it is the bar that is supposed to separate from the page by fill, so
-  /// taking the dark one there would have flattened exactly the edge this bar
-  /// exists to draw.
-  final AppTheme theme;
   final Color primary;
 
   /// Reload is hidden while the stream page is loading, so the action cannot
@@ -607,53 +539,10 @@ class _InfoBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // `textTheme`, not `theme`: the field named `theme` is the [AppTheme] this
-    // bar paints with, and a local `theme` for the Material `ThemeData` would
-    // shadow it — which is a silent, type-checked-nothing bug rather than a
-    // compile error only because the two names are different types.
     final textTheme = Theme.of(context);
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        // Was a hand-picked `0xFF1B211E` in dark and pure `Colors.white` in
-        // light. `AppSurfaces.chrome` is the surface that has to separate from
-        // the page by fill rather than by shadow, which is what this is: a bar
-        // under the player, with a Reload button in it.
-        // Still `AppSurfaces.chrome`, now lit from above through `AppSkeuo`.
-        // The hex pair that briefly replaced it had no Dracula branch.
-        gradient: AppSkeuo.fillGradient(
-          AppSurfaces.chrome(theme),
-          foreground: AppSkeuo.textSide(theme),
-        ),
-        borderRadius: AppRadius.all(AppRadius.card),
-        // Was `white | black @ 0.06`, which measures 1.14:1 on the fill. The bar
-        // sits under a viewport-sized video and holds a Reload button, so its
-        // edge is a component boundary, which WCAG 1.4.11 wants at 3:1.
-        //
-        // `boundaryEdge`, not `controlEdge`, and the difference is measured
-        // rather than stylistic. `controlEdge` is a tint of the accent, and the
-        // light accent `0xFF35A968` is only 2.70:1 at full opacity on the light
-        // page — so no alpha of it can reach 3:1, and this bar would have sat at
-        // 1.54:1. `boundaryEdge` is a neutral at 3.04:1, which is what WCAG
-        // 1.4.11 asks for, and it is worth a grey line on this one control: the
-        // bar is the only thing separating the video panel above it from the
-        // Reload button, and it abuts a matte rather than a themed card, so the
-        // boundary has to hold on its own rather than being carried by a shared
-        // fill.
-        border: Border.all(color: AppElevation.boundaryEdge(theme: theme)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.06),
-            blurRadius: 4,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
+      border: AppBorders.boundary,
       child: Row(
         children: [
           Icon(

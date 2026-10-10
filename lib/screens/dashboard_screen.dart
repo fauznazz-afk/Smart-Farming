@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
-import '../services/alarm_bridge.dart';
+import '../services/alarm_bridge.dart'
 import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
 import '../services/alarm_settings.dart';
@@ -16,7 +16,6 @@ import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
-import '../theme/app_theme_controller.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
@@ -147,11 +146,9 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
     required this.api,
-    required this.themeController,
   });
 
   final ThingsBoardApi api;
-  final AppThemeController themeController;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -1491,25 +1488,21 @@ Future<void> _refreshCurrentPage() async {
     // could disagree with its neighbours and produce a frame that is half Dracula
     // and half the app's dark mode. `AppCard.theme` and `DateStripChip.theme`
     // are required rather than optional for exactly the same reason.
-    final theme = resolveAppTheme(
-      widget.themeController.option,
-      Theme.of(context).brightness,
-    );
+    //
+    // With a single dark theme, the resolution is gone and every card simply
+    // reads the same token file.
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: _buildAppBar(theme),
+      appBar: _buildAppBar(),
       body: AppBackground(
-        theme: theme,
-        child: _buildBody(theme),
+        child: _buildBody(),
       ),
       extendBody: true,
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
         builder: (context, _, _) => GlassNavBar(
           selectedIndex: _selectedIndex,
-          theme: theme,
-          seedColor: _accent,
           collapsed: _navCollapsed,
           onSelect: _selectPage,
           onExpand: () => _navCollapsed.value = false,
@@ -1518,7 +1511,7 @@ Future<void> _refreshCurrentPage() async {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(AppTheme theme) {
+  PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -1531,7 +1524,7 @@ Future<void> _refreshCurrentPage() async {
           // The scrim has to match the page it fades in over, or the app bar
           // shows as a slightly different shade of the same colour once you
           // scroll. These were the old scaffold hexes; the page moved.
-          final baseColor = AppSurfaces.page(theme);
+          final baseColor = AppSurfaces.page;
           return DecoratedBox(
             decoration: BoxDecoration(
               // Opaque, and that is a fix. This was `0.86 * progress`, so 14% of
@@ -1544,10 +1537,9 @@ Future<void> _refreshCurrentPage() async {
               color: baseColor.withValues(alpha: progress),
               border: Border(
                 bottom: BorderSide(
-                  color: (theme.isDark ? Colors.white : Colors.black)
-                      .withValues(
-                        alpha: 0.08 * progress,
-                      ),
+                  color: Colors.white.withValues(
+                    alpha: 0.08 * progress,
+                  ),
                 ),
               ),
             ),
@@ -1602,7 +1594,7 @@ Future<void> _refreshCurrentPage() async {
     );
   }
 
-  Widget _buildBody(AppTheme theme) {
+  Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null && _battery == null) {
       return TelemetryErrorView(message: _error!, onRetry: _fetchAll);
@@ -1647,7 +1639,7 @@ Future<void> _refreshCurrentPage() async {
     }
   }
 
-  Widget _buildPage(int index, AppTheme theme) {
+  Widget _buildPage(int index) {
     // One status strip, not three. They used to stack, and a phone in offline
     // mode showed a green "polling active" line directly above an orange
     // "offline" line, which is two opposite claims about the same connection
@@ -1663,8 +1655,8 @@ Future<void> _refreshCurrentPage() async {
     // Connection state is different and stays everywhere, because a page of
     // numbers that cannot be trusted needs to say so wherever it is displayed.
     final items = <Widget Function()>[
-      () => _statusStripBuilder(theme, showAlerts: index == 0),
-      ..._pageContentFor(index, theme),
+      () => _statusStripBuilder(showAlerts: index == 0),
+      ..._pageContentFor(index),
     ];
     return RepaintBoundary(
       child: NotificationListener<ScrollNotification>(
@@ -1695,14 +1687,14 @@ Future<void> _refreshCurrentPage() async {
     );
   }
 
-  List<Widget Function()> _pageContentFor(int index, AppTheme theme) {
+  List<Widget Function()> _pageContentFor(int index) {
     // The `_ =>` arm renders Overview, so a page index added to the PageView
     // without an arm here shows the Overview page twice with no error anywhere.
     return switch (index) {
-      1 => _powerPage(theme),
-      2 => _hydroponicsPage(theme),
-      3 => _fishPage(theme),
-      _ => _overviewPage(theme),
+      1 => _powerPage(),
+      2 => _hydroponicsPage(),
+      3 => _fishPage(),
+      _ => _overviewPage(),
     };
   }
 
@@ -1768,12 +1760,11 @@ Future<void> _refreshCurrentPage() async {
   /// changed with it.
   Widget _bindRevision(
     Listenable listenable,
-    AppTheme theme,
     Widget Function() builder,
   ) {
     return Bound(
       listenable: listenable,
-      token: Object.hash(_visualToken, theme),
+      token: _visualToken,
       builder: builder,
     );
   }
@@ -1784,10 +1775,9 @@ Future<void> _refreshCurrentPage() async {
   /// beats offline mode, which beats an active alarm, which beats stale devices.
   /// Only the most important thing is ever shown, so the strip cannot contradict
   /// itself and does not push the page content off screen.
-  Widget _statusStripBuilder(AppTheme theme, {required bool showAlerts}) {
+  Widget _statusStripBuilder({required bool showAlerts}) {
     return _bindRevision(
       _connectionChromeListenable,
-      theme,
       () {
         final failed = _error != null;
         final offline = _isOfflineMode;
@@ -1806,11 +1796,6 @@ Future<void> _refreshCurrentPage() async {
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: _error,
-            // `theme.isDark`, not `theme`: this banner paints only text and
-            // status colours, which the two dark presets share. Widening its
-            // parameter would have been protecting nothing — see the note on
-            // `ConnectionStatusBanner.isDark`.
-            isDark: theme.isDark,
             visible: true,
             onRetry: _fetchAll,
           );
@@ -1818,7 +1803,6 @@ Future<void> _refreshCurrentPage() async {
         if (offline) {
           return _bindRevision(
             _liveRevision,
-            theme,
             () => BannerSwitcher(
               visible: true,
               identity: 'offline:${_cachedTelemetryTime ?? ''}',
@@ -1833,7 +1817,6 @@ Future<void> _refreshCurrentPage() async {
         if (showAlerts) {
           return _bindRevision(
             _alertMessages,
-            theme,
             () => BannerSwitcher(
               visible: alerts.isNotEmpty,
               // The identity is the set of messages, so a *change* of alarm
@@ -1850,7 +1833,6 @@ Future<void> _refreshCurrentPage() async {
             health: _connectionHealth.health,
             lastSuccessfulAt: _lastSuccessfulTelemetryAt,
             errorMessage: null,
-            isDark: theme.isDark,
             visible: true,
             onRetry: _fetchAll,
           );
@@ -1870,17 +1852,17 @@ Future<void> _refreshCurrentPage() async {
 
 
   // ── Overview page ────────────────────────────────────────────────────────────
-  List<Widget Function()> _overviewPage(AppTheme theme) {
+  List<Widget Function()> _overviewPage() {
     return [
-      () => GreetingHeader(displayName: _displayName, theme: theme),
+      () => const GreetingHeader(displayName: _displayName),
       () => const SizedBox(height: 8),
-      () => _dateStrip(theme),
+      () => _dateStrip(),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, theme, () => _heroCard(theme)),
+      () => _bindRevision(_liveRevision, () => _heroCard()),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_energyRevision, theme, () => _energySummaryCard(theme)),
+      () => _bindRevision(_energyRevision, () => _energySummaryCard()),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, theme, () => _dualCards(theme)),
+      () => _bindRevision(_liveRevision, () => _dualCards()),
       // The environment grid used to sit here. It moved to the Hydroponics page,
       // where it belongs with the camera looking at the same greenhouse, and
       // Overview is now only what the power system is doing. The readings did not
@@ -1888,24 +1870,19 @@ Future<void> _refreshCurrentPage() async {
     ];
   }
 
-  Widget _dateStrip(AppTheme theme) {
+  Widget _dateStrip() {
     return DateStrip(
       days: _stripDays,
       selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
-      theme: theme,
-      accentColor: strongMetricColor(
-        seedColor: _accent,
-        index: 0,
-        theme: theme,
-      ),
+      accentColor: categoryColor(MetricCategory.pv),
       onSelectDate: _selectDate,
       onPickRange: _pickDateFromCalendar,
     );
   }
 
-  Widget _heroCard(AppTheme theme) {
+  Widget _heroCard() {
     return LivePowerCard(
       pvPower: _pzem?.latestValues['power_dc'],
       acPower: _pzem?.latestValues['power_ac'],
@@ -1931,15 +1908,11 @@ Future<void> _refreshCurrentPage() async {
       soc: _battery?.latestValues['soc'],
       pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
       pzemAgeLabel: _pzem?.ageLabel,
-      theme: theme,
-      seedColor: _accent,
     );
   }
 
-  Widget _energySummaryCard(AppTheme theme) {
+  Widget _energySummaryCard() {
     return EnergySummaryCard(
-      seedColor: _accent,
-      theme: theme,
       weekly: _weeklyEnergySummary,
       loading: _energyLoading,
       hasData:
@@ -1961,7 +1934,7 @@ Future<void> _refreshCurrentPage() async {
     );
   }
 
-  Widget _dualCards(AppTheme theme) {
+  Widget _dualCards() {
     return SystemStatusStrip(
       lowSocThreshold: _thresholds.lowSoc,
       activeAlerts: _activeAlertIds.length,
@@ -1987,21 +1960,15 @@ Future<void> _refreshCurrentPage() async {
         power: _pzem?.latestValues['power_ac'],
         frequency: _pzem?.latestValues['frequency_ac'],
       ),
-      theme: theme,
-      seedColor: _accent,
       onOpenBattery: _openBatteryFromStrip,
     );
   }
 
-  Widget _environmentGrid(AppTheme theme) {
+  Widget _environmentGrid() {
     return MetricGrid(
       title: 'Environment',
       specs: kEnvironmentSpecs,
       values: _sensor?.latestValues,
-      theme: theme,
-      seedColor: _accent,
-      // The grid grades each reading against the same thresholds the alarms use,
-      // so a number on screen always has something to be read against.
       thresholds: _thresholds,
       limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
       staleMinutes: _staleTelemetryMinutes,
@@ -2013,17 +1980,11 @@ Future<void> _refreshCurrentPage() async {
     );
   }
 
-  Widget _fishGrid(AppTheme theme) {
+  Widget _fishGrid() {
     return MetricGrid(
       title: 'Water Quality',
       specs: kFishSpecs,
       values: _fish?.latestValues,
-      theme: theme,
-      seedColor: _accent,
-      // Fish thresholds now exist (pH, water temperature, turbidity), so the
-      // grid grades these readings against them exactly as the environment grid
-      // does — the background alarm and the page the reading lives on must not
-      // disagree about what the limit is.
       thresholds: _thresholds,
       limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
       showGridColors: _thresholds.fishAlerts,
@@ -2049,7 +2010,7 @@ Future<void> _refreshCurrentPage() async {
   /// and re-runs every cached page's closure list — none of which have anything to
   /// do with which sub-view is selected. Same pattern the nav bar already uses for
   /// [_selectedPage].
-  List<Widget Function()> _powerPage(AppTheme theme) {
+  List<Widget Function()> _powerPage() {
     return [
       () => ValueListenableBuilder<int>(
         valueListenable: _powerSubNotifier,
@@ -2074,7 +2035,7 @@ Future<void> _refreshCurrentPage() async {
     ];
   }
 
-  Widget _powerSelector(AppTheme theme, int selected) {
+  Widget _powerSelector(int selected) {
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<int>(
@@ -2106,27 +2067,17 @@ Future<void> _refreshCurrentPage() async {
     unawaited(_fetchHistoryFor(prefix));
   }
 
-  List<Widget Function()> _pvPage(AppTheme theme) => [
+  List<Widget Function()> _pvPage() => [
     () => GlassPageHeader(
       title: 'PV Status',
       icon: Icons.wb_sunny,
-      accent: strongMetricColor(
-        seedColor: _accent,
-        index: 0,
-        theme: theme,
-      ),
-      // `theme.isDark`, not `theme`: the header is a glyph and a heading with no
-      // surface of its own, and the one text colour it uses is shared by both
-      // dark presets. See the note on `GlassPageHeader.isDark`.
-      isDark: theme.isDark,
+      accent: categoryColor(MetricCategory.pv),
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      theme,
       () => _telemetryCard(
         _pzem,
-        theme,
         const [
           MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
           MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
@@ -2158,27 +2109,20 @@ Future<void> _refreshCurrentPage() async {
     // with two groups. Nothing about the current layout changes: each of the three
     // electrical pages still declares exactly one group, and `_chartHeaderGap`
     // moves inside the shared path where the other two pages were missing it.
-    ..._chartSectionThunks('pv', theme),
+    ..._chartSectionThunks('pv'),
   ];
 
-  List<Widget Function()> _acPage(AppTheme theme) => [
+  List<Widget Function()> _acPage() => [
     () => GlassPageHeader(
       title: 'AC Status',
       icon: Icons.power,
-      accent: strongMetricColor(
-        seedColor: _accent,
-        index: 1,
-        theme: theme,
-      ),
-      isDark: theme.isDark,
+      accent: categoryColor(MetricCategory.ac),
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      theme,
       () => _telemetryCard(
         _pzem,
-        theme,
         const [
           MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
           MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
@@ -2192,24 +2136,18 @@ Future<void> _refreshCurrentPage() async {
     // `_chartSections`, for the reason on the PV page: the hand-written
     // `.single` is what threw `Bad state: Too many elements` when the electrical
     // pages were split into one group per unit.
-    ..._chartSectionThunks('ac', theme),
+    ..._chartSectionThunks('ac'),
   ];
 
-  List<Widget Function()> _batteryPage(AppTheme theme) => [
+  List<Widget Function()> _batteryPage() => [
     () => GlassPageHeader(
       title: 'Battery Status',
       icon: Icons.battery_charging_full,
-      accent: strongMetricColor(
-        seedColor: _accent,
-        index: 2,
-        theme: theme,
-      ),
-      isDark: theme.isDark,
+      accent: categoryColor(MetricCategory.battery),
     ),
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _batteryRevision,
-      theme,
       () => _telemetryCard(
         _battery,
         theme,
@@ -2250,17 +2188,12 @@ Future<void> _refreshCurrentPage() async {
   ///
   /// The history request is shared: all four groups come from one fetch of the
   /// greenhouse device, keyed by the same list the charts look up.
-  List<Widget Function()> _hydroponicsPage(AppTheme theme) {
+  List<Widget Function()> _hydroponicsPage() {
     return [
       () => GlassPageHeader(
         title: 'Hydroponics',
         icon: Icons.eco,
-        accent: strongMetricColor(
-          seedColor: _accent,
-          index: 0,
-          theme: theme,
-        ),
-        isDark: theme.isDark,
+        accent: categoryColor(MetricCategory.environment),
       ),
       () => const SizedBox(height: _cardGap),
       // The camera comes first, above the readings.
@@ -2284,8 +2217,7 @@ Future<void> _refreshCurrentPage() async {
       () => const SizedBox(height: 8),
       () => _bindRevision(
         _sensorRevision,
-        theme,
-        () => _environmentGrid(theme),
+        () => _environmentGrid(),
       ),
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries
@@ -2297,10 +2229,9 @@ Future<void> _refreshCurrentPage() async {
       // `_visualToken`. There is deliberately no third way to declare one of these.
       () => _bindRevision(
         _chartRevision,
-        theme,
         () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: _chartSections('env', theme),
+          children: _chartSections('env'),
         ),
       ),
     ];
@@ -2313,17 +2244,12 @@ Future<void> _refreshCurrentPage() async {
   /// and `turbidity_voltage` are intentionally not here: the first is a boolean
   /// the numeric parser would flatten to a confident 0, the second is the
   /// sensor's own supply rail.
-  List<Widget Function()> _fishPage(AppTheme theme) {
+  List<Widget Function()> _fishPage() {
     return [
       () => GlassPageHeader(
         title: 'Fish Tank',
         icon: Icons.set_meal,
-        accent: strongMetricColor(
-          seedColor: _accent,
-          index: 0,
-          theme: theme,
-        ),
-        isDark: theme.isDark,
+        accent: categoryColor(MetricCategory.water),
       ),
       () => const SizedBox(height: _cardGap),
       // Camera first, for the same reason as the greenhouse: it is the one
@@ -2338,14 +2264,13 @@ Future<void> _refreshCurrentPage() async {
         ),
       ),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_fishRevision, theme, () => _fishGrid(theme)),
+      () => _bindRevision(_fishRevision, () => _fishGrid()),
       // Same reason as the greenhouse charts above.
       () => _bindRevision(
         _chartRevision,
-        theme,
         () => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: _chartSections('fish', theme),
+          children: _chartSections('fish'),
         ),
       ),
     ];
@@ -2353,47 +2278,36 @@ Future<void> _refreshCurrentPage() async {
 
   Widget _telemetryCard(
     DeviceTelemetry? data,
-    AppTheme theme,
     List<MetricDef> metrics,
   ) {
     return TelemetryCard(
       data: data,
       metrics: metrics,
-      theme: theme,
-      seedColor: _accent,
       staleMinutes: _staleTelemetryMinutes,
     );
   }
 
-  Widget _chartSectionHeader(String title, String prefix, AppTheme theme) {
+  Widget _chartSectionHeader(String title, String prefix) {
     // A notifier rather than reading the set directly: adding or removing a prefix
     // from `_historyRequestInFlight` mutates a plain Set, which rebuilds nothing.
     return ValueListenableBuilder<int>(
       valueListenable: _historyBusyNotifier,
       builder: (context, _, _) => ChartSectionHeader(
         title: title,
-        // `theme.isDark`: the section header is text plus two accents at
-        // hand-picked HSL lightnesses, and `themeColor` has no `AppTheme`
-        // overload. See the note on `ChartSectionHeader.isDark` — including the
-        // Dracula weakness it records there.
-        isDark: theme.isDark,
         selectedDate: _selectedDate,
         rangeStart: _selectedRangeStart,
         rangeEnd: _selectedRangeEnd,
         realtimeConnected: _realtimeConnected,
-        seedColor: _accent,
         onPickRange: _pickDateFromCalendar,
         refreshing: _historyRequestInFlight.contains(prefix),
       ),
     );
   }
 
-  Widget _chartCard(String prefix, ChartGroup group, AppTheme theme) {
+  Widget _chartCard(String prefix, ChartGroup group) {
     return TelemetryChartCard(
       prefix: prefix,
       group: group,
-      theme: theme,
-      seedColor: _accent,
       points: _history,
       spots: _chartSpots,
       stats: _chartStats,
@@ -2420,8 +2334,8 @@ Future<void> _refreshCurrentPage() async {
   /// moves. The dots below it are load-bearing rather than decorative, and the
   /// reason is that a carousel with no position indicator is indistinguishable
   /// from a chart the user has finished with.
-  List<Widget> _chartSections(String prefix, AppTheme theme) => [
-    for (final build in _chartSectionThunks(prefix, theme)) build(),
+  List<Widget> _chartSections(String prefix) => [
+    for (final build in _chartSectionThunks(prefix)) build(),
   ];
 
   /// One thunk per section, for a page's charts.
@@ -2433,7 +2347,7 @@ Future<void> _refreshCurrentPage() async {
   /// electrical pages ended up with their own hand-written chart wiring, and that
   /// wiring is what threw `Bad state: Too many elements` when the groups were
   /// split. There is now one implementation of "a page's charts".
-  List<Widget Function()> _chartSectionThunks(String prefix, AppTheme theme) {
+  List<Widget Function()> _chartSectionThunks(String prefix) {
     final title = chartPageTitle(prefix);
     if (title == null) return const [];
     final groups = chartGroupsForPrefix(prefix);
@@ -2448,12 +2362,11 @@ Future<void> _refreshCurrentPage() async {
     if (groups.length == 1) {
       return [
         () => const SizedBox(height: _chartHeaderGap),
-        () => _chartSectionHeader(groups.single.title, prefix, theme),
+        () => _chartSectionHeader(groups.single.title, prefix),
         () => const SizedBox(height: 8),
         () => _bindRevision(
           _chartRevision,
-          theme,
-          () => _chartCard(prefix, groups.single, theme),
+          () => _chartCard(prefix, groups.single),
         ),
       ];
     }
@@ -2470,26 +2383,23 @@ Future<void> _refreshCurrentPage() async {
       () => const SizedBox(height: _chartHeaderGap),
       // The page name, not the chart name, because in a carousel the chart name
       // moves and this does not. The indicator below the plot carries it.
-      () => _chartSectionHeader(title, prefix, theme),
+      () => _chartSectionHeader(title, prefix),
       () => const SizedBox(height: 8),
       // One `Bound` around the whole carousel rather than one per page. The
       // pages are a fixed list and they move together, and a `Bound` per page
       // would let four boundaries rebuild because one of them changed.
       () => _bindRevision(
         _chartRevision,
-        theme,
         () => ChartCarousel(
           itemCount: groups.length,
           height: tallest,
-          isDark: theme.isDark,
-          seedColor: _accent,
           // The dashboard's own pager gate, reused. Two horizontal pagers are
           // nested here and without this the outer one takes every swipe — the
           // first build swiped from the Temperature chart to the Fish Tank tab.
           onPointerActive: _setChartPointerActive,
           inset: kDashboardPageMargin,
           labelBuilder: (i) => groups[i].title,
-          itemBuilder: (context, i) => _chartCard(prefix, groups[i], theme),
+          itemBuilder: (context, i) => _chartCard(prefix, groups[i]),
         ),
       ),
     ];

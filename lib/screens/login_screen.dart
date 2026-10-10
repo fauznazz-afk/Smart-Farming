@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../services/alarm_notification_service.dart';
 import '../services/thingsboard_api.dart';
-import '../theme/app_theme_controller.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'dashboard_screen.dart';
@@ -12,9 +11,7 @@ import '../widgets/brand_logo.dart';
 import '../widgets/liquid_glass.dart';
 
 class LoginScreen extends StatefulWidget {
-  final AppThemeController themeController;
-
-  const LoginScreen({super.key, required this.themeController});
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -74,7 +71,6 @@ class _LoginScreenState extends State<LoginScreen> {
             pageBuilder: (context, animation, secondaryAnimation) =>
                 DashboardScreen(
               api: _api,
-              themeController: widget.themeController,
             ),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
@@ -108,29 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Resolved through the controller rather than from
-    // `Theme.of(context).brightness`, because a `Brightness` cannot distinguish
-    // Dracula from the app's dark mode — both are published as
-    // `ThemeMode.dark`. `resolveAppTheme` is the same free function the token
-    // layer and `main.dart` use, so there is one answer and not three.
-    final theme = resolveAppTheme(
-      widget.themeController.option,
-      Theme.of(context).brightness,
-    );
-    final isDark = theme.isDark;
-    // `Colors.red` measured 3.33:1 as the 13dp text it is used for here, which
-    // is a fail, and the wash behind it was a fixed `red @ 0.12` with no
-    // relationship to the theme. `statusBad` is the measured value, pinned by
-    // `test/color_helpers_test.dart` against the real card surface.
-    //
-    // `isDark`, and that is measured rather than assumed: the app's dark status
-    // palette clears AA across the whole Dracula ramp, worst case 5.17:1 on the
-    // chrome step. See the note on `statusOk`.
-    final errorColor = statusBad(isDark);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(
-        theme: theme,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -140,20 +116,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                     child: const BrandLogo(size: 100, showName: false),
                   ),
                   const SizedBox(height: 12),
-                  // Was the only call site that passed `performanceMode: false`
-                  // — the only place the blur ever actually ran — and it also
-                  // restated `borderRadius: 20` on top of the same default. Both
-                  // go: the fill is opaque and there is no `BackdropFilter` left
-                  // to run, and `AppCard` owns its radius.
                   AppCard(
-                    theme: theme,
                     padding: const EdgeInsets.all(24),
-                    // No gloss of its own: `AppCard` paints one beneath its
-                    // content, and only where it raises contrast.
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -162,38 +130,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             'EnerGrow',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: AppType.headlineMd,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'PLTS & Smart Farming Monitoring',
-                          style: TextStyle(
-                            fontSize: 13,
-                            // Was `onSurface @ 0.60`, an unmeasured alpha
-                            // blend — the same shape as the `black54` literals
-                            // this pass removed elsewhere.
-                            color: faintColor(isDark),
-                          ),
+                          style: AppType.bodySm.copyWith(color: faintColor),
                         ),
                         const SizedBox(height: 24),
                         TextField(
                           controller: _usernameCtrl,
-                          // **`TextInputAction.next`, not the implicit `done`.**
-                          //
-                          // With no action set, Flutter resolves a single-line
-                          // field's action to `done`, and `done` routes to
-                          // `focusNode.unfocus()` unless an `onEditingComplete` or
-                          // `onSubmitted` is supplied. Neither was. So the keyboard
-                          // offered "Done", the user pressed it, the keyboard
-                          // closed, and nothing happened -- with a password field
-                          // directly below that the same gesture should have moved
-                          // to. The password field does have
-                          // `onSubmitted: _handleLogin`, which is why the last step
-                          // of the form worked and this one did not.
                           textInputAction: TextInputAction.next,
                           onSubmitted: (_) =>
                               FocusScope.of(context).nextFocus(),
@@ -210,13 +157,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 semanticLabel: 'User',
                               ),
                             ),
-                            // No local `OutlineInputBorder`: the theme's
-                            // `inputDecorationTheme` (main.dart:82) already
-                            // supplies an outlined border at `AppRadius.inset`
-                            // with a `0x22` divider edge. This override also
-                            // only set `border`, so it *removed* the theme's
-                            // `enabledBorder` and `focusedBorder` for the
-                            // focused state.
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -246,46 +186,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (_errorMsg != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            // `liveRegion` because this is the only way a
-                            // failed login is reported. The error text appears
-                            // without any focus change and without a SnackBar,
-                            // so a screen-reader user pressing Login heard
-                            // nothing and had no way to know why the form did
-                            // not advance.
                             child: Semantics(
                               liveRegion: true,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: AppRadius.all(AppRadius.badge),
-                                  // 0.08, not the 0.12 it used to be. The
-                                  // wash is the same colour as the text sitting
-                                  // on it, so every point of alpha is a point
-                                  // of contrast: 0.12 measured 4.23:1 and 0.08
-                                  // measures 4.51:1, which is the line.
-                                  color: errorColor.withValues(alpha: 0.08),
-                                  border: Border.all(
-                                    color: errorColor.withValues(alpha: 0.3),
-                                  ),
-                                ),
+                              child: AppBadge(
+                                color: statusBad,
                                 child: Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.error_outline,
                                       size: 16,
-                                      color: errorColor,
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         _errorMsg!,
-                                        style: TextStyle(
-                                          color: errorColor,
-                                          fontSize: 13,
-                                        ),
+                                        style: AppType.bodySm,
                                       ),
                                     ),
                                   ],
@@ -295,35 +210,26 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         SizedBox(
                           width: double.infinity,
-                          height: 50,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: AppRadius.all(AppRadius.tile),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: FilledButton(
-                              onPressed: _loading ? null : _handleLogin,
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadius.all(AppRadius.tile),
-                                ),
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: _loading ? null : _handleLogin,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppPalette.primary,
+                              foregroundColor: AppPalette.onHue,
+                              textStyle: AppType.labelUppercase,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.all(AppRadius.pill),
                               ),
-                              child: _loading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Login'),
                             ),
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Login'),
                           ),
                         ),
                       ],

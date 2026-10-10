@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../dashboard/utils/design_tokens.dart';
+import '../../dashboard/utils/design_tokens.dart'
+    show AppSurfaces, AppBorders, AppRadius, AppCard;
 import '../utils/format_helpers.dart';
 
 class PeriodSelector extends StatelessWidget {
@@ -33,22 +34,19 @@ class PeriodSelector extends StatelessWidget {
           },
         ),
         const SizedBox(height: 8),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.all(AppRadius.tile),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+        AppCard(
+          padding: EdgeInsets.zero,
           child: OutlinedButton.icon(
             onPressed: onPickPeriod,
             icon: const Icon(Icons.calendar_month_outlined),
             label: Text(
               monthly ? formatMonthLabel(selectedDate) : formatDateLabel(selectedDate),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.tile),
+              ),
             ),
           ),
         ),

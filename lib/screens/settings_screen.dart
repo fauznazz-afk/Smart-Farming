@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme_controller.dart';
-import '../theme/app_theme_of.dart';
-import '../utils/app_log.dart';
 import '../widgets/liquid_glass.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
-import 'settings/widgets/settings_fields.dart';
 
 /// Settings browser: a category list that drills into one section at a time.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
-    required this.themeController,
     required this.onLogout,
   });
 
-  final AppThemeController themeController;
   final Future<void> Function() onLogout;
 
   @override
@@ -34,7 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _settings = SettingsController(themeController: widget.themeController);
+    _settings = SettingsController();
     _sections = buildSettingsSections(onLogout: _confirmLogout);
     _settings
       ..load()
@@ -52,12 +46,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       error = await _settings.save();
     } catch (exception) {
-      // A thrown exception used to escape here as an unhandled async error, so
-      // the save failed with no SnackBar and no pop and the button looked
-      // dead. Say so instead, and leave the details in the log -- in a debug
-      // build. `appLog` compiles the line out in release, so a release user
-      // reporting "save does nothing" now needs a debug build to be chased; see
-      // `app_log.dart`.
       appLog(() => 'Saving settings failed: $exception');
       error = 'Saving the settings failed. Please try again.';
     }
@@ -173,8 +161,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCategoryList(BuildContext context) {
-    final theme = Theme.of(context);
-    final appTheme = appThemeOf(context);
     return ListView.builder(
       key: const ValueKey('settings-list'),
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -183,62 +169,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final section = _sections[index];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          // Each settings row is a raised plate. Tokens and the app's own
-          // shadow pair rather than the hex values and two ad-hoc shadows this
-          // replaced, which had no Dracula branch, and `SkeuoSurface` rather
-          // than a four-colour `Border`, which crashes with a radius.
-          child: SkeuoSurface(
-            theme: appTheme,
-            base: AppSurfaces.card(appTheme),
-            radius: AppRadius.card,
-            shadows: AppElevation.raised(appTheme),
-            child: Material(
-              color: Colors.transparent,
-              child: ListTile(
-                leading: SettingsIconBadge(icon: section.icon),
-                title: Text(section.title),
-                // No `maxLines` and no ellipsis here, deliberately.
-                //
-                // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
-                // a 375dp phone it truncated eight of the nine category
-                // subtitles -- every one except "Application information.",
-                // which is the only string short enough to survive one line. The
-                // `SectionCard` on the drill-in page renders the same string with
-                // no clamp at all (settings_fields.dart), so the copy was written
-                // to wrap; only this list clamped it.
-                //
-                // The subtitle is the only prose on this screen explaining what a
-                // category does, so an ellipsis leaves the reader with a list of
-                // unexplained labels.
-                //
-                // Letting it wrap costs no height here, which was the thing worth
-                // checking before committing to it. `ListTile` with a subtitle and
-                // `isThreeLine: false` targets 72dp, and its `_computeSizes`
-                // (list_tile.dart) falls into "compact" mode when the content
-                // will not fit the ideal baseline positions, giving
-                // `2 * minVerticalPadding + titleHeight + subtitleHeight` = 8*2 +
-                // ~20 + ~32 = ~68dp for a two-line bodySmall subtitle. So a tile
-                // that wraps is not taller than the 72dp one that truncates --
-                // the vertical slack was already reserved. The list extent does
-                // not grow, and the Save button is in `bottomNavigationBar`, so it
-                // is pinned and cannot be pushed off screen regardless.
-                //
-                // Unbounded rather than `maxLines: 2` on purpose: at a 2.0
-                // accessibility text scale these strings need three or four
-                // lines, and a clamp would reintroduce exactly the truncation
-                // this removes, for the users least able to tolerate it.
-                subtitle: Text(
-                  section.subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                onTap: () => _openSection(index),
+          child: AppCard(
+            child: ListTile(
+              leading: SettingsIconBadge(icon: section.icon),
+              title: Text(section.title),
+              // No `maxLines` and no ellipsis here, deliberately.
+              //
+              // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
+              // a 375dp phone it truncated eight of the nine category
+              // subtitles -- every one except "Application information.",
+              // which is the only string short enough to survive one line. The
+              // `SectionCard` on the drill-in page renders the same string with
+              // no clamp at all (settings_fields.dart), so the copy was written
+              // to wrap; only this list clamped it.
+              //
+              // The subtitle is the only prose on this screen explaining what a
+              // category does, so an ellipsis leaves the reader with a list of
+              // unexplained labels.
+              //
+              // Letting it wrap costs no height here, which was the thing worth
+              // checking before committing to it. `ListTile` with a subtitle and
+              // `isThreeLine: false` targets 72dp, and its `_computeSizes`
+              // (list_tile.dart) falls into "compact" mode when the content
+              // will not fit the ideal baseline positions, giving
+              // `2 * minVerticalPadding + titleHeight + subtitleHeight` = 8*2 +
+              // ~20 + ~32 = ~68dp for a two-line bodySmall subtitle. So a tile
+              // that wraps is not taller than the 72dp one that truncates --
+              // the vertical slack was already reserved. The list extent does
+              // not grow, and the Save button is in `bottomNavigationBar`, so it
+              // is pinned and cannot be pushed off screen regardless.
+              //
+              // Unbounded rather than `maxLines: 2` on purpose: at a 2.0
+              // accessibility text scale these strings need three or four
+              // lines, and a clamp would reintroduce exactly the truncation
+              // this removes, for the users least able to tolerate it.
+              subtitle: Text(
+                section.subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppSurfaces.onSurfaceVariant,
+                    ),
               ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: AppSurfaces.onSurfaceVariant,
+              ),
+              onTap: () => _openSection(index),
             ),
           ),
         );

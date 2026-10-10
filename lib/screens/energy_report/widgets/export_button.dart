@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../dashboard/utils/design_tokens.dart';
+import '../../dashboard/utils/design_tokens.dart'
+    show AppSurfaces, AppBorders, AppRadius, AppCard;
 import '../utils/csv_builder.dart';
 import '../../../services/energy_report_service.dart';
 
@@ -25,19 +26,8 @@ class ExportButton extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: sharingNotifier,
       builder: (context, isSharing, _) {
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.all(AppRadius.pill),
-            boxShadow: isSharing
-                ? null
-                : [
-                    BoxShadow(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-          ),
+        return AppCard(
+          padding: EdgeInsets.zero,
           child: FilledButton.icon(
             onPressed: isSharing
                 ? null
@@ -55,6 +45,12 @@ class ExportButton extends StatelessWidget {
                   )
                 : const Icon(Icons.file_download_outlined),
             label: Text(isSharing ? 'Preparing CSV…' : 'Export CSV report'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+            ),
           ),
         );
       },

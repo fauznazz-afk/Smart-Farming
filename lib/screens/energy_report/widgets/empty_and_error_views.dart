@@ -1,52 +1,38 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme_of.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart';
+import '../../dashboard/utils/design_tokens.dart'
+    show AppSurfaces, AppBorders, AppRadius, AppCard;
 import '../utils/format_helpers.dart';
 import '../../../services/energy_report_service.dart';
 
 class EmptyPeriodView extends StatelessWidget {
   const EmptyPeriodView({
     super.key,
-    required this.isDark,
     required this.data,
   });
 
-  final bool isDark;
   final EnergyReportData data;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Container(
-        decoration: BoxDecoration(
-          // The resolved theme, not `isDark`; see `data_note.dart`.
-          gradient: AppSkeuo.fillGradient(
-            AppSurfaces.card(appThemeOf(context)),
-            foreground: AppSkeuo.textSide(appThemeOf(context)),
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const Icon(Icons.event_busy_outlined, size: 36),
+          const SizedBox(height: 10),
+          const Text(
+            'No data for this period',
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
-          borderRadius: BorderRadius.circular(AppRadius.card),
-        ),
-        child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Icon(Icons.event_busy_outlined, size: 36),
-            const SizedBox(height: 10),
-            const Text(
-              'No data for this period',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'ThingsBoard data covers ${formatDateLabel(data.firstSample)} to ${formatDateLabel(data.lastSample)}.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: faintColor(isDark)),
-            ),
-          ],
-        ),
-      ),
+          const SizedBox(height: 6),
+          Text(
+            'ThingsBoard data covers ${formatDateLabel(data.firstSample)} to ${formatDateLabel(data.lastSample)}.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: faintColor),
+          ),
+        ],
       ),
     );
   }
@@ -55,12 +41,10 @@ class EmptyPeriodView extends StatelessWidget {
 class ErrorView extends StatelessWidget {
   const ErrorView({
     super.key,
-    required this.isDark,
     required this.error,
     required this.onRetry,
   });
 
-  final bool isDark;
   final String error;
   final VoidCallback onRetry;
 
@@ -87,7 +71,7 @@ class ErrorView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: faintColor(isDark),
+                color: faintColor,
               ),
             ),
           ],

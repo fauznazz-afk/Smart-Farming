@@ -1,10 +1,9 @@
-import './dashboard/utils/color_helpers.dart';
 import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
-import '../theme/app_theme_of.dart';
-import '../widgets/liquid_glass.dart';
+import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
+import '../widgets/liquid_glass.dart';
 
 class AlarmHistoryScreen extends StatefulWidget {
   const AlarmHistoryScreen({super.key});
@@ -87,10 +86,8 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     AlarmType.deviceOffline => Icons.cloud_off_outlined,
   };
 
-  Color _colorForSeverity(AlarmSeverity severity, bool isDark) =>
-      severity == AlarmSeverity.critical
-          ? alarmCritical(isDark)
-          : alarmWarning(isDark);
+  Color _colorForSeverity(AlarmSeverity severity) =>
+      severity == AlarmSeverity.critical ? alarmCritical() : alarmWarning();
 
   String _formatTimestamp(DateTime dt) {
     const months = [
@@ -117,15 +114,6 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // One resolution, threaded everywhere. This screen has no
-    // `AppThemeController` -- it is pushed without one -- so the appearance comes
-    // from the context, and it has to be resolved *once* rather than per widget:
-    // `Theme.of(context).brightness` is identical for the app's dark theme and
-    // for Dracula, so a screen that asked for a `bool` per row would render
-    // Dracula's page with the app's dark ramp. See `appThemeOf` for the rule and
-    // the contract on `main.dart` that it depends on.
-    final appTheme = appThemeOf(context);
-    final isDark = appTheme.isDark;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -142,22 +130,21 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         ],
       ),
       body: AppBackground(
-        theme: appTheme,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _alarms.isEmpty
-            ? _emptyState(isDark)
+            ? _emptyState()
             : Column(
                 children: [
-                  _filterBar(isDark),
-                  Expanded(child: _alarmList(appTheme)),
+                  _filterBar(),
+                  Expanded(child: _alarmList()),
                 ],
               ),
       ),
     );
   }
 
-  Widget _emptyState(bool isDark) {
+  Widget _emptyState() {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -165,15 +152,14 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
           Icon(
             Icons.notifications_off_outlined,
             size: 56,
-            color: faintColor(isDark),
+            color: faintColor,
           ),
           const SizedBox(height: 16),
           Text(
             'No alarms recorded',
-            style: TextStyle(
-              fontSize: 16,
+            style: AppType.bodyMd.copyWith(
               fontWeight: FontWeight.w600,
-              color: faintColor(isDark),
+              color: faintColor,
             ),
           ),
         ],
@@ -181,21 +167,13 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  /// Takes the [AppTheme] rather than a `bool` even though the only two things
-  /// that need the *appearance* are [AppCard] and [AppBadge], because the text
-  /// and status colours on this screen are the `bool` half of the split — see
-  /// `faintColor` and `appPrimaryText` for why they are deliberately not keyed on
-  /// [AppTheme]. The list and the status badge are handed the enum so each one
-  /// takes `isDark` off it locally rather than taking two parameters that must
-  /// agree.
-  Widget _alarmList(AppTheme appTheme) {
-    final isDark = appTheme.isDark;
+  Widget _alarmList() {
     final alarms = _visibleAlarms;
     if (alarms.isEmpty) {
       return Center(
         child: Text(
           'No alarms match this filter',
-          style: TextStyle(color: faintColor(isDark)),
+          style: TextStyle(color: faintColor),
         ),
       );
     }
@@ -240,18 +218,13 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         // state is stated in words, exactly where it already was.
         final isResolved = alarm.resolved;
         final ringColor = isResolved
-            ? appPrimaryText(isDark)
-            : _colorForSeverity(alarm.severity, isDark);
+            ? appPrimaryText
+            : _colorForSeverity(alarm.severity);
         return AppCard(
-          theme: appTheme,
           padding: EdgeInsets.zero,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              // Was 19: `LiquidGlassCard`'s old radius of 20 minus one, so the
-              // splash would not poke past the card's own corner. It was never
-              // written down and it is now 3dp out from a 16dp card, so the
-              // splash visibly clips inside the corner. Token instead.
               borderRadius: BorderRadius.circular(AppRadius.card),
               onTap: () {
                 setState(() {
@@ -275,27 +248,10 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                       height: 40,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          center: const Alignment(-0.3, -0.3),
-                          radius: 0.7,
-                          colors: [
-                            ringColor.withValues(alpha: 0.28),
-                            ringColor.withValues(alpha: 0.10),
-                          ],
+                        color: AppSurfaces.surface,
+                        border: Border.fromBorderSide(
+                          AppBorders.categoricalBorder(ringColor),
                         ),
-                        // The wash alone left the circle with no edge of its
-                        // own; against the now-opaque card it read as a
-                        // floating smudge rather than a badge.
-                        border: Border.all(
-                          color: ringColor.withValues(alpha: 0.28),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: ringColor.withValues(alpha: 0.15),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
                       ),
                       child: Icon(
                         _iconForType(alarm.type),
@@ -311,28 +267,21 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                         children: [
                           Text(
                             alarm.message,
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: AppType.bodyMd.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: appPrimaryText(isDark),
+                              color: appPrimaryText,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _formatTimestamp(alarm.timestamp),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: faintColor(isDark),
-                            ),
+                            style: AppType.bodySm.copyWith(color: faintColor),
                           ),
                           if (isExpanded && alarm.value != null) ...[
                             const SizedBox(height: 8),
                             Text(
                               'Value: ${alarm.value!.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: faintColor(isDark),
-                              ),
+                              style: AppType.bodySm.copyWith(color: faintColor),
                             ),
                             const SizedBox(height: 4),
                           ],
@@ -340,10 +289,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Type: ${alarm.type.label}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: faintColor(isDark),
-                              ),
+                              style: AppType.bodySm.copyWith(color: faintColor),
                             ),
                           ],
                         ],
@@ -352,7 +298,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _statusBadge(alarm, ringColor, appTheme),
+                        _statusBadge(alarm, ringColor),
                         PopupMenuButton<_AlarmAction>(
                           tooltip: 'Alarm actions',
                           onSelected: (action) => _applyAction(action, alarm),
@@ -386,7 +332,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  Widget _filterBar(bool isDark) {
+  Widget _filterBar() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.fromLTRB(
@@ -398,38 +344,21 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       child: Row(
         children: _AlarmFilter.values.map((filter) {
           final isSelected = _filter == filter;
-          final appTheme = appThemeOf(context);
-          // A selected filter is pushed *in* — a well, lit from inside — and
-          // the others stand on the page. `SkeuoSurface` rather than a
-          // hand-built `Border`, which crashes with a pill radius; see there.
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: SkeuoSurface(
-              theme: appTheme,
-              base: isSelected
-                  ? AppSurfaces.input(appTheme)
-                  : AppSurfaces.card(appTheme),
+            child: AppSurface(
               radius: AppRadius.pill,
-              inverted: isSelected,
-              strength: isSelected ? 0.6 : 1,
-              shadows: isSelected
-                  ? AppElevation.insetDeep(appTheme)
-                  : AppElevation.raised(appTheme),
-              child: Material(
-                color: Colors.transparent,
-                // The chip's own fill would paint over the surface and leave it
-                // flat, so it is made transparent and the surface carries the
-                // look. The selected state stays legible through the well and
-                // the checkmark, not through a colour change.
-                child: ChoiceChip(
-                  label: Text(filter.label),
-                  selected: isSelected,
-                  backgroundColor: Colors.transparent,
-                  selectedColor: Colors.transparent,
-                  side: BorderSide.none,
-                  shape: const StadiumBorder(),
-                  onSelected: (_) => setState(() => _filter = filter),
-                ),
+              fill: isSelected ? AppSurfaces.surfaceAlt : AppSurfaces.surface,
+              border: isSelected ? AppBorders.categoricalBorder(AppPalette.accent) : AppBorders.hairline,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ChoiceChip(
+                label: Text(filter.label, style: AppType.labelMicro),
+                selected: isSelected,
+                backgroundColor: Colors.transparent,
+                selectedColor: Colors.transparent,
+                side: BorderSide.none,
+                shape: const StadiumBorder(),
+                onSelected: (_) => setState(() => _filter = filter),
               ),
             ),
           );
@@ -438,10 +367,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     );
   }
 
-  /// [appTheme] rather than a `bool` for [AppBadge]'s wash alpha, which is keyed
-  /// on brightness only, and `isDark` is taken off it for the text colours here.
-  Widget _statusBadge(AlarmRecord alarm, Color ringColor, AppTheme appTheme) {
-    final isDark = appTheme.isDark;
+  Widget _statusBadge(AlarmRecord alarm, Color ringColor) {
     final severityLabel = alarm.severity == AlarmSeverity.critical
         ? 'Critical'
         : 'Warning';
@@ -497,42 +423,25 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
     // covers.
     if (alarm.resolved) {
       return Padding(
-        // `AppBadge`'s own padding, kept so a row does not change width as it
-        // is acknowledged and resolved. No fill: that padding is the pill's
-        // geometry, not an assertion of a status.
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: appPrimaryText(isDark),
-          ),
+          style: AppType.labelMicro.copyWith(color: appPrimaryText),
         ),
       );
     }
     // `statusAlert` for "Acknowledged" is deliberate and stays. Acknowledged is
     // not the resolved case: the condition is still open, the user has seen it
     // and not fixed it, and that is a live verdict — hence the neither-good-
-    // nor-bad slot rather than ordinary text. Both replaced raw `Colors.green`
-    // and `Colors.blue` here; those are tuned for large fills and measured about
-    // 2.3:1 and 3.0:1 as 10dp text.
+    // nor-bad slot rather than ordinary text.
     //
     // `ringColor` is the severity colour on this path, not the neutral: the
     // caller only substitutes the neutral for a resolved row, and this branch is
     // reached only when the row is not resolved.
-    final color = alarm.acknowledged ? statusAlert(isDark) : ringColor;
+    final color = alarm.acknowledged ? statusAlert : ringColor;
     return AppBadge(
-      theme: appTheme,
       color: color,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
+      child: Text(label),
     );
   }
 

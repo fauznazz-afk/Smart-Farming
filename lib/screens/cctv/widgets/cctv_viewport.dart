@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../theme/app_theme_of.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart';
+import '../../dashboard/utils/design_tokens.dart'
+    show AppSurfaces, AppBorders, AppRadius, AppPalette, AppBadge;
 import '../utils/cctv_status.dart';
 
 /// Small status badge shown next to the CCTV header and in full screen.
@@ -12,43 +12,20 @@ class CctvStatusPill extends StatelessWidget {
   const CctvStatusPill({
     super.key,
     required this.status,
-    this.theme,
   });
 
   final CctvStatus status;
 
-  /// Which side of the page the pill is drawn on.
-  ///
-  /// Null reads the app's theme, which is right for the embedded pill. The
-  /// full-screen pill passes [AppTheme.dark] explicitly, because it floats over
-  /// the video, which is dark whatever the app's theme is doing — the contrast
-  /// that matters here is against what is *behind* the text, not against the
-  /// settings.
-  ///
-  /// **This is an [AppTheme] and not a `bool` for the same reason `AppCard`'s
-  /// `theme` is.** [AppBadge] needs the enum for its wash alpha, and the value
-  /// that says "the app is in a dark theme" is exactly the value that cannot say
-  /// *which* dark theme. Passing `AppTheme.dark` for the over-video case is
-  /// correct rather than a downgrade: the pill there is drawn on camera frames,
-  /// which have nothing to do with Dracula's palette, and what it needs from the
-  /// enum is the dark half of the wash ramp. `AppTheme.dracula` would paint the
-  /// identical colour, and naming the constant that is actually meant is the
-  /// difference between the call site and a reader having to work it out.
-  final AppTheme? theme;
-
   @override
   Widget build(BuildContext context) {
-    final appTheme = theme ?? appThemeOf(context);
-    final dark = appTheme.isDark;
     // The dot keeps the status hue; the label uses the measured text colour.
     final dotColor = status.color;
-    final textColor = status.textColor(dark);
+    final textColor = status.textColor;
     final label = status.label;
     return Semantics(
       label: 'CCTV status: ${label.toLowerCase()}',
       liveRegion: true,
       child: AppBadge(
-        theme: appTheme,
         color: textColor,
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -140,56 +117,18 @@ class CctvStandbyOverlay extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Positioned(
-          left: -70,
-          top: -110,
-          child: Container(
-            width: 190,
-            height: 190,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              // Decorative only — it sits behind the scrim and carries no
-              // information, so it keeps its own low-alpha wash of the accent.
-              color: primary.withValues(alpha: 0.09),
-            ),
-          ),
-        ),
         Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Solid primary circle with onHue ink (FAB-circle style)
               Container(
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(-0.3, -0.3),
-                    radius: 0.8,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.16),
-                      Colors.white.withValues(alpha: 0.06),
-                    ],
-                  ),
+                  color: AppPalette.primary,
                   shape: BoxShape.circle,
-                  // `boundaryEdge` rather than `controlEdge`. An accent tint
-                  // cannot be measured against a video frame of unknown
-                  // luminance at all, and this circle is the one control the
-                  // user has to find before anything is playing — it is the play
-                  // button. So it takes the neutral edge that clears 3:1
-                  // against the standby scrim it is drawn on, rather than the
-                  // themed one that would be invisible on a bright frame.
-                  //
-                  // `AppTheme.dark`, not the resolved theme and not Dracula: this
-                  // circle is drawn over camera frames of unknown luminance, so
-                  // the only thing that decides its contrast is the scrim behind
-                  // it, and the scrim is the same in every appearance. Naming the
-                  // constant says that; passing a `true` boolean would say
-                  // "dark, apparently", and resolving the real theme would say
-                  // "Dracula's page decides" — which is the one of the three
-                  // that would be wrong.
-                  border: Border.all(
-                    color: AppElevation.boundaryEdge(theme: AppTheme.dark),
-                  ),
+                  border: Border.all(color: AppBorders.boundary),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.4),
@@ -203,16 +142,20 @@ class CctvStandbyOverlay extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.videocam_outlined,
-                  size: 30,
-                  // Over a `white @ 0.09` scrim on video, so this is a graphic
-                  // and 3:1 is the requirement rather than 4.5:1. `white @ 0.70`
-                  // over that scrim clears it comfortably; the value is left
-                  // literal because it is compositing against an unknown
-                  // backdrop, which is the one case a theme token cannot
-                  // describe.
-                  color: Colors.white70,
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: onStart,
+                    child: const Center(
+                      child: Icon(
+                        Icons.videocam_outlined,
+                        size: 30,
+                        color: AppPalette.onHue,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -240,18 +183,6 @@ class CctvStandbyOverlay extends StatelessWidget {
                 label: const Text('Play camera'),
                 style: FilledButton.styleFrom(
                   backgroundColor: primary,
-                  // **Not `Colors.white`, and the measurement is why.**
-                  // `primary` is a light accent in every theme on a dark surface
-                  // and the Dracula preset's is lighter still: white on
-                  // `#C1A3EB` measures **2.16:1**, under the 3:1 WCAG 1.4.11
-                  // asks of a control, and this is the one control in the app
-                  // that paints a light fill with white on it.
-                  //
-                  // The fix is a theme-aware pair rather than a constant, because
-                  // there is no single ink that works on both a light accent fill
-                  // and `main.dart`'s own `filledButtonTheme` fills. This one
-                  // measures 7.81:1 on Dracula's primary and 12.6:1 on the
-                  // EnerGrow fill, so it clears on every theme.
                   foregroundColor: onPrimaryInk(primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
