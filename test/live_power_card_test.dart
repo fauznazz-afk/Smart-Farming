@@ -7,7 +7,6 @@ import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
 import 'widget_text_helpers.dart';
 
 void main() {
-  const seedColor = Color(0xFF35A968);
 
   Widget wrap(Widget child) => MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: child)),
@@ -24,8 +23,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: '5s ago',
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -46,8 +43,6 @@ void main() {
             soc: 75,
             pzemStale: true,
             pzemAgeLabel: '2m ago',
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -66,8 +61,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -92,8 +85,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -112,8 +103,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -132,8 +121,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -161,8 +148,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -188,8 +173,6 @@ void main() {
             soc: 99,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -216,8 +199,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -249,8 +230,6 @@ void main() {
             soc: 99,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -280,8 +259,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -308,8 +285,6 @@ void main() {
             soc: 99,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -328,8 +303,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: '5s ago',
-            theme: AppTheme.dark,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -347,8 +320,6 @@ void main() {
             soc: 75,
             pzemStale: false,
             pzemAgeLabel: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
           ),
         ),
       );
@@ -356,60 +327,50 @@ void main() {
       expect(find.text('Live power'), findsOneWidget);
     });
 
-    // Dracula is the reason this widget takes an `AppTheme` and not a bool, so
-    // the test that matters here is the one that asks for a *surface* Dracula
-    // derives separately rather than one that just checks it still renders.
+    // **The charge bar is painted from a token, not from a literal.** That claim
+    // used to be checked once per theme, and the loop was the point: Dracula
+    // derived its own track, so a card that took a `bool isDark` would render
+    // Dracula's page with the dark track — still builds, still finds every text,
+    // and wrong in a way only a pixel comparison catches.
     //
-    // The charge bar's track is the sharpest case in the file:
-    // `AppSurfaces.trackDracula` is `#1E1F29` and `trackDark` is `#131A18`, and
-    // Dracula's is the one that is *darker than its own page* — the inverse of
-    // both existing modes. A `bool isDark` threaded down here would render
-    // Dracula's card with the app's dark track, which still builds, still finds
-    // every text and is wrong in a way only a pixel comparison catches.
+    // There is one appearance now, so there is one track and one bar. What is
+    // left worth asserting is the thing the loop could not have caught: the
+    // track is a gradient shaded at the top with the token as its floor, so the
+    // token has to be found as a *stop*, not as a flat `ColoredBox`.
     //
     // Asserting against the token rather than a hex is deliberate, for the
     // reason `color_helpers_test.dart` documents about its own surface lists: a
     // literal written here is a copy, and copies drift silently.
-    for (final theme in AppTheme.values) {
-      testWidgets('paints the charge track with ${theme.name} track token',
-          (tester) async {
-        await tester.pumpWidget(
-          wrap(
-            LivePowerCard(
-              pvPower: 500,
-              acPower: 200,
-              batteryPower: -100,
-              soc: 75,
-              pzemStale: false,
-              pzemAgeLabel: '5s ago',
-              theme: theme,
-              seedColor: seedColor,
-            ),
+    testWidgets('paints the charge track with the AppSurfaces.track token',
+        (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          LivePowerCard(
+            pvPower: 500,
+            acPower: 200,
+            batteryPower: -100,
+            soc: 75,
+            pzemStale: false,
+            pzemAgeLabel: '5s ago',
           ),
-        );
+        ),
+      );
 
-        // The track is a skeuomorphic groove now — a gradient shaded at the
-        // top with the token as its floor — so the token is looked for as a
-        // stop rather than as a flat `ColoredBox`. The claim is the same: the
-        // bar behind the charge figure is painted from *this* theme's track.
-        expect(
-          find.byWidgetPredicate(
-            (w) =>
-                w is DecoratedBox &&
-                w.decoration is BoxDecoration &&
-                ((w.decoration as BoxDecoration).gradient
-                            as LinearGradient?)
-                        ?.colors
-                        .contains(AppSurfaces.track(theme)) ==
-                    true,
-          ),
-          findsWidgets,
-          reason: 'AppSurfaces.track(${theme.name}) is '
-              '${AppSurfaces.track(theme)} and no bar behind the charge figure '
-              'uses it',
-        );
-      });
-    }
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is DecoratedBox &&
+              w.decoration is BoxDecoration &&
+              ((w.decoration as BoxDecoration).gradient as LinearGradient?)
+                      ?.colors
+                      .contains(AppSurfaces.track) ==
+                  true,
+        ),
+        findsWidgets,
+        reason: 'AppSurfaces.track is ${AppSurfaces.track} and no bar behind '
+            'the charge figure uses it',
+      );
+    });
   });
 
   group('LivePowerCard with nothing reporting', () {
@@ -440,8 +401,6 @@ void main() {
           soc: soc,
           pzemStale: false,
           pzemAgeLabel: '5s ago',
-          theme: AppTheme.light,
-          seedColor: seedColor,
         );
 
     testWidgets('prints -- for every missing figure', (tester) async {
@@ -570,8 +529,6 @@ void main() {
                       soc: 75,
                       pzemStale: false,
                       pzemAgeLabel: '5s ago',
-                      theme: AppTheme.light,
-                      seedColor: seedColor,
                     ),
                   ),
                 ),
@@ -644,8 +601,6 @@ void main() {
                     soc: 81,
                     pzemStale: false,
                     pzemAgeLabel: 'Just now',
-                    theme: AppTheme.light,
-                    seedColor: seedColor,
                   ),
                 ),
               ),

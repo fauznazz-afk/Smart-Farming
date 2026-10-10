@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/cctv/utils/cctv_status.dart';
 import 'package:plts_monitoring/screens/cctv/widgets/cctv_viewport.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
 // Split out of the former `cctv_test.dart`, which at 34 tests had outgrown the
 // RAM budget for a single file on this 7 GB machine: `dart_test.yaml` pins
@@ -86,7 +85,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: CctvStatusPill(status: CctvStatus.live, theme: AppTheme.light),
+            body: CctvStatusPill(status: CctvStatus.live),
           ),
         ),
       );
@@ -113,7 +112,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: CctvStatusPill(status: status, theme: AppTheme.light),
+              body: CctvStatusPill(status: status),
             ),
           ),
         );

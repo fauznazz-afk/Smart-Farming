@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/date_strip.dart';
 
 /// The seven-day strip, checked at the font scales a user can actually set.
@@ -53,7 +52,9 @@ String _ellipsised({
 }
 
 void main() {
-  const seedColor = Color(0xFF35A968);
+  // The strip still takes an accent: it is the categorical accent for "PV" on
+  // the dashboard, which is not the app's appearance accent.
+  const accentColor = Color(0xFF35A968);
   final today = DateTime(2026, 10, 2);
   final days = List<DateTime>.generate(
     7,
@@ -81,8 +82,7 @@ void main() {
                 selectedDate: today,
                 rangeStart: null,
                 rangeEnd: null,
-                theme: AppTheme.light,
-                accentColor: seedColor,
+                accentColor: accentColor,
                 onSelectDate: (_) {},
                 onPickRange: () {},
               ),

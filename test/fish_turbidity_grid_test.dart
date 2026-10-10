@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_specs.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
@@ -17,8 +16,6 @@ import 'package:plts_monitoring/utils/alarm_rules.dart';
 /// key: the fish page passes `ph`, `suhu` and `turbidity_ntu`, and only the
 /// greenhouse ones were exercised.
 void main() {
-  const seedColor = Color(0xFF35A968);
-
   // What the device had stored: pH 6-8.5, water 20-35, turbidity max 100.
   final thresholds = AlarmThresholds(
     energyAlerts: true,
@@ -55,8 +52,6 @@ void main() {
         title: 'Water Quality',
         specs: kFishSpecs,
         values: values,
-        theme: AppTheme.dark,
-        seedColor: seedColor,
         thresholds: thresholds,
         limitLabelFor: (spec) => environmentLimitLabel(spec, thresholds),
         showGridColors: thresholds.fishAlerts,
@@ -81,8 +76,6 @@ void main() {
         title: 'Water Quality',
         specs: kFishSpecs,
         values: values,
-        theme: AppTheme.dark,
-        seedColor: seedColor,
         thresholds: thresholds,
         limitLabelFor: (spec) => environmentLimitLabel(spec, thresholds),
         showGridColors: thresholds.fishAlerts,

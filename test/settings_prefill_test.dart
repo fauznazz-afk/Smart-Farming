@@ -5,7 +5,6 @@ import 'package:plts_monitoring/models/settings_keys.dart';
 import 'package:plts_monitoring/screens/settings/settings_controller.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
 import 'package:plts_monitoring/screens/settings/widgets/settings_fields.dart';
-import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pins the difference between a limit the user has saved and a default sitting
@@ -29,9 +28,7 @@ void main() {
   }) async {
     SharedPreferences.setMockInitialValues(initial);
     FlutterSecureStorage.setMockInitialValues({});
-    final themeController = AppThemeController();
-    await themeController.load();
-    final c = SettingsController(themeController: themeController);
+    final c = SettingsController();
     addTearDown(c.dispose);
     await c.load();
     return c;

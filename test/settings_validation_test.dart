@@ -3,7 +3,6 @@ import 'package:plts_monitoring/screens/settings/settings_controller.dart';
 import 'package:plts_monitoring/models/settings_keys.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
-import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 late SettingsController _controller;
@@ -29,9 +28,7 @@ EnvRangeSetting range({
 void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    final themeController = AppThemeController();
-    await themeController.load();
-    _controller = SettingsController(themeController: themeController);
+    _controller = SettingsController();
   });
 
   tearDown(() => _controller.dispose());

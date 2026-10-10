@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show RenderFittedBox, RenderObject, RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
 
 /// The three flow-row figures share one painted size.
@@ -17,8 +16,6 @@ import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
 /// Adding 13 more card pumps to that file pushed it over, so this half of the
 /// same widget lives beside it. The suite is run per file here anyway.
 void main() {
-  const seedColor = Color(0xFF35A968);
-
   /// The figure drawing [figure], as the layout actually resolved it.
   RenderParagraph findFigure(WidgetTester tester, String figure) {
     final finder = find.text(figure);
@@ -98,8 +95,6 @@ void main() {
                 soc: 75,
                 pzemStale: false,
                 pzemAgeLabel: '5s ago',
-                theme: AppTheme.light,
-                seedColor: seedColor,
               ),
             ),
           ),

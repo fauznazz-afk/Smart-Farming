@@ -8,7 +8,6 @@ import 'package:plts_monitoring/screens/settings/settings_controller.dart';
 import 'package:plts_monitoring/screens/settings/utils/settings_validation.dart';
 import 'package:plts_monitoring/screens/settings_screen.dart';
 import 'package:plts_monitoring/services/cctv_url.dart';
-import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Regression guards for the "Save settings does nothing" bug.
@@ -26,9 +25,7 @@ Future<SettingsController> _freshController({
   // A non-const map: the test platform writes into it, so `const {}` throws
   // "Cannot modify unmodifiable map" as soon as save() stores a CCTV URL.
   FlutterSecureStorage.setMockInitialValues({});
-  final themeController = AppThemeController();
-  await themeController.load();
-  final controller = SettingsController(themeController: themeController);
+  final controller = SettingsController();
   addTearDown(controller.dispose);
   return controller;
 }
@@ -92,17 +89,10 @@ Future<void> _pumpSettings(WidgetTester tester) async {
     buildNumber: '10',
     buildSignature: '',
   );
-  final themeController = AppThemeController();
-  await themeController.load();
   await tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: themeController.seedColor),
-      ),
-      home: SettingsScreen(
-        themeController: themeController,
-        onLogout: () async {},
-      ),
+      theme: ThemeData.dark(),
+      home: SettingsScreen(onLogout: () async {}),
     ),
   );
   await tester.pumpAndSettle();

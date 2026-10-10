@@ -3,7 +3,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:plts_monitoring/screens/settings_screen.dart';
-import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Whether [ancestor] sits above [descendant] in the element tree.
@@ -53,17 +52,10 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
     buildNumber: '9',
     buildSignature: '',
   );
-  final themeController = AppThemeController();
-  await themeController.load();
   await tester.pumpWidget(
     MaterialApp(
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: themeController.seedColor),
-      ),
-      home: SettingsScreen(
-        themeController: themeController,
-        onLogout: () async {},
-      ),
+      theme: ThemeData.dark(),
+      home: SettingsScreen(onLogout: () async {}),
     ),
   );
   await tester.pumpAndSettle();

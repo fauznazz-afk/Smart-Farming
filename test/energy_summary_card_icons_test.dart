@@ -1,17 +1,36 @@
-/// The WCAG 1.4.11 check for `EnergySummaryCard`'s two metric icons.
+/// The WCAG 1.4.11 check for `EnergySummaryCard`'s two category colours.
 ///
-/// **Why this file exists.** Those icons were derived with a bare
+/// **Why this file exists.** Those two colours were once derived from a bare
 /// `themeColor(lightness: 0.52, saturation: 0.5)`, a value chosen when there were
-/// two brightnesses and checked on those two. Adding a third theme applied it to
-/// a surface it had never been measured against, and on Dracula's preset purple
-/// it produces `#7A47C2` at **1.97:1** — the AC usage icon was effectively
-/// invisible. The old code's own comment predicted this ("would need measuring
-/// before Dracula is a supported appearance") and the prediction was correct.
+/// two brightnesses and checked on those two. Adding a third appearance applied
+/// it to a surface it had never been measured against, and on Dracula's preset
+/// purple it produced `#7A47C2` at **1.97:1** — the AC usage figure was
+/// effectively invisible. The old code's own comment predicted this ("would
+/// need measuring before Dracula is a supported appearance") and the prediction
+/// was correct.
 ///
 /// It is the third instance of the same shape in this repo: a colour rule
 /// written for one set of conditions and extended to a new one without a
-/// measurement. The other two were the `AppTile` contrast exclusion and the
-/// `themeColor` lightness that cannot serve two hues.
+/// measurement.
+///
+/// **What survived the migration.** There is one appearance now and the hue is
+/// no longer derived from a seed at all — each tile reads its own category's
+/// fixed hue, so the class of bug above cannot recur. What is left worth
+/// guarding is the two properties the old file cared about: the two tiles are
+/// *different* colours, and both clear 3:1 against the surface they are
+/// actually painted on.
+///
+/// The hue is read off the tile's **icon**, because that is where the card puts
+/// it. The figure text itself is drawn in ordinary ink, so a version of this
+/// file that read the figures' text colour would assert that two labels are the
+/// same grey and pass while both tiles were painted the same hue.
+///
+/// The value is read out of the **painted widget tree**, not re-derived here.
+/// The first version of this file called `metricColor` itself and compared the
+/// results; mutation-checked, it **passed with the card reverted to the broken
+/// derivation** — it was asserting on its own copy of the rule while the card
+/// did something else. A guard that cannot fail reports confidence it has not
+/// earned.
 library;
 
 import 'dart:math' as math;
@@ -19,154 +38,183 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/widgets/energy_summary_card.dart';
+import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
-double _lum(Color c) =>
-    0.2126 * _lin(c.r) + 0.7152 * _lin(c.g) + 0.0722 * _lin(c.b);
-
-double _lin(double c) =>
-    c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
-
+/// WCAG 2.1 relative-luminance contrast ratio between two opaque colours.
+///
+/// The same arithmetic `color_helpers_test.dart` uses, kept local rather than
+/// imported so this file has no dependency on another test's internals. What it
+/// must never become is a hardcoded ratio: the point of the assertion is that
+/// the check is *recomputed*, so a token that moves is caught by a new number
+/// rather than accepted by an old one.
 double _contrast(Color a, Color b) {
-  final x = _lum(a), y = _lum(b);
+  final x = _luminance(a), y = _luminance(b);
   return (math.max(x, y) + 0.05) / (math.min(x, y) + 0.05);
+}
+
+double _luminance(Color c) {
+  double channel(double v) =>
+      v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+  return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
 }
 
 String _hex(Color c) =>
     c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase();
 
-void main() {
-  const oceanCyan = Color(0xFF2AA7A1);
+/// The `BoxDecoration` `AppTile` built for tile [index].
+///
+/// `AppTile` renders a bare `Container` with no key, so the first `Container`
+/// descending from it *is* the tile — nothing inside a tile can precede it.
+BoxDecoration _tileDecoration(WidgetTester tester, int index) => tester
+    .widget<Container>(
+      find
+          .descendant(
+            of: find.byType(AppTile).at(index),
+            matching: find.byType(Container),
+          )
+          .first,
+    )
+    .decoration! as BoxDecoration;
 
-  /// The two icon colours **as the card actually paints them**.
-  ///
-  /// Read out of the rendered widget tree rather than re-derived here, and that
-  /// is the whole point of the file.
-  ///
-  /// The first version called `metricColor` and `strongMetricColor` itself and
-  /// compared the results. Mutation-checked, it **passed with
-  /// `energy_summary_card.dart` reverted to the broken derivation** — it was
-  /// asserting on its own copy of the rule while the card did something else
-  /// entirely. A guard that cannot fail is worse than no guard, because it
-  /// reports confidence it has not earned. This reads the painted tree instead,
-  /// so changing the card changes what is measured.
-  Future<List<Color>> painted(WidgetTester tester, AppTheme theme) async {
+/// The surface each icon is painted on, read out of the rendered tile.
+///
+/// **Not written down.** `AppTile`'s fill is a step on the app's tonal ramp, and
+/// the two tiles sit inside the card, which sits inside the page — so
+/// `AppSurfaces.surfaceAlt` is the right token today and would be the wrong one
+/// the day somebody nests a tile somewhere deeper. Reading it off the
+/// `BoxDecoration` the tile actually built is the only version of this that
+/// cannot drift; see the header of `color_helpers_test.dart` for what a
+/// hand-written surface list cost this repo twice.
+Color _tileFill(WidgetTester tester, int index) =>
+    _tileDecoration(tester, index).color!;
+
+void main() {
+  /// The two figure colours, as the card actually paints them.
+  Future<List<Color>> painted(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: EnergySummaryCard(
-            theme: theme,
-            seedColor: theme == AppTheme.dracula ? draculaAccent : oceanCyan,
             weekly: false,
             loading: false,
             hasData: true,
             errorMessage: null,
-            solarKwh: 4.2,
-            previousSolarKwh: 3.5,
-            loadKwh: 1.0,
-            previousLoadKwh: 2.5,
-            onRangeChanged: (_) {},
-            onOpenReport: () {},
+            solarKwh: 12.4,
+            previousSolarKwh: 10,
+            loadKwh: 8.7,
+            previousLoadKwh: 9,
+            onRangeChanged: _noop,
+            onOpenReport: _noopVoid,
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    return tester
-        .widgetList<Icon>(find.byType(Icon))
-        .where((i) => i.size == 18)
-        .map((i) => i.color ?? Colors.black)
-        .toList();
+
+    // The category hue is on the tile's **icon**, not on its figure text: the
+    // figure is drawn in ordinary ink and the tile's frame carries the hue. So
+    // this is read off the two icons by icon type, which is unambiguous — the
+    // previous version of this file read "every coloured Text in the tree" and
+    // got a list whose length depended on how many captions happened to be
+    // tinted that day.
+    Color iconColour(IconData icon) =>
+        tester.widget<Icon>(find.byIcon(icon)).color!;
+    return [
+      iconColour(Icons.wb_sunny_outlined),
+      iconColour(Icons.electrical_services_outlined),
+    ];
   }
 
-  group('EnergySummaryCard metric icons, read from the painted card', () {
-    testWidgets('clear WCAG 1.4.11 3:1 on dark and on Dracula', (tester) async {
-      // 1.4.11 is non-text contrast: 3:1 for a graphical object. These are 18dp
-      // glyphs, not lettering, so the 4.5:1 `faintColor` is held to does not
-      // apply here and demanding it would be a different, wrong test.
-      for (final theme in [AppTheme.dark, AppTheme.dracula]) {
-        final colours = await painted(tester, theme);
-        expect(colours.length, 2, reason: 'expected the PV and AC icons');
-
-        for (final entry in {0: 'PV', 1: 'AC'}.entries) {
-          final worst = [
-            _contrast(colours[entry.key], AppSurfaces.card(theme)),
-            _contrast(colours[entry.key], AppSurfaces.input(theme)),
-          ].reduce(math.min);
-
-          expect(
-            worst,
-            greaterThanOrEqualTo(3.0),
-            reason: '$theme ${entry.value} icon #${_hex(colours[entry.key])} is '
-                '$worst:1 on its worst surface; the old fixed HSL step measured '
-                '1.97:1 on Dracula and the icon was invisible',
-          );
-        }
-      }
-    });
-
-    testWidgets('stay two different colours, labelling two quantities', (tester) async {
-      // `metricColor` takes an `index` and deliberately ignores it -- a
-      // documented rule in this repo, and `color_helpers_test.dart` fails if it
-      // ever starts honouring it. So the first attempt at fixing the contrast,
-      // routing both icons through `metricColor`, collapsed the two tiles onto
-      // one value and lost the distinction. That was caught by the widget's own
-      // existing test; this is the guard that keeps it caught.
-      for (final theme in AppTheme.values) {
-        final colours = await painted(tester, theme);
-        expect(
-          colours.first,
-          isNot(colours.last),
-          reason: '$theme paints both metric icons as #${_hex(colours.first)}; '
-              'they label different quantities',
-        );
-      }
-    });
-
-    testWidgets('keep their hue, so they still read as the user\'s accent', (tester) async {
-      // The distinction above must not be bought with an unrelated colour.
-      for (final theme in AppTheme.values) {
-        final seed = theme == AppTheme.dracula ? draculaAccent : oceanCyan;
-        final seedHue = HSLColor.fromColor(seed).hue;
-        for (final c in await painted(tester, theme)) {
-          expect(
-            (HSLColor.fromColor(c).hue - seedHue).abs(),
-            lessThan(6.0),
-            reason: '#${_hex(c)} on $theme has drifted from its seed hue',
-          );
-        }
-      }
-    });
-
-    testWidgets('light mode clears 3:1 too, which it did not for a long time', (tester) async {
-      // **This was a recorded shortfall and now is not.** The icon measured
-      // 2.16:1 here, against 2.17:1 before the Dracula work -- the same to within
-      // a hundredth -- and this test used to assert a floor at 2.1 plus a
-      // reminder to retire itself once light mode was fixed.
+  group('EnergySummaryCard category colours, read from the painted card', () {
+    testWidgets('clear WCAG 1.4.11 3:1 on the fill they are painted on',
+        (tester) async {
+      // 1.4.11 is non-text contrast: 3:1 for a graphical object. These are
+      // icons on a tile, not body text, so the 4.5:1 floor that `faintColor` is
+      // held to does not apply here and demanding it would be a different,
+      // wrong test. `color_helpers_test.dart` holds the *same* hues to the
+      // stricter 4.5:1 as captions, so this is the floor and not the claim.
       //
-      // It is fixed, by `metricGraphic`, which is the point of that function: 3:1
-      // is what 1.4.11 asks of a graphical object and 4.5:1 is what it asks of
-      // text, `metricColor` was built for the second, and the fix belongs on the
-      // graphical uses rather than on every metric value in the app.
-      //
-      // The earlier draft of this file also claimed 2.78:1 with a 2.7 floor, which
-      // was a number measured against *Dracula's* cyan rather than the Ocean cyan
-      // the user actually selects. The assertion is what caught that, and it is
-      // why the value is read off the painted card rather than computed here.
-      final colours = await painted(tester, AppTheme.light);
+      // Measured against the tile's own fill rather than against a list of
+      // surfaces: the icon is never painted on anything else, and a measurement
+      // against `page` would pass no matter how dark the tile got.
+      final colours = await painted(tester);
+
       for (final entry in {0: 'PV', 1: 'AC'}.entries) {
-        final measured = _contrast(
-          colours[entry.key],
-          AppSurfaces.card(AppTheme.light),
-        );
+        final fill = _tileFill(tester, entry.key);
+        final measured = _contrast(colours[entry.key], fill);
         expect(
           measured,
           greaterThanOrEqualTo(3.0),
-          reason: 'light-mode ${entry.value} icon #${_hex(colours[entry.key])} '
-              'fell to $measured:1; it was 2.17:1 before any of this work',
+          reason: 'the ${entry.value} icon #${_hex(colours[entry.key])} is '
+              '$measured:1 on its own tile fill #${_hex(fill)}; the old fixed '
+              'HSL step measured 1.97:1 on Dracula and the icon was invisible',
         );
       }
     });
+
+    testWidgets('stay two different colours, labelling two quantities',
+        (tester) async {
+      // The hue rule in this repo is fixed per category and deliberately does
+      // not vary by index — `color_helpers_test.dart` fails if `categoryColor`
+      // ever starts deriving from one. So the two tiles can only collapse onto
+      // one value if both categories are mapped to the same hue, which is
+      // exactly the regression this is here for. This is the shape of bug the
+      // old `metricColor`-based version missed by asserting on its own copy of
+      // the rule.
+      final colours = await painted(tester);
+      expect(
+        colours.first,
+        isNot(colours.last),
+        reason: 'the card paints both tiles in #${_hex(colours.first)}; '
+            'they label different quantities',
+      );
+    });
+
+    testWidgets('are the two category hues, not something derived per render',
+        (tester) async {
+      // Each category owns a fixed hue, reused everywhere that category
+      // appears. If either tile were re-derived at paint time it would drift
+      // from the one shown on the dashboard, and the two screens would stop
+      // agreeing about what "PV" looks like.
+      final colours = await painted(tester);
+      expect(
+        colours,
+        [
+          categoryColor(MetricCategory.pv),
+          categoryColor(MetricCategory.ac),
+        ],
+      );
+    });
+
+    testWidgets('each tile frame carries its own category, not a shared one',
+        (tester) async {
+      // The same claim as above, on the second surface the hue appears on.
+      // `AppTile` takes an `accent` and turns it into a categorical frame, so
+      // there are two places this could collapse and checking only the icon
+      // would leave the frame free to disagree with it.
+      final frames = <Color>[];
+      for (var i = 0; i < 2; i++) {
+        frames.add((_tileDecoration(tester, i).border! as Border).top.color);
+      }
+      expect(
+        frames,
+        [
+          categoryColor(MetricCategory.pv),
+          categoryColor(MetricCategory.ac),
+        ],
+        reason: 'the tile frames are #${frames.map(_hex).join(' and ')}; a '
+            'frame in the wrong category is a card claiming data it does not '
+            'contain',
+      );
+    });
   });
 }
+
+void _noop(bool _) {}
+
+void _noopVoid() {}

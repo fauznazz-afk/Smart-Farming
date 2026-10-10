@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/chart_groups.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/chart_card.dart';
 import 'package:plts_monitoring/screens/dashboard/charts/chart_data.dart';
@@ -18,8 +17,6 @@ import 'package:fl_chart/fl_chart.dart';
 /// read as though it had honoured the font scale, and both fixes are about not
 /// quietly substituting one meaning for another.
 void main() {
-  const seed = Color(0xFF35A968);
-
   Widget wrap(Widget child, {double width = 381, double scale = 1.0}) =>
       MaterialApp(
         home: MediaQuery(
@@ -33,9 +30,7 @@ void main() {
     Widget card({required bool loadFailed, required bool loading}) =>
         TelemetryChartCard(
           prefix: 'pv',
-          seedColor: seed,
           group: chartGroupsForPrefix('pv').first,
-          theme: AppTheme.light,
           points: <String, List<TelemetryPoint>>{},
           spots: <String, List<FlSpot>>{},
           stats: <String, SeriesStats?>{},
@@ -105,8 +100,6 @@ void main() {
             dayName: 'Mon',
             dayNumber: 28,
             isSelected: false,
-            theme: AppTheme.light,
-            accentColor: seed,
             onTap: () {},
           ),
           scale: 2.0,
@@ -130,8 +123,6 @@ void main() {
             dayName: 'Mon',
             dayNumber: 28,
             isSelected: false,
-            theme: AppTheme.light,
-            accentColor: seed,
             onTap: () {},
           ),
           scale: 1.5,

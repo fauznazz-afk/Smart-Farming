@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
 
 void main() {
-  const seedColor = Color(0xFF35A968);
-
   Widget wrap(Widget child) => MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: child)),
       );
@@ -70,8 +67,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
           ),
@@ -101,8 +96,6 @@ void main() {
               'tds_ppm': 800, // in range
               'water_temp': 24.0, // in range
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
           ),
@@ -126,8 +119,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now().subtract(const Duration(minutes: 30)),
             staleMinutes: 10,
@@ -145,8 +136,6 @@ void main() {
             title: 'Environment',
             specs: specs,
             values: null,
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
           ),
@@ -157,7 +146,11 @@ void main() {
       expect(find.text('--'), findsNWidgets(5));
     });
 
-    testWidgets('renders in dark mode', (tester) async {
+    // Was "renders in dark mode", which used to differ from the first test only
+    // by the seed it passed. There is one appearance now, so the two were the
+    // same pump; kept as a plain render check because an uninstrumented grid
+    // laying out its specs is the thing every other test here depends on.
+    testWidgets('renders without overflow', (tester) async {
       await tester.pumpWidget(
         wrap(
           MetricGrid(
@@ -170,14 +163,13 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.dark,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
           ),
         ),
       );
 
+      expect(tester.takeException(), isNull);
       expect(find.text('Environment'), findsOneWidget);
     });
 
@@ -194,8 +186,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
             columns: 2,
@@ -219,8 +209,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
             limitLabelFor: (spec) {
@@ -251,8 +239,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
             showGridColors: false,
@@ -280,8 +266,6 @@ void main() {
               'tds_ppm': 800,
               'water_temp': 24.0,
             },
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now().subtract(const Duration(minutes: 30)),
             staleMinutes: 10,
@@ -302,8 +286,6 @@ void main() {
             title: 'Environment',
             specs: const [],
             values: const {},
-            theme: AppTheme.light,
-            seedColor: seedColor,
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
           ),

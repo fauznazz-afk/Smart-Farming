@@ -1,21 +1,10 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:plts_monitoring/theme/app_theme_controller.dart';
 import 'package:plts_monitoring/widgets/brand_logo.dart';
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
 
   testWidgets('brand logo renders', (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -25,20 +14,20 @@ void main() {
   });
 
   test(
-    'AppThemeController defaults to dark mode and toggles mode properly',
+    'AppThemeController survives load and dispose with no state',
     () async {
+      // The appearance settings it used to carry (an `AppTheme` option and an
+      // accent seed) were removed when the app became single-theme. `load()` is
+      // retained for its one call site in `main.dart`, so what is pinned here is
+      // that loading and disposing still work and that it never notifies.
       final controller = AppThemeController();
+      var notified = 0;
+      controller.addListener(() => notified++);
+
       await controller.load();
-      expect(controller.themeMode, ThemeMode.dark);
-      expect(controller.isDarkMode, isTrue);
+      expect(notified, 0, reason: 'there is no state, so there is nothing to announce');
 
-      await controller.toggleDarkMode(false);
-      expect(controller.themeMode, ThemeMode.light);
-      expect(controller.isDarkMode, isFalse);
-
-      await controller.toggleDarkMode(true);
-      expect(controller.themeMode, ThemeMode.dark);
-      expect(controller.isDarkMode, isTrue);
+      controller.dispose();
     },
   );
 }

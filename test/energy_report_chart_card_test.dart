@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/energy_report/widgets/chart_card.dart';
 import 'package:plts_monitoring/services/energy_report_service.dart';
 
@@ -59,7 +58,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(),
             touchedBucketNotifier: touched,
@@ -82,7 +80,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: true,
             buckets: _buckets(count: 6),
             touchedBucketNotifier: touched,
@@ -102,7 +99,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(),
             touchedBucketNotifier: touched,
@@ -128,7 +124,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 4),
             touchedBucketNotifier: touched,
@@ -151,7 +146,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 6),
             touchedBucketNotifier: touched,
@@ -184,7 +178,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 5),
             touchedBucketNotifier: touched,
@@ -209,7 +202,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: [_bucket(6, 1.0, 0.5)],
             touchedBucketNotifier: touched,
@@ -263,7 +255,6 @@ void main() {
         await tester.pumpWidget(
           _wrap(
             ChartCard(
-              theme: AppTheme.light,
               monthly: false,
               buckets: _buckets(count: 12),
               touchedBucketNotifier: touched,
@@ -290,7 +281,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 12),
             touchedBucketNotifier: touched,
@@ -314,7 +304,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: true,
             buckets: _buckets(count: 6),
             touchedBucketNotifier: touched,
@@ -347,7 +336,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 24),
             touchedBucketNotifier: touched,
@@ -372,7 +360,6 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           ChartCard(
-            theme: AppTheme.light,
             monthly: false,
             buckets: _buckets(count: 7),
             touchedBucketNotifier: touched,
@@ -389,27 +376,26 @@ void main() {
     });
   });
 
-  group('ChartCard renders across the three themes', () {
-    for (final theme in [AppTheme.light, AppTheme.dark, AppTheme.dracula]) {
-      testWidgets('$theme paints without throwing', (tester) async {
-        final touched = ValueNotifier<int?>(2);
-        addTearDown(touched.dispose);
+  // This used to run once per appearance, which was the point back when a chart
+    // had to survive three different page colours. There is one appearance now,
+    // so what is left is the single case: the card paints, and the legend is
+    // legible.
+    testWidgets('ChartCard paints without throwing', (tester) async {
+      final touched = ValueNotifier<int?>(2);
+      addTearDown(touched.dispose);
 
-        await tester.pumpWidget(
-          _wrap(
-            ChartCard(
-              theme: theme,
-              monthly: false,
-              buckets: _buckets(),
-              touchedBucketNotifier: touched,
-            ),
+      await tester.pumpWidget(
+        _wrap(
+          ChartCard(
+            monthly: false,
+            buckets: _buckets(),
+            touchedBucketNotifier: touched,
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(find.text('PV 0.80'), findsOneWidget);
-      });
-    }
-  });
+      expect(tester.takeException(), isNull);
+      expect(find.text('PV 0.80'), findsOneWidget);
+    });
 }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius;
 import '../../../widgets/liquid_glass.dart';
 import '../utils/format_helpers.dart';
 import '../utils/period_buckets.dart';

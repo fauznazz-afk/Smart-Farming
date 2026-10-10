@@ -1,526 +1,309 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
-/// The shadow pairs, pinned as properties rather than as values.
+/// The token file, pinned as properties rather than as values.
 ///
-/// Nothing here asserts a specific blur radius. An earlier version of this idea
-/// asserted `blurRadius == 12` and would have failed the first time someone made
-/// a card deeper, which is the opposite of what a regression guard is for. What
-/// is asserted is the *geometry* — which way each shadow points, how many
-/// distinct distances there are, and that one light source is in force — because
-/// those are the things that make soft UI read as soft UI, and each of them has
-/// been gotten wrong in this repo already.
+/// **What this file used to be.** It was almost entirely about the three-shadow
+/// elevation system: one light source from the top left, a contact shadow and an
+/// ambient one, `pressed` being the inverse of `raised`, `insetDeep` being the
+/// inverse of `inset`, and a long derivation of Dracula's shadow alphas from two
+/// measured points. All of it is gone — `AppElevation` was deleted along with
+/// the themes, because a flat surface has no thickness to collapse and the
+/// brief's depth cue is a 1px line and a tonal step instead.
 ///
-/// **Every group iterates [AppTheme.values] rather than a `[true, false]`.**
-/// That list was the reason the Dracula set could have been added with no test
-/// running against it: a hardcoded pair of booleans covers two themes for ever,
-/// and the moment a third exists the loop is silently one short. The
-/// `AppTheme` enum is now the vocabulary, and the loop follows it.
+/// Two lessons from that file are kept here, because both are about how a guard
+/// is written rather than about what it measures, and both have been paid for
+/// twice in this repo:
+///
+/// 1. **Nothing here asserts a specific number.** An earlier version asserted
+///    `blurRadius == 12` and would have failed the first time somebody made a
+///    card deeper, which is the opposite of what a regression guard is for.
+/// 2. **Nothing here asserts against a copied literal.** A hand-written list of
+///    "the surfaces the app paints" is a copy, and this repo has had three
+///    silent drifts from exactly that shape. Where a value can be read out of
+///    `AppSurfaces` it is read out of `AppSurfaces`.
+///
+/// The load-bearing claim this file now guards is the one the new system rests
+/// on: **a flat design has exactly one depth cue, and hue never means two
+/// things.**
 void main() {
-  /// Every shadow's offset, as a unit-ish comparison.
-  ///
-  /// Both signs matter and neither is enough alone. A shadow at (5, 5) is
-  /// down-right; at (-5, -5) it is up-left. Magnitude alone would pass a pair
-  /// that had been accidentally mirrored onto the wrong side, which is the one
-  /// error that makes a whole screen look broken rather than merely flat.
-  bool isDownRight(BoxShadow s) => s.offset.dx > 0 && s.offset.dy > 0;
-  bool isUpLeft(BoxShadow s) => s.offset.dx < 0 && s.offset.dy < 0;
-
-  /// Diagonal, not one axis. An offset of (5, 0) is a shadow cast to the side,
-  /// and with the light from the top left that reads as two light sources.
-  bool isDiagonal(BoxShadow s) =>
-      s.offset.dx != 0 && s.offset.dy != 0 && s.offset.dx.abs() == s.offset.dy.abs();
-
-  /// The dark half of a pair, identified by colour rather than by position.
-  ///
-  /// `Color.computeLuminance` reads the RGB channels and ignores alpha, so every
-  /// black shadow in the file is exactly 0 and every white one exactly 1,
-  /// whatever their alpha. That is what makes this a reliable classifier across
-  /// all three themes; the earlier version compared against a *page* luminance
-  /// and so only worked for the two themes whose light half happened to be
-  /// white.
-  bool isDarkHalf(BoxShadow s) => s.color.computeLuminance() < 0.5;
-
-  /// The signed change in page luminance a shadow makes at its own alpha.
-  ///
-  /// This is the measure the Dracula alphas were solved against; see the note on
-  /// [AppElevation.raised]. The dark half takes a negative step, the light half
-  /// a positive one, so the sign is what distinguishes them at this level.
-  double luminanceStep(Color page, BoxShadow s) {
-    final over = s.color.computeLuminance() < 0.5
-        ? const Color(0xFF000000)
-        : Colors.white;
-    return (Color.lerp(page, over, s.color.a)!.computeLuminance() -
-            page.computeLuminance());
-  }
-
-  group('one light source, from the top left', () {
-    for (final theme in AppTheme.values) {
-      test('${theme.name} raised', () {
-        final shadows = AppElevation.raised(theme);
-
-        for (final s in shadows) {
-          expect(
-            isDiagonal(s),
-            isTrue,
-            reason: 'offset ${s.offset} is not diagonal; a single-axis shadow '
-                'reads as a second light source',
-          );
-        }
-
-        expect(
-          shadows.where(isDownRight).isNotEmpty,
-          isTrue,
-          reason: 'a raised surface must cast away from the light',
-        );
-        expect(
-          shadows.where(isUpLeft).isNotEmpty,
-          isTrue,
-          reason: 'a raised surface must catch light on the other side, or it '
-              'is a card with a drop shadow and not a soft-UI surface',
-        );
-      });
-
-      test('${theme.name} inset and insetDeep point the same way', () {
-        // This is the pairing that is easy to get wrong and that reads as a
-        // bug rather than as a mistake: a well that is pressed *deeper* and a
-        // block that is pressed *flatter* are different animations, and the
-        // mistake is to give both of them one pair.
-        for (final pair in {
-          'inset': AppElevation.inset(theme),
-          'insetDeep': AppElevation.insetDeep(theme),
-        }.entries) {
-          for (final s in pair.value) {
-            expect(
-              isDiagonal(s),
-              isTrue,
-              reason: '${pair.key} offset ${s.offset}',
-            );
-          }
-          expect(
-            pair.value.where(isDownRight).isNotEmpty,
-            isTrue,
-            reason: '${pair.key} must be a well, lit from inside',
-          );
-        }
-      });
-    }
-  });
-
-  group('a raised surface has two distances, which is what makes it deep', () {
-    for (final theme in AppTheme.values) {
-      test('${theme.name} raised has a contact and an ambient', () {
-        final dark =
-            AppElevation.raised(theme).where(isDarkHalf).toList();
-
-        // Two distinct blur radii among the shadows on the same side. A single
-        // radius is the float look: one soft halo, no measurable thickness.
-        final blurs = dark.map((s) => s.blurRadius).toSet();
-        expect(
-          blurs.length,
-          greaterThanOrEqualTo(2),
-          reason: 'the dark half has ${blurs.length} distinct blur radius; one '
-              'means the card floats instead of standing on the page',
-        );
-
-        // And the tight one has to be genuinely tight, or the pair is one blur
-        // and a slightly less blurry one.
-        final tightest = dark.map((s) => s.blurRadius).reduce(math.min);
-        expect(
-          tightest,
-          lessThanOrEqualTo(8),
-          reason: 'the contact shadow is at blur $tightest, which is not a lip',
-        );
-      });
-    }
-  });
-
-  group('depth must not be bought with the fill', () {
-    // The rule this file exists to protect, and it is a measured one.
-    //
-    // A `BoxShadow` paints outside the decoration rect, so it cannot darken a
-    // card's own interior and cannot touch a caption drawn on it. A *gradient
-    // across the fill* can, and at 4% the light-mode worst case is already
-    // 4.15:1 against an AA requirement of 4.5. So depth belongs in the shadow
-    // and the fill has to stay flat, and this is why.
-    test('the card fill is still exactly the page colour', () {
-      for (final theme in AppTheme.values) {
-        expect(AppSurfaces.card(theme), AppSurfaces.page(theme));
-      }
-    });
-
-    test('the raised pair contains no shadow that could sit under text', () {
-      // Not a contrast assertion -- a geometry one. Every offset in the raised
-      // pair points away from the light, which is the direction that puts it
-      // outside the card. A single shadow pointing *into* the card would be an
-      // inner shadow, and that is the only way a shadow could ever reach the
-      // text, so its absence is what the claim rests on.
-      for (final theme in AppTheme.values) {
-        for (final s in AppElevation.raised(theme)) {
-          expect(
-            isUpLeft(s) || isDownRight(s),
-            isTrue,
-            reason: '${theme.name} offset ${s.offset} is not outward-diagonal',
-          );
-        }
-      }
-    });
-  });
-
-  group('the press pairs are the inverse of the resting ones', () {
-    for (final theme in AppTheme.values) {
-      test('${theme.name} pressed is tighter than raised', () {
-        // A press collapses the shadow toward the surface. If it grew instead,
-        // the control would look like it was lifting off the page as it is
-        // pushed into it.
-        final resting = AppElevation.raised(theme)
-            .map((s) => s.offset.distance)
-            .reduce(math.max);
-        final held = AppElevation.pressed(theme)
-            .map((s) => s.offset.distance)
-            .reduce(math.max);
-        expect(
-          held,
-          lessThan(resting),
-          reason: 'pressed max offset $held vs raised $resting; a press that '
-              'pushes the shadow outward reads as the control rising',
-        );
-      });
-
-      test('${theme.name} insetDeep is deeper than inset', () {
-        // The counterpart, and the one that was gotten wrong first: a well
-        // being pushed goes further in, while a block being pushed comes up.
-        final resting = AppElevation.inset(theme)
-            .map((s) => s.offset.distance)
-            .reduce(math.max);
-        final held = AppElevation.insetDeep(theme)
-            .map((s) => s.offset.distance)
-            .reduce(math.max);
-        expect(
-          held,
-          greaterThan(resting),
-          reason: 'insetDeep $held vs inset $resting; a well being pressed must '
-              'go deeper, and the two are different animations',
-        );
-      });
-    }
-  });
-
-  group('Dracula is a third theme, so it is held to the same properties', () {
-    test('its surfaces are not the app\'s dark surfaces renamed', () {
-      // The tempting implementation is to map `AppTheme.dracula` onto the dark
-      // constants and call it a third mode. That would leave the preset
-      // indistinguishable from dark mode apart from an accent, which is the
-      // thing this exists to avoid.
-      expect(AppSurfaces.page(AppTheme.dracula), isNot(AppSurfaces.pageDark));
-      expect(AppSurfaces.chrome(AppTheme.dracula), isNot(AppSurfaces.chromeDark));
-      expect(AppSurfaces.input(AppTheme.dracula), isNot(AppSurfaces.inputDark));
-      expect(AppSurfaces.track(AppTheme.dracula), isNot(AppSurfaces.trackDark));
-    });
-
-    test('its page is lighter than the app\'s dark page, which is the premise', () {
-      // This is the measurement the whole Dracula shadow set rests on. If a
-      // future edit darkened `pageDracula` towards the app's dark page, the
-      // derived alphas would be wrong and every one of the guards below would
-      // still pass, because they are relative to the theme's own page. So the
-      // premise itself is pinned.
-      expect(
-        AppSurfaces.pageDracula.computeLuminance(),
-        greaterThan(AppSurfaces.pageDark.computeLuminance() * 1.5),
-        reason: 'Dracula is 0.0237 against the app\'s 0.0141. If these two ever '
-            'converge, the Dracula alphas were solved for a page that no longer '
-            'exists and have to be re-derived.',
-      );
-    });
-
-    test('its chrome is the lightest surface, so it is the binding one', () {
-      // The reason every AA measurement in the repo takes the worst of a list
-      // rather than the page: `#343746` is 0.0390 against the page's 0.0237.
-      final surfaces = AppSurfaces.captionSurfaces(AppTheme.dracula);
-      final lightest = surfaces
-          .reduce((a, b) => a.computeLuminance() >= b.computeLuminance() ? a : b);
-      expect(lightest, AppSurfaces.chromeDracula);
-    });
-
-    test('the shadow geometry is identical to dark, so the light cannot move',
-        () {
-      // A Dracula card that caught its light from somewhere else would be
-      // invisible to every other guard in this file, all of which check
-      // direction and magnitude but not *which* direction. Pinning the geometry
-      // to the dark theme's is what makes "one light source, app-wide" a claim
-      // about three themes instead of three claims.
-      for (final pair in const {
-        'raised': AppElevation.raised,
-        'inset': AppElevation.inset,
-        'insetDeep': AppElevation.insetDeep,
-        'pressed': AppElevation.pressed,
+  group('depth is a line and a tonal step, not a shadow', () {
+    test('the borders are one pixel wide, so they cannot read as depth', () {
+      // A thick border is the failure mode of a flat design: it starts to look
+      // like the edge of a solid object again, which is the thing the migration
+      // was away from. Every edge in the system is a hairline.
+      for (final entry in {
+        'hairline': AppBorders.hairline,
+        'control': AppBorders.control,
+        'boundary': AppBorders.boundary,
       }.entries) {
-        final dracula = pair.value(AppTheme.dracula);
-        final dark = pair.value(AppTheme.dark);
-        expect(dracula.length, dark.length, reason: pair.key);
-        for (var i = 0; i < dracula.length; i++) {
+        expect(
+          entry.value.width,
+          lessThanOrEqualTo(1.5),
+          reason: '${entry.key} is ${entry.value.width}px, which is a frame '
+              'rather than a hairline',
+        );
+      }
+    });
+
+    test('the hairline is neutral, so no card claims a category it lacks', () {
+      // An earlier revision tinted this with the theme accent, which put a green
+      // outline on every card and undid the whole soft-UI migration. A card that
+      // carries a hue in its border is a card making a claim about what data it
+      // contains, and only `AppBorders.categoricalBorder` is allowed to do that.
+      expect(AppBorders.hairline.color, AppSurfaces.border);
+    });
+
+    test('the categorical border is the one place a hue is drawn as a frame', () {
+      // `categoricalBorder` returns a `Border`, so the side has to be taken off
+      // it. `Border.top` rather than a cast: a four-sided `Border` is what the
+      // decoration gets, and reading `top` is also the assertion that all four
+      // are the same, which a `Border` with mismatched sides would fail.
+      for (final category in MetricCategory.values) {
+        final border = AppBorders.categoricalBorder(categoryColor(category));
+        final side = border.top;
+        expect(
+          side.color,
+          isNot(AppSurfaces.border),
+          reason: '${category.name} drew a neutral frame, so the wash behind it '
+              'has nothing to belong to',
+        );
+        expect(
+          side.width,
+          AppBorders.hairline.width,
+          reason: 'a categorical frame must not be heavier than the neutral '
+              'one, or carrying a category costs more visually than it explains',
+        );
+        for (final edge in [border.top, border.bottom, border.left, border.right]) {
           expect(
-            dracula[i].offset,
-            dark[i].offset,
-            reason: '${pair.key}[$i]: a different offset in Dracula is a second '
-                'light source',
-          );
-          expect(
-            dracula[i].blurRadius,
-            dark[i].blurRadius,
-            reason: '${pair.key}[$i]: only the alpha is per-theme; the distances '
-                'are what make the pair read as a thickness',
+            edge,
+            side,
+            reason: 'a four-sided frame with one odd edge out reads as a bug, '
+                'not as a design',
           );
         }
+      }
+    });
+
+    test('the wash is faint enough that its own hue stays the subject', () {
+      // `categoricalWash` is 10% of the hue. The pairing — faint wash behind,
+      // full-strength foreground — is the whole reason the wash is safe, and the
+      // 10% is what makes "faint" true. A wash that is not faint puts a
+      // saturated block behind a 12px caption, which is the mistake this repo
+      // has made in three previous design systems.
+      for (final category in MetricCategory.values) {
+        final hue = categoryColor(category);
+        expect(
+          AppBorders.categoricalWash(hue).a,
+          lessThanOrEqualTo(0.15),
+          reason: '${category.name} wash is at '
+              '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
+              'alpha',
+        );
+        // Same hue, so the wash and the foreground are recognisably one thing.
+        expect(
+          HSLColor.fromColor(hue.withValues(
+            alpha: AppBorders.categoricalWash(hue).a,
+          )).hue,
+          closeTo(HSLColor.fromColor(hue).hue, 0.5),
+        );
       }
     });
   });
 
-  group('the Dracula alphas were solved, not guessed', () {
-    // The rule, asserted so that it cannot be quietly abandoned:
-    //
-    //   every shadow's *absolute* luminance step on #282A36 matches the step the
-    //   same shadow makes on #1A211F, to within the 8-bit quantisation of the
-    //   alpha byte.
-    //
-    // The intuitive measure is the wrong one and it is worth saying why in a
-    // test. At a fixed alpha, black over Dracula drops *proportionally* more
-    // than over the app's dark page (83.4% against 79.7%), which makes the dark
-    // alphas look about right. But the absolute step is 1.8x larger — 0.0198
-    // against 0.0112 — and the absolute step is what the eye sees. A backdrop
-    // that is already almost black flatters a shadow.
-
-    /// Pairs the same shadow in the Dracula set and the dark set by position.
-    /// Valid because the geometry guard above pins the lists to the same length
-    /// and the same offsets.
-    const pairs = <String, (List<BoxShadow> Function(AppTheme), List<BoxShadow> Function(AppTheme))>{
-      'raised': (AppElevation.raised, AppElevation.raised),
-      'inset': (AppElevation.inset, AppElevation.inset),
-      'insetDeep': (AppElevation.insetDeep, AppElevation.insetDeep),
-      'pressed': (AppElevation.pressed, AppElevation.pressed),
-    };
-
-    // Measured on the Xiaomi, one card, one build, 8-bit luminance scanline.
-    //
-    //   |               | page   | bounce | hairline | fraction of page |
-    //   |----------------|--------|--------|----------|------------------|
-    //   | light #E1E7E4 | 229.5  |   --   |  244.5   |  +6.5%           |
-    //   | dark  #1A211F |  31.4  |  51.6  |   48.7   | +55%            |
-    //   | drac  #282A36 |  42.4  |  58.4  |   59.4   | +40%            |
-    //
-    // At the alpha this file used to carry, the hairline was the brightest
-    // element within two pixels of the card edge on both dark pages, and on
-    // Dracula it was brighter than the bounce itself -- 59.4 against 58.4. The
-    // eye reads a one-pixel outline instead of an embossed surface, and a drawn
-    // edge is the one thing this style exists to replace.
-    //
-    // The cause is worth stating because it is not obvious from the token file.
-    // White has 255 of headroom above every page in the app, but a page at 229.5
-    // can only be lifted 25.5 units by going to pure white while a page at 31.4
-    // has 223.6. One alpha therefore spans a factor of nine in perceived weight
-    // across the three presets. An alpha is not a perceptual quantity; the gap
-    // between the page and white is, and the three pages do not share it.
-    group('the hairline must stay below the shadow that defines the edge', () {
-      const accent = Color(0xFF3D4A44);
-
-      for (final theme in [AppTheme.dark, AppTheme.dracula]) {
-        test('$theme: hairline lifts the page less than the bounce does', () {
-          final page = AppSurfaces.page(theme);
-          final shadows = AppElevation.raised(theme);
-          final bounce = shadows
-              .where((s) => !isDarkHalf(s))
-              .map((s) => luminanceStep(page, s))
-              .reduce(math.max);
-          // The hairline is a colour rather than a shadow, so it gets composed
-          // directly. Note this is `computeLuminance` -- linear relative
-          // luminance -- while the numbers in the table above are 8-bit weighted
-          // from the screenshot. The two scales differ by a lot on a near-black
-          // page, which is exactly why the device had to be the arbiter and why
-          // this assertion is stated as an ordering rather than as the 55%
-          // figure.
-          final hairline = AppElevation.hairline(accent: accent, theme: theme);
-          final line = Color.lerp(page, Colors.white, hairline.a)!
-              .computeLuminance() -
-              page.computeLuminance();
-
-          expect(
-            line,
-            lessThan(bounce * 0.6),
-            reason: 'hairline lifts $page by ${line.toStringAsFixed(4)} but '
-                'the bounce only manages ${bounce.toStringAsFixed(4)}. The '
-                'brightest thing on the card edge must be the shadow, not a '
-                'drawn line -- this is the Dracula 59.4-against-58.4 defect.',
-          );
-        });
-      }
-
-      test('light keeps its stronger alpha, because its page has no headroom',
-          () {
-        // The asymmetry is deliberate and the comment above is the reason. Light
-        // can only be lifted 25.5 units by pure white, so it needs a far larger
-        // alpha to reach a visible lip; the dark pages have 223.6 available and
-        // reach the same weight at 0x0A.
-        expect(
-          AppElevation.hairline(accent: accent, theme: AppTheme.light).a,
-          greaterThan(
-            AppElevation.hairline(accent: accent, theme: AppTheme.dark).a * 8,
-          ),
-          reason: 'if the light hairline were cut to match the dark ones it '
-              'would vanish entirely, because it has a ninth of the headroom',
-        );
-      });
+  group('the tonal ramp is a ramp, not a set of unrelated fills', () {
+    test('each step is lighter than the one below it', () {
+      // page < surface < surfaceAlt. If this ever inverts, a "raised" surface is
+      // darker than the page behind it, which reads as a hole rather than as a
+      // step. Asserted as an ordering rather than as three hexes, because the
+      // whole ramp is allowed to move.
+      double l(Color c) => c.computeLuminance();
+      expect(l(AppSurfaces.surface), greaterThan(l(AppSurfaces.page)));
+      expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.surface)));
     });
 
-    /// **This assertion was wrong, and one device measurement is what proved it.**
-    ///
-    /// It required every shadow to make the same *composited* step on both dark
-    /// pages within 0.002 of luminance, and it passed: the measured spread across
-    /// all fourteen combinations was 0.0007. That reads as a strong guarantee and
-    /// is in fact a claim about arithmetic. It is true of the `Color.lerp` result
-    /// and says nothing about what reaches the screen, because the mask blur
-    /// removes a different fraction of each page's shadow.
-    ///
-    /// Measured on the Xiaomi, same build, same card, right-hand edge, by scanline:
-    ///
-    /// | | page | contact | measured ΔL |
-    /// |---|---|---|---|
-    /// | dark (`#1A211F`) | 31.4 | 15.5 | **15.9** |
-    /// | dracula (`#282A36`) | 42.4 | 34.2 | **8.2** |
-    ///
-    /// Dracula was delivering **52%** of the dark drop while the composited steps
-    /// agreed to within 0.0007. The blur ate 28% of the dark page's peak and 38%
-    /// of Dracula's, because a given mask blur removes more of a shadow's peak
-    /// where the contrast it is measured against is smaller.
-    ///
-    /// **What replaced it.** Dracula's alphas stay *below* the dark theme's, which is
-    /// correct: a lighter page already carries more luminance, so a given alpha
-    /// drops it further. What has to be larger is the **composited** step, because
-    /// the blur then removes more of it. Those two facts are the whole
-    /// correction, and asserting either alone would miss half of it — so both are
-    /// pinned: the composited step above, and the alpha ordering below.
-    ///
-    /// **The magnitude came from measurement, not from the number above.** The
-    /// shortfall was 1.9x in ΔL, but scaling the alphas by 1.9x overshot — the
-    /// relation between alpha and *measured* ΔL is convex, so the same
-    /// fractional alpha increase buys far more ΔL when it starts weak. Measured
-    /// on the device, in three builds of the same APK:
-    ///
-    /// | contact alpha | measured ΔL |
-    /// |---|---|
-    /// | `0x50` | 8.2 |
-    /// | `0x8C` | **20.0** ← shipped |
-    /// | `0x98` | 21.3 |
-    ///
-    /// `0x8C` is the interpolated landing. Its 20.0 is 47% of Dracula's page
-    /// against the dark theme's 15.9 being 51% of its own, so it is a near match
-    /// on the comparison that is actually meaningful once two pages differ in
-    /// luminance.
-    ///
-    /// The composited-step helper is kept, and the step is still asserted — but
-    /// as the *ordering* it always was, not as an equality between two numbers
-    /// that turned out not to mean what they looked like.
-    for (final entry in pairs.entries) {
-      test('${entry.key}: Dracula composites a bigger step than dark does', () {
-        // **Not** "Dracula's alpha is bigger" — it is smaller, and it has to be:
-        // a lighter page already carries more luminance, so a given alpha drops it
-        // further. What has to be bigger is the *composited* step, because the
-        // blur then removes more of it. Those two facts together are the whole
-        // correction, and asserting either alone would miss half of it.
-        final dracula = entry.value.$1(AppTheme.dracula);
-        final dark = entry.value.$2(AppTheme.dark);
-        for (var i = 0; i < dracula.length; i++) {
-          final a = luminanceStep(AppSurfaces.page(AppTheme.dracula), dracula[i]);
-          final b = luminanceStep(AppSurfaces.pageDark, dark[i]);
-          expect(
-            a.abs(),
-            greaterThan(b.abs()),
-            reason: '${entry.key}[$i]: Dracula composites '
-                '${a.toStringAsFixed(4)} against the dark theme\'s '
-                '${b.toStringAsFixed(4)}. On the device that produced a measured '
-                'ΔL of 8.2 against 15.9 — the cards read half as raised as the '
-                'dark theme\'s did.',
-          );
-        }
-      });
-    }
-
-    test('every Dracula dark-half alpha is lower than the dark theme\'s', () {
-      // The direction of the fix, pinned separately from the magnitude so that
-      // "both sets are right" cannot be satisfied by copying one over the other.
-      for (final name in ['raised', 'inset', 'insetDeep', 'pressed']) {
-        final list = switch (name) {
-          'raised' => AppElevation.raised,
-          'inset' => AppElevation.inset,
-          'insetDeep' => AppElevation.insetDeep,
-          _ => AppElevation.pressed,
-        };
-        for (var i = 0; i < list(AppTheme.dracula).length; i++) {
-          expect(
-            list(AppTheme.dracula)[i].color.a,
-            lessThan(list(AppTheme.dark)[i].color.a),
-            reason: '$name[$i]: Dracula\'s page is lighter, so every alpha has '
-                'to come down or the shadow becomes a halo',
-          );
-        }
-      }
-    });
-
-    test('the light-to-dark ratio is preserved, which is the documented failure',
+    test('the binding caption surface is the top of the ramp, and is listed',
         () {
-      // A flat ratio is the light-mode artefact this file spends its length
-      // warning about: the light half does nearly all the work and the card
-      // reads as *lit* rather than as standing off the surface.
-      //
-      // **This tolerance was 10% and is now 40%, and that is a real loss of
-      // precision rather than tidying.** The ratio was solved to land on the dark
-      // theme's 3.80 so the two pages carried the same light-to-dark balance.
-      // The device measurement then moved the dark half of Dracula's pair and left
-      // the light half alone, because only the dark half had been sampled, and
-      // the ratio landed at 2.41. It is now that the dark half does most of the
-      // work on Dracula, which is the opposite of how the dark theme behaves —
-      // and that inversion is recorded as a known gap rather than papered over,
-      // because the honest fix is a scanline across a card's *top* edge, and it
-      // has not been taken.
-      //
-      // The band exists to exclude the artefact this file warns about, not to
-      // pretend the balance is solved. `AppElevation`'s own doc note carries the
-      // same numbers and the same admission.
-      double ratioFor(AppTheme theme) {
-        final page = AppSurfaces.page(theme);
-        final shadows = AppElevation.raised(theme);
-        final light = shadows
-            .where((s) => !isDarkHalf(s))
-            .map((s) => luminanceStep(page, s))
-            .reduce(math.max);
-        final dark = shadows
-            .where(isDarkHalf)
-            .map((s) => luminanceStep(page, s))
-            .reduce(math.min);
-        return light / -dark;
-      }
+      // `surfaceAlt` is the hardest surface for a caption because it is the
+      // lightest. A reader scanning `captionSurfaces()` should see that the
+      // hardest one is listed, and it is listed last, and a consumer that takes
+      // the worst is measuring the right thing.
+      expect(AppSurfaces.captionSurfaces().last, AppSurfaces.surfaceAlt);
+      expect(AppSurfaces.bindingCaptionSurface, AppSurfaces.surfaceAlt);
+    });
 
-      final dark = ratioFor(AppTheme.dark);
-      final dracula = ratioFor(AppTheme.dracula);
+    test('the caption surface list covers every fill a caption can land on', () {
+      // `input` and `track` are absent on purpose and the reasons are in
+      // `design_tokens.dart`: no caption is drawn on a 6dp progress bar. This
+      // asserts the absence rather than restating the reasoning, so a future
+      // widget that *does* draw on one of them has to reopen the call.
+      final surfaces = AppSurfaces.captionSurfaces();
+      expect(surfaces, isNot(contains(AppSurfaces.track)));
+      expect(surfaces, contains(AppSurfaces.page));
+      expect(surfaces, contains(AppSurfaces.surface));
+    });
+  });
+
+  group('the radius scale has no strays', () {
+    test('pill, round and bar are all fully round', () {
+      // Three names for one number. They are kept because they mean different
+      // things to a reader — a stadium, a dot, a chip — and a test that pins the
+      // identity is what stops a future edit from making one of them 8dp, which
+      // would look correct on a dot and wrong on a bar.
+      expect(AppRadius.pill, AppRadius.round);
+      expect(AppRadius.bar, AppRadius.round);
+    });
+
+    test('the card is the largest corner on the scale', () {
+      // A tile inside a card has to be visibly *inside* it. If the two ever
+      // matched, a nested card loses its edge and the layout reads as one
+      // undifferentiated block.
       expect(
-        dracula,
-        closeTo(dark, dark * 0.40),
-        reason: 'dark $dark vs dracula $dracula. The tolerance moved from 10% to '
-            '40%, and that is a real loss of precision rather than tidying: the '
-            'ratio was solved to land on the dark theme\'s value so the two pages '
-            'carried the same light-to-dark balance, and the measured 1.9x '
-            'correction applied to both halves moved it to about 2.41, because a '
-            'uniform factor cannot preserve a ratio of two composited values '
-            'sitting at different points on two different pages. Re-deriving the '
-            'bounce separately would restore an exact number and is the kind of '
-            'arithmetic that has now been wrong twice -- once as a solve that did '
-            'not survive the screen, once as a scale that assumed it would. The '
-            'band excludes the real artefact, the 1.9 that uniform scaling '
-            'produced. The balance itself is a judgement about how cards look, '
-            'and look is what the device is for.',
+        AppRadius.card,
+        greaterThan(AppRadius.tile),
+        reason: 'card ${AppRadius.card} vs tile ${AppRadius.tile}',
       );
+      expect(AppRadius.tile, greaterThan(AppRadius.inset));
+      expect(AppRadius.inset, greaterThan(AppRadius.badge));
+    });
+
+    test('a bar at the bar radius is a stadium, not a rectangle', () {
+      // The value is 999 on purpose and this is what it buys: at 6dp tall, a
+      // 999 radius is a stadium. If somebody dropped it to a literal 4 the shape
+      // would still *look* right on a bar, so nothing else would catch it —
+      // but the token's name would then be lying about what it is for.
+      expect(AppRadius.bar, 999);
+    });
+  });
+
+  group('motion', () {
+    test('every duration is non-zero and ordered by how far it travels', () {
+      // A press is immediate, a page transition is not. An inverted pair is not
+      // a slow UI, it is a UI that feels broken: a page that arrives before the
+      // press that navigated to it has finished.
+      expect(AppMotion.press, lessThan(AppMotion.state));
+      expect(AppMotion.state, lessThan(AppMotion.container));
+      expect(AppMotion.container, lessThan(AppMotion.page));
+    });
+
+    test('no duration is zero', () {
+      // A zero-duration animation is not an animation; it is a value that was
+      // forgotten, and it renders as a jump that reads as a glitch.
+      for (final entry in {
+        'press': AppMotion.press,
+        'state': AppMotion.state,
+        'container': AppMotion.container,
+        'page': AppMotion.page,
+      }.entries) {
+        expect(
+          entry.value,
+          isNot(Duration.zero),
+          reason: '${entry.key} is zero, which is a forgotten value rather '
+              'than a chosen one',
+        );
+      }
+    });
+  });
+
+  group('type', () {
+    test('the three families are distinct', () {
+      // A heading set in the body font is not a hierarchy, it is a font-size
+      // difference — and it is invisible on a card until somebody measures it.
+      final families = {AppType.heading, AppType.sans, AppType.mono};
+      expect(families, hasLength(3));
+    });
+
+    test('figures are set in a font with tabular figures, or a column jitters', () {
+      // The numeral styles are the ones that matter here: a live value that
+      // changes width as it changes digit count makes the whole card twitch on
+      // every poll. That is why they are a separate family from the captions
+      // around them.
+      for (final entry in {
+        'numeralXl': AppType.numeralXl,
+        'numeralLg': AppType.numeralLg,
+        'displayLg': AppType.displayLg,
+        'displayMd': AppType.displayMd,
+        'numeralMono': AppType.numeralMono,
+      }.entries) {
+        expect(
+          entry.value.fontFamily,
+          isNotNull,
+          reason: '${entry.key} inherits the platform default, so its width '
+              'depends on the device rather than on the design',
+        );
+      }
+    });
+
+    test('the uppercase labels are bold and wide-tracked, which is the motif', () {
+      // "Uppercase, wide-tracked, bold" is what `design_tokens.dart` calls the
+      // motif the whole system is identified by, and it is applied by the call
+      // site rather than by a `case` feature in the token. So the two properties
+      // the token *does* own are the ones asserted: the weight, and tracking
+      // that is a real fraction of the size. Without the tracking, all-caps at
+      // 10dp sets as a grey smear and a section header stops being scannable.
+      for (final entry in {
+        'labelUppercase': AppType.labelUppercase,
+        'labelMicro': AppType.labelMicro,
+      }.entries) {
+        expect(
+          entry.value.fontWeight,
+          FontWeight.w700,
+          reason: '${entry.key} is ${entry.value.fontWeight}; the motif is bold',
+        );
+        expect(
+          (entry.value.letterSpacing ?? 0) / entry.value.fontSize!,
+          greaterThanOrEqualTo(0.09),
+          reason: '${entry.key} tracks at '
+              '${((entry.value.letterSpacing ?? 0) / entry.value.fontSize!).toStringAsFixed(3)}em',
+        );
+        expect(
+          entry.value.fontSize!,
+          lessThanOrEqualTo(12),
+          reason: '${entry.key} is a caption; at 14sp and all-caps it stops '
+              'being connective tissue and starts being a heading',
+        );
+      }
+    });
+  });
+
+  group('aura', () {
+    test('aura is derived from the hue it is given, not a fixed colour', () {
+      // An aura is the one place a hue is allowed to glow. If it were a fixed
+      // colour it would be a sixth meaning for whatever it happens to be, which
+      // is the rule this whole system is built on.
+      for (final category in MetricCategory.values) {
+        final hue = categoryColor(category);
+        final aura = AppPalette.aura(hue);
+        expect(aura, isNotEmpty);
+        for (final shadow in aura) {
+          expect(
+            shadow.color.computeLuminance(),
+            closeTo(hue.computeLuminance(), 0.05),
+            reason: '${category.name} aura is lit with a colour that is not '
+                'its own hue',
+          );
+        }
+      }
+    });
+
+    test('strength scales the alpha rather than changing the hue', () {
+      // A strength argument that shifted the hue would produce a different
+      // colour rather than a dimmer version of the same one, and a page that
+      // glows differently depending on an unrelated setting is exactly the
+      // "a colour the user did not choose" problem from the old system.
+      final hue = categoryColor(MetricCategory.pv);
+      final soft = AppPalette.aura(hue, strength: 0.1);
+      final strong = AppPalette.aura(hue, strength: 0.3);
+      expect(soft.length, strong.length);
+      for (var i = 0; i < soft.length; i++) {
+        expect(soft[i].color.a, lessThan(strong[i].color.a));
+        expect(
+          HSLColor.fromColor(soft[i].color).hue,
+          closeTo(HSLColor.fromColor(strong[i].color).hue, 0.5),
+        );
+      }
     });
   });
 }

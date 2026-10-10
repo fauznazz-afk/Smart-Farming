@@ -1,18 +1,25 @@
-/// The accessibility defects found by auditing the accent system, pinned.
+/// The accessibility defects found while auditing the colour system, pinned.
 ///
-/// Three claims were checked while building the Dracula theme and each produced a
-/// different answer than expected, which is why this file exists rather than a
-/// line in a commit message.
+/// Three claims were checked while building what used to be four themes, and
+/// each produced a different answer than expected. That is why this file exists
+/// rather than a line in a commit message.
 ///
 /// **Measured, not assumed:**
-///   * `metricColor` as a *graphic* on the light page is 2.28 / 2.88 / 2.16 / 2.21
-///     for the four accents the user can pick — three of four fail WCAG 1.4.11's
-///     3:1 for a graphical object. `metricGraphic` exists because of that.
-///   * White on Dracula's `#C1A3EB` is 2.16:1, which is why the CCTV play button
-///     stopped hardcoding `Colors.white`.
-///   * `AppElevation.boundaryEdge` was reported as under 3:1 and is **not** — it
-///     measures 7.41:1 on the light page. The report was wrong and the assertion
-///     below exists so nobody re-raises it.
+///   * A user-chosen accent used to be measured as a *graphic* on the light page
+///     and came in at 2.16 to 2.88 for three of the four accents — all under
+///     WCAG 1.4.11's 3:1 for a graphical object. `metricGraphic` was the second
+///     derivation created to answer that, and it is gone with the accents: there
+///     is no user-chosen accent to mis-measure any more. Every hue in the app
+///     now comes from `AppPalette`, and `color_helpers_test.dart` measures each
+///     one it can land on.
+///   * White on a light accent fill is far below 4.5:1, which is why
+///     `onPrimaryInk` exists rather than every call site hardcoding
+///     `Colors.white`.
+///   * `AppElevation.boundaryEdge` was reported as under 3:1 and was **not**.
+///     The report was wrong. `AppElevation` is gone entirely; its replacement,
+///     `AppBorders.boundary`, is the one edge in the system that makes a 1.4.11
+///     claim, and it is measured below so the number is on the record rather
+///     than only in a doc comment.
 library;
 
 import 'dart:math' as math;
@@ -26,7 +33,8 @@ double _lin(double c) =>
     c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
 
 double _contrast(Color a, Color b) {
-  double l(Color c) => 0.2126 * _lin(c.r) + 0.7152 * _lin(c.g) + 0.0722 * _lin(c.b);
+  double l(Color c) =>
+      0.2126 * _lin(c.r) + 0.7152 * _lin(c.g) + 0.0722 * _lin(c.b);
   final x = l(a), y = l(b);
   return (math.max(x, y) + 0.05) / (math.min(x, y) + 0.05);
 }
@@ -34,178 +42,121 @@ double _contrast(Color a, Color b) {
 String _hex(Color c) =>
     c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase();
 
-/// The four accents in `kAccentPalette`, and the ones that matter here.
-const Map<String, Color> accents = {
-  'EnerGrow green': Color(0xFF35A968),
-  'Solar amber': Color(0xFFE0A020),
-  'Ocean cyan': Color(0xFF2AA7A1),
-  'Forest teal': Color(0xFF2F8F7A),
-};
-
 void main() {
-  group('metricGraphic clears 1.4.11 where metricColor does not', () {
-    test('every accent, every theme, on the card it is drawn on', () {
-      for (final theme in AppTheme.values) {
-        for (final a in accents.entries) {
-          for (final surface in {
-            'card': AppSurfaces.card(theme),
-            'chrome': AppSurfaces.chrome(theme),
-            'input': AppSurfaces.input(theme),
-          }.entries) {
-            final g = metricGraphic(
-              seedColor: a.value,
-              index: 0,
-              theme: theme,
-            );
-            expect(
-              _contrast(g, surface.value),
-              greaterThanOrEqualTo(3.0),
-              reason: '$theme ${a.key} graphic #${_hex(g)} is '
-                  '${_contrast(g, surface.value).toStringAsFixed(2)}:1 on '
-                  '${surface.key}; 1.4.11 wants 3:1 for a graphical object and '
-                  '`metricColor` alone measures 2.16-2.88 on the light page',
-            );
-          }
-        }
-      }
-    });
+  /// Every fill a saturated surface can end up carrying in this app. Read out of
+  /// the palette rather than listed, because a literal here is a copy and
+  /// copies drift.
+  final fills = <String, Color>{
+    'primary': AppPalette.primary,
+    'secondary': AppPalette.secondary,
+    'accent': AppPalette.accent,
+    'success': AppPalette.success,
+    'error': AppPalette.error,
+    'chartViolet': AppPalette.chartViolet,
+    'chartCoral': AppPalette.chartCoral,
+    for (final category in MetricCategory.values)
+      category.name: categoryColor(category),
+  };
 
-    test('and the claim it exists for is still true of metricColor', () {
-      // If `metricColor` ever reaches 3:1 on the light page for every accent,
-      // `metricGraphic` is redundant and this file should argue for deleting it
-      // rather than keeping a second derivation alive.
-      //
-      // Asserting the *defect* rather than the fix means this test fails when
-      // the underlying problem is solved -- which is the point. It should not be
-      // made to pass by loosening it.
-      final belowThree = accents.entries.where((a) {
-        final m = metricColor(
-          seedColor: a.value,
-          index: 0,
-          theme: AppTheme.light,
-        );
-        return _contrast(m, AppSurfaces.card(AppTheme.light)) < 3.0;
-      }).length;
-      expect(
-        belowThree,
-        greaterThanOrEqualTo(3),
-        reason: 'metricColor now clears 3:1 as a graphic on the light page for '
-            'every accent, so metricGraphic is redundant and should be removed '
-            'rather than kept as a second derivation',
-      );
-    });
-
-    test('it stays in the user\'s hue', () {
-      // The extra contrast must not be bought with a different colour. This is
-      // the rule AGENTS.md states about not inventing hues.
-      for (final theme in AppTheme.values) {
-        for (final a in accents.entries) {
-          final seedHue = HSLColor.fromColor(a.value).hue;
-          final g = metricGraphic(
-            seedColor: a.value,
-            index: 0,
-            theme: theme,
-          );
+  group('every palette hue clears 1.4.11 as a graphical object', () {
+    test('3:1 on every surface it can be drawn on', () {
+      // The claim that used to fail for three of four user accents. A hue is
+      // used as a chart line, a progress fill and an icon tile, and 1.4.11 asks
+      // 3:1 of all of those — measured here against the same derived surface
+      // list every caption is measured against, so a hue cannot be legible as
+      // text and illegible as a graphic on the same background.
+      for (final entry in fills.entries) {
+        for (final surface in AppSurfaces.captionSurfaces()) {
           expect(
-            (HSLColor.fromColor(g).hue - seedHue).abs(),
-            lessThan(6.0),
-            reason: '$theme ${a.key} graphic #${_hex(g)} drifted from its seed',
+            _contrast(entry.value, surface),
+            greaterThanOrEqualTo(3.0),
+            reason: '${entry.key} #${_hex(entry.value)} is '
+                '${_contrast(entry.value, surface).toStringAsFixed(2)}:1 on '
+                '#${_hex(surface)}; 1.4.11 wants 3:1 for a graphical object',
           );
         }
       }
-    });
-
-    test('it does not change text, which has its own requirement', () {
-      // The whole reason `metricGraphic` is separate is that darkening
-      // `metricColor` would restyle every metric *value* in the app. If
-      // `metricGraphic` were folded back into it, that would have happened.
-      final before = metricColor(
-        seedColor: accents['Ocean cyan']!,
-        index: 0,
-        theme: AppTheme.light,
-      );
-      final after = metricGraphic(
-        seedColor: accents['Ocean cyan']!,
-        index: 0,
-        theme: AppTheme.light,
-      );
-      expect(
-        after,
-        isNot(before),
-        reason: 'metricGraphic and metricColor are now the same colour, so the '
-            'light accent is either 2.16:1 as a graphic or the text values '
-            'changed too. One of those two is the defect this avoids.',
-      );
     });
   });
 
   group('onPrimaryInk', () {
-    test('puts a legible ink on every accent fill the app can produce', () {
-      final fills = <String, Color>{
-        // `filledButtonTheme` in main.dart derives its fill per mode.
-        'EnerGrow light fill': const Color(0xFF35A968),
-        'EnerGrow dark fill': const Color(0xFF79E2A7),
-        'Solar amber fill': const Color(0xFFE2BF79),
-        'Ocean cyan dark fill': const Color(0xFF79E2DD),
-        // And the Dracula preset, which is the one that broke it.
-        'Dracula primary': metricColor(
-          seedColor: draculaAccent,
-          index: 0,
-          theme: AppTheme.dracula,
-        ),
-        'Dracula primaryContainer': strongMetricColor(
-          seedColor: draculaAccent,
-          index: 0,
-          theme: AppTheme.dracula,
-        ),
-      };
-
+    test('puts a legible ink on every fill the app can produce', () {
+      // A fill is a fill: what matters is the measured ratio, not which palette
+      // entry it came from, so the whole palette plus every category hue is
+      // measured together. Anything that fails here is a button whose label the
+      // user cannot read.
       for (final f in fills.entries) {
         final ink = onPrimaryInk(f.value);
         expect(
           _contrast(ink, f.value),
           greaterThanOrEqualTo(4.5),
           reason: '${f.key} #${_hex(f.value)} with ink #${_hex(ink)} is '
-              '${_contrast(ink, f.value).toStringAsFixed(2)}:1. White on '
-              "Dracula's primary is 2.16:1, which is what this exists for.",
+              '${_contrast(ink, f.value).toStringAsFixed(2)}:1; white on a '
+              'light accent fill is far below the 4.5 that a label needs, and '
+              'this is the function that exists because of it',
         );
       }
     });
 
     test('white really does fail, so the function is not decorative', () {
-      final draculaPrimary = metricColor(
-        seedColor: draculaAccent,
-        index: 0,
-        theme: AppTheme.dracula,
-      );
+      // If `Colors.white` ever cleared 4.5:1 on the palette's own fills then
+      // this function would be returning a constant and every call site could go
+      // back to hardcoding it. The cheapest guard against that is the number.
+      final failures = fills.values
+          .where((fill) => _contrast(Colors.white, fill) < 4.5)
+          .length;
       expect(
-        _contrast(Colors.white, draculaPrimary),
-        lessThan(3.0),
-        reason: 'white now clears 3:1 on Dracula\'s primary, so the '
-            'cctv_viewport override it replaced can go back to a constant',
+        failures,
+        greaterThan(0),
+        reason: 'white now clears 4.5:1 on every fill, so onPrimaryInk is a '
+            'constant and this file should argue for deleting it',
       );
+    });
+
+    test('it is deterministic, and it does not depend on a lightness guess', () {
+      // The same fill must always get the same ink, or a button changes its
+      // label colour when it is rebuilt.
+      for (final f in fills.entries) {
+        expect(onPrimaryInk(f.value), onPrimaryInk(f.value));
+      }
     });
   });
 
-  group('boundaryEdge', () {
-    test('does clear 3:1, contrary to a report that said it did not', () {
-      // An agent reviewing the CCTV work reported this as under 3:1. It is not:
-      // 7.41:1 on the light page and 11.79-16.39:1 on the dark presets. The
-      // assertion is here because a claim like that gets repeated, and the
-      // cheapest thing in this repo is a number that settles it.
-      for (final theme in AppTheme.values) {
-        final edge = AppElevation.boundaryEdge(theme: theme);
-        for (final s in {
-          'page': AppSurfaces.page(theme),
-          'chrome': AppSurfaces.chrome(theme),
-        }.entries) {
-          expect(
-            _contrast(edge, s.value),
-            greaterThanOrEqualTo(3.0),
-            reason: '$theme boundaryEdge #${_hex(edge)} on ${s.key}',
-          );
-        }
+  group('boundary', () {
+    test('does clear 3:1, which is why it is the one 1.4.11 edge', () {
+      // An agent reviewing the CCTV work reported the old `boundaryEdge` as
+      // under 3:1. It was not, and it is gone anyway. What replaced it is
+      // pinned here for the same reason the claim was: a claim like that gets
+      // repeated, and the cheapest thing in this repo is a number that settles
+      // it.
+      final edge = AppBorders.boundary.color;
+      for (final s in {
+        'page': AppSurfaces.page,
+        'surface': AppSurfaces.surface,
+        'surfaceAlt': AppSurfaces.surfaceAlt,
+      }.entries) {
+        expect(
+          _contrast(edge, s.value),
+          greaterThanOrEqualTo(3.0),
+          reason: 'boundary #${_hex(edge)} on ${s.key} is '
+              '${_contrast(edge, s.value).toStringAsFixed(2)}:1',
+        );
       }
+    });
+
+    test('the hairline is not, and is not asked to be', () {
+      // Stated so the distinction stays honest. `AppBorders.hairline` is a
+      // grouping cue and is well under 3:1; only `boundary` carries the 1.4.11
+      // claim. If the hairline ever reached 3:1 the whole screen would be
+      // framed, which `design_tokens.dart` argues is a heavier visual than the
+      // brief asks for.
+      expect(
+        _contrast(AppBorders.hairline.color, AppSurfaces.page),
+        lessThan(3.0),
+        reason: 'the hairline has crossed 3:1; it is a grouping cue, and '
+            'reaching the compliance figure needs the stronger edge to exist '
+            'beside it',
+      );
     });
   });
 }

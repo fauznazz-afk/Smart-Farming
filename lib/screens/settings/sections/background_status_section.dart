@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../services/alarm_bridge.dart';
 import '../../dashboard/utils/color_helpers.dart';
-import '../../dashboard/utils/design_tokens.dart'
-    show AppSurfaces, AppBorders, AppRadius;
-
 /// Live status of the background alarm check, plus the two things that can stop
 /// it working.
 ///

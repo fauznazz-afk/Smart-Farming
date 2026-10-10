@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/nav_bar.dart';
 
 /// Covers the reservation the dashboard's scroll padding makes for the floating
@@ -87,8 +86,6 @@ void main() {
               extendBody: true,
               bottomNavigationBar: GlassNavBar(
                 selectedIndex: 0,
-                theme: AppTheme.dark,
-                seedColor: const Color(0xFF4CAF50),
                 collapsed: collapsed,
                 onSelect: (_) {},
                 onExpand: () {},
@@ -142,8 +139,6 @@ void main() {
               extendBody: true,
               bottomNavigationBar: GlassNavBar(
                 selectedIndex: 0,
-                theme: AppTheme.dark,
-                seedColor: const Color(0xFF4CAF50),
                 collapsed: collapsed,
                 onSelect: (_) {},
                 onExpand: () {},

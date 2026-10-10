@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/charts/chart_data.dart';
-import '../../dashboard/utils/design_tokens.dart'
-    show AppRadius;
+import '../../dashboard/utils/design_tokens.dart';
 import '../../../services/energy_report_service.dart';
 
 /// The Y axis interval for the energy report, and the maximum it implies.

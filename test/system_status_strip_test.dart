@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 // `RenderParagraph`, for `didExceedMaxLines`.
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/system_status_strip.dart';
 
 import 'widget_text_helpers.dart';
@@ -30,8 +29,6 @@ import 'widget_text_helpers.dart';
 /// widget 48 dp wider than the one that ships; that mistake is what let
 /// `LivePowerCard` pass here while the device showed `Sola` for `Solar`.
 void main() {
-  const seedColor = Color(0xFF35A968);
-
   Widget wrap(Widget child) => MaterialApp(
         home: Scaffold(body: SingleChildScrollView(child: child)),
       );
@@ -46,8 +43,6 @@ void main() {
     int activeAlerts = 0,
   }) =>
       SystemStatusStrip(
-        theme: AppTheme.light,
-        seedColor: seedColor,
         onOpenBattery: () {},
         lowSocThreshold: 15,
         activeAlerts: activeAlerts,
