@@ -63,3 +63,5 @@ app.*.map.json
 # would mean every code change carries a regenerated binary blob, and two clones
 # would drift. `AGENTS.md` records how to rebuild it.
 graphify-out/
+
+pair.txt
