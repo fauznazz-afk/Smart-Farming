@@ -13,7 +13,6 @@ class DateStrip extends StatelessWidget {
     required this.selectedDate,
     required this.rangeStart,
     required this.rangeEnd,
-    required this.accentColor,
     required this.onSelectDate,
     required this.onPickRange,
   });
@@ -22,7 +21,6 @@ class DateStrip extends StatelessWidget {
   final DateTime selectedDate;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
-  final Color accentColor;
   final ValueChanged<DateTime> onSelectDate;
   final VoidCallback onPickRange;
 

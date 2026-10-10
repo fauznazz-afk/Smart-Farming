@@ -59,8 +59,7 @@ class EnergySummaryCard extends StatelessWidget {
       // distinguish them, as the report does, still can.
       EnergyChangeKind.noPreviousData ||
       EnergyChangeKind.previousWasZero ||
-      EnergyChangeKind.nothingToCompare =>
-        'Nothing to compare yet',
+      EnergyChangeKind.nothingToCompare => 'Nothing to compare yet',
       EnergyChangeKind.noProduction => 'No production',
       // Short on purpose. The two tiles sit side by side and wrap independently,
       // so a caption long enough to wrap on one of them leaves the pair with
@@ -95,7 +94,6 @@ class EnergySummaryCard extends StatelessWidget {
           // Was a hand-written wash at radius 16 while the energy report's
           // identical tile used 14. AppTile is that object, once.
           child: AppTile(
-            
             accent: color,
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -158,10 +156,7 @@ class EnergySummaryCard extends StatelessWidget {
                   // user cannot finish reading is a correctness one.
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: faintColor,
-                  ),
+                  style: TextStyle(fontSize: 10, color: faintColor),
                 ),
               ],
             ),
@@ -259,29 +254,9 @@ class EnergySummaryCard extends StatelessWidget {
                   // selected segment is the one that keeps its full label for as
                   // long as it can.
                   Flexible(
-                    child: SegmentedButton<bool>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: false,
-                          label: Text(
-                            'Day',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        ButtonSegment(
-                          value: true,
-                          label: Text(
-                            '7 days',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                      selected: {weekly},
-                      onSelectionChanged: (selection) =>
-                          onRangeChanged(selection.first),
+                    child: _EnergyRangeSelector(
+                      weekly: weekly,
+                      onChanged: onRangeChanged,
                     ),
                   ),
                   // A round button. `AppSurface` with `circle`, because a multi-side
@@ -289,7 +264,7 @@ class EnergySummaryCard extends StatelessWidget {
                   AppSurface(
                     circle: true,
                     fill: AppSurfaces.surface,
-                                  child: IconButton(
+                    child: IconButton(
                       tooltip: 'Open the energy report',
                       visualDensity: VisualDensity.compact,
                       onPressed: onOpenReport,
@@ -303,10 +278,7 @@ class EnergySummaryCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             'Estimated from average telemetry power',
-            style: TextStyle(
-              fontSize: 11,
-              color: faintColor,
-            ),
+            style: TextStyle(fontSize: 11, color: faintColor),
           ),
           const SizedBox(height: 8),
           if (loading)
@@ -417,20 +389,14 @@ class EnergySummaryCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             '$targetLabel · $runway',
-            style: TextStyle(
-              fontSize: 10,
-              color: faintColor,
-            ),
+            style: TextStyle(fontSize: 10, color: faintColor),
           ),
           if (result.hasProduction)
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Actual today: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: faintColor,
-                ),
+                style: TextStyle(fontSize: 10, color: faintColor),
               ),
             ),
         ],
@@ -463,6 +429,51 @@ class EnergySummaryCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EnergyRangeSelector extends StatefulWidget {
+  const _EnergyRangeSelector({required this.weekly, required this.onChanged});
+
+  final bool weekly;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  State<_EnergyRangeSelector> createState() => _EnergyRangeSelectorState();
+}
+
+class _EnergyRangeSelectorState extends State<_EnergyRangeSelector> {
+  late bool _weekly = widget.weekly;
+
+  @override
+  void didUpdateWidget(covariant _EnergyRangeSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weekly != widget.weekly) {
+      _weekly = widget.weekly;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<bool>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: false,
+          label: Text('Day', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        ButtonSegment(
+          value: true,
+          label: Text('7 days', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
+      selected: {_weekly},
+      onSelectionChanged: (selection) {
+        final value = selection.first;
+        setState(() => _weekly = value);
+        widget.onChanged(value);
+      },
     );
   }
 }

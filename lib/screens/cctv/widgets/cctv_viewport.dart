@@ -8,10 +8,7 @@ import '../utils/cctv_status.dart';
 
 /// Small status badge shown next to the CCTV header and in full screen.
 class CctvStatusPill extends StatelessWidget {
-  const CctvStatusPill({
-    super.key,
-    required this.status,
-  });
+  const CctvStatusPill({super.key, required this.status});
 
   final CctvStatus status;
 
@@ -116,80 +113,84 @@ class CctvStandbyOverlay extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
+        // `FittedBox` on the way down, because this column is taller than the
+        // viewport at the largest text scales and a `Center` inside a `Stack`
+        // reports the overflow as a yellow stripe over the video. `scaleDown`
+        // shrinks it to fit rather than growing the box.
         Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Solid primary circle with onHue ink (FAB-circle style)
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppPalette.primary,
-                  shape: BoxShape.circle,
-                  border: AppBorders.boundaryBorder,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      blurRadius: 4,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: onStart,
-                    child: const Center(
-                      child: Icon(
-                        Icons.videocam_outlined,
-                        size: 30,
-                        color: AppPalette.onHue,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Solid primary circle with onHue ink (FAB-circle style)
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: AppPalette.primary,
+                    shape: BoxShape.circle,
+                    border: AppBorders.boundaryBorder,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: onStart,
+                      child: const Center(
+                        child: Icon(
+                          Icons.videocam_outlined,
+                          size: 30,
+                          color: AppPalette.onHue,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Camera ready',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'The stream does not run until you press Play',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xB3FFFFFF),
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onStart,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Play camera'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: primary,
-                  foregroundColor: onPrimaryInk(primary),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
+                const SizedBox(height: 12),
+                const Text(
+                  'Camera ready',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                const Text(
+                  'The stream does not run until you press Play',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onStart,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Play camera'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: onPrimaryInk(primary),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -216,9 +217,7 @@ class CctvLoadingOverlay extends StatelessWidget {
         // whatever is behind it, and this is the state where the user is waiting
         // and looking for the only sign that anything is happening.
         color: Color(0xCC0B100E),
-        child: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        child: Center(child: CircularProgressIndicator(color: Colors.white)),
       ),
     );
   }
@@ -305,9 +304,7 @@ class CctvRoundControl extends StatelessWidget {
               Colors.black.withValues(alpha: 0.55),
             ],
           ),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.15),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.5),

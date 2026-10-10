@@ -8,14 +8,12 @@ import '../../../services/energy_report_service.dart';
 class ExportButton extends StatelessWidget {
   const ExportButton({
     super.key,
-    required this.sharing,
     required this.buckets,
     required this.selectedDate,
     required this.monthly,
     required this.sharingNotifier,
   });
 
-  final bool sharing;
   final List<EnergyBucket> buckets;
   final DateTime selectedDate;
   final bool monthly;

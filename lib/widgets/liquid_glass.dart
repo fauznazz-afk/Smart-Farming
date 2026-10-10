@@ -85,8 +85,7 @@ class AppSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: fill ?? AppSurfaces.surface,
         shape: circle ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius:
-            circle ? null : BorderRadius.circular(radius),
+        borderRadius: circle ? null : BorderRadius.circular(radius),
         border: border,
       ),
       child: child,
@@ -171,7 +170,8 @@ class AppCard extends StatelessWidget {
       fill = AppSurfaces.surface;
     }
 
-    final edge = border ??
+    final edge =
+        border ??
         (inset || accent == null
             ? AppBorders.hairlineBorder
             : AppBorders.categoricalBorder(accent!));
@@ -202,10 +202,7 @@ class AppCard extends StatelessWidget {
         border: edge,
       ),
       padding: padding ?? const EdgeInsets.all(20),
-      child: Material(
-        type: MaterialType.transparency,
-        child: child,
-      ),
+      child: Material(type: MaterialType.transparency, child: child),
     );
 
     // Keeps a card from re-rasterising when something above it moves; the eight
@@ -249,8 +246,20 @@ class AppTile extends StatelessWidget {
   final Color? accent;
   final EdgeInsetsGeometry padding;
 
-  /// A well (one step up the ramp) or a card (one step down from a card, for a
-  /// tile inside a card). Defaults to the well, which is what a metric tile wants.
+  /// The tile surface, or the input surface.
+  ///
+  /// The default is the tile surface: [AppSurfaces.surfaceAlt], one step above
+  /// the card. Both arms are distinct — `input` is declared as the same value as
+  /// `surface`, so `inset: false` is the card's own fill and is for a field set
+  /// *into* a card rather than on it.
+  ///
+  /// **Not the progress track, although it is the same value.** The track is a
+  /// 6 to 8dp bar and is named separately; the tile is the lightest surface a
+  /// caption is ever drawn on, which is what `color_helpers_test.dart` measures.
+  /// The failure mode to avoid is the one that already happened here: with the
+  /// tile drawn in `surface` — the card's own fill — every metric tile in the app
+  /// was invisible against the card behind it and only the 20%-alpha categorical
+  /// border was left to describe it. Analyze was clean and the suite was green.
   final bool inset;
 
   @override
@@ -258,11 +267,19 @@ class AppTile extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
+        // **`inset` is a real branch, and it has to stay one.** This line once
+        // read `inset ? AppSurfaces.surface : AppSurfaces.input`, and because
+        // `input` is *declared* as the same value as `surface` that collapsed
+        // both arms onto one colour: every tile in the app drew in the card's own
+        // fill, and the only thing left to tell a metric tile from the card
+        // behind it was the 20%-alpha categorical border. The `inset` parameter
+        // was still threaded through two call sites and still documented as
+        // making them distinct, so nothing failed — it just quietly stopped
+        // being true. `surfaceAlt` is the step above the card, and it is what
+        // the token file already says a tile inside a card is for.
         color: inset ? AppSurfaces.surfaceAlt : AppSurfaces.input,
         borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: accent == null
-            ? null
-            : AppBorders.categoricalBorder(accent!),
+        border: accent == null ? null : AppBorders.categoricalBorder(accent!),
       ),
       child: child,
     );
@@ -347,6 +364,7 @@ class DateStripChip extends StatelessWidget {
   });
 
   final String dayName;
+
   /// The day of the month, 1-31. An `int` rather than a `String` because that is
   /// what it is: the call site has a `DateTime.day` and a `String` here would be
   /// a conversion done at the call site, where nothing else needs one.
@@ -384,14 +402,15 @@ class DateStripChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.tile),
             // The active chip has no border, per the brief. An outline round a
             // solid fill reads as a second, competing edge.
-            border: isSelected
-                ? null
-                : AppBorders.hairlineBorder,
+            border: isSelected ? null : AppBorders.hairlineBorder,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(dayName.toUpperCase(), style: AppType.labelMicro.copyWith(color: ink)),
+              Text(
+                dayName.toUpperCase(),
+                style: AppType.labelMicro.copyWith(color: ink),
+              ),
               const SizedBox(height: 6),
               FittedBox(
                 fit: BoxFit.scaleDown,

@@ -30,6 +30,8 @@ class ChartCard extends StatelessWidget {
 
     return Semantics(
       label: 'Energy bar chart showing ${buckets.length} intervals',
+      container: true,
+      explicitChildNodes: true,
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
         child: Column(

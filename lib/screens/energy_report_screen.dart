@@ -254,7 +254,6 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                     _ => buckets.isEmpty
                         ? const SizedBox.shrink()
                         : ExportButton(
-                            sharing: _sharing.value,
                             buckets: buckets,
                             selectedDate: _selectedDate,
                             monthly: _monthly,

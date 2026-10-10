@@ -143,10 +143,7 @@ const double _navBarClearance = 20;
 
 /// Main monitoring dashboard: overview, PV, AC, battery, and CCTV tabs.
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({
-    super.key,
-    required this.api,
-  });
+  const DashboardScreen({super.key, required this.api});
 
   final ThingsBoardApi api;
 
@@ -357,9 +354,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _checkLaunchAlarm() async {
     final alarmId = await AlarmBridge.instance.launchAlarmId();
     if (alarmId != null && mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()),
-      );
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()));
     }
   }
 
@@ -458,8 +454,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final thresholds = readAlarmThresholds(preferences);
     setState(() {
       _autoRefresh = preferences.getBool(SettingsKeys.autoRefresh) ?? true;
-      _refreshSeconds =
-          preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
+      _refreshSeconds = preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
       _setThresholds(thresholds);
       _dailyProductionTargetKwh = _readDouble(
         preferences,
@@ -655,7 +650,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         final wasLoading = _loading;
         _error = message;
         _loading = false;
-        _notifyLive(wasLoading: wasLoading, changed: wasLoading || _battery == null);
+        _notifyLive(
+          wasLoading: wasLoading,
+          changed: wasLoading || _battery == null,
+        );
       }
     } finally {
       _telemetryRequestInFlight = false;
@@ -798,9 +796,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     // already on screen, which is the common case for a device that reports on a
     // slow cycle. Those frames used to be indistinguishable from real changes.
     final changed =
-        wasLoading ||
-        _error != null ||
-        !sameTelemetry(slot, updated);
+        wasLoading || _error != null || !sameTelemetry(slot, updated);
     _connectionHealth.markSuccess(
       ConnectionTransport.webSocket,
       latency: DateTime.now().difference(values.values.first.timestamp),
@@ -834,19 +830,19 @@ class _DashboardScreenState extends State<DashboardScreen>
       deviceId == ThingsBoardApi.deviceFish;
 
   /// Pull-to-refresh, which has to outrank the poll.
-///
-/// [RefreshIndicator] dismisses itself as soon as this future completes, so a
-/// future that returns without having fetched anything is a lie told to the
-/// user's finger. Both entry points here bail out unconditionally when their
-/// request is already in flight -- `_fetchAll` on `_telemetryRequestInFlight`,
-/// `_fetchHistoryFor` on `_historyRequestInFlight` -- so pulling while the
-/// 10-second poll was mid-tick refetched nothing and still ended the spinner.
-///
-/// The fix is not to remove either guard: they exist so the poll cannot stack
-/// requests on top of each other, which is a real problem on a slow link. It is
-/// to wait for the in-flight request to finish and then do one more, so the
-/// gesture always results in a fetch that happened after the finger lifted.
-Future<void> _refreshCurrentPage() async {
+  ///
+  /// [RefreshIndicator] dismisses itself as soon as this future completes, so a
+  /// future that returns without having fetched anything is a lie told to the
+  /// user's finger. Both entry points here bail out unconditionally when their
+  /// request is already in flight -- `_fetchAll` on `_telemetryRequestInFlight`,
+  /// `_fetchHistoryFor` on `_historyRequestInFlight` -- so pulling while the
+  /// 10-second poll was mid-tick refetched nothing and still ended the spinner.
+  ///
+  /// The fix is not to remove either guard: they exist so the poll cannot stack
+  /// requests on top of each other, which is a real problem on a slow link. It is
+  /// to wait for the in-flight request to finish and then do one more, so the
+  /// gesture always results in a fetch that happened after the finger lifted.
+  Future<void> _refreshCurrentPage() async {
     // A poll that is already running is *about* to deliver the same data, so
     // waiting for it and then issuing one more is not duplicated work in the
     // common case -- it is one extra request, once, on a deliberate gesture.
@@ -876,7 +872,8 @@ Future<void> _refreshCurrentPage() async {
       rules: _alarmRules,
       readings: _alarmReadings,
       now: now,
-    );    final alerts = {for (final signal in signals) signal.id: signal.message};
+    );
+    final alerts = {for (final signal in signals) signal.id: signal.message};
 
     final newSignals = newlyActiveSignals(
       signals: signals,
@@ -1032,8 +1029,7 @@ Future<void> _refreshCurrentPage() async {
       // `_energyError` set on the next line, which is unchanged either way.
       appLog(() => 'Energy summary history request failed: $error');
       _energyLoading = false;
-      _energyError =
-          'Power history could not be loaded. Pull down to retry.';
+      _energyError = 'Power history could not be loaded. Pull down to retry.';
       _notifyEnergy();
     } finally {
       _energyRequestInFlight = false;
@@ -1116,6 +1112,7 @@ Future<void> _refreshCurrentPage() async {
       now: now,
     );
     Map<String, List<TelemetryPoint>> histories;
+    var requestFailed = false;
     try {
       histories = await widget.api.fetchHistoryForKeys(
         window.deviceId,
@@ -1129,9 +1126,12 @@ Future<void> _refreshCurrentPage() async {
       // so, and clear it on the next attempt so a recovered prefix does not
       // keep warning.
       _historyLoadFailed.add(prefix);
+      requestFailed = true;
       histories = const {};
     }
-    _historyLoadFailed.remove(prefix);
+    if (!requestFailed) {
+      _historyLoadFailed.remove(prefix);
+    }
 
     // Drop the result if the user changed the selection while it was loading.
     final currentKey = historySelectionKey(
@@ -1167,7 +1167,7 @@ Future<void> _refreshCurrentPage() async {
     }
   }
 
-/// Releases the in-flight bookkeeping for one history request.
+  /// Releases the in-flight bookkeeping for one history request.
   ///
   /// Called from `_fetchHistoryFor` at the end of its straight-line section, and
   /// it exists as a method for one reason: the first version of this was a
@@ -1361,7 +1361,9 @@ Future<void> _refreshCurrentPage() async {
         : value.isAfter(today)
         ? today
         : value;
-    final initialStart = clamp(startOfDay(_selectedRangeStart ?? _selectedDate));
+    final initialStart = clamp(
+      startOfDay(_selectedRangeStart ?? _selectedDate),
+    );
     final initialEnd = clamp(startOfDay(_selectedRangeEnd ?? _selectedDate));
     final safeEnd = initialEnd.isBefore(initialStart)
         ? initialStart
@@ -1420,11 +1422,7 @@ Future<void> _refreshCurrentPage() async {
   Future<void> _openSettings() async {
     final changed = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => SettingsScreen(
-          onLogout: _logout,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => SettingsScreen(onLogout: _logout)),
     );
     if (changed == true) {
       _loadPreferences();
@@ -1470,9 +1468,7 @@ Future<void> _refreshCurrentPage() async {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: _buildAppBar(),
-      body: AppBackground(
-        child: _buildBody(),
-      ),
+      body: AppBackground(child: _buildBody()),
       extendBody: true,
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
@@ -1512,9 +1508,7 @@ Future<void> _refreshCurrentPage() async {
               color: baseColor.withValues(alpha: progress),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.white.withValues(
-                    alpha: 0.08 * progress,
-                  ),
+                  color: Colors.white.withValues(alpha: 0.08 * progress),
                 ),
               ),
             ),
@@ -1641,8 +1635,7 @@ Future<void> _refreshCurrentPage() async {
           backgroundColor: Theme.of(context).colorScheme.surface,
           strokeWidth: 2.5,
           displacement: 58,
-          edgeOffset:
-              MediaQuery.paddingOf(context).top + kToolbarHeight,
+          edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
           onRefresh: _refreshCurrentPage,
           child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -1732,15 +1725,8 @@ Future<void> _refreshCurrentPage() async {
   /// the same and switching between them would not have rebuilt anything; the
   /// enum makes the two distinct, which is the whole reason the token type
   /// changed with it.
-  Widget _bindRevision(
-    Listenable listenable,
-    Widget Function() builder,
-  ) {
-    return Bound(
-      listenable: listenable,
-      token: _visualToken,
-      builder: builder,
-    );
+  Widget _bindRevision(Listenable listenable, Widget Function() builder) {
+    return Bound(listenable: listenable, token: _visualToken, builder: builder);
   }
 
   /// One status line for everything the user needs to know about liveness.
@@ -1750,70 +1736,67 @@ Future<void> _refreshCurrentPage() async {
   /// Only the most important thing is ever shown, so the strip cannot contradict
   /// itself and does not push the page content off screen.
   Widget _statusStripBuilder({required bool showAlerts}) {
-    return _bindRevision(
-      _connectionChromeListenable,
-      () {
-        final failed = _error != null;
-        final offline = _isOfflineMode;
-        final alerts = _alertMessages.value;
-        final stale = _staleDeviceNames();
+    return _bindRevision(_connectionChromeListenable, () {
+      final failed = _error != null;
+      final offline = _isOfflineMode;
+      final alerts = _alertMessages.value;
+      final stale = _staleDeviceNames();
 
-        // Each branch is wrapped in a BannerSwitcher rather than returned
-        // conditionally, so a banner that goes away collapses instead of
-        // vanishing in one frame. The alert banner is the case that matters
-        // most: a reading returning to range used to drop the whole Overview
-        // down a card-height with no transition, which reads as a glitch.
-        if (failed) {
-          return ConnectionStatusBannerSwitcher(
-            failed: true,
-            staleNames: stale,
-            health: _connectionHealth.health,
-            lastSuccessfulAt: _lastSuccessfulTelemetryAt,
-            errorMessage: _error,
+      // Each branch is wrapped in a BannerSwitcher rather than returned
+      // conditionally, so a banner that goes away collapses instead of
+      // vanishing in one frame. The alert banner is the case that matters
+      // most: a reading returning to range used to drop the whole Overview
+      // down a card-height with no transition, which reads as a glitch.
+      if (failed) {
+        return ConnectionStatusBannerSwitcher(
+          failed: true,
+          staleNames: stale,
+          health: _connectionHealth.health,
+          lastSuccessfulAt: _lastSuccessfulTelemetryAt,
+          errorMessage: _error,
+          visible: true,
+          onRetry: _fetchAll,
+        );
+      }
+      if (offline) {
+        return _bindRevision(
+          _liveRevision,
+          () => BannerSwitcher(
             visible: true,
-            onRetry: _fetchAll,
-          );
-        }
-        if (offline) {
-          return _bindRevision(
-            _liveRevision,
-            () => BannerSwitcher(
-              visible: true,
-              identity: 'offline:${_cachedTelemetryTime ?? ''}',
-              bottomSpacing: 8,
-              builder: () => OfflineBanner(
-                cacheTime: _cachedTelemetryTime,
-                onRetry: _fetchAll,
-              ),
+            identity: 'offline:${_cachedTelemetryTime ?? ''}',
+            bottomSpacing: 8,
+            builder: () => OfflineBanner(
+              cacheTime: _cachedTelemetryTime,
+              onRetry: _fetchAll,
             ),
-          );
-        }
-        if (showAlerts) {
-          return _bindRevision(
-            _alertMessages,
-            () => BannerSwitcher(
-              visible: alerts.isNotEmpty,
-              // The identity is the set of messages, so a *change* of alarm
-              // cross-fades the text rather than only resizing the box.
-              identity: alerts.join('|'),
-              builder: () => EnergyAlertBanner(messages: alerts),
-            ),
-          );
-        }
-        if (stale.isNotEmpty) {
-          return ConnectionStatusBannerSwitcher(
-            failed: false,
-            staleNames: stale,
-            health: _connectionHealth.health,
-            lastSuccessfulAt: _lastSuccessfulTelemetryAt,
-            errorMessage: null,
-            visible: true,
-            onRetry: _fetchAll,
-          );
-        }
-        return const SizedBox.shrink();
-      },
-    );
+          ),
+        );
+      }
+      if (showAlerts) {
+        return _bindRevision(
+          _alertMessages,
+          () => BannerSwitcher(
+            visible: alerts.isNotEmpty,
+            // The identity is the set of messages, so a *change* of alarm
+            // cross-fades the text rather than only resizing the box.
+            identity: alerts.join('|'),
+            builder: () => EnergyAlertBanner(messages: alerts),
+          ),
+        );
+      }
+      if (stale.isNotEmpty) {
+        return ConnectionStatusBannerSwitcher(
+          failed: false,
+          staleNames: stale,
+          health: _connectionHealth.health,
+          lastSuccessfulAt: _lastSuccessfulTelemetryAt,
+          errorMessage: null,
+          visible: true,
+          onRetry: _fetchAll,
+        );
+      }
+      return const SizedBox.shrink();
+    });
   }
 
   /// Feeds the same readings the rule engine uses, so the banner and the alarms
@@ -1822,8 +1805,6 @@ Future<void> _refreshCurrentPage() async {
     readings: _alarmReadings,
     staleMinutes: _staleTelemetryMinutes,
   );
-
-
 
   // ── Overview page ────────────────────────────────────────────────────────────
   List<Widget Function()> _overviewPage() {
@@ -1850,7 +1831,6 @@ Future<void> _refreshCurrentPage() async {
       selectedDate: _selectedDate,
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
-      accentColor: categoryColor(MetricCategory.pv),
       onSelectDate: _selectDate,
       onPickRange: _pickDateFromCalendar,
     );
@@ -2050,15 +2030,12 @@ Future<void> _refreshCurrentPage() async {
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      () => _telemetryCard(
-        _pzem,
-        const [
-          MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
-          MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
-          MetricDef('power_dc', 'Power DC', 'W', Icons.wb_sunny),
-          MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
-        ],
-      ),
+      () => _telemetryCard(_pzem, const [
+        MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
+        MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
+        MetricDef('power_dc', 'Power DC', 'W', Icons.wb_sunny),
+        MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
+      ]),
     ),
     // **Through `_chartSectionThunks`, which iterates the groups.** This used to
     // hand-write a header and one
@@ -2095,17 +2072,20 @@ Future<void> _refreshCurrentPage() async {
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _pzemRevision,
-      () => _telemetryCard(
-        _pzem,
-        const [
-          MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
-          MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
-          MetricDef('power_ac', 'Power AC', 'W', Icons.power, decimals: 1),
-          MetricDef('frequency_ac', 'Frequency', 'Hz', Icons.graphic_eq, decimals: 1),
-          MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
-          MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
-        ],
-      ),
+      () => _telemetryCard(_pzem, const [
+        MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
+        MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
+        MetricDef('power_ac', 'Power AC', 'W', Icons.power, decimals: 1),
+        MetricDef(
+          'frequency_ac',
+          'Frequency',
+          'Hz',
+          Icons.graphic_eq,
+          decimals: 1,
+        ),
+        MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
+        MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
+      ]),
     ),
     // `_chartSections`, for the reason on the PV page: the hand-written
     // `.single` is what threw `Bad state: Too many elements` when the electrical
@@ -2122,27 +2102,36 @@ Future<void> _refreshCurrentPage() async {
     () => const SizedBox(height: _cardGap),
     () => _bindRevision(
       _batteryRevision,
-      () => _telemetryCard(
-        _battery,
-        const [
-          MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
-          MetricDef('current', 'Current', 'A', Icons.swap_horiz),
-          MetricDef('power', 'Power', 'W', Icons.bolt_outlined, decimals: 1),
-          MetricDef('soc', 'State of Charge', '%', Icons.battery_charging_full, decimals: 0),
-          MetricDef('cycles', 'Cycles', '', Icons.refresh, decimals: 0),
-          MetricDef(
-            'remain_capacity_ah',
-            'Remaining Capacity',
-            'Ah',
-            Icons.battery_3_bar,
-            decimals: 1,
-          ),
-          // The full capacity was already being fetched and displayed nowhere.
-          // A remaining charge with no reference to the original size is just a
-          // number, so the pack size goes next to it.
-          MetricDef('full_capacity_ah', 'Full Capacity', 'Ah', Icons.battery_full, decimals: 0),
-        ],
-      ),
+      () => _telemetryCard(_battery, const [
+        MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
+        MetricDef('current', 'Current', 'A', Icons.swap_horiz),
+        MetricDef('power', 'Power', 'W', Icons.bolt_outlined, decimals: 1),
+        MetricDef(
+          'soc',
+          'State of Charge',
+          '%',
+          Icons.battery_charging_full,
+          decimals: 0,
+        ),
+        MetricDef('cycles', 'Cycles', '', Icons.refresh, decimals: 0),
+        MetricDef(
+          'remain_capacity_ah',
+          'Remaining Capacity',
+          'Ah',
+          Icons.battery_3_bar,
+          decimals: 1,
+        ),
+        // The full capacity was already being fetched and displayed nowhere.
+        // A remaining charge with no reference to the original size is just a
+        // number, so the pack size goes next to it.
+        MetricDef(
+          'full_capacity_ah',
+          'Full Capacity',
+          'Ah',
+          Icons.battery_full,
+          decimals: 0,
+        ),
+      ]),
     ),
     // `_chartSections`, for the reason on the PV page.
     ..._chartSectionThunks('battery'),
@@ -2188,10 +2177,7 @@ Future<void> _refreshCurrentPage() async {
         ),
       ),
       () => const SizedBox(height: 8),
-      () => _bindRevision(
-        _sensorRevision,
-        () => _environmentGrid(),
-      ),
+      () => _bindRevision(_sensorRevision, () => _environmentGrid()),
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries
       // would let three cards rebuild for a bounds change on the fourth.
@@ -2231,10 +2217,8 @@ Future<void> _refreshCurrentPage() async {
       () => Bound(
         listenable: _cctvKeepAlive,
         token: '$_cctvUrlFish|$_selectedIndex',
-        builder: () => CctvScreen(
-          streamUrl: _cctvUrlFish,
-          isVisible: _selectedIndex == 3,
-        ),
+        builder: () =>
+            CctvScreen(streamUrl: _cctvUrlFish, isVisible: _selectedIndex == 3),
       ),
       () => const SizedBox(height: 8),
       () => _bindRevision(_fishRevision, () => _fishGrid()),
@@ -2249,10 +2233,7 @@ Future<void> _refreshCurrentPage() async {
     ];
   }
 
-  Widget _telemetryCard(
-    DeviceTelemetry? data,
-    List<MetricDef> metrics,
-  ) {
+  Widget _telemetryCard(DeviceTelemetry? data, List<MetricDef> metrics) {
     return TelemetryCard(
       data: data,
       metrics: metrics,
@@ -2271,7 +2252,6 @@ Future<void> _refreshCurrentPage() async {
         rangeStart: _selectedRangeStart,
         rangeEnd: _selectedRangeEnd,
         realtimeConnected: _realtimeConnected,
-        onPickRange: _pickDateFromCalendar,
         refreshing: _historyRequestInFlight.contains(prefix),
       ),
     );

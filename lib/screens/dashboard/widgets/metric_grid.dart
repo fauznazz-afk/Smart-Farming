@@ -79,20 +79,22 @@ class MetricGrid extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              title,
-              style: AppType.labelUppercase.copyWith(color: faintColor),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.labelUppercase.copyWith(color: faintColor),
+              ),
             ),
             const Spacer(),
             if (verdicts.isStale)
-              _Tag(
-                text: 'Stale data',
-                color: statusWarn,
+              Flexible(
+                child: _Tag(text: 'Stale data', color: statusWarn),
               )
             else if (breached > 0 && showGridColors)
-              _Tag(
-                text: '$breached out of range',
-                color: statusBad,
+              Flexible(
+                child: _Tag(text: '$breached out of range', color: statusBad),
               ),
           ],
         ),
@@ -143,7 +145,8 @@ class _Verdicts {
         if (metric == null || value == null) continue;
         final min = thresholds.minFor(metric);
         final max = thresholds.maxFor(metric);
-        result[metric] = (min != null && value < min) || (max != null && value > max);
+        result[metric] =
+            (min != null && value < min) || (max != null && value > max);
       }
     }
     final stale =
@@ -174,6 +177,9 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.end,
       style: AppType.labelMicro.copyWith(
         fontWeight: FontWeight.w600,
         color: color,
@@ -240,7 +246,9 @@ class _MetricCard extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      value == null ? '--' : value!.toStringAsFixed(spec.decimals),
+                      value == null
+                          ? '--'
+                          : value!.toStringAsFixed(spec.decimals),
                       maxLines: 1,
                       style: AppType.numeralLg.copyWith(color: appPrimaryText),
                     ),
@@ -248,7 +256,10 @@ class _MetricCard extends StatelessWidget {
                 ),
               if (spec.unit.isNotEmpty) ...[
                 const SizedBox(width: 3),
-                Text(spec.unit, style: AppType.labelMicro.copyWith(color: faint)),
+                Text(
+                  spec.unit,
+                  style: AppType.labelMicro.copyWith(color: faint),
+                ),
               ],
             ],
           ),

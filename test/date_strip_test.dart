@@ -52,9 +52,6 @@ String _ellipsised({
 }
 
 void main() {
-  // The strip still takes an accent: it is the categorical accent for "PV" on
-  // the dashboard, which is not the app's appearance accent.
-  const accentColor = Color(0xFF35A968);
   final today = DateTime(2026, 10, 2);
   final days = List<DateTime>.generate(
     7,
@@ -82,7 +79,6 @@ void main() {
                 selectedDate: today,
                 rangeStart: null,
                 rangeEnd: null,
-                accentColor: accentColor,
                 onSelectDate: (_) {},
                 onPickRange: () {},
               ),

@@ -1,4 +1,5 @@
 import '../utils/color_helpers.dart';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -22,7 +23,6 @@ class ChartSectionHeader extends StatelessWidget {
     required this.rangeStart,
     required this.rangeEnd,
     required this.realtimeConnected,
-    required this.onPickRange,
     this.refreshing = false,
   });
 
@@ -31,7 +31,6 @@ class ChartSectionHeader extends StatelessWidget {
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final bool realtimeConnected;
-  final VoidCallback onPickRange;
   final bool refreshing;
 
   @override
@@ -69,10 +68,7 @@ class ChartSectionHeader extends StatelessWidget {
           SizedBox(
             width: 10,
             height: 10,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.6,
-              color: accent,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 1.6, color: accent),
           ),
           const SizedBox(width: 4),
           Text(
@@ -107,14 +103,14 @@ class _MetricSpec {
   String get label => series.label;
   String get unit => series.unit;
 
-  Color color() =>
-      categoryColorForKey(series.key) ?? AppPalette.primary;
+  Color color() => categoryColorForKey(series.key) ?? AppPalette.primary;
 }
 
 IconData _iconForSeries(ChartSeriesSpec spec) => switch (spec.key) {
   'voltage_dc' || 'voltage_ac' || 'voltage' => Icons.bolt_outlined,
-  'current_dc' || 'current_ac' || 'current' =>
-    Icons.electrical_services_outlined,
+  'current_dc' ||
+  'current_ac' ||
+  'current' => Icons.electrical_services_outlined,
   'power_dc' || 'power_ac' || 'power' => Icons.wb_sunny_outlined,
   'temp_dht' => Icons.device_thermostat,
   'temp_ds18b20' => Icons.thermostat,
@@ -174,7 +170,8 @@ class TelemetryChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final specs = _specsFor(group);
-    final accent = categoryColorForKey(specs.first.series.key) ?? AppPalette.primary;
+    final accent =
+        categoryColorForKey(specs.first.series.key) ?? AppPalette.primary;
     final scaled = _buildSeries(specs, accent);
     final bounds = boundsCache.putIfAbsent(
       '$prefix/${group.title}',
@@ -186,12 +183,18 @@ class TelemetryChartCard extends StatelessWidget {
     final hasData = scaled.any((item) => item.series.points.isNotEmpty);
     final title = group.title;
 
+    // Through `AppCard.semanticLabel` rather than a `Semantics` wrapper, and the
+    // difference is `excludeSemantics`. A hand-written wrapper here used
+    // `explicitChildNodes: true`, which is a *different* claim: it marks the
+    // node's children as the explicit ones, but does not stop a screen reader
+    // from also walking them, so the summary sentence was read and then every
+    // `Text` under it was read again. `AppCard` pairs the caller's summary with
+    // `excludeSemantics: true`, which is the behaviour the summary exists for.
     return AppCard(
-      height: (loading || !hasData)
-          ? 170
-          : (group.height ?? 400),
+      height: (loading || !hasData) ? 170 : (group.height ?? 400),
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel: '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
+      semanticLabel:
+          '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
           '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
       child: loading
           ? const Center(child: CircularProgressIndicator())
@@ -221,7 +224,6 @@ class TelemetryChartCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
                 const SizedBox(height: 10),
                 if (scaled.length == 1)
                   _SingleSeriesStatistics(scaled.first)
@@ -271,7 +273,10 @@ class TelemetryChartCard extends StatelessWidget {
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
           tooltipRoundedRadius: AppRadius.tile,
-          tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          tooltipPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 9,
+          ),
           tooltipMargin: 12,
           maxContentWidth: 150,
           fitInsideHorizontally: true,
@@ -291,7 +296,10 @@ class TelemetryChartCard extends StatelessWidget {
             ];
             final tooltip = LineTooltipItem(
               '$time\n${values.join('  \u00b7  ')}',
-              AppType.bodyMd.copyWith(color: appPrimaryText, fontWeight: FontWeight.w700),
+              AppType.bodyMd.copyWith(
+                color: appPrimaryText,
+                fontWeight: FontWeight.w700,
+              ),
             );
             return List<LineTooltipItem?>.generate(
               touchedSpots.length,
@@ -333,20 +341,21 @@ class TelemetryChartCard extends StatelessWidget {
   FlTitlesData _titlesData(ChartBounds bounds) {
     final labelStyle = AppType.labelMicro.copyWith(color: faintColor);
     return FlTitlesData(
-      topTitles: const AxisTitles(
-        sideTitles: SideTitles(showTitles: false),
-      ),
-      rightTitles: const AxisTitles(
-        sideTitles: SideTitles(showTitles: false),
-      ),
+      // `showTitles: false` with **no `reservedSize`**. A `reservedSize: 44`
+      // sat here once and did nothing at all: fl_chart only inserts a side's
+      // `SideTitlesWidget` when that side's `showTitles` is true, so the value
+      // was read by nobody. It reads like it buys room for the top-side labels
+      // the left axis draws for its maximum value — those really are drawn at
+      // `AxisSide.top` inside the left widget — and it does not buy any.
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 40,
           interval: bounds.chartInterval,
           getTitlesWidget: (value, meta) => SideTitleWidget(
-            axisSide:
-                value >= bounds.maxY - bounds.chartInterval / 2
+            axisSide: value >= bounds.maxY - bounds.chartInterval / 2
                 ? AxisSide.top
                 : meta.axisSide,
             space: 4,
@@ -418,9 +427,7 @@ class _SingleSeriesStatistics extends StatelessWidget {
             series.label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppType.labelUppercase.copyWith(
-              color: series.color,
-            ),
+            style: AppType.labelUppercase.copyWith(color: series.color),
           ),
         ),
         const SizedBox(width: 8),
@@ -462,9 +469,7 @@ class _SeriesStatistics extends StatelessWidget {
                   series.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppType.labelUppercase.copyWith(
-                    color: series.color,
-                  ),
+                  style: AppType.labelUppercase.copyWith(color: series.color),
                 ),
               ),
             ],
@@ -498,10 +503,7 @@ class _SeriesStatistics extends StatelessWidget {
 
 /// One row per series: swatch, name, and the live value in its own unit.
 class _SeriesLegend extends StatelessWidget {
-  const _SeriesLegend({
-    required this.series,
-    required this.accent,
-  });
+  const _SeriesLegend({required this.series, required this.accent});
 
   final List<_Scaled> series;
   final Color accent;
@@ -511,9 +513,7 @@ class _SeriesLegend extends StatelessWidget {
     return Wrap(
       spacing: 14,
       runSpacing: 6,
-      children: [
-        for (final item in series) _entry(item),
-      ],
+      children: [for (final item in series) _entry(item)],
     );
   }
 

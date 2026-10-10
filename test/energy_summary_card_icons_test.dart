@@ -197,6 +197,7 @@ void main() {
       // `AppTile` takes an `accent` and turns it into a categorical frame, so
       // there are two places this could collapse and checking only the icon
       // would leave the frame free to disagree with it.
+      await painted(tester);
       final frames = <Color>[];
       for (var i = 0; i < 2; i++) {
         frames.add((_tileDecoration(tester, i).border! as Border).top.color);
@@ -204,8 +205,8 @@ void main() {
       expect(
         frames,
         [
-          categoryColor(MetricCategory.pv),
-          categoryColor(MetricCategory.ac),
+          categoryColor(MetricCategory.pv).withValues(alpha: 0.2),
+          categoryColor(MetricCategory.ac).withValues(alpha: 0.2),
         ],
         reason: 'the tile frames are #${frames.map(_hex).join(' and ')}; a '
             'frame in the wrong category is a card claiming data it does not '

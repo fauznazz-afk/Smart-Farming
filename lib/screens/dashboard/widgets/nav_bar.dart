@@ -56,6 +56,23 @@ const List<NavDestination> kNavDestinations = [
 /// It is the same 52 in both places deliberately: [kGlassNavBarHeight] is what
 /// the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
 /// drift without the test failing.
+///
+/// **Four slots, four destinations, and there is no fifth slot.**
+/// [kNavDestinations] is the tab set and the row indexes it directly; the bar's
+/// width is that list's length times the 56dp pitch, so a fifth entry has to be
+/// added to the list rather than to the row.
+///
+/// A centre FAB occupied a fifth slot once. It was removed, and the reason is
+/// worth keeping where the next reader will look for it: the FAB's `onTap` was
+/// `onExpand`, which un-collapses the bar — and the FAB was only *visible* while
+/// the bar was already expanded, because it hid itself when collapsed and the
+/// collapsed slot is occupied by `_CollapsedNavItem`. So its one gesture was the
+/// one gesture with no effect, in the only state where it could be pressed. It
+/// also widened the bar from 224 to 280 and the reserved band from 52 to 56, so
+/// the clearance test's two sides moved together and neither noticed. If an
+/// action button comes back here it needs something to act on, and the aura
+/// token documented for it (`AppPalette.aura`, still unused) is the place to
+/// start.
 const double kGlassNavBarHeight = 52;
 
 /// The bar's own gap below the pill, and the floor for the safe-area inset.
@@ -72,7 +89,8 @@ const double kGlassNavBarBottomGap = 10;
 /// `BuildContext`: this is the whole reservation rule, and it is the number the
 /// dashboard's scroll padding must be derived from.
 double glassNavBarReservedHeightFor(double systemBottomInset) {
-  return kGlassNavBarHeight + math.max(systemBottomInset, kGlassNavBarBottomGap);
+  return kGlassNavBarHeight +
+      math.max(systemBottomInset, kGlassNavBarBottomGap);
 }
 
 /// [glassNavBarReservedHeightFor] for the inset this subtree actually has.
@@ -155,9 +173,11 @@ class GlassNavBar extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceEvenly,
                                   children: [
-                                    for (var i = 0;
-                                        i < kNavDestinations.length;
-                                        i++)
+                                    for (
+                                      var i = 0;
+                                      i < kNavDestinations.length;
+                                      i++
+                                    )
                                       SizedBox(
                                         width: 48,
                                         child: _NavItem(
@@ -199,10 +219,7 @@ class GlassNavBar extends StatelessWidget {
 }
 
 class _CollapsedNavItem extends StatelessWidget {
-  const _CollapsedNavItem({
-    required this.selectedIndex,
-    required this.onTap,
-  });
+  const _CollapsedNavItem({required this.selectedIndex, required this.onTap});
 
   final int selectedIndex;
   final VoidCallback onTap;
@@ -301,29 +318,25 @@ class _NavDestination extends StatelessWidget {
         duration: AppMotion.press,
         curve: AppMotion.enter,
         width: 44,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? selectedIcon : icon,
-              size: 22,
-              color: color,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              destination.label,
-              style: AppType.labelMicro.copyWith(color: color),
-            ),
-          ],
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(selected ? selectedIcon : icon, size: 22, color: color),
+              const SizedBox(height: 2),
+              Text(
+                destination.label,
+                style: AppType.labelMicro.copyWith(color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  NavDestination get destination =>
-      kNavDestinations[selectedIndex];
+  NavDestination get destination => kNavDestinations[selectedIndex];
   int get selectedIndex =>
-      kNavDestinations.indexWhere(
-        (d) => d.selectedIcon == selectedIcon,
-      );
+      kNavDestinations.indexWhere((d) => d.selectedIcon == selectedIcon);
 }

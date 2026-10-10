@@ -141,14 +141,6 @@ const List<double> kNarrowWidthsDp = [320, 360, 411];
 /// screen is `screenWidth - 2 * kDashboardPageMargin` dp wide.
 const double kDashboardPageMarginDp = kDashboardPageMargin;
 
-/// The width a card actually gets on a phone [screenWidthDp] wide.
-///
-/// Use this instead of [screenWidthDp] wherever a test means "on a narrow
-/// phone", and keep the parameter named for the *screen* so a reader does not
-/// have to remember to subtract anything.
-double cardWidthFor(double screenWidthDp) =>
-    screenWidthDp - 2 * kDashboardPageMarginDp;
-
 /// Wraps a widget in the dashboard's page margin, so a test's width parameter
 /// means the width of the phone rather than the width of the card.
 ///

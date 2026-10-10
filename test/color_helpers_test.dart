@@ -52,18 +52,24 @@ Future<BoxDecoration> _tileDecoration(WidgetTester tester) async {
       .decoration! as BoxDecoration;
 }
 
-/// The progress track (`AppSurfaces.track`) is deliberately **not** in
-/// [AppSurfaces.captionSurfaces]. A track is a 6 to 8dp bar and no text is ever
-/// drawn on one, so including it measures a requirement that does not apply. It
-/// was in the list while this was being written, and it failed all five colours
-/// at between 4.31:1 and 4.39:1, because the track is the darkest surface in the
-/// app. Darkening every colour until it cleared the track was the other option
-/// and it is the wrong one: it moves `faintColor` and four status colours to
-/// satisfy a measurement of text on a bar that has none.
+/// The progress track (`AppSurfaces.track`) is the **same value** as
+/// [AppSurfaces.surfaceAlt], and that is deliberate rather than an accident of
+/// the ramp: a track is a 6 to 8dp bar, but nothing else in the app needs a
+/// fourth step, so the two share one. `design_tokens_test.dart` asserts the
+/// identity (`contains(AppSurfaces.track)`), and the tile that draws text is
+/// `surfaceAlt` — which is why `surfaceAlt` is the last entry of
+/// [AppSurfaces.captionSurfaces], and why the tile is measured against it.
 ///
-/// The tile is the counter-example that keeps this honest, and it is asserted
-/// below rather than left as a comment: the tile *does* carry text, so its fill
-/// *is* a caption surface even though it shares the ramp.
+/// A test used to live here asserting the tile fill was *not* the track. It was
+/// written for the previous system, in which the track was a lighter step than
+/// the tile and no text sat on it, and its numbers (captions at 4.31:1 to
+/// 4.39:1 on it) describe that value, not this one. Under the current tokens the
+/// assertion could only be satisfied by putting the tile in the card's own fill,
+/// which is what it was "fixed" to do — and which made every metric tile in the
+/// app invisible against the card behind it, with the suite green. That is the
+/// third guard in this repo that encoded a relationship which was itself the
+/// thing that had gone stale, so it is recorded here rather than deleted
+/// quietly.
 void main() {
   /// `HSLColor.hue` is already in degrees, not 0..1, which is worth stating
   /// because getting that wrong scales every tolerance here by 360 and makes a
@@ -262,6 +268,13 @@ void main() {
       // the 6–8dp progress bars, and the track was excluded from the surface
       // lists above because nothing draws on a bar. That exclusion was written
       // for one consumer and applied to two.
+      //
+      // It is still the same token as the track today, and it is still a
+      // caption surface -- `design_tokens_test.dart` asserts the identity and
+      // that the list covers it. What this pins is the consequence: the five
+      // caption colours have to clear AA on the fill the tile *actually*
+      // paints, which is the lightest surface in the app and therefore the
+      // worst case for every one of them.
       final fill = (await _tileDecoration(tester)).color!;
       for (final entry in {
         'faintColor': faintColor,
@@ -274,18 +287,15 @@ void main() {
       }
     });
 
-    testWidgets('the tile fill is not the progress-bar track', (tester) async {
-      // Stated separately because `captionSurfaces()` *does* exclude the track,
-      // and this is the assertion that keeps that exclusion honest: it is
-      // scoped to the bars, not to the token.
-      final decoration = await _tileDecoration(tester);
-      expect(
-        decoration.color,
-        isNot(AppSurfaces.track),
-        reason: 'the track carries no text; the tile does, so it needs a '
-            'lighter step',
-      );
-    });
+    // A test used to sit here: "the tile fill is not the progress-bar track".
+    // It was a leftover from the previous system, where the track was a lighter
+    // step than the tile and carried no text. Under these tokens
+    // `AppSurfaces.track` *is* [AppSurfaces.surfaceAlt] and the tile is meant to
+    // be `surfaceAlt` too, so the only way to satisfy it was to draw the tile in
+    // the card's own fill -- which is how every metric tile in the app ended up
+    // invisible against the card behind it, on a build where this file's other
+    // tests were green. `design_tokens_test.dart` asserts the identity it
+    // contradicted. See the header of this file.
 
     test('the surfaces this file measures against are the ones the app paints',
         () {
