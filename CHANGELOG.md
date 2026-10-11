@@ -2,6 +2,86 @@
 
 ---
 
+# [1.10.0] - 2026-10-11
+
+The Overview becomes one instrument panel, and the app grows a second typeface.
+
+### Changed
+
+- **The Overview is one panel, not four cards.** It used to be the live-power
+  hero card, the sky card, the energy summary card and the status strip, each in
+  its own rounded box with its own 8dp gap. That composition says "four
+  different widgets", and what it means is "one readout, and these are its
+  fields". It is now a single frame with hairline rules inside it and every
+  reading on a labelled row.
+
+  Nothing was lost. Both routes the removed cards carried are now entry points
+  inside the panel — `BAT_SOC` opens the Battery view, the `ENERGY` heading opens
+  the full report — and the sky reading is the `LUX` row rather than a whole
+  fifth card.
+
+- **JetBrains Mono is bundled, at two weights.** The panel's argument is that
+  its rows read as instrumentation, and that is a *monospaced* claim: in a
+  proportional face a column of `PV_OUT` / `SKY_LUX` / `BAT_SOC` is three
+  different widths and looks ragged. Weight 500 for the keys you read around,
+  700 for the values you read for — that contrast is the panel's whole
+  hierarchy, doing the work colour does on the categorical pages.
+
+  **Only the Overview uses it.** The other three tabs, the nav bar and Settings
+  stay Inter, so this is a one-page change and not a restyle.
+
+- **The hero is the house load, not PV output.** A healthy array reads 0 W at
+  midnight and 0 W under a storm, so a big PV figure is a number that trains the
+  reader to distrust it. The house draw is the one figure on the page that is
+  bounded, non-negative and always present.
+
+- **Slot-name vocabulary.** `PV_OUT`, `BAT_SOC`, `SKY_LUX`, `LUX`, `METER_AGE` —
+  abbreviated, underscored, monospace. An abbreviation is a smaller promise than
+  a word, and it reads as instrumentation rather than as a consumer dashboard.
+
+- **A zero bar now draws nothing.** The meters use a `widthFactor`, because a
+  `Row` of two `Expanded`s cannot express "zero of this" — both children get at
+  least their flex share, so a 0% reading drew a visible stub.
+
+- **Trailing zeros are trimmed.** `81.0 W` and `12.00 A` read as false precision
+  in a tabular column; the sensor reported a whole number, so the display says
+  so.
+
+### Added
+
+- **`terminal_panel.dart`** — `TerminalPanel`, `TerminalRow`, `TerminalHero`,
+  `TerminalTag`, `TerminalMeter`, `TerminalRule`, `slotNumber`.
+- **`overview_panel.dart`** — `OverviewPanel` and `OverviewReadings`.
+- **Terminal type scale** — `AppType.slotKey`, `slotMicro`, `slotValue`,
+  `slotValueSmall`, `slotUnit`, `heroFigure`, `heroUnit`.
+
+### Fixed
+
+- **Two routes would have died with the cards.** `SystemStatusStrip.onOpenBattery`
+  and `EnergySummaryCard.onOpenReport` were the only callers of
+  `_openBatteryFromStrip` and `_openEnergyReport`. Removing those cards without
+  carrying their entry points forward would have left the Battery view and the
+  full energy report unreachable from anywhere on the app.
+
+- **The energy forecast survives its card.** `EnergyForecastService` and the
+  daily production target are still configured in Settings; the two rows
+  `TARGET` and `BAT_RUNTIME` carry the result. A negative runtime is *not*
+  painted as a breach — "minus three hours" means the array cannot cover the
+  load right now, and it is the most useful number the forecast produces.
+
+- **The `BAT_SOC` meter's hit area is the whole row, not the 6dp bar.** A 6dp
+  target is under the 48dp minimum every platform calls accessible, and this one
+  is a shortcut to another page.
+
+### Removed
+
+- **`_heroCard`, `_energySummaryCard` and `_dualCards`** — private builders with
+  no remaining caller, each of which was a page section the panel replaced.
+  Their four widget files are still here and still tested; what went is the
+  section, not the widgets.
+
+---
+
 # [1.9.2] - 2026-10-11
 
 Three visual complaints from the device, and three silent bugs underneath them.

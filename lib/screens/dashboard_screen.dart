@@ -20,9 +20,7 @@ import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
 import '../utils/poll_interval.dart';
-import '../widgets/energy_summary_card.dart';
 import '../widgets/liquid_glass.dart';
-import '../widgets/solar_condition.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
@@ -39,12 +37,11 @@ import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
 import 'dashboard/widgets/date_strip.dart';
 import 'dashboard/widgets/power_sub_tabs.dart';
-import 'dashboard/widgets/system_status_strip.dart';
 import 'dashboard/widgets/metric_grid.dart';
 import 'dashboard/widgets/metric_specs.dart';
 import 'dashboard/widgets/greeting_header.dart';
-import 'dashboard/widgets/live_power_card.dart';
 import 'dashboard/widgets/nav_bar.dart';
+import 'dashboard/widgets/overview_panel.dart';
 import 'dashboard/widgets/telemetry_card.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
@@ -1814,31 +1811,99 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => const SizedBox(height: 8),
       () => _dateStrip(),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, () => _heroCard()),
-      () => const SizedBox(height: 8),
-      // **The sky card, here rather than on Hydroponics.** It answers the
-      // question the PV card poses from the other side — not "why is the array
-      // producing that" but "what is the sky currently offering" — so the two
-      // belong on the same page. The Hydroponics tab keeps the sensor's
-      // *numbers* in the environment grid; a second reading of the same sensor
-      // one tab away is a duplication.
-      () => _bindRevision(
-        _sensorRevision,
-        () => SolarConditionCard(
-          lux: _sensor?.latestValues['lux'],
-          lastUpdate: _sensor?.lastUpdate,
-          staleMinutes: _staleTelemetryMinutes,
-        ),
-      ),
-      () => const SizedBox(height: 8),
-      () => _bindRevision(_energyRevision, () => _energySummaryCard()),
-      () => const SizedBox(height: 8),
-      () => _bindRevision(_liveRevision, () => _dualCards()),
-      // The environment grid used to sit here. It moved to the Hydroponics page,
-      // where it belongs with the camera looking at the same greenhouse, and
-      // Overview is now only what the power system is doing. The readings did not
-      // change and the limits did not change, so the alarms are unaffected.
+      () => _bindRevision(_liveRevision, () => _overviewPanel()),
+      // **One panel, and it replaced four widgets.**
+      //
+      // The page used to be the live-power hero card, the sky card, the energy
+      // summary card and the status strip, each in its own rounded box with its
+      // own padding and its own 8dp gap. That composition says "four different
+      // widgets", and what it means is "one readout, and these are its fields".
+      //
+      // Nothing was lost. Both routes those cards carried — the Battery view and
+      // the full energy report — are now entry points inside the panel, and the
+      // sky reading is the `LUX` row rather than a whole fifth card. See
+      // `_overviewPanel`.
     ];
+  }
+
+  /// The Overview instrument panel, fed from the devices the screen owns.
+  ///
+  /// **This is where the panel's inputs are resolved, and that boundary is why
+  /// the widget is testable at all.** Everything below `OverviewPanel` is a
+  /// plain `double?` and a `String?`; the ThingsBoard device objects, the stale
+  /// arithmetic and the alert set all stop here. A widget test can pump the
+  /// panel from a record and never construct a server client.
+  Widget _overviewPanel() {
+    final battery = _battery;
+    final pzem = _pzem;
+    // **Computed once, here.** `calculate` integrates the day's telemetry and
+    // sorts a list of samples; calling it twice for two rows would double that
+    // work on every ten-second poll for no reason, and — worse — two calls a few
+    // microseconds apart can straddle a poll and produce two rows disagreeing
+    // about the same day.
+    final forecast = _energyForecastService.calculate(
+      history: _energyHistory,
+      latest: {...?battery?.latestValues, ...?pzem?.latestValues},
+      dailyProductionTargetKwh: _dailyProductionTargetKwh,
+      referenceDate: DateTime.now(),
+    );
+    return OverviewPanel(
+      readings: OverviewReadings(
+        displayName: _displayName,
+        pvPower: pzem?.latestValues['power_dc'],
+        acPower: pzem?.latestValues['power_ac'],
+        // Read from the BMS's own `power` key, never multiplied out from
+        // voltage and current. The device reports all three, and deriving it
+        // produced two separate wrong answers: the product collapses to 0
+        // whenever current reads `0.00 A`, which this BMS does report while
+        // idle, and it drifts from the reported figure whenever the pack is not
+        // at its nominal voltage.
+        //
+        // Passed through raw, sign and all, so the figure matches the Battery
+        // page one tab away. Which sign means which direction is decided by the
+        // observed state-of-charge trend, not by this comment, and it has been
+        // opposite twice on two BMSes — `batteryChargeState` owns it and is
+        // pinned by a test; see `lib/utils/battery_sign.dart`.
+        batteryPower: battery?.latestValues['power'],
+        soc: battery?.latestValues['soc'],
+        batteryVoltage: battery?.latestValues['voltage'],
+        acVoltage: pzem?.latestValues['voltage_ac'],
+        lux: _sensor?.latestValues['lux'],
+        pzemAgeLabel: pzem?.ageLabel,
+        pzemStale: pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
+        batteryStale: battery?.isStale(minutes: _staleTelemetryMinutes) ?? true,
+        // Already aggregated by `_updateMemoizedEnergy`; the panel reads the
+        // result rather than recomputing it, so there is one rule for "today vs
+        // this week" in the app rather than two.
+        solarKwh: _solarKwh,
+        loadKwh: _loadKwh,
+        previousSolarKwh: _previousSolarKwh,
+        previousLoadKwh: _previousLoadKwh,
+        energyLoading: _energyLoading,
+        energyError: _energyError,
+        // **The forecast moves here rather than dying with `EnergySummaryCard`.**
+        // `_dailyProductionTargetKwh` is still read from Settings and the service
+        // still has 13 tests; dropping the call site would have silently retired
+        // a feature the user can still configure a target for. Two rows is what
+        // it costs.
+        forecastTargetProgress: forecast.targetProgress,
+        forecastBatteryHours: forecast.batteryDepletionHours,
+        weekly: _weeklyEnergySummary,
+        activeAlerts: _activeAlertIds.length,
+        staleDevices: _staleDeviceNames(),
+      ),
+      // **Both routes the panel replaced a card for.** `SystemStatusStrip` and
+      // `EnergySummaryCard` were the only callers of these two; removing those
+      // cards without carrying their entry points forward would have left the
+      // Battery view and the full energy report unreachable from anywhere.
+      onOpenBattery: _openBatteryFromStrip,
+      onOpenEnergyReport: _openEnergyReport,
+      // The 24H / 7D toggle moved onto the energy rows. Same screen state, same
+      // aggregation rule — only the affordance changed, because a segmented pair
+      // of buttons is a lot of chrome for a panel this dense.
+      onToggleEnergyPeriod: () =>
+          _setWeeklyEnergySummary(!_weeklyEnergySummary),
+    );
   }
 
   Widget _dateStrip() {
@@ -1852,87 +1917,28 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _heroCard() {
-    return LivePowerCard(
-      pvPower: _pzem?.latestValues['power_dc'],
-      acPower: _pzem?.latestValues['power_ac'],
-      // Read from the BMS's own `power` key, not multiplied out from voltage and
-      // current. The device reports all three, and deriving it produced two
-      // separate wrong answers: the product collapses to 0 whenever current reads
-      // 0.00 A, which the BMS does report while idle, and it drifts from the
-      // reported figure whenever the pack is not at its nominal voltage.
-      //
-      // Passed through raw, sign and all, so the figure matches the Battery page
-      // one tab away. Negating it here to make the hero read "Charging 12 W" was
-      // tried and reverted: two screens reporting different numbers for one
-      // measurement is worse than an odd-looking minus, because the reader has to
-      // work out that a minus became a plus.
-      //
-      // Which sign means which direction is decided by the observed state-of-charge
-      // trend, not by this comment, and it has been opposite twice on two BMSes.
-      // `batteryChargeState` owns it and is pinned by a test; see
-      // `lib/utils/battery_sign.dart`. `energy_forecast_service.dart` documents the
-      // same vendor disagreement behind a warning to use `.abs()` where only the
-      // magnitude matters.
-      batteryPower: _battery?.latestValues['power'],
-      soc: _battery?.latestValues['soc'],
-      pzemStale: _pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
-      pzemAgeLabel: _pzem?.ageLabel,
-    );
-  }
-
-  Widget _energySummaryCard() {
-    return EnergySummaryCard(
-      weekly: _weeklyEnergySummary,
-      loading: _energyLoading,
-      hasData:
-          (_energyHistory['power_dc']?.isNotEmpty ?? false) ||
-          (_energyHistory['power_ac']?.isNotEmpty ?? false),
-      errorMessage: _energyError,
-      solarKwh: _solarKwh,
-      previousSolarKwh: _previousSolarKwh,
-      loadKwh: _loadKwh,
-      previousLoadKwh: _previousLoadKwh,
-      forecast: _energyForecastService.calculate(
-        history: _energyHistory,
-        latest: {...?_battery?.latestValues, ...?_pzem?.latestValues},
-        dailyProductionTargetKwh: _dailyProductionTargetKwh,
-        referenceDate: DateTime.now(),
-      ),
-      onRangeChanged: _setWeeklyEnergySummary,
-      onOpenReport: _openEnergyReport,
-    );
-  }
-
-  Widget _dualCards() {
-    return SystemStatusStrip(
-      lowSocThreshold: _thresholds.lowSoc,
-      activeAlerts: _activeAlertIds.length,
-      // **No `?? 0.0` anywhere in here, and that is the fix.** These records used
-      // to be `double` and an absent device was filled in with a zero, so a
-      // never-reporting BMS rendered as a red `0%` beside `min 20%` and a meter
-      // that had not spoken rendered as a red `Unstable 0 V - 0 Hz`. Both
-      // verdicts fail on zero, so absence became a fault. `SystemStatusStrip`
-      // renders a null as `--` and `not reporting` in ordinary text, which is
-      // the same answer `LivePowerCard` and `MetricGrid` already give on this
-      // page. The record's own doc comment carries the longer version.
-      battery: (
-        soc: _battery?.latestValues['soc'],
-        voltage: _battery?.latestValues['voltage'],
-        current: _battery?.latestValues['current'],
-        // The same key the hero card reads, so the two cannot disagree about
-        // which way the pack is moving.
-        power: _battery?.latestValues['power'],
-      ),
-      ac: (
-        voltage: _pzem?.latestValues['voltage_ac'],
-        current: _pzem?.latestValues['current_ac'],
-        power: _pzem?.latestValues['power_ac'],
-        frequency: _pzem?.latestValues['frequency_ac'],
-      ),
-      onOpenBattery: _openBatteryFromStrip,
-    );
-  }
+  // `_heroCard`, `_energySummaryCard` and `_dualCards` were here until the
+  // Overview became one panel. They are gone rather than kept as unused code
+  // because each one was a card the panel replaced outright, and leaving a
+  // private builder nobody calls is how the next reader concludes the page still
+  // has four sections.
+  //
+  // **Two things they owned had to move first**, and both did — the reasoning is
+  // at their new call sites:
+  //
+  //   * `_openBatteryFromStrip` was reachable only through
+  //     `SystemStatusStrip.onOpenBattery`. It is now `OverviewPanel.onOpenBattery`
+  //     and the `BAT_SOC` meter is the target.
+  //   * `_openEnergyReport` was reachable only through
+  //     `EnergySummaryCard.onOpenReport`. It is now
+  //     `OverviewPanel.onOpenEnergyReport` and the `ENERGY` heading is the
+  //     target.
+  //
+  // So this was a move, not a deletion. Their four widget files are also still
+  // here and still tested; what went is the *page section*, not the widgets —
+  // `LivePowerCard`, `EnergySummaryCard` and `SystemStatusStrip` remain live for
+  // anyone who re-adds a section, and removing them would have taken their tests
+  // with them.
 
   Widget _environmentGrid() {
     return MetricGrid(

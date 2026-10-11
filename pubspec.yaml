@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.9.2+20
+version: 1.10.0+21
 
 environment:
   sdk: ^3.13.4
@@ -113,6 +113,31 @@ flutter:
           weight: 700
         - asset: assets/fonts/Inter-Black-900.ttf
           weight: 900
+
+    # JetBrains Mono is the Overview panel's instrument face, and **only** the
+    # Overview panel's. Four weights exist upstream; two are bundled because two
+    # are what `terminal_panel.dart` uses:
+    #
+    #   500 - slot keys, units, micro captions
+    #   700 - values, and the hero figure
+    #
+    # The distinction is the panel's entire hierarchy. A key at 500 beside a
+    # value at 700 in the same monospace face is a legible contrast without
+    # colour; two weights of 500 would be a wall of grey.
+    #
+    # Same static-instance rule as Inter, and for the same reason: the variable
+    # `wght` axis is not applied reliably on Android, so a variable file declared
+    # once renders every weight at its default.
+    #
+    # The file names have no weight suffix in the font family — `Bold` is 700 and
+    # `Medium` is 500 — so the weight is declared here rather than read off the
+    # filename, unlike the Inter block above.
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

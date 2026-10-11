@@ -270,18 +270,36 @@ void main() {
   });
 
   group('type', () {
-    test('one family, three weights — not three families', () {
-      // The brief allows exactly one typeface and puts the whole hierarchy in the
-      // weight. The previous system carried three families and a test asserting
-      // they were distinct; that assertion is now the opposite claim, because a
-      // heading set in a second family is a deviation from the brief rather than a
-      // hierarchy.
-      // A list rather than a set literal, because a set literal with three
-      // equal strings is itself a lint and the point here is that they *are*
-      // equal.
-      final families = [AppType.heading, AppType.sans, AppType.mono];
-      expect(families.toSet(), hasLength(1), reason: 'Inter is the entire system');
-      expect(families, everyElement('Inter'));
+    test('Inter everywhere except the Overview panel, which is mono', () {
+      // **The rule changed, and the reason it changed is worth stating rather
+      // than just relaxing the assertion.** The brief allowed one family and put
+      // the whole hierarchy in the weight, and for a card UI that is the right
+      // call. The Overview panel is not a card UI — it is an instrument panel,
+      // and its argument is that its rows read as instrumentation. That is a
+      // *monospaced* claim: in a proportional face a column of `PV_OUT` /
+      // `SKY_LUX` / `BAT_SOC` is three different widths and looks ragged, and
+      // the underscore vocabulary that signals instrumentation stops signalling
+      // anything.
+      //
+      // So `AppType.mono` is now honestly mono for the first time — it was a
+      // comment on an Inter value. The constraint that survives is narrower and
+      // more useful: **the split is exactly one page wide.** If a third family
+      // appears, or the mono family spreads past the panel, this fails.
+      expect(AppType.heading, 'Inter');
+      expect(AppType.sans, 'Inter');
+      expect(
+        AppType.mono,
+        'JetBrainsMono',
+        reason: 'the panel is only monospaced if its face actually is',
+      );
+      expect(
+        AppType.mono,
+        isNot(AppType.sans),
+        reason:
+            'if these are equal again the `mono` token is a comment on a '
+            'non-mono face, which is what it was before the panel existed',
+      );
+
       final weights = [
         AppType.numeralXl.fontWeight,
         AppType.labelUppercase.fontWeight,
@@ -294,6 +312,70 @@ void main() {
             '900 for displays and numerals, 700 for the uppercase labels, '
             '400 for the rare lowercase body line',
       );
+    });
+
+    test('the panel scale is exactly two weights, and the split is keys vs values',
+        () {
+      // 500 for the things you read *around* — keys, units, captions — and 700
+      // for the things you read *for* — values, and the hero. That contrast is
+      // the panel's whole hierarchy, and it is doing the work that colour does
+      // in the categorical pages.
+      expect(AppType.slotKey.fontWeight, FontWeight.w500);
+      expect(AppType.slotMicro.fontWeight, FontWeight.w500);
+      expect(AppType.slotUnit.fontWeight, FontWeight.w500);
+      expect(AppType.heroUnit.fontWeight, FontWeight.w500);
+
+      expect(AppType.slotValue.fontWeight, FontWeight.w700);
+      expect(AppType.slotValueSmall.fontWeight, FontWeight.w700);
+      expect(AppType.heroFigure.fontWeight, FontWeight.w700);
+
+      expect(
+        AppType.slotValue.fontWeight,
+        isNot(AppType.slotKey.fontWeight),
+        reason:
+            'a key and a value at the same weight in the same face is a wall of '
+            'grey, which is the failure the two-weight split exists to prevent',
+      );
+    });
+
+    test('every panel style is monospaced, or the vocabulary is decoration', () {
+      // The `slot*` and `hero*` names promise an instrument. A proportional face
+      // under those names would satisfy every other assertion in this file and
+      // produce a panel that looks like a card UI with abbreviations on it.
+      for (final entry in {
+        'slotKey': AppType.slotKey,
+        'slotMicro': AppType.slotMicro,
+        'slotValue': AppType.slotValue,
+        'slotValueSmall': AppType.slotValueSmall,
+        'slotUnit': AppType.slotUnit,
+        'heroFigure': AppType.heroFigure,
+        'heroUnit': AppType.heroUnit,
+      }.entries) {
+        expect(
+          entry.value.fontFamily,
+          AppType.mono,
+          reason: '${entry.key} is not monospaced',
+        );
+      }
+    });
+
+    test('the hero figure is the largest thing in the app', () {
+      // "Exactly one hero" is a structural claim about the Overview page, and it
+      // is the claim that keeps the page from competing with itself. If a second
+      // style reaches this size, the page has two answers to one question.
+      final hero = AppType.heroFigure.fontSize!;
+      for (final entry in {
+        'displayLg': AppType.displayLg,
+        'displayMd': AppType.displayMd,
+        'numeralXl': AppType.numeralXl,
+        'numeralLg': AppType.numeralLg,
+      }.entries) {
+        expect(
+          hero,
+          greaterThan(entry.value.fontSize!),
+          reason: '${entry.key} is as large as the hero',
+        );
+      }
     });
 
     test('figures are tabular, or a column jitters', () {

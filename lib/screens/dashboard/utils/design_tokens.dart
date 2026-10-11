@@ -323,9 +323,22 @@ class AppType {
   /// Labels, captions, metadata, body. Same family — the weight does the work.
   static const String sans = 'Inter';
 
-  /// Ratios and tabular data. Same family again; nothing in this app dumps raw
-  /// data, so the brief's mono slot stays empty.
-  static const String mono = 'Inter';
+  /// Tabular data in the Overview instrument panel: slot keys, values, and the
+  /// hero figure.
+  ///
+  /// **This one is genuinely mono, and it is the only token in the app whose name
+  /// now means what it says.** Every other token here was Inter, so
+  /// `fontFamily: mono` was Inter and the token was a comment. The Overview
+  /// panel's argument is that its rows read as instrumentation, and that is a
+  /// monospaced claim: in a proportional face a column of `PV_OUT` / `SKY_LUX` /
+  /// `BAT_SOC` is three different widths and looks ragged, and the underscore
+  /// vocabulary that signals instrumentation stops signalling anything.
+  ///
+  /// Only the `slot*` and `hero*` styles below read this. Everything else — the
+  /// nav bar, the settings screens, the other three tabs — stays Inter, so a
+  /// stray `AppType.numeralMono` in old code still resolves to Inter and looks
+  /// unchanged rather than suddenly turning monospaced in five places.
+  static const String mono = 'JetBrainsMono';
 
   // ── Displays ─────────────────────────────────────────────────────────────────
 
@@ -458,6 +471,106 @@ class AppType {
     fontWeight: FontWeight.w700,
     height: 1.0,
     fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  // ── The terminal panel's own scale ───────────────────────────────────────────
+  //
+  // **These exist only for `terminal_panel.dart`, and none of them is a retune of
+  // an existing token.** The panel's whole visual argument is that its text looks
+  // like instrumentation rather than like a consumer dashboard, and that is a
+  // *monospace* claim: the existing scale is Inter end to end, and Inter at 11
+  // px with 0.1 em tracking reads as a small bold caption, not as a slot name.
+  //
+  // They are separate tokens rather than overrides for one specific reason:
+  // `labelMicro` is used in about forty places, and changing it to satisfy one
+  // page would change all forty. A per-page scale is the cheap way to be wrong
+  // in one place instead of forty.
+
+  /// A panel row's key: `PV_OUT`, `BAT_SOC`, `SKY_LUX`.
+  ///
+  /// **Monospace, tracked wide, and at 11 px rather than 10.** The underscore in
+  /// the vocabulary only reads as instrumentation if the glyphs are monospaced —
+  /// in a proportional face `PV_OUT` and `SKY_LUX` are different lengths and the
+  /// column of keys looks ragged. JetBrains Mono also gives every key the same
+  /// advance width, so a stack of them aligns without any layout work.
+  static const TextStyle slotKey = TextStyle(
+    fontFamily: mono,
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    height: 1.2,
+    letterSpacing: 0.06 * 11,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// The micro variant, for the panel header's id and a meter caption.
+  static const TextStyle slotMicro = TextStyle(
+    fontFamily: mono,
+    fontSize: 10,
+    fontWeight: FontWeight.w500,
+    height: 1.2,
+    letterSpacing: 0.08 * 10,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// A panel row's value, right-aligned.
+  ///
+  /// **Weight 700 where the rest of the app's small text is 500, and that is the
+  /// panel's hierarchy doing its work without colour.** A key at 500 and a value
+  /// at 700 in the same monospace face is a legible contrast; two weights of 500
+  /// would be a wall of grey.
+  static const TextStyle slotValue = TextStyle(
+    fontFamily: mono,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    height: 1.1,
+    letterSpacing: -0.01 * 15,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// The hero's secondary stats.
+  static const TextStyle slotValueSmall = TextStyle(
+    fontFamily: mono,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    height: 1.2,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// A unit, set smaller and muted beside its figure.
+  static const TextStyle slotUnit = TextStyle(
+    fontFamily: mono,
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    height: 1.1,
+  );
+
+  /// The panel's one enormous figure.
+  ///
+  /// **72 px, and it is the only thing in the app set that large.** The Overview
+  /// has exactly one question, so it has exactly one hero. Tabular figures are
+  /// not decoration here either: this value changes digit count as the day
+  /// progresses, and a proportional 72 px figure would shift the whole row under
+  /// it on every poll.
+  ///
+  /// The tracking is `-0.03 em`, *not* the `-0.04 em` on [displayLg]. JetBrains
+  /// Mono is already monospaced, so a display-tuned negative tracking that looks
+  /// right on Inter visibly closes up the digits here — at 72 px that reads as
+  /// kerning error rather than as tightness.
+  static const TextStyle heroFigure = TextStyle(
+    fontFamily: mono,
+    fontSize: 72,
+    fontWeight: FontWeight.w700,
+    height: 0.92,
+    letterSpacing: -0.03 * 72,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+
+  /// The hero's unit, baseline-aligned beside a 72 px figure.
+  static const TextStyle heroUnit = TextStyle(
+    fontFamily: mono,
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    height: 1.0,
   );
 }
 
