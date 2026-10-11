@@ -2,9 +2,20 @@
 
 **Project:** FNN-XAI-IoT — Smart Farming Energy Monitoring
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
-**Dokumen:** 1.3
+**Dokumen:** 1.4
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.8.0 (build 17), tag `v1.8.0`
+**Rilis acuan:** 1.9.1 (build 19), tag `v1.9.1`
+
+**1.9.1 — 11 Oktober 2026.** Rilis perbaikan; kartu kondisi langit pindah ke
+Overview, satuannya W/m² → lx, dan Settings diperketat per blok. Satu bug nyata
+ikut ketemu dan diperbaiki: bar kecerahan di kartu itu menggambar penuh pada
+setiap bacaan di atas 1.8% matahari, karena `Container` track di dalam
+`Column(crossAxisAlignment: start)` mengukur anaknya sendiri. Nomornya patch
+karena tidak ada fungsi yang hilang dan pembacaannya sama. Build naik 18 → 19.
+
+**1.9.0 — 10 Oktober 2026.** Rilis fitur; satu sistem visual ganti empat preset,
+warna jadi kategorikal, tiga typeface di-bundle. Nomornya minor karena seluruh
+permukaan visual dan navigasinya berubah. Build naik 17 → 18.
 
 **1.8.0 — 7 Oktober 2026.** Rilis fitur dan keamanan; sepuluh temuan dari audit
 sumber penuh, plus lapisan skeuomorfis dengan tema keempat, jadi nomornya minor
