@@ -2,6 +2,78 @@
 
 ---
 
+# [1.9.2] - 2026-10-11
+
+Three visual complaints from the device, and three silent bugs underneath them.
+No behaviour, reading or alarm rule changes — this is entirely how three things
+look.
+
+### Changed
+
+- **The nav bar is a stadium, not an 8 px rectangle.** It used to be
+  `AppRadius.card`, and 8 px on a bar 76 dp tall is a corner radius of about 10%
+  of the height — roughly two millimetres at a phone's density. It read as a
+  chamfered rectangle. A tab bar is the one *floating* element in this app
+  (`extendBody: true`, a gap under it, page visible on both sides), and a floating
+  object with near-square corners does not read as floating; it reads as a strip
+  that happens to be inset.
+
+- **Two of the four nav glyphs were wrong.** `set_meal` is Material's
+  fish-on-a-dinner-plate icon and reads as a menu; the Fish page reports
+  temperature, pH and turbidity, so it is now `water`. `dashboard` is a
+  nine-square grid, which at 24 dp in a 72 dp slot is a grey smudge, so it is now
+  `space_dashboard`. `bolt` and `eco` were the right glyphs at the wrong weight —
+  `Icons.bolt` is a hairline zigzag and `Icons.eco` a thin outline, both the
+  Material 2 weight, while the rest of the bar draws at the rounded weight.
+
+- **The sky card uses the width it has.** It was four left-aligned lines in a
+  card 387 dp wide: header, figure, condition, bar. The one thing worth reading
+  occupied about a fifth of the width with 300 dp of bare card beside it. The
+  figure now sits on the trailing edge of the header row, baseline-aligned with
+  the condition, with `Expanded` on the label column rather than a `Spacer` —
+  `Heavily overcast` is nearly twice `Clear sky`, and a `Spacer` would let the
+  figure slide depending on which one the card was showing.
+
+- **The live-power row's dead space was structural.** Two equal `Flexible`
+  children split the figure row in half each, so a five-digit figure was laid out
+  against half the width it could have had while the other half stood empty
+  holding the letter `W` — about 35 dp of nothing per slot, three times over.
+  Now 4:1, and `_sharedFigureScale` models the split rather than dividing by two.
+
+- **The three flow terms are tiles.** `surfaceAlt` fill, hairline, no shadow.
+  Bare columns of text on the card's own fill is what made the row read as holes
+  rather than as three stations.
+
+### Fixed
+
+Three bugs, all of them silent — nothing threw, `flutter analyze` was clean, and
+the suite was green through every one of them.
+
+- **The label planner and the label painter could measure with different styles.**
+  `DefaultTextStyle.of(context)` was resolved independently at the
+  `LayoutBuilder` and inside `_Term`. There is now one `TextStyle` instance,
+  resolved once and threaded through the plan, the minimum-width search and the
+  `Text`, so the disagreement is no longer expressible.
+
+- **`plan.widths` is an *inner* width and was being used as an *outer* one.**
+  Every tile came out 16 dp narrower than it was planned for, so each label needed
+  one wrap more than the shared block reserved — and a flow label with no
+  `maxLines` that needs one line more than it was allotted is cut silently, with
+  no flag anywhere. This rendered `Discharging` as `Di…`.
+
+- **The stacked fallback divided the width three ways for no reason.** Stacking
+  exists because three columns could not hold the labels; giving each column its
+  width back is the layout the fallback was asking for. At 381 dp and a 3.0 scale
+  `Solar` was measured at five lines in a slot planned for three.
+
+- **`the three figures share a line at every scale` measured the wrong thing.**
+  It compared three figure tops unconditionally, which is only meaningful in the
+  three-column layout — and 381 dp at a 3.0 scale now genuinely stacks. It
+  asserts either one shared baseline or three separate rows in reading order, and
+  still fails for two figures sharing a row and one not.
+
+---
+
 # [1.9.1] - 2026-10-11
 
 The sky card moves to where its question is asked, shows lux instead of W/m², and
