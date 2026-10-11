@@ -49,10 +49,19 @@ Future<void> pumpCard(
 /// **Never call `tester.getSemantics()` without `ensureSemantics()`** — it can
 /// hang the isolate, and AGENTS.md records that the damage is then attributed to
 /// every later test in the file. Each test that reads semantics takes the handle
-/// from `tester.ensureSemantics()` and disposes it, which is the pairing the
-/// framework documents.
-String? announce(WidgetTester tester) =>
-    tester.getSemantics(find.byType(Semantics).first).label;
+/// from `tester.ensureSemantics()` and disposes it at the end of the test body —
+/// see the group below for why not in a teardown.
+///
+/// **Matched with `find.bySemanticsLabel`, not `tester.getSemantics`.** The
+/// obvious spelling -- grab the node for the `Semantics` widget and read
+/// `node.label` -- fails twice over here, and both failures are silent: the
+/// un-narrowed `find.byType(Semantics).first` returns the `Scaffold`'s node
+/// rather than the card's (AGENTS.md lists this), and once narrowed the label is
+/// still empty because the card's own `Semantics` sits above descendants whose
+/// nodes are separate rather than merged. Either way the assertion sees `''` and
+/// reports a failure that has nothing to do with the card. `bySemanticsLabel`
+/// asks the question the reader's software actually asks.
+Finder announced(Pattern pattern) => find.bySemanticsLabel(pattern);
 
 void main() {
   group('states', () {
@@ -211,25 +220,37 @@ void main() {
   });
 
   group('the announcement', () {
+    // **`handle.dispose()` at the end of the body, not in an `addTearDown`.**
+    //
+    // The framework verifies that every `SemanticsHandle` was disposed *before*
+    // tearDowns run, so a teardown-registered dispose fails the test with "A
+    // SemanticsHandle was active at the end of the test" — a message about
+    // bookkeeping that has nothing to do with the card, and one that appears only
+    // once the label assertions themselves have already passed.
     testWidgets('reads the figure and the condition in one sentence', (
       tester,
     ) async {
       final handle = tester.ensureSemantics();
-      addTearDown(handle.dispose);
       await pumpCard(tester, lux: 41200);
-      final label = announce(tester);
-      expect(label, isNotNull);
-      expect(label, contains('W/m²'));
-      expect(label, contains('Mostly clear'));
+      // 41 200 lx is 443 W/m² and lands in the 28 000–55 000 band, so the whole
+      // point of the card -- a bare lux number turned into a sentence about the
+      // sky -- is in this one string.
+      expect(announced(RegExp(r'443 W/m²')), findsOneWidget);
+      expect(announced(RegExp('Mostly clear')), findsOneWidget);
+      handle.dispose();
     });
 
     testWidgets('says "no reading" rather than reading out a zero', (
       tester,
     ) async {
       final handle = tester.ensureSemantics();
-      addTearDown(handle.dispose);
       await pumpCard(tester, lux: null);
-      expect(announce(tester), contains('no reading'));
+      // A missing sensor and a dark one are different facts. Announcing "0 W/m²"
+      // for a device that has never reported would tell a grower the greenhouse
+      // is in darkness when in fact nothing is known.
+      expect(announced(RegExp('no reading')), findsOneWidget);
+      expect(announced(RegExp(r'0 W/m²')), findsNothing);
+      handle.dispose();
     });
   });
 
@@ -239,13 +260,18 @@ void main() {
       // one place a hue could drift is here. A clear-sky card that borrowed the
       // chart triad's red would say "something is wrong" about a cloudless noon.
       await pumpCard(tester, lux: 100000);
-      final box = tester.widget<Container>(
-        find.descendant(
-          of: find.byType(FractionallySizedBox),
-          matching: find.byType(DecoratedBox),
-        ),
-      );
-      final decoration = box.decoration! as BoxDecoration;
+      final decoration =
+          tester
+                  .widget<DecoratedBox>(
+                    find
+                        .descendant(
+                          of: find.byType(FractionallySizedBox),
+                          matching: find.byType(DecoratedBox),
+                        )
+                        .first,
+                  )
+                  .decoration
+              as BoxDecoration;
       expect(decoration.color, AppPalette.primary);
     });
   });
