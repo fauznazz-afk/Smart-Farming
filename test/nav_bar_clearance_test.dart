@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/nav_bar.dart';
 
 /// Covers the reservation the dashboard's scroll padding makes for the floating
@@ -98,18 +99,65 @@ void main() {
       return tester.getSize(find.byType(GlassNavBar)).height;
     }
 
-    testWidgets('measured height equals the reservation, with no inset',
-        (tester) async {
+    testWidgets('measured height equals the reservation, with no inset', (
+      tester,
+    ) async {
       final measured = await measureBar(tester, bottomInset: 0);
       expect(measured, glassNavBarReservedHeightFor(0));
     });
 
-    testWidgets('measured height equals the reservation, with a system inset',
-        (tester) async {
+    testWidgets('measured height equals the reservation, with a system inset', (
+      tester,
+    ) async {
       // The device case. If the bar is genuinely taller than the rule says for
       // some inset, this is the assertion that names it.
       final measured = await measureBar(tester, bottomInset: 34);
       expect(measured, glassNavBarReservedHeightFor(34));
+    });
+
+    testWidgets('the bar corners are rounded, and the clip agrees with them', (
+      tester,
+    ) async {
+      // **A decoration's radius and its clipper's radius being allowed to
+      // disagree is a shape that cannot exist.**
+      //
+      // The bar was asked to become rounded: the `BoxDecoration` got
+      // `AppRadius.card` on all four corners. It looked right in the source,
+      // threw nothing, and passed `flutter analyze` -- because the `ClipRRect`
+      // wrapping the bar's contents still had no radius, and in Flutter 3.47
+      // `ClipRRect.borderRadius` *defaults* to `BorderRadius.zero` rather than
+      // being required. So the clip was a plain rectangle painted over rounded
+      // corners, and the active tab's lime fill squared off the corners on the
+      // device.
+      //
+      // This is the third variant of a defect this repo has already paid for
+      // (AGENTS.md: an arithmetic relationship and a pixel are different
+      // claims). Nothing here is arithmetic -- it is two numbers in two widgets
+      // that have to be the same number, and only the device can show that they
+      // are not.
+      await measureBar(tester, bottomInset: 0);
+
+      final decoration = tester
+          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .firstWhere((d) => d.borderRadius != null);
+      expect(
+        decoration.borderRadius,
+        BorderRadius.circular(AppRadius.card),
+        reason: 'the bar is no longer rounded',
+      );
+
+      final clip = tester.widget<ClipRRect>(find.byType(ClipRRect).first);
+      expect(
+        clip.borderRadius,
+        decoration.borderRadius,
+        reason:
+            'the clip is ${clip.borderRadius} but the decoration is '
+            '${decoration.borderRadius}. The clip is painted over the fill, so a '
+            'square clip squares off the rounded corners however round the '
+            'decoration is.',
+      );
     });
   });
 
@@ -125,8 +173,9 @@ void main() {
     // its end, the last row of content must sit above the top of the pill. A
     // screen whose content is covered is the defect, and the only way to know it
     // is fixed is to look at where the content ends up.
-    testWidgets('the last row of content clears the top of the nav bar',
-        (tester) async {
+    testWidgets('the last row of content clears the top of the nav bar', (
+      tester,
+    ) async {
       const clearance = 20.0;
       final collapsed = ValueNotifier<bool>(false);
       addTearDown(collapsed.dispose);
@@ -177,7 +226,8 @@ void main() {
       expect(
         gap,
         greaterThan(0),
-        reason: 'the last row of content ends ${-gap}dp below the top of the '
+        reason:
+            'the last row of content ends ${-gap}dp below the top of the '
             'nav bar, so the bar is painted over it. The gap measured '
             '$gap; the reserved padding produces about +27.5 and the literal 76 '
             'this replaced produced about -7.6.',
@@ -188,7 +238,8 @@ void main() {
       expect(
         gap,
         greaterThanOrEqualTo(clearance - 8),
-        reason: 'the content clears the bar by only $gap dp, which puts it '
+        reason:
+            'the content clears the bar by only $gap dp, which puts it '
             'inside the drop shadow the bar casts.',
       );
     });

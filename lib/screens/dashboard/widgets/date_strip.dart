@@ -61,7 +61,16 @@ class DateStrip extends StatelessWidget {
     // to be covered by slack is a shortfall that a future change to the slack
     // will uncover with the suite still green. Measuring with the real style is
     // the fix; the padding arithmetic is untouched.
-    final style = AppType.labelMicro;
+    //
+    // **Italic, because the selected chip is the one that is drawn that way.**
+    // The brief asks for the active day to lean forward, and a slanted Inter is
+    // a fraction wider than an upright one at the same weight and size. The probe
+    // measured upright and the strip laid out for upright, so the chip with the
+    // *least* room to give — the one carrying the widest string — was the one
+    // that overflowed. Measuring the wider of the two variants means the strip is
+    // sized for the worst case rather than for the average one, which is the only
+    // asymmetry that matters here: every chip gets the same width either way.
+    final style = AppType.labelMicro.copyWith(fontStyle: FontStyle.italic);
     final scaler = MediaQuery.textScalerOf(context);
     var widest = 0.0;
     for (final day in days) {
@@ -85,47 +94,61 @@ class DateStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Row(
-            children: [
-              Material(
-                type: MaterialType.transparency,
-                child: IconButton(
-                  tooltip: 'Pick a date range',
-                  constraints: const BoxConstraints.tightFor(
-                    width: 48,
-                    height: 48,
+        Row(
+          children: [
+            // **The legend leads and the calendar button trails, because the
+            // strip has to read as one grid.**
+            //
+            // It used to be the other way round: a `Padding(horizontal: 2)` with
+            // a 48dp `IconButton` and a 4dp gap, then an `Expanded` legend. That
+            // put the legend text's left edge at 2 + 48 + 4 = 54dp while the chip
+            // row below started at 0, and it pulled the header's right edge in to
+            // maxWidth - 2 while the chips ran to maxWidth. Three different edges
+            // inside one widget, which is what the Overview calendar's "slightly
+            // off-centre" look was: nothing was misaligned by much and nothing
+            // was aligned, and the eye reads the sum rather than the parts.
+            //
+            // Trailing the button collapses it to two, and both of them are now
+            // the chip row's: the legend starts where the first chip starts, and
+            // the button's touch target ends where the last chip ends. The 48dp
+            // target is kept deliberately — it is below the 48dp minimum tap
+            // size, and shrinking it to match a text baseline would be trading an
+            // accessibility floor for optical tidiness.
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    _rangeLabel(),
+                    style: AppType.labelUppercase.copyWith(color: faintColor),
                   ),
-                  padding: EdgeInsets.zero,
-                  onPressed: onPickRange,
-                  icon: Icon(
-                    Icons.calendar_month_outlined,
-                    size: 16,
-                    color: faintColor,
+                  Text(
+                    rangeStart != null ? 'Range' : 'Pick a day',
+                    style: AppType.labelMicro.copyWith(color: faintColor),
                   ),
+                ],
+              ),
+            ),
+            Material(
+              type: MaterialType.transparency,
+              child: IconButton(
+                tooltip: 'Pick a date range',
+                constraints: const BoxConstraints.tightFor(
+                  width: 48,
+                  height: 48,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: onPickRange,
+                icon: Icon(
+                  Icons.calendar_month_outlined,
+                  size: 16,
+                  color: faintColor,
                 ),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 2,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      _rangeLabel(),
-                      style: AppType.labelUppercase.copyWith(color: faintColor),
-                    ),
-                    Text(
-                      rangeStart != null ? 'Range' : 'Pick a day',
-                      style: AppType.labelMicro.copyWith(color: faintColor),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         LayoutBuilder(

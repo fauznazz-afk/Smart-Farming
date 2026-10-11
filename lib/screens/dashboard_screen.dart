@@ -22,6 +22,7 @@ import '../utils/app_log.dart';
 import '../utils/poll_interval.dart';
 import '../widgets/energy_summary_card.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/solar_condition.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
@@ -2174,6 +2175,31 @@ class _DashboardScreenState extends State<DashboardScreen>
           // flag has to know, because this panel is inside an `IndexedStack`
           // and is therefore mounted on every tab; see `isVisible`.
           isVisible: _selectedIndex == 2,
+        ),
+      ),
+      () => const SizedBox(height: _cardGap),
+      // The sky, read off the greenhouse lux sensor.
+      //
+      // **Below the camera and above the environment grid, and that is the whole
+      // argument.** The grid it precedes is the one that carries `lux` as a bare
+      // number in a list of five; this card is the same sensor, converted to W/m²
+      // and named. Putting the interpretation immediately above the raw figure
+      // means the reader gets "412 W/m², partly cloudy" first and then the five
+      // readings it was derived from, rather than the two being separated by
+      // nothing in particular.
+      //
+      // It is on *this* page and not on Overview because this is where the
+      // greenhouse lux sensor lives — Overview has no lux reading to convert, and
+      // inventing one there would mean reaching across pages for a sensor the
+      // page does not own. What it answers is the question the PV card on
+      // Overview poses from the other side: not "why is the array producing
+      // that" but "what is the sky currently offering".
+      () => _bindRevision(
+        _sensorRevision,
+        () => SolarConditionCard(
+          lux: _sensor?.latestValues['lux'],
+          lastUpdate: _sensor?.lastUpdate,
+          staleMinutes: _staleTelemetryMinutes,
         ),
       ),
       () => const SizedBox(height: 8),

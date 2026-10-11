@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../utils/solar_irradiance.dart';
 import 'design_tokens.dart';
 
 /// The categories of data this app shows, and the hue each one owns.
@@ -280,6 +281,26 @@ const Color statusBad = Color(0xFFFF5C5C);
 Color alarmCritical() => statusBad;
 
 Color alarmWarning() => statusWarn;
+
+/// The colour a sky condition is drawn in.
+///
+/// **The status ramp, and that is deliberate.** A sky condition is a judgement
+/// about the day, so it takes the app's quality scale rather than a categorical
+/// hue: clear is the "nothing is wrong" colour and overcast is the "look at
+/// this" one. Lime is deliberately *not* the clear-sky colour — lime is reserved
+/// for the sun itself, and the figure on the card *is* the sun, so the label
+/// stays neutral and the lime lives in the number.
+///
+/// Clear and mostly clear share a colour, and partly cloudy and overcast share
+/// one, because the scale has four steps and this ramp has three hues; the
+/// label beside it carries the distinction.
+Color skyConditionColor(SkyCondition condition) => switch (condition) {
+  SkyCondition.clear => AppPalette.secondary,
+  SkyCondition.mostlyClear => AppPalette.secondary,
+  SkyCondition.partlyCloudy => AppPalette.accent,
+  SkyCondition.overcast => AppPalette.accent,
+  SkyCondition.heavilyOvercast => AppPalette.error,
+};
 
 /// The colour for secondary text: units, captions, timestamps.
 ///

@@ -440,13 +440,52 @@ class DateStripChip extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // **The name can never wrap, and that is not cosmetic.**
+              //
+              // `maxLines: 1` with `softWrap: false` is what makes a three-letter
+              // day name a *label*. Without it the text breaks at whatever
+              // character it has to in order to fit, so "MON" renders as "MO"
+              // over "N" — and because the chip's height comes from its content
+              // (`minHeight: 68`, not a fixed height, so the strip survives a 3x
+              // system font), one chip grows a line taller than its six
+              // neighbours. That is the asymmetry on the Overview calendar: a
+              // seven-cell row that is not one row.
+              //
+              // **Deliberately NOT wrapped in a `FittedBox`, and this is the most
+              // load-bearing comment in the widget.** A `FittedBox(scaleDown)` is
+              // the obvious way to stop a name being clipped, it was tried here
+              // first, and it is precisely the defect
+              // `absent_and_failed_states_test.dart` exists to catch. `scaleDown`
+              // shrinks the child to fit the width, so at a 2x system font a
+              // 20 sp day name is laid out and then scaled straight back down:
+              // the chip renders at effectively its 1.0 size whatever the user
+              // asked for, silently inverting the one accessibility setting they
+              // control. That was the original bug, found on a device — and
+              // reintroducing it to fix a wrapping bug would trade a cosmetic
+              // defect for a real one.
+              //
+              // So the name keeps its natural size at every scale and grows the
+              // chip with it. If it is ever genuinely too wide it clips
+              // horizontally rather than shrinking, and it should not be:
+              // `DateStrip._widestDayNameWidth` measures this label in italic --
+              // the selected chip's variant, and the wider of the two -- and the
+              // row is given that width plus the chip's own padding.
               Text(
                 dayName.toUpperCase(),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.clip,
                 style: AppType.labelMicro.copyWith(
                   color: ink,
                   // Italic at the label's own weight: the brief's "leaning the
                   // type forward to imply motion", applied to the one chip that
                   // is selected.
+                  //
+                  // Italic is also *wider* than upright at the same weight, so
+                  // this chip is the one that decides how wide a day name has to
+                  // be. `DateStrip._widestDayNameWidth` measures in italic for
+                  // the same reason; measuring upright and drawing italic is how
+                  // the selected chip came out the one that wrapped.
                   fontStyle: isSelected ? FontStyle.italic : null,
                 ),
               ),

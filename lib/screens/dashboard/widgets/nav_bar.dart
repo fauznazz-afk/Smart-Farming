@@ -181,9 +181,33 @@ class GlassNavBar extends StatelessWidget {
                       // flat tier, and [AppShadows.stamped] would make it the only
                       // stamped thing at the bottom of the screen.
                       color: AppSurfaces.page,
-                      border: const Border(top: AppBorders.hairline),
+                      // **Rounded, and that is the brief's own radius.** The bar is
+                      // a floating pill, not a strip welded to the bottom edge: the
+                      // brief's `tab-bar` is `rounded-lg` with `px-6`, and a
+                      // full-bleed rectangle with a hairline across the whole width
+                      // reads as a divider rather than as a bar. 8px is the only
+                      // rectilinear radius in the scale, so the corners are that.
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      // A full hairline, not a top-only one. A rounded rect with a
+                      // border on one side only is a shape that cannot exist, and
+                      // the top-only version left the two bottom corners square
+                      // against the page.
+                      border: AppBorders.hairlineBorder,
                     ),
+                    // **The clip carries the same radius as the decoration, and
+                    // that is load-bearing rather than tidy.** In Flutter 3.47
+                    // `ClipRRect.borderRadius` defaults to `BorderRadius.zero`,
+                    // so this used to clip the bar's contents to a plain
+                    // rectangle while the decoration painted rounded corners
+                    // around it. Nothing looks wrong in the source, nothing
+                    // throws, `flutter analyze` is clean and every test passes --
+                    // and on the device the active tab's lime fill and the icons
+                    // square off the corners, because the clip is painted after
+                    // the fill and wins. A decoration's radius and its clipper's
+                    // radius being allowed to disagree is a shape that cannot
+                    // exist.
                     child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.card),
                       child: Material(
                         type: MaterialType.transparency,
                         child: Stack(
