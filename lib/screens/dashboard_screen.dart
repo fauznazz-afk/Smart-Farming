@@ -1722,6 +1722,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     // updated immediately, which made the stale card below it read as the wrong
     // page rather than as a slow refresh.
     _powerSubNotifier.value,
+    // **The 24H / 7D toggle, and it was the gap that froze the energy rows.**
+    //
+    // `_overviewPanel` reads `_weeklyEnergySummary` at the `ENERGY (24H)` /
+    // `(7D)` section heading and switches which rows it draws. That field is
+    // only ever written by `_setWeeklyEnergySummary`, which bumps
+    // `_energyRevision` — a notifier this subtree is *not* bound to. The panel
+    // is bound to `_liveRevision`, which only the telemetry poll touches, so
+    // tapping the toggle changed nothing on screen until the next ten-second
+    // poll happened to land. Found by the dead-code audit's `_visualToken`
+    // sweep, which is the direction that check is good at: a value read by a
+    // builder that no entry accounts for.
+    _weeklyEnergySummary,
     // **The selected date and range, because the Overview's period summary reads
     // them.** `_selectDate` and `_pickDateFromCalendar` change all three in a
     // plain `setState`, which rebuilds this screen but not a `Bound` whose token

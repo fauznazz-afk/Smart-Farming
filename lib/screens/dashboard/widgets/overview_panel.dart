@@ -6,18 +6,23 @@
 /// single frame with hairline rules inside it and every reading on a labelled
 /// row.
 ///
-/// ## Which figure is the hero, and why it is not the power
+/// ## Which figure is the hero, and why it changed once
 ///
-/// The hero is **total load**, not PV output. That is a decision, so here is the
-/// reasoning: PV output alone cannot answer "is the system ok", because a
-/// perfectly healthy array reads 0 W at midnight and 0 W under a storm. The
-/// number a grower actually wants on opening the app is the one the house is
-/// drawing, because that is the thing that has to keep working — and it is the
-/// only figure on this page that is bounded, non-negative and always present.
+/// The hero is **PV output**. It was the house load, on the argument that a
+/// healthy array reads 0 W at midnight and 0 W under a storm, so a large figure
+/// that collapses to zero every night trains the reader to distrust it. The
+/// user reversed that call: what they want at a glance is what the panels are
+/// producing, which is the number the whole system exists to make. Their call,
+/// and the trade-off is now recorded rather than argued.
 ///
-/// So the hero carries the load, and the array is the row *under* it. Reversing
-/// those two was the other candidate and it inverts the page's meaning: a big
-/// number that collapses to zero every night trains the reader to distrust it.
+/// **The cost is real and is not papered over.** At 22:00 the hero reads 0, and
+/// a user who opens the app to check whether the system is ok sees a zero. The
+/// array's own status is on the panel anyway — `SKY_STATE` and `LUX` under SKY,
+/// `ALARMS` and `METER_AGE` under SYSTEM — so the answer is two scrolls down
+/// rather than one glance up. If it is ever argued back, this is the paragraph
+/// to read first.
+///
+/// So the hero carries the array and the house draw is the row *under* it.
 ///
 /// ## Absent values
 ///
@@ -171,28 +176,26 @@ class OverviewPanel extends StatelessWidget {
       header: _Header(readings: r),
       children: [
         TerminalHero(
-          // The house draw, for the reason in the file doc.
-          figure: slotNumber(r.acPower, decimals: 0),
+          // **The array, not the house draw.** It was the house draw, on the
+          // argument that a healthy array reads 0 W at midnight and 0 W under a
+          // storm, so a large PV figure trains the reader to distrust it. The
+          // user reversed that call, which is theirs to make — see the file doc
+          // for the trade-off now recorded.
+          figure: slotNumber(r.pvPower, decimals: 0),
           unit: 'W',
-          // **The slot name, not a sentence.** `House load` in prose above an
-          // 88 dp figure was the loudest quiet thing on the page; `AC_LOAD` is in
-          // the panel's own voice, sits on the header row beside the stats, and
+          // **The slot name, not a sentence.** A caption in prose above an 88 dp
+          // figure is the loudest quiet thing on the page; `PV_OUT` is in the
+          // panel's own voice, sits on the header row beside the stats, and
           // labels the block instead of competing with it.
-          slot: 'AC_LOAD',
+          slot: 'PV_OUT',
           secondary: [
-            ('Peak', slotNumber(_todayPeak(r.acPower), decimals: 0)),
+            ('Peak', slotNumber(_todayPeak(r.pvPower), decimals: 0)),
             ('Stale', r.pzemStale ? 'YES' : 'NO'),
           ],
         ),
         const TerminalRule(),
 
         _section('POWER'),
-        TerminalRow(
-          label: 'PV_OUT',
-          value: slotNumber(r.pvPower, decimals: 0),
-          unit: 'W',
-          divider: false,
-        ),
         TerminalRow(
           label: 'AC_LOAD',
           value: slotNumber(r.acPower, decimals: 0),
@@ -218,7 +221,12 @@ class OverviewPanel extends StatelessWidget {
         TerminalMeter(
           fraction: _socFraction(r.soc),
           alert: r.batteryStale,
-          leftCaption: 'BAT_SOC 0%',
+          // **Both captions carry the real figure.** The left one used to be
+          // the literal `'BAT_SOC 0%'`, which was invisible while the meter drew
+          // a continuous fill and became a flat contradiction the moment the bar
+          // was segmented: 0% over eight lit blocks. The right caption had it
+          // right all along, so the two now read from one expression.
+          leftCaption: 'BAT_SOC ${r.soc == null ? '--' : slotNumber(r.soc, decimals: 0)}%',
           rightCaption: r.soc == null ? '--' : '${slotNumber(r.soc, decimals: 0)}%  100%',
           onTap: onOpenBattery,
         ),

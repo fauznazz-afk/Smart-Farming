@@ -119,7 +119,7 @@ class DateSummaryPanel extends StatelessWidget {
   /// group — generation here, load there, arithmetic left to the reader — is
   /// the reason the request was made.
   ///
-  /// Not clamped, unlike the hero's AC_LOAD. A negative day is a real and
+  /// Not clamped, unlike the hero's PV_OUT. A negative day is a real and
   /// important answer (overcast week, battery carried the house), and clamping it
   /// to zero would render that day indistinguishable from a day the array did
   /// nothing.

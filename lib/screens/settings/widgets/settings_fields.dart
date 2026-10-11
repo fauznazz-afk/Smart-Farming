@@ -34,9 +34,16 @@ class SectionCard extends StatelessWidget {
         // a single control appeared. 12 keeps the card's silhouette and the
         // hairline legible while giving the controls the room, which is what a
         // settings page is for.
+        // **Tightened again, and this time it is the panel look the rest of the
+        // app moved to.** 12/10/12/8 rather than 12/12/12/8: the top was the
+        // only remaining 12 on the card and it is the same 12 the side padding
+        // already spends, so the header started one 12 lower than the left edge
+        // of its own title. 10 is a literal because `AppSpacing` has no step
+        // between 8 and 12 and `design_tokens.dart` is not this screen's to
+        // change — a token wants to be a decision somebody makes once.
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
-          AppSpacing.md,
+          10,
           AppSpacing.md,
           AppSpacing.sm,
         ),
@@ -46,18 +53,21 @@ class SectionCard extends StatelessWidget {
             Row(
               children: [
                 SettingsIconBadge(icon: icon),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // `headline-md`: the brief gives card titles inside list
-                      // rows the display weight at 20px. `titleMedium` already
-                      // resolved to this token through the text theme, so the
-                      // change is that the value is now read rather than
-                      // inherited — a card title that survives a theme edit.
-                      Text(title, style: AppType.headlineMd),
-                      const SizedBox(height: AppSpacing.xs),
+                      // **`label-uppercase-md`, not `headline-md`.** The drill-in
+                      // page's heading is already in the app bar directly above
+                      // it — `SettingsScreen` passes `section.title` to both —
+                      // so the card was setting the same words twice, the second
+                      // time at 20px. The instrument-panel look is a small
+                      // uppercase label, and that is what this is now. Nothing is
+                      // lost with the title: `settings_screen_test.dart` finds it
+                      // by text, not by style.
+                      Text(title, style: AppType.labelUppercase),
+                      const SizedBox(height: 2),
                       Text(
                         subtitle,
                         // Left in the body face on purpose, and this is the
@@ -83,12 +93,12 @@ class SectionCard extends StatelessWidget {
             // its own edge — two spacings saying the same thing. One `xs` on
             // each side now.
             Padding(
-              // 34 badge + 12 gap, matching the row above rather than a second
+              // 28 badge + 8 gap, matching the row above rather than a second
               // hand-picked number.
-              padding: const EdgeInsets.only(left: 46, top: AppSpacing.xs),
+              padding: const EdgeInsets.only(left: 36, top: 6),
               child: AppDivider(opacity: 0.12),
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 6),
             child,
           ],
         ),
@@ -108,6 +118,11 @@ class SectionCard extends StatelessWidget {
 /// So the badge is tonal instead: `surfaceAlt` one step above the card it sits
 /// on, a hairline for the silhouette, and `onSurfaceVariant` ink — the brief's
 /// `tab-item-inactive` colour, which is what an inactive chrome glyph takes.
+///
+/// **28dp, not 34.** It is a leading glyph, not a control: it carries no state
+/// and is never tapped, and the row that holds it is now sized by its label. It
+/// also sets the width the header row's divider insets to, so shrinking it is
+/// what lets `SectionCard` indent the divider by 36 rather than 46.
 class SettingsIconBadge extends StatelessWidget {
   const SettingsIconBadge({super.key, required this.icon});
 
@@ -116,14 +131,85 @@ class SettingsIconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
-      height: 34,
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
         color: AppSurfaces.surfaceAlt,
         shape: BoxShape.circle,
         border: AppBorders.controlBorder,
       ),
-      child: Icon(icon, color: AppSurfaces.onSurfaceVariant, size: 19),
+      child: Icon(icon, color: AppSurfaces.onSurfaceVariant, size: 16),
+    );
+  }
+}
+
+/// Compact input decoration for every settings field.
+///
+/// The app theme's own `contentPadding` is 16 vertical, which is the right
+/// answer for a login form — one field, thumb-sized — and the wrong one here,
+/// because a settings page is a *column* of fields: the Environment alerts
+/// section alone stacks six of them. 14 with `isDense` keeps every field at or
+/// above the 48dp touch floor (`settings_screen_test.dart` measures it rather
+/// than assuming it) and gives back ~10dp per field, which is ~60dp on that one
+/// section.
+///
+/// Applied per field rather than in `main.dart` on purpose: the dashboard's own
+/// inputs keep the roomier padding, and a global change would be a different
+/// decision made by a different screen.
+InputDecoration settingsFieldDecoration({
+  String? label,
+  String? helperText,
+  String? suffixText,
+  Widget? prefixIcon,
+}) => InputDecoration(
+  isDense: true,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  labelText: label,
+  helperText: helperText,
+  suffixText: suffixText,
+  prefixIcon: prefixIcon,
+);
+
+/// A toggle row, sized for a column of fields rather than for a list.
+///
+/// `dense` + `compact` is what removes the 16dp of vertical padding Material
+/// puts on a two-line `SwitchListTile`. It is *not* `ListTile` with
+/// `dense: true` plus a height assertion: the density here is Material's own,
+/// and the row it produces is still a full-width tappable `SwitchListTile`, so
+/// the ink layer, the semantics node and the switch's own 48dp target are
+/// unchanged. `settings_screen_test.dart` pins the resulting height.
+class SettingsSwitchRow extends StatelessWidget {
+  const SettingsSwitchRow({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      isThreeLine: false,
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: AppType.labelUppercase),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: AppType.bodySm.copyWith(
+                color: AppSurfaces.onSurfaceVariant,
+              ),
+            ),
+      value: value,
+      onChanged: onChanged,
     );
   }
 }
@@ -169,8 +255,8 @@ class NumberField extends StatelessWidget {
               fontStyle: FontStyle.italic,
             )
           : AppType.labelUppercase,
-      decoration: InputDecoration(
-        labelText: label,
+      decoration: settingsFieldDecoration(
+        label: label,
         helperText: inactive ? 'Not saved yet' : null,
       ),
     );
@@ -186,7 +272,7 @@ class EnvRangeField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -198,7 +284,7 @@ class EnvRangeField extends StatelessWidget {
               color: AppSurfaces.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -209,7 +295,7 @@ class EnvRangeField extends StatelessWidget {
                   inactive: setting.minIsPrefill,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: NumberField(
                   controller: setting.max,
@@ -263,7 +349,7 @@ class UnsavedDefaultsNote extends StatelessWidget {
     );
     if (count == 0) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.md),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -314,8 +400,8 @@ class LabeledDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int>(
       initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
+      decoration: settingsFieldDecoration(
+        label: label,
         suffixText: suffix.isEmpty ? null : suffix,
       ),
       items: options
@@ -402,14 +488,19 @@ class SaveSettingsButton extends StatelessWidget {
   }
 }
 
-/// The brief's `button-secondary`: the page fill behind a hairline, 56dp, no
-/// shadow.
+/// The brief's `button-secondary`: the page fill behind a hairline, no shadow.
 ///
-/// Used by the two actions inside the Background checks card. It sits on the
-/// card rather than on the page, so its fill is *darker* than its surround —
-/// which is the brief's own relationship (`background` below `surface`) applied
-/// one level down, and it reads as an action set into the card without needing
-/// a second outline colour.
+/// Used by the two actions inside the Background checks card and by Logout. It
+/// sits on the card rather than on the page, so its fill is *darker* than its
+/// surround — which is the brief's own relationship (`background` below
+/// `surface`) applied one level down, and it reads as an action set into the
+/// card without needing a second outline colour.
+///
+/// **48dp, not the brief's 56.** These are secondary actions inside a card that
+/// is already dense, and 48 is the accessibility floor, so dropping to it costs
+/// no reachability and buys 8dp per button on the two pages that stack them.
+/// The primary CTA ([SaveSettingsButton]) keeps its 56 — the one button on the
+/// screen that is allowed to be large is still large.
 class SecondaryButton extends StatelessWidget {
   const SecondaryButton({
     super.key,
@@ -438,7 +529,7 @@ class SecondaryButton extends StatelessWidget {
         disabledForegroundColor: AppSurfaces.onSurfaceVariant,
         side: AppBorders.hairline,
         textStyle: AppType.buttonLabel,
-        minimumSize: const Size(0, 56),
+        minimumSize: const Size(0, 48),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.all(AppRadius.card),

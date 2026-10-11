@@ -76,6 +76,23 @@ class ThingsBoardApi {
   /// `Uri.parse` call sites already were.
   static String get _allowedHost => Uri.parse(baseUrl).host;
 
+  /// **The scheme and port `baseUrl` resolves to, checked alongside the host.**
+  ///
+  /// The host check alone was the one gap a full source audit found: a URL of
+  /// the same host on a different scheme or port would pass it, and the JWT
+  /// would be sent over cleartext to the right name. It cannot fail today for
+  /// the same reason the host check cannot — [baseUrl] is a constant — and it
+  /// is here for the same reason too: at the moment that stops being true,
+  /// this is the difference between a test failing and a token going out in
+  /// the clear.
+  ///
+  /// `Uri.port` is 0 when the URL carries no explicit port, which is why both
+  /// are compared against the parsed `baseUrl` rather than against a literal.
+  static bool _matchesBaseUrl(Uri url) =>
+      url.host == _allowedHost &&
+      url.scheme == Uri.parse(baseUrl).scheme &&
+      url.port == Uri.parse(baseUrl).port;
+
   // Device ID (UUID) — bukan token
   static const String deviceBattery = '9465cf90-b264-11f1-9294-d92385142e6d';
   static const String deviceSensor = '2e1b25c0-af33-11f1-8455-0717167ff6c3';
@@ -547,10 +564,11 @@ static const _maxHistoryBytes = 4 * 1024 * 1024;
     // it guards against is a `baseUrl` that stops being a constant, and at that
     // moment this is the difference between a test failing and a token going
     // somewhere unvetted.
-    if (request.url.host != _allowedHost) {
+    if (!_matchesBaseUrl(request.url)) {
       throw StateError(
         'ThingsBoardApi: refusing to send a credential to '
-        '"${request.url.host}". This client only talks to "$_allowedHost".',
+        '"${request.url.scheme}://${request.url.host}:${request.url.port}". '
+        'This client only talks to "$baseUrl".',
       );
     }
     request.followRedirects = false;

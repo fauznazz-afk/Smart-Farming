@@ -161,10 +161,17 @@ class AlarmBridgePlugin :
         } catch (error: AlarmConfigException) {
             // Dart sent something this build cannot read. Saying so lets the
             // Dart side keep working with in-app alerts instead of going quiet.
-            Log.e(TAG, "rejected alarm configuration", error)
+            //
+            // **The class name, never the object.** `org.json` embeds a fragment
+            // of the unconsumed response in its parse errors, and on the token
+            // refresh path that response is the JWT. This catch is on the config
+            // path today and not on that one — but the rule is stated once, at
+            // the place an audit reads, rather than being re-derived by whoever
+            // adds the next catch.
+            Log.e(TAG, "rejected alarm configuration: ${error.javaClass.simpleName}")
             result.error("bad_config", error.message, null)
         } catch (error: Exception) {
-            Log.e(TAG, "alarm bridge call ${call.method} failed", error)
+            Log.e(TAG, "alarm bridge call ${call.method} failed: ${error.javaClass.simpleName}")
             result.error("alarm_bridge", error.message, null)
         }
     }

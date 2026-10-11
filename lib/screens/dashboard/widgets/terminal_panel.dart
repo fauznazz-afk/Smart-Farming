@@ -296,7 +296,7 @@ class TerminalHero extends StatelessWidget {
   /// Its unit.
   final String unit;
 
-  /// What the figure *is*, in the panel's slot vocabulary — `AC_LOAD`.
+  /// What the figure *is*, in the panel's slot vocabulary — `PV_OUT`.
   ///
   /// **This replaced a spelled-out caption ("House load") and it is not only a
   /// space saving.** A caption in sentence case above a 72 dp figure is the
@@ -367,7 +367,17 @@ class TerminalHero extends StatelessWidget {
             children: [
               Text(
                 figure,
-                style: AppType.heroFigure.copyWith(color: AppPalette.error),
+                // **The glow is the whole "menyala" claim, and it is the only
+                // lever there is.** The accent cannot get more saturated:
+                // `color_helpers_test.dart` holds it to 4.5:1 on `surfaceMuted`
+                // and the search for a more saturated red that still clears it
+                // comes back empty, because the luminance floor that contrast
+                // implies pins the value at about `#FF6B6B`. So brightness comes
+                // from the shadow around it rather than from the fill.
+                style: AppType.heroFigure.copyWith(
+                  color: AppPalette.error,
+                  shadows: AppShadows.glow(AppPalette.error, strength: 0.55),
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Text(
@@ -437,6 +447,16 @@ class TerminalTag extends StatelessWidget {
 /// **The caption carries the two ends, because a bar with no scale is a shape.**
 /// `0%` on the left and `100%` on the right turn a decorative bar into a
 /// readable one, and they cost eight characters.
+///
+/// **The bar is 20 square blocks with 2 dp gaps, not a continuous rounded fill —
+/// this follows the reference photo, so do not smooth it back into a pill.** A
+/// continuous bar cannot show *where* the level is, and the flat ends are what
+/// make the blocks read as blocks. The glow stays, per block: this is the one
+/// surface on the panel where the accent is meant to emit.
+///
+/// The block height is explicit and `stretch` is load-bearing — a `Row` passes
+/// loose vertical constraints, and a childless `DecoratedBox` under loose
+/// constraints collapses to zero. That is the exact bar that shipped in 1.9.1.
 class TerminalMeter extends StatelessWidget {
   const TerminalMeter({
     super.key,
@@ -477,65 +497,54 @@ class TerminalMeter extends StatelessWidget {
     // the accent — a second shade of it would say "worse" in a way the panel
     // cannot back up, and the row's own value already carries severity.
     final fill = color ?? AppPalette.error;
+    // **The proportion is quantised to whole blocks, and that is the bar.** 20
+    // blocks on a ~349 dp track is a ~15 dp block and a 2 dp gap, which reads as a
+    // segmented gauge at phone width and still resolves 5% steps — finer than the
+    // caption's `NN%`, so the bar never claims more precision than the label.
+    final lit = (clamped * _segmentCount).round().clamp(0, _segmentCount);
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // **`Positioned.fill` on the FILL, not just on the track.** This is the same
-        // bug the sky card's bar had in 1.9.1, in the same shape: a
-        // `FractionallySizedBox` in a `Stack` is a *non-positioned* child, so the
-        // stack sizes itself to it and hands it loose constraints — with nothing
-        // to scale against, `widthFactor` has no width to take a fraction *of*.
-        // A 95% reading drew an empty track, which is the one number on the
-        // panel a reader would act on directly.
-        //
-        // Positioning it means the track's width is established first and the
-        // fill is then resolved against it. `Align(alignment: centerLeft)` with
-        // `widthFactor` keeps the fill left-anchored; a bare `FractionallySizedBox`
-        // would centre it, and a 3% fill floating in the middle of a 95% track
-        // reads as a rendering fault.
+        // **The block row is a `Positioned.fill` on the track, not a sibling.** A
+        // non-positioned child lets the `Stack` size to it and hand it loose
+        // constraints, which is how the 1.9.1 meter drew an empty track at 95%.
         SizedBox(
           height: 6,
           child: Stack(
             children: [
               Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppSurfaces.track,
-                    borderRadius: AppRadius.all(AppRadius.sm),
-                  ),
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(color: AppSurfaces.track),
                 ),
               ),
               Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  // **`widthFactor: 1` with the fill sized by a `FractionallySizedBox`
-                  // is not the same thing as sizing the *width* of a box that fills
-                  // the height.** This meter is 6 dp tall, and the fill came out
-                  // **0 dp tall on the device while every widget test measured it
-                  // at the right width** — so the ratio assertions passed and the
-                  // bar was invisible anyway.
-                  //
-                  // The cause is `Align`: it passes *loose* constraints to its
-                  // child, and a `DecoratedBox` with no child under loose
-                  // constraints collapses to `constraints.smallest`, which is zero
-                  // on an unbounded axis. A `FractionallySizedBox` with only
-                  // `widthFactor` leaves the height to that child — so the height
-                  // was always going to be nothing.
-                  //
-                  // The fix is to make the fill's *height* explicit with
-                  // `heightFactor: 1` inside a `Positioned.fill`, which resolves it
-                  // against the track's height rather than against a loose box.
-                  child: FractionallySizedBox(
-                    widthFactor: clamped,
-                    heightFactor: 1,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: fill,
-                        borderRadius: AppRadius.all(AppRadius.sm),
+                // **`crossAxisAlignment: stretch` is load-bearing, and it is the
+                // same trap as the `Align` that this replaced.** A `Row` hands its
+                // children *loose* vertical constraints, and a `DecoratedBox` with
+                // no child under loose constraints collapses to
+                // `constraints.smallest` — every block would be 0 dp tall with the
+                // right width, exactly the bar that shipped in 1.9.1. `stretch`
+                // makes each block take the 6 dp the row already has.
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < _segmentCount; i++) ...[
+                      if (i > 0) const SizedBox(width: _segmentGap),
+                      Expanded(
+                        child: i < lit
+                            ? DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: fill,
+                                  // **The glow stays, per block.** The meter is the
+                                  // panel's one "this accent emits" surface.
+                                  boxShadow: AppShadows.glow(fill),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    ),
-                  ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -580,6 +589,13 @@ class TerminalMeter extends StatelessWidget {
       ),
     );
   }
+
+  /// Blocks across the whole track.
+  static const int _segmentCount = 20;
+
+  /// The gap between two blocks. Thin, because a wide gap makes the bar read as
+  /// a row of buttons rather than as one meter at a level.
+  static const double _segmentGap = 2;
 
   /// The meter's own inset, kept in one place.
   ///

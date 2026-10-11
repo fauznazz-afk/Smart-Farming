@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../dashboard/utils/design_tokens.dart';
 import '../settings_controller.dart';
+import '../widgets/settings_fields.dart';
 
 /// Selectable refresh intervals, in seconds.
 const List<int> kRefreshIntervalOptions = [5, 10, 30, 60];
@@ -12,21 +13,13 @@ class MonitoringSection extends StatelessWidget {
 
   final SettingsController settings;
 
-  /// The switch row's title, in the app's uppercase label face.
-  ///
-  /// `label-uppercase-md` is the brief's workhorse line and it is what the
-  /// theme's `labelLarge` already resolves to; reading the token directly means
-  /// the row does not change shape when the text theme is retuned.
-  static final _toggleTitle = AppType.labelUppercase;
-
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text('Auto refresh telemetry', style: _toggleTitle),
+        SettingsSwitchRow(
+          title: 'Auto refresh telemetry',
           value: settings.autoRefresh,
           onChanged: (value) =>
               settings.update(() => settings.autoRefresh = value),
@@ -34,7 +27,7 @@ class MonitoringSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<int>(
           initialValue: settings.refreshSeconds,
-          decoration: const InputDecoration(labelText: 'Refresh interval'),
+          decoration: settingsFieldDecoration(label: 'Refresh interval'),
           items: kRefreshIntervalOptions
               .map(
                 (option) => DropdownMenuItem(
@@ -73,18 +66,18 @@ class CctvSection extends StatelessWidget {
         TextField(
           controller: settings.cctvUrl,
           keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'Hydroponics camera URL',
-            prefixIcon: Icon(Icons.link),
+          decoration: settingsFieldDecoration(
+            label: 'Hydroponics camera URL',
+            prefixIcon: const Icon(Icons.link),
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: settings.fishCctvUrl,
           keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'Fish camera URL',
-            prefixIcon: Icon(Icons.videocam_outlined),
+          decoration: settingsFieldDecoration(
+            label: 'Fish camera URL',
+            prefixIcon: const Icon(Icons.videocam_outlined),
           ),
         ),
       ],

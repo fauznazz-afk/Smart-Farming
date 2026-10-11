@@ -40,8 +40,18 @@ import 'package:flutter/material.dart';
 class AppSurfaces {
   const AppSurfaces._();
 
-  /// The page canvas and the depressed track inside a progress bar, `#1A1A1A`.
-  static const Color page = Color(0xFF1A1A1A);
+  /// The page canvas and the depressed track inside a progress bar, `#000000`.
+  ///
+  /// **Pitch black, and it changed for the instrument-panel reference.** It was
+  /// `#1A1A1A`, which the old soft-UI rule demanded: that rule came from light
+  /// mode, where the page had to stay a mid-tone for a shadow to have somewhere
+  /// to fall. The panels are the other way round now — the reference is a black
+  /// instrument with red light, and depth comes from the hairline and the
+  /// segmented meter, not from a shadow. 21:1 for white text on it.
+  ///
+  /// If the stamped shadow ever stops being visible, this is the value to
+  /// question, and the answer is to raise the shadow rather than grey the page.
+  static const Color page = Color(0xFF000000);
 
   /// The card layer, `#222222` — every card, input and list row.
   ///
@@ -90,14 +100,20 @@ class AppSurfaces {
   /// Text-input fill. Same value as [surface]: an input is a card.
   static const Color input = Color(0xFF222222);
 
-  /// The depressed track inside a progress bar, `#1A1A1A` — the brief sets the
-  /// track to the *background*, so the fill has to lift off the page rather than
-  /// off a second grey.
+  /// The depressed track inside a progress bar — **the page value**, `#000000`.
   ///
-  /// **Not the same value as [surfaceAlt], and that is the point.** A track
-  /// carries no text; a tile does. The two used to resolve to one value, which
-  /// is how this app's metric tiles once became invisible against the card.
-  static const Color track = Color(0xFF1A1A1A);
+  /// It was its own grey `#1A1A1A` and it only worked because the page was the
+  /// same grey. With the page going pitch black the two diverged, which broke
+  /// the invariant `design_tokens_test.dart` holds: the caption surface list is
+  /// exactly three entries, and `track` is one of them, so a track that is a
+  /// fourth value silently puts a measurable surface outside the list that
+  /// contrast is judged against.
+  ///
+  /// **The identity is also the right reading now.** An un-lit meter segment on
+  /// a pitch-black panel should be a hole, not a lighter grey; the reference
+  /// shows the empty segments at the page value. And the accent against it
+  /// measures 7.57:1 rather than 6.27, so nothing about AA moved.
+  static const Color track = page;
 
   /// The tooltip, opaque because it must stay readable over an arbitrary series
   /// crossing underneath it.

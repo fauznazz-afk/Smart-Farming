@@ -2,127 +2,128 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
 
-/// The panel's primitives, and the two claims that are invisible in the source.
+/// The panel's primitives, and the claims that are invisible in the source.
 ///
-/// ## Why this file asserts a *rendered width*
+/// ## Why this file asserts *rendered geometry*
 ///
 /// The meter looked correct in the source, compiled clean, and drew nothing. A
-/// `FractionallySizedBox` in a `Stack` is a non-positioned child, so the stack
-/// sizes itself to it and hands it loose constraints — with nothing to scale
-/// against, `widthFactor` has no width to take a fraction *of*, and a 95%
-/// reading drew an empty track.
+/// childless `DecoratedBox` under loose vertical constraints collapses to
+/// `constraints.smallest`, so a fill with the right width and **0 dp height**
+/// passes every ratio assertion and paints nothing — twice on this widget, once
+/// through an `Align` and once through a `Row`.
 ///
 /// `flutter analyze` cannot see that, and neither can an assertion about the
-/// caption. This is the same lesson as the sky card's bar in 1.9.1, in the same
-/// shape, so the check here reads the rendered size rather than trusting the
-/// widget tree.
+/// caption. So the checks here read the layout rather than the widget tree: the
+/// blocks' painted height against the track's, and the *number of lit blocks*
+/// rather than a continuous width.
 void main() {
-  /// The meter's painted size, as the layout actually resolved it.
-///
-/// **Both dimensions, and the height is the half that was missing.** The first
-/// version of this file measured `fill.width / track.width` and passed at 95%
-/// while the bar was invisible on the device — because the fill was 95% wide
-/// and **0 dp tall**. A `DecoratedBox` with no child under loose constraints
-/// collapses to `constraints.smallest`, so a `FractionallySizedBox` carrying
-/// only a `widthFactor` gets a width and nothing for height.
-///
-/// So this asserts the fill's height against the track's, which is the claim
-/// that actually describes whether anything was painted.
-Future<Size> pumpMeter(
-  WidgetTester tester,
-  double fraction, {
-  double width = 381,
-}) async {
-  tester.view.physicalSize = Size(width, 900);
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.reset);
-  await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(
-          child: TerminalMeter(
-            fraction: fraction,
-            leftCaption: '0%',
-            rightCaption: '100%',
+  /// How the meter actually painted: the track's painted size, one block's
+  /// painted size, the fraction of the track the lit blocks span, and the
+  /// number of lit blocks.
+  ///
+  /// **Block count, not width.** A segmented bar quantises the reading, so the
+  /// claim is "19 of 20 blocks are lit", and a continuous width would only be
+  /// measuring the gaps. The span is still checked, because a row of blocks with
+  /// the right count in the wrong place is a rendering fault.
+  Future<({Size track, Size block, double span, int lit})> pumpMeter(
+    WidgetTester tester,
+    double fraction, {
+    double width = 381,
+  }) async {
+    tester.view.physicalSize = Size(width, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: TerminalMeter(
+              fraction: fraction,
+              leftCaption: '0%',
+              rightCaption: '100%',
+            ),
           ),
         ),
       ),
-    ),
-  );
-  await tester.pumpAndSettle();
+    );
+    await tester.pumpAndSettle();
 
-  final track = tester.getSize(
-    find
-        .descendant(
-          of: find.byType(TerminalMeter),
-          matching: find.byType(DecoratedBox),
-        )
-        .first,
-  );
-  final fill = tester.getSize(
-    find
-        .descendant(
-          of: find.byType(FractionallySizedBox),
-          matching: find.byType(DecoratedBox),
-        )
-        .first,
-  );
-  expect(
-    track.width,
-    greaterThan(0),
-    reason: 'the track has no width, so no fraction can mean anything',
-  );
-  expect(
-    fill.height,
-    closeTo(track.height, 0.5),
-    reason:
-        'the fill is ${fill.height}dp tall and the track is ${track.height}dp. A '
-        'zero-height fill has the right width and paints nothing at all, which '
-        'is what shipped.',
-  );
-  return Size(fill.width / track.width, fill.height);
-}
+    // The first box is the track; every box after it is a lit block, because an
+    // unlit slot renders as `SizedBox.shrink` and so is not a `DecoratedBox`.
+    final boxes = find.descendant(
+      of: find.byType(TerminalMeter),
+      matching: find.byType(DecoratedBox),
+    );
+    final count = boxes.evaluate().length;
+    final trackFinder = boxes.first;
+    final track = tester.getSize(trackFinder);
+    final lit = count - 1;
+    expect(
+      track.width,
+      greaterThan(0),
+      reason: 'the track has no width, so no fraction can mean anything',
+    );
+
+    final trackRect = tester.getRect(trackFinder);
+    final span = lit == 0
+        ? 0.0
+        : (tester.getRect(boxes.at(count - 1)).right - trackRect.left) /
+            track.width;
+    return (
+      track: track,
+      block: lit == 0 ? Size.zero : tester.getSize(boxes.at(1)),
+      span: span,
+      lit: lit,
+    );
+  }
 
   group('the meter actually fills', () {
-    testWidgets('a 95% reading draws 95% of the track', (tester) async {
-      final size = await pumpMeter(tester, 0.95);
+    testWidgets('a 95% reading lights 19 of the 20 blocks', (tester) async {
+      final m = await pumpMeter(tester, 0.95);
       expect(
-        size.width,
-        closeTo(0.95, 0.02),
+        m.lit,
+        19,
         reason:
-            'the fill is ${(size.width * 100).toStringAsFixed(1)}% of the track. '
-            'A meter that reads empty at 95% is worse than no meter, because the '
-            'reader acts on it.',
+            'a 95% reading lit ${m.lit} blocks. The blocks *are* the reading — a '
+            'bar that reads empty at 95% is worse than no bar, because the reader '
+            'acts on it.',
       );
+      expect(m.span, closeTo(0.95, 0.02));
     });
 
-    testWidgets('a half reading draws half', (tester) async {
-      expect((await pumpMeter(tester, 0.5)).width, closeTo(0.5, 0.02));
+    testWidgets('a half reading lights half the blocks', (tester) async {
+      final m = await pumpMeter(tester, 0.5);
+      expect(m.lit, 10);
+      expect(m.span, closeTo(0.5, 0.02));
     });
 
-    testWidgets('a zero reading draws nothing at all', (tester) async {
+    testWidgets('a zero reading lights nothing at all', (tester) async {
       // The case a `Row` of two `Expanded`s cannot express: both children get at
       // least their flex share, so zero renders as a visible stub.
-      expect((await pumpMeter(tester, 0)).width, lessThan(0.01));
+      expect((await pumpMeter(tester, 0)).lit, 0);
     });
 
-    testWidgets('a full reading draws the whole track, never past it', (
+    testWidgets('a full reading lights every block, never past it', (
       tester,
     ) async {
-      final size = await pumpMeter(tester, 1.0);
-      expect(size.width, closeTo(1.0, 0.01));
-      expect(size.width, lessThanOrEqualTo(1.0));
+      final m = await pumpMeter(tester, 1.0);
+      expect(m.lit, 20);
+      // `Expanded` divides the track into 20 fractional widths, so the last
+      // block's right edge is the track's within rounding — 1.0000000000000002.
+      expect(m.span, closeTo(1.0, 0.001));
     });
 
     testWidgets('out-of-range and NaN inputs cannot escape the track', (
       tester,
     ) async {
       for (final bad in [1.7, -0.4, double.nan, double.infinity]) {
-        final size = await pumpMeter(tester, bad);
+        final m = await pumpMeter(tester, bad);
+        expect(m.lit, inInclusiveRange(0, 20), reason: '$bad lit ${m.lit} blocks');
+        // The span is clamped, not forced: a negative input legitimately lights nothing.
         expect(
-          size.width,
-          inInclusiveRange(0.0, 1.0),
-          reason: '$bad drew ${(size.width * 100).toStringAsFixed(1)}% of the track',
+          m.span,
+          inInclusiveRange(0.0, 1.001),
+          reason: '$bad spans ${(m.span * 100).toStringAsFixed(1)}% of the track',
         );
       }
     });
@@ -131,7 +132,7 @@ Future<Size> pumpMeter(
     // tall and a phone is 2.75x; a widget test at `devicePixelRatio: 1` lays the
     // same numbers out. This runs at the device's own density so the zero-height
     // collapse cannot hide behind a different layout pass.
-    testWidgets('the fill is the height of the track on a real phone', (
+    testWidgets('every block is the height of the track on a real phone', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 2.75;
@@ -148,22 +149,54 @@ Future<Size> pumpMeter(
       );
       await tester.pumpAndSettle();
 
-      final fill = tester.getSize(
-        find
-            .descendant(
-              of: find.byType(FractionallySizedBox),
-              matching: find.byType(DecoratedBox),
-            )
-            .first,
+      final boxes = find.descendant(
+        of: find.byType(TerminalMeter),
+        matching: find.byType(DecoratedBox),
       );
+      final track = tester.getSize(boxes.first);
+      final block = tester.getSize(boxes.at(1));
       expect(
-        fill.height,
-        greaterThan(0),
+        block.height,
+        closeTo(track.height, 0.5),
         reason:
-            'the fill is ${fill.height}dp tall. A `DecoratedBox` with no child '
-            'collapses to zero under the loose constraints an `Align` passes, so '
-            'a fill with the right width and no height paints nothing.',
+            'the block is ${block.height}dp tall and the track is '
+            '${track.height}dp. A childless `DecoratedBox` under the loose '
+            'constraints a `Row` passes collapses to zero, so a block with the '
+            'right width and no height paints nothing.',
       );
+    });
+
+    // **The blocks are separated and flat-ended, or it is a bar again.** Both
+    // assertions here pass on a continuous rounded fill, which is why they
+    // exist: `gap: 0` and a radius render a bar that satisfies every count and
+    // height check above and silently undoes the change.
+    testWidgets('the blocks are gapped and square-ended', (tester) async {
+      final m = await pumpMeter(tester, 1.0);
+      expect(m.lit, greaterThan(1), reason: 'there is nothing to space out');
+
+      final boxes = find.descendant(
+        of: find.byType(TerminalMeter),
+        matching: find.byType(DecoratedBox),
+      );
+      final first = tester.getRect(boxes.at(1));
+      final second = tester.getRect(boxes.at(2));
+      expect(
+        second.left - first.right,
+        greaterThan(0),
+        reason: 'two blocks are flush, so the meter reads as one continuous bar',
+      );
+
+      for (final box in [boxes.first, boxes.at(1)]) {
+        final decoration = tester.widget<DecoratedBox>(box).decoration;
+        expect(
+          decoration,
+          isA<BoxDecoration>()
+              .having((d) => d.borderRadius, 'borderRadius', null),
+          reason:
+              'a rounded block or track is a pill again. The reference is '
+              'flat-ended.',
+        );
+      }
     });
   });
 

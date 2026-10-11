@@ -212,7 +212,10 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     // and lime both claiming "fine" on one card.
     final color = ok ? appPrimaryText : AppSurfaces.onSurfaceVariant;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      // 2, not 3: five of these stack, and the panel look this page now has
+      // elsewhere on the screen wants the rows to read as a table rather than
+      // as a list of cards.
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -229,14 +232,19 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
             width: 150,
             child: Text(
               label,
-              style: AppType.bodyMd.copyWith(color: faintColor),
+              // The label face, not `body-md`: this is the panel's own label
+              // column, and the value beside it stays in body ink at a heavier
+              // weight. Uppercase also means the label column's width is set by
+              // its longest string rather than by the sentence wrapping under
+              // it, which is what kept these five rows a ragged two-line block.
+              style: AppType.labelUppercase.copyWith(color: faintColor),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: AppType.bodyMd.copyWith(
                 color: plain ? null : color,
                 fontWeight: ok ? FontWeight.w700 : FontWeight.w400,
               ),

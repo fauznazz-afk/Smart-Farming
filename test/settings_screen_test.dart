@@ -194,6 +194,54 @@ void main() {
     }
   });
 
+  // The compactness guard, and it is deliberately *not* a snapshot.
+  //
+  // Settings was tightened to the panel look — small uppercase labels, dense
+  // inputs, a compact switch row — and the one thing that must not come out of
+  // that is the 48dp touch floor. So the assertion is on the floor and nothing
+  // else: every control on the tallest section is at least 48dp tall. Writing
+  // it the other way round ("no field is taller than 56") would pin the
+  // compaction to the pixel, which is the shape of test that fails the next
+  // time anybody reads this file and decides the design moved.
+  //
+  // **Every height here is measured under the test harness's Ahem font**, whose
+  // advance is exactly the font size. The prose subtitles therefore wrap to
+  // roughly twice the lines they take on the device, so these numbers bound the
+  // worst case rather than the real one — which is the safe direction for a
+  // floor, and the reason no exact height is written down.
+  testWidgets('settings controls keep the 48dp touch floor', (tester) async {
+    // Phone width, where the rows have the least room and therefore the least
+    // slack to absorb a tighter field.
+    await _pumpSettings(tester, surface: const Size(375, 1600));
+
+    await tester.tap(find.text('Environment alerts'));
+    await tester.pumpAndSettle();
+
+    // Six min/max fields plus the toggle: the densest section on the screen.
+    expect(find.byType(TextField), findsNWidgets(6));
+    for (final field in find.byType(TextField).evaluate()) {
+      final height = tester.getSize(find.byWidget(field.widget)).height;
+      expect(
+        height,
+        greaterThanOrEqualTo(48.0),
+        reason:
+            'a settings field renders ${height}dp tall, under the 48dp touch '
+            'floor. The compact decoration buys its height from '
+            'contentPadding, and this is what stops it buying too much.',
+      );
+    }
+
+    final toggle = tester.getSize(find.byType(SwitchListTile)).height;
+    expect(
+      toggle,
+      greaterThanOrEqualTo(48.0),
+      reason:
+          'the toggle row renders ${toggle}dp tall. `dense` and '
+          '`visualDensity: compact` were allowed to remove padding, not the '
+          'target the finger has to hit.',
+    );
+  });
+
   testWidgets('opens the background checks category', (tester) async {
     await _pumpSettings(tester);
 
