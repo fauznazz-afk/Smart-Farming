@@ -5,29 +5,23 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Proyek**: `plts_monitoring` / **EnerGrow** - aplikasi monitoring energi PLTS hybrid
 - **Konteks**: Proyek **FNN-XAI-IoT**, program MBKM, Politeknik Negeri Sriwijaya
 - **Remote**: `https://github.com/fauznazz-afk/Smart-Farming.git` (branch `main`)
-- **Dibuat**: 26 September 2026 · **Diperbarui**: 30 September 2026 (sesi kedelapan)
-- **Status**: rilis **1.6.1 (build 13)** di `origin/main`. Setelah itu, **enam
-  commit tanpa tag rilis** yang mengubah sistem secara mendasar — `pubspec.yaml`
-  masih `1.6.1+13`. Rilis berikutnya harus memotong seluruh `[Unreleased]` di
-  `CHANGELOG.md` sebagai **1.7.0**, bukan 1.6.2: surface system, navigasi, dan
-  set chart berubah, yang tidak memenuhi syarat patch. Rilis
-  sebelumnya: 1.5.0 (27 September 2026, commit `24189a0`).
+- **Dibuat**: 26 September 2026 · **Diperbarui**: 12 Oktober 2026 (sesi kesebelas)
+- **Status**: rilis **1.11.0 (build 22)** di `origin/main`, commit `f758488`.
+  Rilis sebelumnya: 1.10.0 (11 Oktober 2026, build 21).
 
-- **Sesi kedelapan (30 Sep 2026 sore)** menutup dua hal besar:
-  1. **Bug kontras yang sudah dua commit tertidur.** `test/color_helpers_test.dart`
-     mengukur AA terhadap **enam dari enam hex basi** — nilai pre-restyle, yang
-     *lebih terang* dari yang sebenarnya, jadi suite hijau sementara
-     `faintColor` 4,47 · `statusBad` 4,48 · `statusAlert` 4,47 di bawah AA.
-     List-nya sekarang dibaca dari `AppSurfaces`.
-  2. **Neumorphism diperdalam** (`ce7a7a9`): raised jadi **tiga** shadow
-     (contact + ambient + bounce), light mode naikkan alpha gelap dua kali
-     setelah pengukuran piksel, dan `Pressable` yang baru — karena
-     `AppCard.pressed` **tidak pernah dipakai satu pun call site** sejak
-     migrasi soft-UI.
+- **Sesi kesebelas (12 Okt 2026)** menutup perubahan visual terbesar sejak
+  1.10.0: aksen tunggal merah di seluruh aplikasi (akar lime ternyata di
+  `main.dart`'s `ColorScheme`, bukan di widget), canvas **pitch black**
+  (`AppSurfaces.page` #1A1A1A → #000000), meter jadi **petak/segmented** 20 blok,
+  dan hero Overview jadi **PV output**. Ditambah audit keamanan penuh (nol
+  temuan Critical/High/Medium; dua fix defense-in-depth) dan perbaikan bug
+  `BAT_SOC 0%` hardcode + `_visualToken` yang kehilangan
+  `_weeklyEnergySummary`. Detail di `CHANGELOG.md` §1.11.0.
 
-  Kedalaman sengaja ditaruh di shadow, bukan fill, karena `BoxShadow` hanya
-  digambar di luar rect dan jadi tidak bisa menyentuh teks. Gradien fill sudah
-  diukur dan ditolak: 4% sudah 4,15:1.
+  **Temuan yang harus diingat:** merah tidak bisa jadi lebih menyala dengan
+  mengubah nilainya — floor luminansitas dari AA di `surfaceMuted` memaku
+  `AppPalette.error` di sekitar `#FF6B6B`. Yang menyala sekarang adalah
+  **shadow** (`AppShadows.glow`), bukan fill.
 
 ---
 

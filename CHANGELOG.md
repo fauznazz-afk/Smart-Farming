@@ -1,13 +1,91 @@
 # [Unreleased]
 
-- Nav bar: the four icons are now drawn at the same size. They were declared at
-  24 dp and rendered at **8.6 / 11.8 / 18.9 / 23.6** — a 2.7x spread tracking the
-  length of each label, because one `FittedBox` wrapped the icon *and* the label
-  and the label set the scale. Fixed, and `nav_bar_icon_size_test.dart` pins it.
-- Overview: rows are 2 dp tighter, section headings sit against their rows, the
-  hero's legend moved under the figure, and the sky bar is gone — `LUX` and
-  `SKY_STATE` already say whether the sky is doing anything, and it was the only
-  figure on the page with no route behind it.
+---
+
+# [1.11.0] - 2026-10-12
+
+Every accent becomes the red one. The canvas goes pitch black. The meters become
+segmented bars. All four are the same reference.
+
+### Changed
+
+- **One accent, and it is red.** `main.dart`'s `ColorScheme` was still setting
+  `primary` to acid lime, so every `FilledButton`, `SegmentedButton`, `Switch`,
+  `ProgressIndicator`, selection handle and focus ring in the app inherited it —
+  converting call sites alone would have looked half-finished forever.
+  `categoryColor` collapses to `AppPalette.error` for all five categories.
+- **The page canvas is `#000000`.** It was `#1A1A1A`, a value that came from
+  light mode where the page had to stay a mid-tone for a shadow to fall on. The
+  panels take their depth from the hairline and the segmented bar, so that reason
+  is gone. `AppSurfaces.track` was the same grey and only worked because the page
+  was; it is now `page` by value, which is also the right reading — an un-lit
+  segment is a hole, not a lighter grey.
+- **Meters are 20 square blocks with 2 dp gaps**, not a continuous rounded fill,
+  matching the reference's segmented bars. One widget (`TerminalMeter`) draws
+  every meter in the app, so Overview, Environment and Fish changed together.
+- **The nav bar is a capsule**, not a slab: 64 -> 54 dp tall, 40 -> 36 dp slots.
+  The four icons are drawn at the same size — they were declared at 24 dp and
+  rendered at **8.6 / 11.8 / 18.9 / 23.6** because a `FittedBox` wrapped the icon
+  and the label, and the label set the scale. Pinned by
+  `nav_bar_icon_size_test.dart`, which has to walk up through every
+  `RenderFittedBox` and multiply — `RenderBox.size` cannot see a paint transform.
+- **The sky is three daylight states and a night**: `clear` / `partlyCloudy` /
+  `overcast` / `night`. `night` is a different kind of reading, not another rung
+  — at `<= 0` lux there is no measurement of the sky at all, and a lux sensor
+  reports a small negative value in the dark the same way the BMS reports
+  `-0.01 A` while idle.
+- **The Overview hero is PV output**, not the house load. It was the load, on the
+  argument that a healthy array reads 0 W at midnight and 0 W under a storm, so a
+  large figure that collapses every night trains the reader to distrust it. That
+  call was reversed; the cost is recorded on `overview_panel.dart`.
+
+### Added
+
+- **A summary of the selected day** — solar generated, load used, net (unclamped;
+  negative is a real answer), and min/avg/max for every environment and fish
+  reading. It appears only when the selection is not today, because for today the
+  Overview already carries `ENERGY (24H)` one screen above. The env and fish
+  history was genuinely missing before: the Overview is page index 0,
+  `_prefixForPage(0)` is null, and no request was ever fired.
+- **`TerminalPanel.semanticLabel`.** It had been hardcoded to `'Overview'`, so
+  every panel on screen announced itself as the Overview.
+
+### Fixed
+
+- `BAT_SOC`'s left caption was the literal string `'BAT_SOC 0%'`, hardcoded,
+  while the caption to its right read the real value. Invisible on a continuous
+  bar; a flat contradiction once the bar was segmented — `0%` printed over eight
+  lit blocks. `overview_panel_test.dart` is new.
+- `_weeklyEnergySummary` was read by the Overview builder but was not in
+  `_visualToken`, and is only written by `_setWeeklyEnergySummary`, which bumps
+  `_energyRevision` — a notifier that subtree is not bound to. Tapping 24H / 7D
+  changed nothing until the next telemetry poll.
+- `thingsboard_api.dart`'s `_send` checked `request.url.host` only; a URL of the
+  right host on the wrong scheme or port would have carried the JWT in the clear.
+  Scheme and port are compared against the parsed `baseUrl` too.
+- `AlarmBridgePlugin.kt` logged the exception object on two catches, and
+  `org.json` embeds a fragment of the unconsumed response in its parse errors.
+  Now `error.javaClass.simpleName`.
+
+### Security
+
+A full source-level re-audit: no Critical/High/Medium, and every claim the
+previous audit made still holds — the token handover, the host allowlist, the
+manifest's exported receivers, the absent TLS bypass, the boolean-only logging,
+the WebView guards, the SharedPreferences purge, the alarm budget and lock.
+
+### Notes
+
+The glowing red is a **shadow, not a fill colour**, and that is a measurement
+rather than a taste. A search over every red that still clears 4.5:1 on
+`surfaceMuted` returns nothing more saturated than the value that was already
+there: the luminance floor that contrast implies pins it at about `#FF6B6B`. So
+`AppShadows.glow` is applied to the hero figure and per meter block, and
+`AppPalette.error` is unchanged. Black ink on that fill is 7.57:1 and white is
+2.78:1 — white fails AA by 1.6x, which is why every red fill reaches for
+`AppPalette.onHue`.
+
+716 tests across 55 files, 0 failing.
 
 ---
 
