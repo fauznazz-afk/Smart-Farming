@@ -26,6 +26,22 @@ final List<Color> _surfaces = AppSurfaces.captionSurfaces();
 /// They are `const` today rather than functions of a `bool isDark`, so this list
 /// is a plain list of constants and the "does Dracula reuse the dark palette?"
 /// question below has become the stronger claim: there is only one palette.
+///
+/// ## One accent, and what it did to this file
+///
+/// Every lime, blue, violet, cyan and green that used to be spent on a heading,
+/// an icon, a chip or a border became [AppPalette.error] or a neutral from
+/// [AppSurfaces]. **The palette values were not changed to do it** — the tokens
+/// still exist and the chart-series order and the status ramp still read them —
+/// so every contrast number this file asserts is unchanged, and that is the
+/// point worth stating: the conversion moved *which* colour reaches a job, not
+/// how legible that colour is.
+///
+/// What it did change is the *load* on one colour. Red used to mean "a reading
+/// is out of range" and to appear in three places; it is now the app's only
+/// accent and appears on every heading, chip, ring, dot and meter. The `the red
+/// accent` group below is that new obligation written down, because a guard that
+/// only tests the old one would let the new one rot silently.
 List<Color> _captionPalette() => [
       faintColor,
       statusOk,
@@ -77,42 +93,81 @@ void main() {
   double hueOf(Color c) => HSLColor.fromColor(c).hue;
 
   group('the categorical vocabulary', () {
-    test('every category owns a distinct colour', () {
-      // A category mapped to exactly the same colour as another one is the
-      // failure this whole system exists to prevent: two pages, two meanings,
-      // one colour. Checked as distinctness rather than as a list of expected
-      // hexes, so adding a category cannot pass by accident.
-      final byColor = <int, List<String>>{};
+    test('every category resolves to the one accent, and to nothing else', () {
+      // **This is the inverse of what it used to assert, and the inversion is
+      // the design, not a relaxation.**
+      //
+      // The old rule was "every category owns a distinct colour", and it was
+      // right for a card UI: a hue that means a category is a compact label,
+      // and five categories on one screen is five labels in one glance. The
+      // Overview panel is not a card UI — it is an instrument panel, and its
+      // whole argument is that hue is spent on ONE thing (severity) while
+      // everything else is carried by weight, case, tracking and position.
+      //
+      // So what has to hold now is the opposite: `categoryColor` must be
+      // *total and constant*. The failure this guards is a category silently
+      // resolving to something that is not the accent — a leftover hue, or a
+      // derivation that starts varying by index again, which is the exact
+      // regression `metricColor` committed before.
       for (final category in MetricCategory.values) {
-        byColor
-            .putIfAbsent(categoryColor(category).toARGB32(), () => [])
-            .add(category.name);
-      }
-      for (final entry in byColor.entries) {
         expect(
-          entry.value,
-          hasLength(1),
-          reason: '#${_hex(Color(entry.key))} is claimed by '
-              '${entry.value.join(" and ")}',
+          categoryColor(category),
+          AppPalette.error,
+          reason: '${category.name} resolves outside the accent. If a category '
+              'needs its own hue back, that is a decision to make deliberately '
+              'with the contrast and the panel both in view, not something to '
+              'arrive at by leaving one behind.',
         );
       }
     });
 
-    test('the three Power-tab sub-tabs are far enough apart to tell apart', () {
-      // PV, AC and battery are the only three category hues that share a
-      // screen, so this is the only place separation is load-bearing. Butter
-      // yellow was chosen for solar partly for this: it is the widest
-      // separation the palette offers. Asserted as the floor the doc names
-      // rather than as the exact angles, so quantisation cannot make it flaky.
-      final angles = <String, double>{
-        'battery': hueOf(categoryColor(MetricCategory.battery)),
-        'ac': hueOf(categoryColor(MetricCategory.ac)),
-        'pv': hueOf(categoryColor(MetricCategory.pv)),
-      };
-      expect((angles['ac']! - angles['pv']!).abs(),
-          greaterThan(50.0), reason: 'AC and PV');
-      expect((angles['ac']! - angles['battery']!).abs(),
-          greaterThan(50.0), reason: 'AC and battery');
+    test('a category can never be mistaken for a status colour', () {
+      // The one guarantee the collapse put at risk. Everything on the panel is
+      // red now, so the red that means "this reading is wrong" has to stay
+      // separable from the red that means "this is the accent". They are
+      // different constants today; this is what stops that being an accident.
+      //
+      // Checked as "not equal" rather than as a distance, because they are two
+      // steps on one ramp and a hue-distance assertion would pass on a pair
+      // that is visually identical and only technically different.
+      for (final category in MetricCategory.values) {
+        final hue = categoryColor(category);
+        for (final status in {
+          'statusOk': statusOk,
+          'statusWarn': statusWarn,
+          'statusBad': statusBad,
+          'statusAlert': statusAlert,
+        }.entries) {
+          expect(
+            hue,
+            isNot(status.value),
+            reason: '${category.name} and ${status.key} are the same colour, '
+                'so a category marker would read as a fault',
+          );
+        }
+      }
+    });
+
+    test('the three Power-tab sub-tabs are told apart by their labels', () {
+      // **Hue separation is no longer the mechanism, so the test follows the
+      // mechanism.** PV, AC and battery used to share a screen as three hues,
+      // which is why the old version measured their hue angles and demanded
+      // 50 degrees of separation. They share a screen still, and they are now
+      // all the accent — so whatever tells them apart has to be their text.
+      //
+      // Asserted on the names rather than on the widget: the Power sub-tabs are
+      // PV, AC and Battery, and the whole point is that they are named rather
+      // than tinted. `environment` and `water` are the other two and they are
+      // named too — a future category cannot arrive without a name here, which
+      // is the "adding a category cannot pass by accident" property the old
+      // version got from the distinctness loop.
+      expect(
+        MetricCategory.values.map((c) => c.name).toSet(),
+        {'pv', 'ac', 'battery', 'environment', 'water'},
+        reason:
+            'every category must have a name, because the name is now what '
+            'tells two categories apart rather than a hue',
+      );
     });
 
     test('the one hue collision the palette cannot avoid is still two roles', () {
@@ -341,6 +396,135 @@ void main() {
         reason: 'a category hue that is the success green would put a second '
             'green palette on screen next to a status colour',
       );
+    });
+
+    group('the red accent', () {
+      // `AppPalette.error` used to mean exactly one thing — a reading out of
+      // range — and to be drawn in three places. It is now the app's only
+      // accent: the CTA, the selected date chip, the avatar ring, the live dot,
+      // every panel heading, a 2px row edge, a chart line and a meter fill.
+      //
+      // **That is a heavier load than a status colour ever had, and it is the
+      // reason this group exists.** A breach is always accompanied by a word;
+      // the avatar ring is not. So the accent now has to clear AA as a caption
+      // on *every* surface, not only where an alarm happened to land, and it has
+      // to stay distinguishable from the status ramp it shares a hue with.
+
+      test('clears AA as a caption on every surface it can be drawn on', () {
+        // `track` and `surfaceMuted` are new to this list on purpose. Neither is
+        // a caption surface, so neither is in `captionSurfaces()` — and the
+        // track is what the sky card's brightness bar and the forecast bar are
+        // filled against, while `surfaceMuted` is the muted tile. Adding them
+        // here rather than to `captionSurfaces()` is the point: the token list
+        // stays a description of where *text* goes, and this is a statement
+        // about a specific colour's job.
+        //
+        // The margin at the bottom is 0.05:1. Red measures 6.27 / 5.73 / 5.17
+        // / 4.55 on page / surface / surfaceAlt / surfaceMuted, so any future
+        // change to a surface is a change to this colour's legibility, exactly
+        // as the header of this file says.
+        expectClearsAa('AppPalette.error', AppPalette.error, [
+          ..._surfaces,
+          AppSurfaces.track,
+          AppSurfaces.surfaceMuted,
+        ]);
+      });
+
+      test('clears 3:1 as a graphic on the same list', () {
+        // The same colour is an icon, a 2px bottom border and a 10dp meter fill.
+        // WCAG 1.4.11 asks 3:1 of all three, and a role that passes as text can
+        // still fail as a shape.
+        for (final s in [
+          ..._surfaces,
+          AppSurfaces.track,
+          AppSurfaces.surfaceMuted,
+        ]) {
+          expect(
+            _contrast(AppPalette.error, s),
+            greaterThanOrEqualTo(3.0),
+            reason: 'the accent on #${_hex(s)} is '
+                '${_contrast(AppPalette.error, s).toStringAsFixed(2)}:1',
+          );
+        }
+      });
+
+      test('the ink on an accent fill is the one the app actually uses', () {
+        // Both large fills of the accent — the primary button in `banners.dart`
+        // and the selected date chip in `liquid_glass.dart` — hardcode
+        // `AppPalette.onHue` rather than calling `onPrimaryInk`, because the
+        // fill is a constant rather than a caller-supplied hue. That is only
+        // defensible while the ratio holds.
+        //
+        // **Pinned as `onHue` rather than as "not white" on purpose.** The
+        // assumption this test exists to kill is the natural one: white ink on a
+        // red fill. It measures 2.78:1, below AA for body text by a factor of
+        // 1.6, and every instinct about "ink on a coloured chip is white" points
+        // at it. Black is 7.57:1. Neither number is obvious and both were
+        // measured, which is why the assertion is on the value.
+        expectClearsAa('AppPalette.onHue on the accent', AppPalette.onHue,
+            [AppPalette.error]);
+      });
+
+      test('a wash in the accent is legible as a graphic but NOT as text', () {
+        // `AppBorders.categoricalWash` at 20%, which is the shape `AppBadge`
+        // draws. Composited over every caption surface rather than only over
+        // `page`, because the category loop above only ever composited over the
+        // page and the accent is now the hue behind most badges.
+        //
+        // **The number is 4.20:1 over a card and it is below AA, and that is a
+        // finding rather than a rounding error.** A 20% wash of the accent over
+        // `AppSurfaces.surface` lands on `#4E3131`, and the accent on that is
+        // 4.20:1 — over `page` and `surfaceAlt` it clears, and the card is the
+        // one that does not.
+        //
+        // So the guarantee is split, and the split is the useful part:
+        //
+        //  * **3:1, which passes.** This is what `GlassPageHeader` does — a 20%
+        //    wash with an 18px `Icon` of the same hue on it. That is 1.4.11's
+        //    graphical-object rule, and it clears with 1.2:1 to spare.
+        //  * **4.5:1, which fails.** Nobody draws accent-coloured *text* on an
+        //    accent wash today: `AppBadge`'s three call sites are the status ramp
+        //    and the CCTV overlay's own text colour. So this is a tripwire for
+        //    the next badge, not a description of the screen.
+        for (final surface in _surfaces) {
+          final wash = Color.alphaBlend(
+            AppBorders.categoricalWash(AppPalette.error),
+            surface,
+          );
+          final ratio = _contrast(AppPalette.error, wash);
+          expect(
+            ratio,
+            greaterThanOrEqualTo(3.0),
+            reason: 'the accent on its own wash over #${_hex(surface)} is '
+                '${ratio.toStringAsFixed(2)}:1, which is below the 3:1 that '
+                'an icon of the hue on that wash needs',
+          );
+        }
+        final overCard = Color.alphaBlend(
+          AppBorders.categoricalWash(AppPalette.error),
+          AppSurfaces.surface,
+        );
+        expect(
+          _contrast(AppPalette.error, overCard),
+          lessThan(4.5),
+          reason: 'the accent now clears 4.5:1 on a 20% wash over a card, so '
+              'this assertion — and the comment above explaining why a badge '
+              'must stay an icon — should both be revisited',
+        );
+      });
+
+      test('the accent is still distinct from every status colour it replaced',
+          () {
+        // The accent took over a lot of jobs the status ramp used to share
+        // territory with — the chart-section live dot, the carousel's active
+        // dot, the row edge — so it must not be confusable with the ramp. It is
+        // allowed to be the *same constant* as `statusBad`, because those never
+        // appear in the same sentence; it is not allowed to be equal to a colour
+        // that means a different condition.
+        expect(AppPalette.error, isNot(statusWarn));
+        expect(AppPalette.error, isNot(statusOk));
+        expect(AppPalette.error, isNot(statusAlert));
+      });
     });
   });
 }

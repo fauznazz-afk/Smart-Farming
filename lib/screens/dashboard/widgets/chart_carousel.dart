@@ -39,18 +39,16 @@ class _ChartCarouselState extends State<ChartCarousel> {
   @override
   Widget build(BuildContext context) {
     final faint = faintColor;
-    // **Lime, not amber.** The active dot used to take `AppPalette.accent`,
-    // which is the app's *stale/warning* status colour — see
-    // `color_helpers.dart`, where `statusWarn` is exactly this value and the
-    // comment above it says amber is the caution hue. A page indicator is not a
-    // warning, and using the warning colour for "you are here" spends the one
-    // hue that has to mean something is wrong.
+    // **The accent, and the dot was lime.** Two generations of "not amber" here,
+    // both arguing against the *status* ramp and both settling on a categorical
+    // hue. The dot is not a status and it is not a data series either: it is
+    // page chrome, and chrome has one colour. Which is `AppPalette.error`.
     //
-    // The brief is the authority here: lime appears as "active tab text + icon,
-    // active chip fill, 'live' pulse dot", and this is the same job. It is a
-    // 16dp pill beside six-dp grey ones, so the active state was already
-    // carried by size and does not lose anything by also being the right colour.
-    final accent = AppPalette.primary;
+    // It is also fine that red does not mean "warning" here — `terminal_panel.dart`
+    // settles that, at length, for the panel that established the rule: red is
+    // the instrument's own colour, and a meaning it carries only when a *word*
+    // says so.
+    const accent = AppPalette.error;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

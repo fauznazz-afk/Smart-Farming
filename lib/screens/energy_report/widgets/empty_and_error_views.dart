@@ -17,9 +17,9 @@ class EmptyPeriodView extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         children: [
-          // 36, inside the brief's 32–40 band for a hero/tile icon. Neutral
-          // rather than categorical: this state has no category, and the
-          // categorical hues are markers for data rather than for chrome.
+          // 36, inside the brief's 32–40 band for a hero/tile icon. Neutral:
+          // "no data" is a chrome state, not a reading, and the app spends its
+          // accent on chrome that means something rather than on an absence.
           const Icon(Icons.event_busy_outlined, size: 36),
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -73,14 +73,14 @@ class ErrorView extends StatelessWidget {
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: AppRadius.all(AppRadius.card),
-                boxShadow: AppShadows.stampedIn(AppPalette.primary),
+                boxShadow: AppShadows.stampedIn(AppPalette.error),
               ),
               child: FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 label: const Text('Retry'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppPalette.primary,
+                  backgroundColor: AppPalette.error,
                   foregroundColor: AppPalette.onHue,
                   textStyle: AppType.buttonLabel,
                   minimumSize: const Size(0, 56),

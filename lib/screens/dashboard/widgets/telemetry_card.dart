@@ -35,6 +35,13 @@ class GlassPageHeader extends StatelessWidget {
         // 10% the brief's list-row thumbnail uses, because 20% is the only wash
         // the token file has and a hand-mixed alpha here is exactly the
         // unmeasured-value problem `color_helpers_test.dart` exists to stop.
+        //
+        // **The 20% wash of the accent over a card is `#4E3131`, and the accent
+        // on it is 4.20:1.** That clears the 3:1 an 18px `Icon` needs under
+        // WCAG 1.4.11 and does *not* clear the 4.5:1 that accent-coloured text
+        // would need. So this header may put an icon of the hue on the wash and
+        // nothing else — which is why the title below is `appPrimaryText` and
+        // not `accent`. `color_helpers_test.dart` pins both halves of that.
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -81,8 +88,15 @@ class TelemetryCard extends StatelessWidget {
             _MetricRow(
               metric: metrics[index],
               value: data?.latestValues[metrics[index].key],
-              accent:
-                  categoryColorForKey(metrics[index].key) ?? AppPalette.primary,
+              // **The accent, and it was the category hue.** The three call sites
+              // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
+              // battery keys respectively — so every row in a given card is
+              // *already* one category, and the colour could not be telling the
+              // reader anything the card's own header does not already say. What
+              // it was telling them is which of five hues the dashboard
+              // currently believes the app is. Rows, icons and a 2px edge are
+              // chrome and headings, so they take the one accent.
+              accent: AppPalette.error,
               // **The 2px categorical bottom border, and it replaces the
               // [AppDivider] this row used to be separated by.** The brief's stat
               // tile is "card + leading icon in a categorical colour + numeral
@@ -98,8 +112,9 @@ class TelemetryCard extends StatelessWidget {
               //
               // Every reading in this card is one category — the three call sites
               // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
-              // battery keys respectively — so the rules are one hue per card and
-              // the card reads as its page's colour.
+              // battery keys respectively — so the hue used to be constant
+              // *within* a card and only ever varied *between* cards, which is
+              // decoration and not information.
               beneath: index < metrics.length - 1,
             ),
           ],

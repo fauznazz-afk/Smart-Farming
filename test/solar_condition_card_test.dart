@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/widgets/solar_condition.dart';
 
@@ -89,11 +90,15 @@ void main() {
       expect(find.textContaining('% of a clear noon'), findsNothing);
     });
 
-    testWidgets('a dark reading reads as heavily overcast, not as clear', (
+    testWidgets('a dark reading reads as night, not as clear', (
       tester,
     ) async {
       await pumpCard(tester, lux: 0);
-      expect(find.text('Heavily overcast'), findsOneWidget);
+      // The four-step ladder is now three steps plus night, and `<= 0` is `night`
+      // by construction — see `skyConditionFor`'s doc. The old expectation of
+      // "Heavily overcast" described a state that no longer exists; one lux is
+      // `overcast` and zero is `night`, and that boundary is deliberate.
+      expect(find.text('Night'), findsOneWidget);
       expect(find.text('0'), findsOneWidget);
     });
 
@@ -111,7 +116,7 @@ void main() {
 
     testWidgets('a noon reading is clear', (tester) async {
       await pumpCard(tester, lux: 100000);
-      expect(find.text('Clear sky'), findsOneWidget);
+      expect(find.text('Clear'), findsOneWidget);
       // **The lux reading itself, not a conversion.** 100 000 lx is 1075 W/m²,
       // which is over one sun — but the card no longer shows that, because the
       // number the user can verify against the environment grid is the one the
@@ -260,12 +265,12 @@ void main() {
     ) async {
       final handle = tester.ensureSemantics();
       await pumpCard(tester, lux: 41200);
-      // 41 200 lx lands in the 28 000–55 000 band, so the whole point of the
+      // 41 200 lx clears the 28 000 lx line, so the whole point of the
       // card -- a bare lux number turned into a sentence about the sky -- is in
       // this one string. The lux figure is what a screen reader is told, and it
       // is the number the sensor reported rather than a derived one.
       expect(announced(RegExp(r'41200 lux')), findsOneWidget);
-      expect(announced(RegExp('Mostly clear')), findsOneWidget);
+      expect(announced(RegExp('Clear')), findsOneWidget);
       handle.dispose();
     });
 
@@ -284,11 +289,23 @@ void main() {
   });
 
   group('tokens', () {
-    testWidgets('the fill is lime, and only lime', (tester) async {
-      // The app's rule is that a status colour means a condition rather than an
-      // identity, and the one place a hue could drift is here. A clear-sky card
-      // that borrowed the chart triad's red would say "something is wrong" about
-      // a cloudless noon.
+    testWidgets('the meter fill is the accent, and only the accent', (
+      tester,
+    ) async {
+      // **This assertion was `AppPalette.primary`, and it was the right test
+      // against the wrong rule.** It existed to stop the sky card borrowing a
+      // *status* colour — a clear-sky card drawn in the chart triad's red would
+      // say "something is wrong" about a cloudless noon. Then red became the
+      // accent, which put the test and its reason at odds with each other: under
+      // the new rule the fill *is* `AppPalette.error`, so the original wording
+      // would have failed for the correct behaviour.
+      //
+      // So both halves are kept and the second is the one that now carries the
+      // weight. The fill must be the accent, and the accent must not be one of
+      // the status colours a stale reading is painted in — because this card
+      // draws a `statusWarn` "stale" notice beside the very same bar, and if the
+      // meter and the warning shared a hue the user could not tell a fresh
+      // reading from a dead one by looking at the colour.
       await pumpCard(tester, lux: 100000);
       final decoration =
           tester
@@ -302,7 +319,10 @@ void main() {
                   )
                   .decoration
               as BoxDecoration;
-      expect(decoration.color, AppPalette.primary);
+      expect(decoration.color, AppPalette.error);
+      expect(AppPalette.error, isNot(statusWarn));
+      expect(AppPalette.error, isNot(statusOk));
+      expect(decoration.color, isNot(statusWarn));
     });
   });
 }

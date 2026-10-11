@@ -4,15 +4,18 @@
 /// **This file was rewritten against the "Neon Brutalist Mobile" brief on 10
 /// October 2026, and four of its load-bearing values changed.**
 ///
-///   * **One accent, and it is acid lime.** The palette before this carried a
-///     coral/periwinkle/butter set with no relationship to the brief. `primary`
-///     is now `#C6FF00`, and it is reserved exactly as the brief reserves it:
-///     the primary CTA, the active tab, the active chip, the live dot, the peak
-///     bar, the focus ring. It is never a card background.
+///   * **One accent, and it is red.** [AppPalette.error], `#FF6B6B`, is the only
+///     hue the app spends on chrome: the primary CTA, the active chip, the
+///     avatar ring, the live dot, the meter fill, every panel heading. Everything
+///     else is a neutral from [AppSurfaces]. The lime, blue, violet, cyan and
+///     green tokens are still in [AppPalette] because the chart-series order and
+///     the status ramp read them, but none of them may be *decoration* — a hue
+///     in a heading, a label, an icon or a border that is not carrying data is
+///     the thing this rule exists to remove.
 ///   * **Elevation is a hard offset shadow, not a blur.** A card is stamped
 ///     `4px 4px 0 rgba(0,0,0,0.3)` — no blur, no spread, a solid displaced
 ///     rectangle. The primary button carries the tinted variant. The soft outer
-///     glow is rare and lime-only, for a progress fill or a peak bar.
+///     glow is rare and accent-only, for a progress fill or a peak bar.
 ///   * **Radii are small.** Cards, inputs, buttons and list rows are 8px. Badges
 ///     are 2px. Filter pills are the only full-round shapes. The 24px card
 ///     radius this replaces was the previous system's; nothing in the brief
@@ -23,9 +26,9 @@
 ///     bundled as three *static* instances — see `pubspec.yaml` for why a
 ///     variable file would render every weight at its default on older Android.
 ///
-/// The two derived hues and the one deprecated token are recorded where they
-/// are defined rather than here: see [AppPalette] for why green and cyan exist
-/// in a palette whose categorical set is four.
+/// The hues that are not the accent are recorded where they are defined rather
+/// than here: see [AppPalette] for which ones still have a reader and which are
+/// retained only so a call site keeps compiling.
 library;
 
 import 'package:flutter/material.dart';
@@ -239,6 +242,11 @@ class AppBorders {
   /// The one sanctioned way to put a hue behind text. A hand-written
   /// `hue.withValues(alpha: 0.3)` behind a caption is the mistake that cost
   /// contrast in three previous design systems in this app.
+  ///
+  /// **The hue is nearly always [AppPalette.error] now.** The wash exists for a
+  /// badge whose foreground is the accent, and `color_helpers_test.dart` measures
+  /// the result; the function takes a parameter rather than hardcoding red
+  /// because the status ramp still washes its own colour.
   static Color categoricalWash(Color hue) => hue.withValues(alpha: 0.20);
 
   /// The 20%-alpha border that goes with [categoricalWash].
@@ -264,7 +272,7 @@ class AppBorders {
 ///  * **Flat** — the app bar, the tab bar, badges, chips. No shadow at all.
 ///  * **Stamped** — cards, inputs, list rows, and the primary button (with the
 ///    tinted displacement).
-///  * **Glow** — rare, lime-only: a progress fill or a peak bar, so the accent
+///  * **Glow** — rare, accent-only: a progress fill or a peak bar, so the accent
 ///    visibly emits.
 class AppShadows {
   const AppShadows._();
@@ -292,7 +300,7 @@ class AppShadows {
     ),
   ];
 
-  /// The rare lime-only glow: `0 0 10px` at 50%.
+  /// The one glow in the app: `0 0 10px` at 50%.
   ///
   /// For a progress fill or a chart's peak bar. Nothing else in the app is
   /// allowed to glow.
@@ -617,59 +625,77 @@ Color appDivider({double opacity = 1.0}) =>
 
 /// The palette.
 ///
-/// **One brand accent and four categorical markers, plus two hues the brief
-/// does not have and this app needs.**
+/// ## One accent: red
 ///
-/// | token          | hex       | role                                            |
-/// |----------------|-----------|-------------------------------------------------|
-/// | [primary]      | `#C6FF00` | acid lime: the CTA, the active tab, the live dot |
-/// | [secondary]    | `#4A9EFF` | blue — the AC / house category                  |
-/// | [accent]       | `#FFB84D` | amber — the stale/warning status                 |
-/// | [error]        | `#FF6B6B` | red — the environment category, breach fills     |
-/// | [chartViolet]  | `#C084FC` | violet — the battery category                   |
-/// | [chartCyan]    | `#22D3EE` | cyan — the water category                        |
-/// | [success]      | `#4ADE80` | green — healthy                                  |
+/// | token         | hex       | role                                          |
+/// |---------------|-----------|-----------------------------------------------|
+/// | [error]       | `#FF6B6B` | **the accent**, and the breach fill           |
 ///
-/// ### The two that are not in the brief
+/// In a chrome, heading, label, icon or border, colour is either this red or a
+/// neutral from [AppSurfaces]. There is no second accent. That is not a
+/// preference: a hue the user did not choose is a hue they cannot predict, and
+/// an app that spent lime on a CTA and blue on an avatar ring was showing four
+/// brands at once. The instrument-panel reading is what the Overview page
+/// established — `terminal_panel.dart` argues it at length — and it is now the
+/// whole app.
 ///
-/// **Green.** The brief's palette has no green, and this app needs one colour
-/// that means "a problem is absent" — it is the one remaining semantic role the
-/// old system had and the brief has no equivalent for. `#4ADE80` measures 8.6:1
-/// on [AppSurfaces.surfaceAlt].
+/// ## The other five, and why they still exist
 ///
-/// **Cyan.** The brief's categorical set is four and the app has five data
-/// categories. Water is the fifth, and it is the one category that never shares
-/// a screen with another — the Fish tab is the only place it appears — so it
-/// takes the one hue with no rival claim rather than doubling up on a brief
-/// colour and breaking the "a hue never means two things" rule.
+/// None of these is an accent any more. Each is retained because something
+/// still reads it, and deleting a token that a call site or a test still names
+/// is a separate, deliberate change — not something to do as a side effect of a
+/// colour conversion.
 ///
-/// ### The one that is shared
+/// | token          | hex       | still read by                                    |
+/// |----------------|-----------|--------------------------------------------------|
+/// | [primary]      | `#C6FF00` | `kChartSeriesOrder`, position 0                  |
+/// | [secondary]    | `#4A9EFF` | `kChartSeriesOrder`, position 1                  |
+/// | [chartViolet]  | `#C084FC` | `kChartSeriesOrder`, position 2                  |
+/// | [chartCyan]    | `#22D3EE` | `kChartSeriesOrder`, position 3                  |
+/// | [accent]       | `#FFB84D` | `statusWarn`, the stale/warning severity         |
+/// | [success]      | `#4ADE80` | `statusOk`, "a problem is absent"                |
 ///
-/// [primary] is both the brand accent and the PV category. That is the brief's
-/// own reuse pattern applied to the app's hero metric: it sanctions lime as the
-/// "peak bar in charts", and PV power is the peak data this app charts. It is
-/// used as an icon, a border and a series line — never as a fill — so it never
-/// becomes a card background, which is the one thing the brief forbids outright.
+/// **A chart series is data, not decoration.** A group with more than one series
+/// draws them in the fixed order above, because three lightness steps of one hue
+/// are indistinguishable on a phone and dash patterns to compensate read as
+/// broken lines. A group with a single series takes the accent instead, because
+/// there is nothing to distinguish it from. That boundary is the only place a
+/// non-red hue is allowed on screen outside the status ramp.
+///
+/// **The status ramp keeps its hues** for the same reason: green means a problem
+/// is absent and amber means it is stale, and both always ship with the word that
+/// says which. They are conditions rather than identities, which is exactly the
+/// distinction the accent rule rests on.
 class AppPalette {
   const AppPalette._();
 
-  /// Acid lime. The focal hue, and the PV category.
-  static const Color primary = Color(0xFFC6FF00);
-
-  /// Blue. The AC / house category.
-  static const Color secondary = Color(0xFF4A9EFF);
-
-  /// Amber. The stale/warning status.
-  static const Color accent = Color(0xFFFFB84D);
-
-  /// Green. A healthy reading. Derived: see the class doc.
-  static const Color success = Color(0xFF4ADE80);
-
-  /// Red. The environment category, and the breach fill. Derived shade of the
-  /// brief's `accent-red`, which is used as the categorical marker here.
+  /// **The accent.** Red, and the only colour the app spends on chrome.
+  ///
+  /// Derived shade of the brief's `accent-red`. It is not a claim that something
+  /// is wrong — `terminal_panel.dart` states that deliberately, and the panel's
+  /// hero figure, its section headings and its meter fills are all this value on
+  /// a day when everything is perfectly nominal.
   static const Color error = Color(0xFFFF6B6B);
 
-  /// Violet. The battery category.
+  /// **No longer an accent.** Acid lime. Retained for the chart-series order and
+  /// the PV category; a call site that reaches for it as decoration is the bug
+  /// this doc exists to prevent.
+  static const Color primary = Color(0xFFC6FF00);
+
+  /// **No longer an accent.** Blue. Retained for the chart-series order and the
+  /// AC category; see [primary].
+  static const Color secondary = Color(0xFF4A9EFF);
+
+  /// Amber. The stale/warning severity. **A condition, not an identity** — it
+  /// only appears beside the word that says what is stale.
+  static const Color accent = Color(0xFFFFB84D);
+
+  /// Green. A healthy reading. **A condition, not an identity** — it is
+  /// `statusOk` and nothing else, and it is never a page's own colour.
+  static const Color success = Color(0xFF4ADE80);
+
+  /// Violet. Retained for the chart-series order and the battery category; see
+  /// [primary].
   ///
   /// **The brief's `#A855F7` scaled up 1.28x per channel, and the direction is
   /// the whole point.** The obvious fix for a colour that fails contrast on a
@@ -677,10 +703,27 @@ class AppPalette {
   /// rather than stepped in HSL, so the hue is preserved exactly.
   static const Color chartViolet = Color(0xFFC084FC);
 
-  /// Cyan. The water category. Derived: see the class doc.
+  /// Cyan. Retained for the chart-series order and the water category; see
+  /// [primary].
   static const Color chartCyan = Color(0xFF22D3EE);
 
-  /// Ink on a saturated fill. The brief's `on-primary`: black on lime.
+  /// Ink on a saturated fill. The brief's `on-primary`.
+  ///
+  /// **Black, and the name is misleading enough to be worth arguing here.**
+  /// `onHue` was written for lime, where black reads 14:1 and white 1.9:1, so it
+  /// looks like a leftover from the old brand hue rather than a rule. It is not:
+  /// it is *dark ink on a bright fill*, and the accent is bright. On
+  /// `#FF6B6B` black measures **7.57:1** and white measures **2.78:1** — white
+  /// fails AA for body text by a factor of 1.6, which is the reason both the
+  /// primary button (`banners.dart`) and the selected date chip
+  /// (`liquid_glass.dart`) keep reaching for this token rather than
+  /// `AppSurfaces.onSurface`.
+  ///
+  /// `color_helpers.dart`'s `onPrimaryInk` derives the same answer from the
+  /// fill's measured luminance instead of from its hue, and
+  /// `accent_graphic_contrast_test.dart` holds that function to 4.5:1 for every
+  /// fill in the palette. Use this token when the fill is a known constant; use
+  /// `onPrimaryInk` when a caller supplies the fill.
   static const Color onHue = Color(0xFF000000);
 
   /// **Deprecated: use [AppShadows].** `aura` was a blurred halo, and the brief

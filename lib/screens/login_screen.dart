@@ -221,11 +221,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         // because Material maps elevation through
                         // `kElevationToShadow` and can only produce a blurred
                         // halo — the one shadow language the brief bans
-                        // outright.
+                        // outright. The hue is the accent, so the offset strip
+                        // bleeds the same colour as the fill.
                         DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: AppRadius.all(AppRadius.card),
-                            boxShadow: AppShadows.stampedIn(AppPalette.primary),
+                            boxShadow: AppShadows.stampedIn(AppPalette.error),
                           ),
                           child: SizedBox(
                             width: double.infinity,
@@ -233,9 +234,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: FilledButton(
                               onPressed: _loading ? null : _handleLogin,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppPalette.primary,
+                                backgroundColor: AppPalette.error,
                                 foregroundColor: AppPalette.onHue,
-                                disabledBackgroundColor: AppPalette.primary,
+                                disabledBackgroundColor: AppPalette.error,
                                 disabledForegroundColor: AppPalette.onHue,
                                 textStyle: AppType.buttonLabel,
                                 shape: RoundedRectangleBorder(

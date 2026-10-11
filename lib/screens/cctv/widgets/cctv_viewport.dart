@@ -118,7 +118,7 @@ class CctvStandbyOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Solid primary circle with onHue ink (FAB-circle style).
+                // Solid accent circle with onHue ink (FAB-circle style).
                 //
                 // **Flat, and the two blurred shadows are gone.** They were a
                 // black 10px-blur offset plus a white 4px-blur highlight — the
@@ -132,7 +132,7 @@ class CctvStandbyOverlay extends StatelessWidget {
                   width: 68,
                   height: 68,
                   decoration: BoxDecoration(
-                    color: AppPalette.primary,
+                    color: AppPalette.error,
                     shape: BoxShape.circle,
                     border: AppBorders.boundaryBorder,
                   ),
@@ -311,7 +311,7 @@ class CctvErrorOverlay extends StatelessWidget {
                 TextButton(
                   onPressed: onBack,
                   style: TextButton.styleFrom(
-                    foregroundColor: AppPalette.primary,
+                    foregroundColor: AppPalette.error,
                     textStyle: AppType.labelMicro,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xs,

@@ -96,10 +96,16 @@ class SolarConditionCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // The sun glyph is the accent. It was `AppPalette.primary` — lime — which
+              // is a *chart-series* colour, and a chart series is data. An icon
+              // in a label row is chrome, and chrome has one colour. The same
+              // hue also fills the brightness bar below, which is the one thing
+              // on the card that is a meter, so the glyph and the meter now
+              // agree with each other as well as with the rest of the app.
               const Icon(
                 Icons.wb_sunny_rounded,
                 size: 20,
-                color: AppPalette.primary,
+                color: AppPalette.error,
               ),
               const SizedBox(width: AppSpacing.sm),
               // **The left half is the *name*, the right half is the *reading*.**
@@ -223,10 +229,18 @@ class _BrightnessBar extends StatelessWidget {
         child: FractionallySizedBox(
           widthFactor: fraction,
           child: DecoratedBox(
+            // **The fill is the accent, and the glow is the only glow in the app.**
+            //
+            // It was lime, matching the sun glyph above it — which is the reason
+            // that pairing was worth breaking: the two were consistent with each
+            // other and inconsistent with every other card on the dashboard.
+            // `AppShadows.glow` is reserved for a meter fill, and a meter fill is
+            // the accent; `design_tokens.dart` says so and this is now the only
+            // place that obeys it.
             decoration: BoxDecoration(
-              color: AppPalette.primary,
+              color: AppPalette.error,
               borderRadius: BorderRadius.circular(AppRadius.bar),
-              boxShadow: AppShadows.glow(AppPalette.primary, strength: 0.35),
+              boxShadow: AppShadows.glow(AppPalette.error, strength: 0.35),
             ),
           ),
         ),

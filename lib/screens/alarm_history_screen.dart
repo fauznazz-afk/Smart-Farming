@@ -368,7 +368,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
             // The brief's `chip`: a full-round 40dp pill, `surface` behind a
             // hairline in `label-uppercase-sm`, and — when selected — a solid
-            // [AppPalette.primary] fill with [AppPalette.onHue] ink and *no*
+            // [AppPalette.error] fill with [AppPalette.onHue] ink and *no*
             // border. An outline round a solid fill is a second, competing edge,
             // which is the same argument `DateStripChip` already makes.
             //
@@ -397,7 +397,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
               ),
               selected: isSelected,
               backgroundColor: AppSurfaces.surface,
-              selectedColor: AppPalette.primary,
+              selectedColor: AppPalette.error,
               side: isSelected ? BorderSide.none : AppBorders.hairline,
               shape: const StadiumBorder(),
               padding: const EdgeInsets.symmetric(

@@ -30,19 +30,34 @@ void main() {
 /// only thing that survives here is the reason it did before: a derived role is
 /// a copy that drifts the moment a surface moves.
 ///
-/// `onHue` on every role it can sit on is not decoration. Every hue in
-/// [AppPalette] is light enough that dark ink is correct, and white on
-/// [AppPalette.primary] measures 1.71:1.
+/// **Every accent-bearing role resolves to [AppPalette.error], and that is the
+/// root of the black-and-red panel.** Material derives an enormous amount of
+/// chrome from this one object — `FilledButton`'s fill and ink, the selected
+/// `Chip`, the `SegmentedButton` selection, a `Switch`'s active track, a
+/// `Checkbox`, the focus ring, text selection handles, the progress indicator —
+/// and none of it was listed anywhere except here. A lime scheme therefore
+/// survived every per-widget conversion, because the widget was reading the
+/// scheme and the scheme still said lime. `primary`/`secondary`/`tertiary` and
+/// their containers are now all the one accent, so there is no role left that
+/// can reintroduce a second hue.
+///
+/// `secondaryContainer` is not optional here: it is what a selected `ChoiceChip`
+/// paints, and leaving it at Material's derived value would put a desaturated
+/// near-invisible fill behind the alarm-history filter chips.
+///
+/// `onHue` on every role it can sit on is not decoration. Black ink on
+/// `#FF6B6B` measures **7.57:1** and white measures **2.78:1**, so white fails
+/// AA for body text by a factor of 1.6 and black clears it by a wide margin.
 ColorScheme _appColorScheme() => const ColorScheme.dark(
-  primary: AppPalette.primary,
+  primary: AppPalette.error,
   onPrimary: AppPalette.onHue,
-  primaryContainer: AppPalette.primary,
+  primaryContainer: AppPalette.error,
   onPrimaryContainer: AppPalette.onHue,
-  secondary: AppPalette.secondary,
+  secondary: AppPalette.error,
   onSecondary: AppPalette.onHue,
-  secondaryContainer: AppPalette.secondary,
+  secondaryContainer: AppPalette.error,
   onSecondaryContainer: AppPalette.onHue,
-  tertiary: AppPalette.accent,
+  tertiary: AppPalette.error,
   onTertiary: AppPalette.onHue,
   surface: AppSurfaces.surface,
   onSurface: AppSurfaces.onSurface,
@@ -86,7 +101,7 @@ TextTheme _appTextTheme() {
   );
 }
 
-/// The app's buttons: a solid categorical pill with dark ink.
+/// The app's buttons: a solid accent pill with dark ink.
 ///
 /// `filledButtonTheme` was simply absent for most of this app's life, so every
 /// `FilledButton` — "Sign in", "Save settings", "Play camera" — was a raw
@@ -96,20 +111,25 @@ TextTheme _appTextTheme() {
 /// paired a light seed with a light `onPrimary`.
 /// The brief's `button-primary`, applied to every filled button in the app.
 ///
-/// Acid lime fill, black ink, `AppRadius.card` (8px — the brief's default for
-/// buttons), 56dp tall, and the **tinted hard shadow** `4px 4px 0` in the lime
-/// at 20%, which is the one place the accent is allowed to bleed. Label is
-/// `AppType.buttonLabel`: 13px at 900 with 0.1em tracking — buttons shout.
+/// Accent fill, black ink, `AppRadius.card` (8px — the brief's default for
+/// buttons), 56dp tall. Label is `AppType.buttonLabel`: 13px at 900 with 0.1em
+/// tracking — buttons shout.
+///
+/// **Black ink on the accent, and it is measured rather than preferred:** 7.57:1
+/// against 2.78:1 for white. `AppPalette.onHue` was written for a lime fill and
+/// its name is a leftover; what it has always meant is *dark ink on a bright
+/// fill*, and the accent is bright.
 ///
 /// The 56dp is `minimumSize` rather than `fixedSize`, so the button still grows
 /// with the user's font scale. `elevation: 0` keeps Material from adding a soft
-/// shadow underneath the hard one.
+/// shadow underneath the hard one, which the call sites paint themselves through
+/// `AppShadows.stampedIn` — a solid offset rectangle in the accent at 20%.
 FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
   style: ButtonStyle(
-    backgroundColor: const WidgetStatePropertyAll(AppPalette.primary),
+    backgroundColor: const WidgetStatePropertyAll(AppPalette.error),
     foregroundColor: const WidgetStatePropertyAll(AppPalette.onHue),
     elevation: const WidgetStatePropertyAll(0),
-    shadowColor: const WidgetStatePropertyAll(AppPalette.primary),
+    shadowColor: const WidgetStatePropertyAll(AppPalette.error),
     minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -150,7 +170,7 @@ OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
 
 TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
   style: ButtonStyle(
-    foregroundColor: const WidgetStatePropertyAll(AppPalette.primary),
+    foregroundColor: const WidgetStatePropertyAll(AppPalette.error),
     elevation: const WidgetStatePropertyAll(0),
     minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
     textStyle: const WidgetStatePropertyAll(AppType.labelMicro),
@@ -166,15 +186,16 @@ TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
 /// desaturating the seed until it reads as a neutral — invisible on a near-black
 /// card, which is where this card's three call sites live.
 ///
-/// The fill is [AppPalette.primary] rather than a category hue: a segmented
-/// control is chrome, and the brief reserves lime for the active thing on
-/// screen. The corner is the brief's `full` — a filter chip is the one shape it
-/// allows to pill.
+/// The fill is the accent, because a segmented control is chrome and a filter
+/// chip is the one shape allowed to pill. It states the same thing as the
+/// colour scheme's `secondaryContainer`, deliberately: a `SegmentedButton` that
+/// reads red while an unthemed `Chip` beside it does not is two systems on one
+/// screen.
 SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
   style: ButtonStyle(
     backgroundColor: WidgetStateProperty.resolveWith(
       (states) => states.contains(WidgetState.selected)
-          ? AppPalette.primary
+          ? AppPalette.error
           : AppSurfaces.surface,
     ),
     foregroundColor: WidgetStateProperty.resolveWith(
@@ -203,9 +224,8 @@ SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
 ///
 /// **The fill is [AppSurfaces.input], which is the same value as
 /// [AppSurfaces.surface]: a text field is a surface.** 56dp tall, the stamped
-/// shadow, and a 2px [AppPalette.primary] border on focus — the brief's focus
-/// ring, which is the only attention hue in the palette that is not also a
-/// severity.
+/// shadow, and a 2px [AppPalette.error] border on focus — the accent, which is
+/// the only attention hue in the palette that is not also a severity.
 InputDecorationTheme _inputTheme() => InputDecorationTheme(
   filled: true,
   fillColor: AppSurfaces.input,
@@ -220,7 +240,7 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
   ),
   focusedBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.inset),
-    borderSide: const BorderSide(color: AppPalette.primary, width: 2),
+    borderSide: const BorderSide(color: AppPalette.error, width: 2),
   ),
   // Uppercase 700 with 0.1em tracking, per `label-uppercase-md`: a
   // placeholder in this system is a shout, not a hint.
@@ -269,11 +289,20 @@ ThemeData _appThemeData() => ThemeData(
   textButtonTheme: _textButtonTheme(),
   segmentedButtonTheme: _segmentedTheme(),
   inputDecorationTheme: _inputTheme(),
-  // The brief's progress indicator: a lime line with no soft Material track
+  // The brief's progress indicator: an accent line with no soft Material track
   // around it. `RefreshIndicator`'s spinner inherits it.
   progressIndicatorTheme: const ProgressIndicatorThemeData(
-    color: AppPalette.primary,
+    color: AppPalette.error,
     circularTrackColor: AppSurfaces.surfaceMuted,
+  ),
+  // Material draws a `SnackBar` on `inverseSurface`, which on a dark scheme is
+  // a light box — a white panel on a black page. It is stated here rather than
+  // left to the default because the default also picks the action's ink, and the
+  // accent on a light surface measures 2.78:1.
+  snackBarTheme: SnackBarThemeData(
+    backgroundColor: AppSurfaces.surface,
+    contentTextStyle: AppType.bodySm.copyWith(color: AppSurfaces.onSurface),
+    actionTextColor: AppPalette.error,
   ),
 );
 

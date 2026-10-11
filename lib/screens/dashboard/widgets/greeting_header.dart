@@ -26,11 +26,11 @@ class GreetingHeader extends StatelessWidget {
     return Row(
       children: [
         // **The brief's `avatar` component, and it is the only thing on the
-        // Overview page allowed to wear the brand accent as a ring.** The spec is
+        // Overview page allowed to wear the accent as a ring.** The spec is
         // `size 48px, rounded full, borderColor primary, borderWidth 2px, no
         // shadow` — and the brief lists "avatar ring" among the six sanctioned
         // uses of `{colors.primary}` alongside the CTA, the active tab and the
-        // live dot.
+        // live dot. In this app `primary` resolves to the one accent, red.
         //
         // What this replaces was a 44dp circle filled with `AppSurfaces.track`
         // and outlined in the neutral hairline at 1.5px: a grey disc on a grey
@@ -48,7 +48,7 @@ class GreetingHeader extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: AppPalette.primary, width: 2),
+            border: Border.all(color: AppPalette.error, width: 2),
           ),
           child: Padding(
             padding: const EdgeInsets.all(10),

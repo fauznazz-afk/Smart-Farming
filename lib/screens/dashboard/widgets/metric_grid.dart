@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/alarm_rules.dart';
-import '../../../widgets/liquid_glass.dart';
-import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
+import 'terminal_panel.dart';
 
 /// One reading in a [MetricGrid]: which telemetry key, what to call it, and
 /// whether anything is watching it.
@@ -28,8 +27,32 @@ class MetricSpec {
 /// How a spec's configured range is captioned under its value.
 typedef LimitLabelBuilder = String? Function(MetricSpec spec);
 
-/// A titled grid of reading cards, used for the greenhouse sensors and for the
-/// fish tank.
+/// A titled table of readings, used for the greenhouse sensors and for the fish
+/// tank. One [TerminalPanel], one [TerminalRow] per spec.
+///
+/// ## Why it is no longer a grid of tiles
+///
+/// This was `columns` side-by-side [AppCard]s, each with an icon, a value and a
+/// caption. On a phone that is four or five boxes inside a box, and the
+/// comparison the layout promised — two readings of the same kind next to each
+/// other — is one the reader was never making, because a `temp_dht` and a `lux`
+/// have nothing to be compared against. It was also the last part of the
+/// dashboard still in the old card vocabulary after the Overview became a
+/// panel, so the two grids and the Overview page read as three different apps.
+///
+/// **One spec per row is the fix, and [columns] did nothing for it.** The
+/// column count was chosen so a row would not end half empty, which was a
+/// property of the tile grid and not of the data. It is still a constructor
+/// parameter because `dashboard_screen.dart` passes it and callers should not
+/// have to change to get the new look, but it no longer decides anything: the
+/// rows are ordered and dense, which is what makes this a readout.
+///
+/// ## The label is now a slot name
+///
+/// `AMBIENT_T`, `PV_TEMP`, `TURBIDITY` — abbreviated, underscored, monospace,
+/// the same vocabulary as `PV_OUT` and `BAT_SOC` on the Overview panel. `key`
+/// and `metric` are untouched: those are the ThingsBoard telemetry keys and the
+/// alarm-rule names, and the two are deliberately different.
 class MetricGrid extends StatelessWidget {
   const MetricGrid({
     super.key,
@@ -47,6 +70,9 @@ class MetricGrid extends StatelessWidget {
   final String title;
   final List<MetricSpec> specs;
   final Map<String, double>? values;
+
+  /// Retained for call-site compatibility only. It no longer affects layout —
+  /// see the class doc comment.
   final int columns;
   final AlarmThresholds? thresholds;
   final int staleMinutes;
@@ -63,61 +89,150 @@ class MetricGrid extends StatelessWidget {
       staleMinutes,
       specs,
     );
-    final monitored = specs.where((spec) => spec.metric != null).toList();
-    final breached = monitored
+    final breached = specs
         .where((spec) => verdicts.isBreached(spec))
         .length;
 
-    final rows = <List<MetricSpec>>[];
-    for (var start = 0; start < specs.length; start += columns) {
-      final end = (start + columns).clamp(0, specs.length);
-      rows.add(specs.sublist(start, end));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return TerminalPanel(
+      header: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.cardPadding,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
           children: [
-            Expanded(
+            // **The heading is the panel's accent, not a muted caption.** A
+            // quiet grey title above a black table is a caption; a red slot name
+            // is a section of an instrument. Same reason `POWER` and `SKY` are
+            // red on the Overview page.
+            Flexible(
               child: Text(
-                title,
+                title.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppType.labelUppercase.copyWith(color: faintColor),
+                style: AppType.slotKey.copyWith(color: AppPalette.error),
               ),
             ),
             const Spacer(),
+            // **Say nothing when nothing is wrong.** Both tags below are a
+            // verdict on the data, so the healthy case draws nothing at all
+            // rather than a green "all normal" badge occupying the space a real
+            // breach needs.
             if (verdicts.isStale)
-              Flexible(
-                child: _Tag(text: 'Stale data', color: statusWarn),
-              )
+              TerminalTag(text: 'Stale data', alert: false)
             else if (breached > 0 && showGridColors)
-              Flexible(
-                child: _Tag(text: '$breached out of range', color: statusBad),
-              ),
+              TerminalTag(text: '$breached out of range', alert: true),
           ],
         ),
-        const SizedBox(height: 8),
-        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) ...[
-          if (rowIndex > 0) const SizedBox(height: 6),
-          Row(
-            children: [
-              for (var i = 0; i < rows[rowIndex].length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: _MetricCard(
-                    spec: rows[rowIndex][i],
-                    value: values?[rows[rowIndex][i].key],
-                    verdict: verdicts.verdictFor(rows[rowIndex][i]),
-                    limit: limitLabelFor?.call(rows[rowIndex][i]),
-                    showGridColors: showGridColors,
-                  ),
-                ),
-              ],
-            ],
+      ),
+      children: [
+        for (var i = 0; i < specs.length; i++) ...[
+          _SpecRow(
+            spec: specs[i],
+            value: values?[specs[i].key],
+            breached: verdicts.isBreached(specs[i]),
+            limit: limitLabelFor?.call(specs[i]),
+            meterFraction: _meterFraction(specs[i]),
+            showGridColors: showGridColors,
           ),
+          if (i < specs.length - 1) const TerminalRule(),
         ],
+      ],
+    );
+  }
+
+  /// Where a reading sits inside its configured range, or null for no bar.
+  ///
+  /// **A meter needs both ends of the scale.** [AlarmThresholds] leaves a bound
+  /// null on purpose — turbidity has a maximum and no minimum — and a bar drawn
+  /// against one end is not a position, it is a decoration that reads as
+  /// "nearly empty" or "nearly full" for a value that has nowhere to sit. So a
+  /// one-sided limit gets the caption only, and the reading still says whether
+  /// it is inside the limit it has.
+  ///
+  /// A zero-width range is the same problem: no reading can be inside it, so
+  /// the fraction would divide by zero and clamp to a bar that is either empty
+  /// or full regardless of the value.
+  double? _meterFraction(MetricSpec spec) {
+    final metric = spec.metric;
+    final value = metric == null ? null : values?[metric];
+    if (metric == null || value == null || thresholds == null) return null;
+    final min = thresholds!.minFor(metric);
+    final max = thresholds!.maxFor(metric);
+    if (min == null || max == null || max <= min) return null;
+    return ((value - min) / (max - min)).clamp(0.0, 1.0);
+  }
+}
+
+/// One spec: the row, and the range bar under it when there is a range.
+class _SpecRow extends StatelessWidget {
+  const _SpecRow({
+    required this.spec,
+    required this.value,
+    required this.breached,
+    required this.limit,
+    required this.meterFraction,
+    required this.showGridColors,
+  });
+
+  final MetricSpec spec;
+  final double? value;
+
+  /// The reading is outside its configured range.
+  final bool breached;
+
+  final String? limit;
+
+  /// null when there is no two-ended range to plot — see [_meterFraction].
+  final double? meterFraction;
+
+  final bool showGridColors;
+
+  @override
+  Widget build(BuildContext context) {
+    // **The alert colour is gated on `showGridColors`, and the caption is
+    // not.** The reading and the configured limit are facts; the red is the
+    // user's chosen severity, and Settings switches it off. Gating both would
+    // make a breached reading look identical to an unwatched one.
+    final alert = breached && showGridColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TerminalRow(
+          label: spec.label,
+          value: slotNumber(value, decimals: spec.decimals),
+          unit: spec.unit.isEmpty ? null : spec.unit,
+          alert: alert,
+          // `slotNumber` right-trims trailing zeros, which is what a tabular
+          // column wants: the device reported a whole number, so the column
+          // says so and every row is the same width.
+          divider: false,
+        ),
+        if (meterFraction != null)
+          TerminalMeter(
+            fraction: meterFraction!,
+            alert: alert,
+            leftCaption: limit,
+            rightCaption: value == null ? null : slotNumber(value),
+          )
+        else if (limit != null)
+          // One-sided limit: the caption is the range, and it stays muted rather
+          // than turning red because the bar it would have sat under is absent.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.cardPadding,
+              0,
+              AppSpacing.cardPadding,
+              AppSpacing.md,
+            ),
+            child: Text(
+              limit!,
+              style: AppType.slotMicro.copyWith(
+                color: alert ? AppPalette.error : AppSurfaces.onSurfaceVariant,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -163,164 +278,5 @@ class _Verdicts {
     final out = breached[metric];
     if (out == null) return null;
     return !out;
-  }
-}
-
-/// The grid's single verdict, shown only when something is wrong.
-class _Tag extends StatelessWidget {
-  const _Tag({required this.text, required this.color});
-
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      textAlign: TextAlign.end,
-      // **No `fontWeight` override, and that is the change.** This used to set
-      // `w600`, which is a weight the brief does not have: the type scale is 900
-      // for what matters, 700 for the uppercase labels, 400 for the rare body
-      // line. A semibold tag sat between the two and read as neither — it had the
-      // tracking of a label and the presence of a numeral, so it looked like a
-      // heading that had been shrunk. [AppType.labelMicro] is the brief's
-      // micro-metadata style and it already carries the weight this wanted.
-      style: AppType.labelMicro.copyWith(color: color),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.spec,
-    required this.value,
-    required this.verdict,
-    required this.limit,
-    required this.showGridColors,
-  });
-
-  final MetricSpec spec;
-  final double? value;
-  final bool? verdict;
-  final String? limit;
-  final bool showGridColors;
-
-  @override
-  Widget build(BuildContext context) {
-    final faint = faintColor;
-    final accent = categoryColorForKey(spec.key) ?? AppPalette.primary;
-    final breached = verdict == false;
-    final status = (breached && showGridColors) ? statusBad : null;
-
-    // **The brief's stat tile, and the edge is the whole recipe.**
-    //
-    // `card` + a leading icon in the category's own hue + a `numeral-lg` value +
-    // a `label-uppercase-sm` unit, with a **2px categorical bottom border** to
-    // colour-code the metric. What this replaces is the 1px categorical frame
-    // drawn all the way round the tile: a frame is a *drawn edge*, and it put the
-    // hue on four sides where the brief puts it on one. One coloured edge under
-    // the value reads as the tile's own colour-code; four coloured edges read as
-    // an outline, which is the thing this style exists to replace.
-    //
-    // The other three sides stay the neutral hairline, because the brief's card
-    // is explicit that "a 1px border hairline always accompanies the stamped
-    // shadow — the border defines the silhouette, the shadow displaces it."
-    // Dropping the hairline entirely would leave the stamped shadow with nothing
-    // to be the silhouette of. So the silhouette is neutral and exactly one edge
-    // carries the category.
-    //
-    // The category edge is **not part of the Border**. A `BoxDecoration` with a
-    // `borderRadius` throws at paint time if its border is not uniform —
-    // "A borderRadius can only be given on borders with uniform colors" — and a
-    // hairline on three sides with a 2px hue on the fourth is not. It was drawn
-    // that way for one afternoon and `metric_grid_test.dart` caught it. The edge
-    // is therefore a bar inside the card's content, flush to its bottom, which
-    // is also what the brief's recipe is: a colour under the value, not a frame
-    // around it.
-    //
-    // The border is always drawn, `showGridColors` or not: it is a *category*
-    // marker, not a status, and switching alerts off in Settings must not
-    // recolour which sensor is which. Only the breach caption below is gated.
-    return AppCard(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(spec.icon, size: 14, color: accent),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  spec.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.labelMicro.copyWith(color: faint),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              if (spec.unit.isEmpty)
-                Text(
-                  value == null ? '--' : value!.toStringAsFixed(spec.decimals),
-                  style: AppType.numeralLg.copyWith(color: appPrimaryText),
-                )
-              else
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      value == null
-                          ? '--'
-                          : value!.toStringAsFixed(spec.decimals),
-                      maxLines: 1,
-                      style: AppType.numeralLg.copyWith(color: appPrimaryText),
-                    ),
-                  ),
-                ),
-              if (spec.unit.isNotEmpty) ...[
-                const SizedBox(width: 3),
-                Text(
-                  spec.unit,
-                  style: AppType.labelMicro.copyWith(color: faint),
-                ),
-              ],
-            ],
-          ),
-          if (limit != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              limit!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppType.labelMicro.copyWith(color: status ?? faint),
-            ),
-          ],
-          // **The 2px categorical bottom edge, drawn inside the card.**
-          //
-          // It has to be a child rather than a `Border` side, and the reason is
-          // a runtime error rather than a preference: `BoxDecoration` throws
-          // "A borderRadius can only be given on borders with uniform colors"
-          // the moment a hairline on three sides shares a border with a 2px hue
-          // on the fourth. `test/metric_grid_test.dart` is what found it — the
-          // widget built, analyzed clean, and threw on the first paint.
-          //
-          // The card's padding is 0 for this one child so the bar sits flush
-          // with the rounded box's bottom edge, and it is drawn above the
-          // card's own border rather than outside it.
-          const SizedBox(height: 6),
-          Container(height: 2, color: accent),
-        ],
-      ),
-    );
   }
 }

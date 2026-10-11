@@ -111,31 +111,26 @@ void main() {
   });
 
   group('skyConditionFor thresholds', () {
-    // One row per boundary, both sides. The threshold is `>=`, so the value
-    // exactly at the boundary belongs to the band ABOVE it and one lx below
-    // belongs below — that off-by-one is the only thing this table can catch,
-    // and every one of these numbers is a lux value a greenhouse grower reads
-    // off a manual, not an arbitrary constant.
+    // One row per boundary, both sides. The daylight thresholds are `>=`, so the
+    // value exactly at the boundary belongs to the band ABOVE it and one lx
+    // below belongs below — that off-by-one is the only thing this table can
+    // catch, and every one of these numbers is a lux value a greenhouse grower
+    // reads off a manual, not an arbitrary constant.
     final cases = <String, ({double lux, SkyCondition expected, String why})>{
-      '55000 lx is the first band of clear sky': (
-        lux: 55000,
+      'noon sun reads clear': (
+        lux: 100000,
+        expected: SkyCondition.clear,
+        why: 'a clear noon, the top of the scale',
+      ),
+      '28000 lx is the first band of clear': (
+        lux: 28000,
         expected: SkyCondition.clear,
         why: 'the first row of a greenhouse roof in full sun',
-      ),
-      'just under 55000 lx is mostly clear': (
-        lux: 54999,
-        expected: SkyCondition.mostlyClear,
-        why: 'haze, one lx below the clear threshold',
-      ),
-      '28000 lx is a bright overcast day': (
-        lux: 28000,
-        expected: SkyCondition.mostlyClear,
-        why: 'thin cloud, still bright enough to cast a shadow',
       ),
       'just under 28000 lx is broken cloud': (
         lux: 27999,
         expected: SkyCondition.partlyCloudy,
-        why: 'the sun is behind something',
+        why: 'thin cloud; the sun is behind something',
       ),
       '9000 lx is a dark overcast day': (
         lux: 9000,
@@ -147,30 +142,28 @@ void main() {
         expected: SkyCondition.overcast,
         why: 'diffuse light, no shadows',
       ),
-      '1800 lx is storm cloud': (
-        lux: 1800,
+      'one lx is light, so it is not night': (
+        lux: 1,
         expected: SkyCondition.overcast,
-        why: 'the low end of a solid sheet',
+        why: 'a lux reading measures what arrived, not whether the sun is up; '
+            '1 lx arrived, so the only remaining daylight state is overcast',
       ),
-      'just under 1800 lx is heavily overcast': (
-        lux: 1799,
-        expected: SkyCondition.heavilyOvercast,
-        why: 'storm cloud, or a sensor that has been covered',
-      ),
-      'a dark sensor reads heavily overcast': (
+      'zero is night': (
         lux: 0,
-        expected: SkyCondition.heavilyOvercast,
-        why: 'the covered-sensor case shares the storm band',
+        expected: SkyCondition.night,
+        why: 'no light arrived at all, which is the whole night condition',
       ),
-      'a negative dark reading reads heavily overcast': (
+      'a negative dark reading is night': (
+        lux: -0.4,
+        expected: SkyCondition.night,
+        why: 'the negative lux a real sensor reports at night, the same way '
+            'the BMS reports -0.01 A while idle — so the boundary has to be '
+            '<= 0, not < 0',
+      ),
+      'a negative dark reading is night at BMS scale': (
         lux: -0.01,
-        expected: SkyCondition.heavilyOvercast,
-        why: 'the negative lux a real sensor reports at night',
-      ),
-      'noon sun reads clear': (
-        lux: 100000,
-        expected: SkyCondition.clear,
-        why: 'a clear noon, the top of the scale',
+        expected: SkyCondition.night,
+        why: 'the sub-lux dark reading the test device actually produced',
       ),
     };
 
@@ -186,6 +179,34 @@ void main() {
         );
       });
     });
+
+    test('the scale is monotonic, so a darker sky never reads brighter', () {
+      // The old table could not catch a reordering across the collapsed bands;
+      // this can, and it costs one loop.
+      var previous = SkyCondition.clear;
+      for (final lux in [100000.0, 55000.0, 28000.0, 27999.0, 9000.0, 8999.0, 1.0]) {
+        final condition = skyConditionFor(lux);
+        expect(
+          condition.index,
+          greaterThanOrEqualTo(previous.index),
+          reason: '$lux lx reads $condition after ${previous.name}.',
+        );
+        previous = condition;
+      }
+    });
+
+    test('only zero and below are night', () {
+      for (final lux in [0.0, -0.0001, -1.0, -40.0]) {
+        expect(skyConditionFor(lux), SkyCondition.night, reason: '$lux lx');
+      }
+      for (final lux in [0.001, 0.5, 1.0]) {
+        expect(
+          skyConditionFor(lux),
+          isNot(SkyCondition.night),
+          reason: '$lux lx is daylight, however faint.',
+        );
+      }
+    });
   });
 
   group('SkyCondition.label', () {
@@ -200,9 +221,9 @@ void main() {
     });
 
     test('every value has a distinct label', () {
-      // Two bands sharing a word would make the condition meaningless: the
-      // label is the only thing distinguishing clear from mostly clear, because
-      // the two deliberately share a colour.
+      // All three daylight states deliberately share a colour, so the label is
+      // the only thing distinguishing them. Two states sharing a word would
+      // make the condition meaningless.
       final labels = SkyCondition.values.map((c) => c.label).toList();
       expect(
         labels.toSet().length,
@@ -212,11 +233,40 @@ void main() {
     });
 
     test('is the word shown on the card', () {
-      expect(SkyCondition.clear.label, 'Clear sky');
-      expect(SkyCondition.mostlyClear.label, 'Mostly clear');
+      expect(SkyCondition.clear.label, 'Clear');
       expect(SkyCondition.partlyCloudy.label, 'Partly cloudy');
       expect(SkyCondition.overcast.label, 'Overcast');
-      expect(SkyCondition.heavilyOvercast.label, 'Heavily overcast');
+      expect(SkyCondition.night.label, 'Night');
+    });
+
+    test('no label carries trailing punctuation', () {
+      // These sit inline in a card caption, where a full stop reads as a
+      // sentence about nothing.
+      for (final c in SkyCondition.values) {
+        expect(
+          c.label,
+          isNot(matches(RegExp(r'[.!?,;:]$'))),
+          reason: '"${c.label}" ends in punctuation.',
+        );
+      }
+    });
+  });
+
+  group('SkyCondition.isDaylight', () {
+    test('every daylight state says yes', () {
+      for (final c in SkyCondition.values.where((c) => c != SkyCondition.night)) {
+        expect(c.isDaylight, isTrue, reason: c.name);
+      }
+    });
+
+    test('night is the only one that says no', () {
+      expect(SkyCondition.night.isDaylight, isFalse);
+      expect(
+        SkyCondition.values.where((c) => !c.isDaylight),
+        [SkyCondition.night],
+        reason: 'If a state other than night reports no daylight, it is a '
+            'fourth kind of reading and the enum doc has to say so.',
+      );
     });
   });
 }

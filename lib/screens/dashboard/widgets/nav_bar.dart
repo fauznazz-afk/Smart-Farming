@@ -97,18 +97,31 @@ const List<NavDestination> kNavDestinations = [
 /// what the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
 /// drift without the test failing.
 ///
-/// **64, down from 76.** The brief chose 76 — which is a coincidence worth
+/// **54, down from 76.** The brief chose 76 — which is a coincidence worth
 /// naming, because the literal `76` that caused the *original* defect was a
 /// *wrong* 76. At 76 the bar reserved 24 dp on every page to hold a 24 dp icon
 /// and a 10 sp label with "real air", and the air was mostly air.
 ///
-/// The reduction is a third of the bar's height and it is not free: the
-/// reservation shrinks with it, which is the whole point, and
-/// `test/nav_bar_clearance_test.dart` is what proves the two halves moved
-/// together rather than one being forgotten — which is exactly what went wrong
-/// the first time a literal was written here.
+/// **54 is where a second reduction stopped.** The user called the 64 version
+/// "masih agak mengganggu … lebih ke bulky" — still bulky — and height is what
+/// makes a bar bulky: at 54 the pill is 26 dp above and below a 22 dp glyph,
+/// which reads as a floating capsule rather than a slab, and a fully round
+/// `AppRadius.pill` at that height is a shape rather than a chamfer.
 ///
-/// The bar's own gap below it ([kGlassNavBarBottomGap]) is *not* part of the 64.
+/// It stops at 54 rather than going lower because **the bar's height is also
+/// the vertical touch target** — `_NavItem`'s `InkWell` fills a
+/// `SizedBox(height: kGlassNavBarHeight)`, so the slot is 36 x 54 dp. 54 is the
+/// point below which the target drops under Material's 44 dp and the user
+/// trades a cosmetic complaint for a reachability one. Shrinking the icon to
+/// buy the last few dp was rejected: the glyph is the entire content now the
+/// captions are gone.
+///
+/// The reduction is not free: the reservation shrinks with it, which is the
+/// whole point, and `test/nav_bar_clearance_test.dart` is what proves the two
+/// halves moved together rather than one being forgotten — which is exactly
+/// what went wrong the first time a literal was written here.
+///
+/// The bar's own gap below it ([kGlassNavBarBottomGap]) is *not* part of the 54.
 ///
 /// **Four slots, four destinations, and there is no fifth slot.**
 /// [kNavDestinations] is the tab set and the row indexes it directly; the bar's
@@ -126,7 +139,7 @@ const List<NavDestination> kNavDestinations = [
 /// action button comes back here it needs something to act on, and the aura
 /// token documented for it (`AppPalette.aura`, still unused) is the place to
 /// start.
-const double kGlassNavBarHeight = 64;
+const double kGlassNavBarHeight = 54;
 
 /// The bar's own gap below the pill, and the floor for the safe-area inset.
 ///
@@ -535,9 +548,12 @@ const double _kNavItemGap = 3;
 /// item draws the same glyph and the two used to carry their own numbers — so a
 /// retune of one silently desynchronised the other.
 ///
-/// **22, down from 24.** The bar is 12 dp shorter, so a 24 dp icon left the
-/// label crowdable against the top and bottom edges. 22 keeps the icon
-/// unmistakably larger than the 10 sp label without crowding it.
+/// **22, down from 24, and deliberately *not* reduced with the bar.** A 24 dp
+/// icon in the original 76 dp bar left the label crowdable against the top and
+/// bottom edges. The captions are gone now, so the glyph is the entire content
+/// of a destination: it was left at 22 while the bar went 76 -> 64 -> 54,
+/// because shrinking it further would make the bar smaller at the cost of the
+/// only thing it still shows.
 ///
 /// The label it was measured against is gone, so this number is now free to grow
 /// and was deliberately *not* grown: the icon-size test reads the declared value
@@ -547,16 +563,22 @@ const double _kNavIconSize = 22;
 
 /// The width a destination is laid out in.
 ///
-/// **40 dp, down from 46, because there is no longer a label to fit.** Every step
+/// **36 dp, down from 46, because there is no longer a label to fit.** Every step
 /// of this number so far has been argued in terms of the widest word underneath
 /// the icon — `Hydroponics` is 123 dp of natural text — and that constraint is
 /// gone. What is left is the ripple's `_kNavItemWidth` box, so the slot only has
-/// to clear the 22 dp icon with air around it: 9 dp on each side.
+/// to clear the 22 dp icon with air around it: 7 dp on each side.
+///
+/// `shortcut:` the slot is also the horizontal touch target, and 36 dp is under
+/// Material's 44 dp. The vertical half is carried by [kGlassNavBarHeight] (54),
+/// so a destination is a 36 x 54 target; raise this back towards 44 if an
+/// accessibility audit ever demands a square one — the pill's width arithmetic
+/// below follows automatically, at the cost of a wider bar.
 ///
 /// The bar's width is this constant times the destination count plus the gap, and
 /// that arithmetic lives in `GlassNavBar` rather than here, so the two halves move
 /// together when this moves.
-const double _kNavItemWidth = 40;
+const double _kNavItemWidth = 36;
 
 // There were two getters here — `destination` and `selectedIndex` — that
 // recovered the label from the *icon* by searching [kNavDestinations] for the

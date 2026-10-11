@@ -57,10 +57,25 @@ import '../utils/design_tokens.dart';
 /// hairline rules inside it is the difference between a list of cards and an
 /// instrument.
 class TerminalPanel extends StatelessWidget {
-  const TerminalPanel({super.key, required this.children, this.header});
+  const TerminalPanel({
+    super.key,
+    required this.children,
+    this.header,
+    this.semanticLabel = 'Overview',
+  });
 
   /// The panel's first row: a title, a station-style id, and any status.
   final Widget? header;
+
+  /// What a screen reader announces for this panel.
+  ///
+  /// **A parameter because the label used to be the literal `'Overview'`, which
+  /// was correct only while every panel on screen was the Overview.** It is a
+  /// shared primitive: `MetricGrid` uses it for the greenhouse and the fish tank
+  /// too, and a screen reader read "Overview" while describing a pH table is not
+  /// a cosmetic bug — it is the one string a non-sighted user has to judge the
+  /// page by. Defaulted rather than required so no existing call site changes.
+  final String semanticLabel;
 
   final List<Widget> children;
 
@@ -68,7 +83,7 @@ class TerminalPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       padding: EdgeInsets.zero,
-      semanticLabel: 'Overview',
+      semanticLabel: semanticLabel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

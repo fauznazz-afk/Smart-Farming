@@ -405,12 +405,22 @@ class DateStripChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **Selected is the acid lime, not an amber.** The brief's `chip-active` is
-    // a `primary` fill with `on-primary` ink, and the date strip is the only
-    // filter chip on the dashboard — so the selected day is the one place on
-    // the page allowed to carry the accent fill. That is why the selected day
-    // label is the one the brief asks to lean: italic at 900 weight.
-    final fill = isSelected ? AppPalette.primary : AppSurfaces.surface;
+    // **Selected is the accent, and it was lime.** The brief's `chip-active` is
+    // a `primary` fill with `on-primary` ink, and in this app `primary` resolves
+    // to the one accent, red. The date strip is the only filter chip on the
+    // dashboard, so the selected day is the one place on the page allowed to
+    // carry the accent fill. That is why the selected day label is the one the
+    // brief asks to lean: italic at 900 weight.
+    //
+    // **The ink is `AppPalette.onHue` — black — and white would have failed.**
+    // `onHue` was written for lime, where black and white are 14:1 and 1.9:1, so
+    // the name reads like it belongs to the old brand hue rather than to the
+    // role. It does not: on this red fill black measures **7.57:1** and white
+    // measures **2.78:1**, which is below AA for body text by a factor of 1.6.
+    // `color_helpers.dart`'s `onPrimaryInk` reaches the same answer from the
+    // fill's luminance rather than from its hue, and the day number here is the
+    // largest text on the page, so it is the one that would have been read.
+    final fill = isSelected ? AppPalette.error : AppSurfaces.surface;
     final ink = isSelected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
     final numberInk = isSelected ? AppPalette.onHue : AppSurfaces.onSurface;
 

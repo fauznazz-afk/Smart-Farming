@@ -18,17 +18,19 @@ class BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **The wordmark's two colours are palette tokens now, and the second one
-    // used to be a second green.** `#35A968` was a free-hand green in an app
-    // whose green (`AppPalette.success`) means "a problem is absent" — exactly
-    // the hue-collision rule `color_helpers.dart` spells out, broken by a
-    // logo. `secondary` is the categorical blue, so the wordmark reads as the
-    // brand accent plus a category rather than as two unrelated brand colours.
+    // **The wordmark is the accent plus a neutral, and it used to be lime plus
+    // blue.** Both defaults were *category* hues doing a *brand* job, which is
+    // the same mistake the file's earlier note made about a second green: a
+    // colour that means something on one screen is spending that meaning here.
+    //
+    // So `primary` is the app's one accent and `secondary` is
+    // `AppSurfaces.onSurfaceVariant`. A wordmark in red and grey is a wordmark;
+    // a wordmark in red and blue is two charts with no axis.
     //
     // Both parameters are still honoured: a caller that wants its own pair can
     // have one, and the defaults no longer contradict the palette.
-    final primary = accentColor ?? AppPalette.primary;
-    final secondary = secondaryColor ?? AppPalette.secondary;
+    final primary = accentColor ?? AppPalette.error;
+    final secondary = secondaryColor ?? AppSurfaces.onSurfaceVariant;
     final mark = Container(
       width: size,
       height: size,

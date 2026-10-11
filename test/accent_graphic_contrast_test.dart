@@ -20,6 +20,20 @@
 ///     `AppBorders.boundary`, is the one edge in the system that makes a 1.4.11
 ///     claim, and it is measured below so the number is on the record rather
 ///     than only in a doc comment.
+///
+/// ## One accent, and why the loops above still enumerate the whole palette
+///
+/// The app is now a black-and-red instrument panel: in chrome, a heading, a
+/// label, an icon or a border, colour is either `AppPalette.error` or a neutral.
+/// The lime, blue, violet, cyan and green tokens are still in `AppPalette`
+/// because `kChartSeriesOrder` and the status ramp read them — a chart series is
+/// data rather than decoration — so **this file still measures all of them, and
+/// it should.** A token that is only reachable through the chart-series order
+/// today can become reachable from a card tomorrow, and the guarantee that
+/// matters is that it was never illegible while it was there.
+///
+/// The `one accent` group is what the conversion added: the obligation on that
+/// one colour, which is heavier than the obligation on a breach colour ever was.
 library;
 
 import 'dart:math' as math;
@@ -119,6 +133,80 @@ void main() {
       for (final f in fills.entries) {
         expect(onPrimaryInk(f.value), onPrimaryInk(f.value));
       }
+    });
+  });
+
+  group('the one accent, measured as what it now is', () {
+    // Everything below used to be about *four* accents and a per-category
+    // mapping. There is one accent now, and it is asked for more than any colour
+    // in the app has ever been asked for: a large fill with ink on it, an icon, a
+    // 2px border, a chart line, a meter fill and a live dot. These two tests are
+    // the obligations the conversion created, and they are here rather than
+    // folded into the loops above because the loops above enumerate a *list* and
+    // these are claims about one specific fill.
+
+    test('it takes black ink, and white would have failed', () {
+      // The natural assumption on a red chip is a white label. White on
+      // `#FF6B6B` is **2.78:1** — under AA for body text by a factor of 1.6 —
+      // while `AppPalette.onHue`'s black is **7.57:1**. The app's own
+      // `onPrimaryInk` picks black here without being asked to, because the fill's
+      // luminance is above the 0.18 threshold and the rule is not about hue.
+      //
+      // The assertion is on the *value* rather than on `greaterThanOrEqualTo`
+      // alone, because "it clears 4.5:1" is true of both inks on some other fill
+      // and would not catch a future edit that moved the fill under a hardcoded
+      // white.
+      expect(onPrimaryInk(AppPalette.error), AppPalette.onHue);
+      expect(
+        _contrast(onPrimaryInk(AppPalette.error), AppPalette.error),
+        greaterThanOrEqualTo(4.5),
+        reason: 'the accent fill with its own ink is '
+            '${_contrast(onPrimaryInk(AppPalette.error), AppPalette.error).toStringAsFixed(2)}:1',
+      );
+      expect(
+        _contrast(Colors.white, AppPalette.error),
+        lessThan(4.5),
+        reason: 'white now clears 4.5:1 on the accent, so the hardcoded '
+            'AppPalette.onHue in banners.dart and liquid_glass.dart should be '
+            're-checked rather than trusted',
+      );
+    });
+
+    test('it is legible on every surface, not only where an alarm lands', () {
+      // A breach colour could be as poor as it liked away from an alarm, because
+      // an alarm always arrives with a word next to it. The accent has no such
+      // escort: it draws the avatar ring, the selected day chip, the panel
+      // headings and the carousel dot. `track` and `surfaceMuted` are here and
+      // are not in `AppSurfaces.captionSurfaces()` — the first is what the sky
+      // card's brightness bar is filled against and the second is the muted
+      // tile — so this is a claim about one colour's reach rather than a
+      // redefinition of where text goes.
+      //
+      // Red measures 6.27 / 5.73 / 5.17 / 4.55:1 across the four. The last of
+      // those is the binding one and it has 0.05:1 of margin, so a surface tweak
+      // is an accent-legibility change even when nothing about the accent moved.
+      for (final s in {
+        'page': AppSurfaces.page,
+        'surface': AppSurfaces.surface,
+        'surfaceAlt': AppSurfaces.surfaceAlt,
+        'surfaceMuted': AppSurfaces.surfaceMuted,
+        'track': AppSurfaces.track,
+        'tooltip': AppSurfaces.tooltip,
+      }.entries) {
+        expect(
+          _contrast(AppPalette.error, s.value),
+          greaterThanOrEqualTo(3.0),
+          reason: 'the accent on ${s.key} is '
+              '${_contrast(AppPalette.error, s.value).toStringAsFixed(2)}:1; '
+              '1.4.11 wants 3:1 for a graphical object',
+        );
+      }
+      expect(
+        _contrast(AppPalette.error, AppSurfaces.bindingCaptionSurface),
+        greaterThanOrEqualTo(4.5),
+        reason: 'the accent has to clear AA as text on the binding surface, '
+            'because it now draws headings and labels and not only alarms',
+      );
     });
   });
 

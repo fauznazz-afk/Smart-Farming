@@ -386,7 +386,7 @@ class EnergySummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           if (progress != null)
             // The brief's progress bar: a 12dp depressed track in the *page*
-            // colour with a 1px hairline, and a lime fill that glows. The track
+            // colour with a 1px hairline, and an accent fill. The track
             // has to be darker than the card it sits in for the fill to lift off
             // it, which is why `LinearProgressIndicator`'s own background is set
             // rather than left to its default (a tinted version of the fill).
@@ -406,7 +406,7 @@ class EnergySummaryCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.bar),
                   backgroundColor: Colors.transparent,
                   valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppPalette.primary,
+                    AppPalette.error,
                   ),
                 ),
               ),

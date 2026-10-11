@@ -38,6 +38,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/color_helpers.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/widgets/energy_summary_card.dart';
 import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
@@ -161,23 +162,36 @@ void main() {
       }
     });
 
-    testWidgets('stay two different colours, labelling two quantities', (
+    testWidgets('stay the accent, because every category is the accent now', (
       tester,
     ) async {
-      // The hue rule in this repo is fixed per category and deliberately does
-      // not vary by index — `color_helpers_test.dart` fails if `categoryColor`
-      // ever starts deriving from one. So the two tiles can only collapse onto
-      // one value if both categories are mapped to the same hue, which is
-      // exactly the regression this is here for. This is the shape of bug the
-      // old `metricColor`-based version missed by asserting on its own copy of
-      // the rule.
+      // **This is the inverse of what it used to assert, and it is the design.**
+      //
+      // It demanded the two tiles paint *different* colours, because two tiles
+      // labelled different quantities used to carry different category hues.
+      // Every category now resolves to the one accent — the panel spends hue on
+      // severity and nothing else — so demanding distinctness would demand the
+      // old system back.
+      //
+      // The guarantee that is still real, and the one this now asserts, is that
+      // both tiles resolve to *the accent specifically* rather than to whatever
+      // a leftover hue happens to be. A test that only compared them to each
+      // other would pass on two wrong colours.
       final colours = await painted(tester);
+      for (var i = 0; i < colours.length; i++) {
+        expect(
+          colours[i],
+          categoryColor(MetricCategory.values[i]),
+          reason: 'tile $i paints #${_hex(colours[i])}',
+        );
+      }
       expect(
-        colours.first,
-        isNot(colours.last),
+        AppPalette.error,
+        isNot(statusWarn),
         reason:
-            'the card paints both tiles in #${_hex(colours.first)}; '
-            'they label different quantities',
+            'the accent and the warning status are the same colour, so a '
+            'forecast fill would read as a fault. `color_helpers_test.dart` '
+            'holds the same pair apart across every category.',
       );
     });
 

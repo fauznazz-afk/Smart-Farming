@@ -342,16 +342,16 @@ class LabeledDropdown extends StatelessWidget {
 /// * **`AppType.buttonLabel`, not `label-uppercase`.** 13px at weight 900 with
 ///   0.1em tracking. Buttons shout; the brief gives them the display weight at
 ///   label size, which is not the same as a 12px/700 metadata line.
-/// * **The tinted hard shadow**, `AppShadows.stampedIn(AppPalette.primary)`.
+/// * **The tinted hard shadow**, `AppShadows.stampedIn(AppPalette.error)`.
 ///   That is the brief's signature move for the one button allowed to be
-///   electric: a solid offset rectangle in the brand hue at 20%, no blur, so
-///   the displacement itself bleeds lime.
+///   electric: a solid offset rectangle in the accent at 20%, no blur, so the
+///   displacement itself bleeds the same colour as the fill.
 ///
 /// The shadow is painted by a [DecoratedBox] *behind* the button rather than by
 /// `FilledButton.styleFrom`, because Material's `elevation` maps through
 /// `kElevationToShadow` and can only ever produce a blurred halo — the exact
 /// thing the brief bans. `DecoratedBox` paints its decoration first and then its
-/// child, so only the 4px offset strip is visible around the opaque lime fill.
+/// child, so only the 4px offset strip is visible around the opaque accent fill.
 class SaveSettingsButton extends StatelessWidget {
   const SaveSettingsButton({
     super.key,
@@ -367,7 +367,7 @@ class SaveSettingsButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: AppRadius.all(AppRadius.card),
-        boxShadow: AppShadows.stampedIn(AppPalette.primary),
+        boxShadow: AppShadows.stampedIn(AppPalette.error),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -381,13 +381,13 @@ class SaveSettingsButton extends StatelessWidget {
               : const Icon(Icons.save, size: 20),
           label: Text(saving ? 'Saving...' : 'Save settings'),
           style: FilledButton.styleFrom(
-            backgroundColor: AppPalette.primary,
+            backgroundColor: AppPalette.error,
             foregroundColor: AppPalette.onHue,
             // Both disabled colours keep the fill and the ink, so the button
             // does not grey out behind the spinner mid-write. It is still
             // disabled — `onPressed` is null — it just says so with its label
             // rather than by turning into a different button.
-            disabledBackgroundColor: AppPalette.primary,
+            disabledBackgroundColor: AppPalette.error,
             disabledForegroundColor: AppPalette.onHue,
             textStyle: AppType.buttonLabel,
             minimumSize: const Size(0, 56),

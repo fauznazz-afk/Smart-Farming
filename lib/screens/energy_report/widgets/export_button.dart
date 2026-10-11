@@ -28,7 +28,7 @@ class ExportButton extends StatelessWidget {
         // **The `AppCard` wrapper is gone, and that is deliberate.** It used to
         // put this button inside a card, which is a `surface` fill carrying its
         // own stamped shadow — so the one object the brief says may be a large
-        // lime fill sat inside a second, quieter box, with two shadows and two
+        // accent fill sat inside a second, quieter box, with two shadows and two
         // edges. The brief is explicit that "the only large fill ever rendered
         // in primary is the primary button", and this is it.
         //
@@ -36,12 +36,12 @@ class ExportButton extends StatelessWidget {
         // than by `FilledButton`'s `elevation`, because Material maps elevation
         // through `kElevationToShadow` and can only produce a blurred halo —
         // the one shadow language the brief bans. `AppShadows.stampedIn` is
-        // the tinted variant: a solid offset rectangle in the brand hue at 20%,
-        // so the displacement itself bleeds lime.
+        // the tinted variant: a solid offset rectangle in the accent at 20%,
+        // so the displacement itself bleeds the fill's own colour.
         return DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: AppRadius.all(AppRadius.card),
-            boxShadow: AppShadows.stampedIn(AppPalette.primary),
+            boxShadow: AppShadows.stampedIn(AppPalette.error),
           ),
           child: SizedBox(
             width: double.infinity,
@@ -63,13 +63,13 @@ class ExportButton extends StatelessWidget {
                   : const Icon(Icons.file_download_outlined, size: 20),
               label: Text(isSharing ? 'Preparing CSV…' : 'Export CSV report'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppPalette.primary,
+                backgroundColor: AppPalette.error,
                 foregroundColor: AppPalette.onHue,
                 // Both disabled colours keep the fill and the ink, so the
                 // button does not grey out behind the spinner mid-write. It is
                 // still disabled — `onPressed` is null — it says so with its
                 // label rather than by becoming a different button.
-                disabledBackgroundColor: AppPalette.primary,
+                disabledBackgroundColor: AppPalette.error,
                 disabledForegroundColor: AppPalette.onHue,
                 // 13/900/0.1em. Buttons shout; `label-uppercase` is the
                 // metadata line and this is not metadata.

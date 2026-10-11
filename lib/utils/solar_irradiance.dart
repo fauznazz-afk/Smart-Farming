@@ -64,47 +64,87 @@ const double oneSunWm2 = 1000.0;
 double sunFraction(double lux) =>
     (luxToIrradiance(lux) / oneSunWm2).clamp(0.0, 1.0);
 
-/// The sky conditions this file distinguishes, brightest first.
+/// What a lux reading says about the sky.
 ///
-/// **Five because the lux scale spans five decades and the useful distinctions
-/// are not linear.** A drop from 100 000 lx to 90 000 is haze; from 10 000 to
-/// 1000 is weather. The thresholds are therefore spaced by roughly a factor of
-/// three to ten, and each one lands on a lux value a greenhouse grower already
-/// knows: 55 000 lx is the first row of a greenhouse roof in full sun, 28 000 is
-/// a bright overcast day, 9 000 is a dark one, and 1 800 is a storm.
+/// **Three daylight states and a night, not five states on one ladder.** The
+/// lux scale spans five decades and the distinctions are wildly non-linear: a
+/// drop from 100 000 lx to 90 000 is haze, while a drop from 10 000 to 1 000
+/// is the weather changing. That spread is the reason not to enumerate bands —
+/// each extra step needs a lux number of its own, and each number is a threshold
+/// the grower has to be able to picture, or it is just a number.
+///
+/// The three daylight states are the only distinctions that change what anyone
+/// does:
+///
+/// - is the array getting anything worth harvesting (**overcast**, or **clear**
+///   which is the top of the same question),
+/// - is it partial, so a battery is worth filling now while the diffuse light
+///   lasts (**partlyCloudy**),
+/// - is it just daylight at all (**night**).
+///
+/// Haze versus thin cloud versus broken cloud versus a solid sheet were four
+/// ways of answering "is it bright", and the answer to that is already on the
+/// card as a number. The label is not where a reading repeats itself.
+///
+/// **`night` is a different kind of reading, not another rung.** It is the
+/// absence of a measurement of the sky rather than a dimmer sky, which is why
+/// it is not `overcast` with a low threshold — and why it is also where a
+/// covered or failed sensor lands, since both look identical from here. The
+/// old `heavilyOvercast` band tried to be that state as a step on the ladder
+/// and was wrong twice: it claimed a storm at 1 800 lx, which is not what 1 800
+/// lx is, and it swallowed the 0 lx covered-sensor case into a weather word.
+///
+/// **`overcast` therefore covers both ends.** A solid sheet at 9 000 lx and a
+/// nearly-dark 3 lx both mean *there is light, and it is not sunny*; there is
+/// no action a grower would take about the difference. If that band is ever
+/// found to be too wide, widen it with a number from a measurement, not by
+/// adding a state back.
 enum SkyCondition {
-  /// ≥ 55 000 lx. Direct sun, sharp shadows.
+  /// Direct sun.
   clear,
 
-  /// ≥ 28 000 lx. Thin cloud or haze; still bright enough to cast a shadow.
-  mostlyClear,
-
-  /// ≥ 9 000 lx. Broken cloud; the sun is behind something.
+  /// Broken cloud; the sun is behind something but still contributes.
   partlyCloudy,
 
-  /// ≥ 1 800 lx. A solid sheet; diffuse light, no shadows.
+  /// A solid sheet; diffuse light, no shadows.
   overcast,
 
-  /// < 1 800 lx. Storm cloud, or a sensor that has been covered.
-  heavilyOvercast,
+  /// No usable light at all — night, or the sensor is covered/dark.
+  night,
 }
 
 /// The condition a lux reading indicates.
+///
+/// **Reads the raw lux, and `<= 0` is `night`, because that is the only way to
+/// reach it.** The same sensors that report `-0.01 A` from an idle BMS report a
+/// small negative lux in the dark; a `< 0` test would classify that night as a
+/// dim overcast afternoon. `luxToIrradiance` clamps the same readings at zero,
+/// so the two agree by construction — the difference is that this one says so
+/// out loud instead of inheriting it.
+///
+/// One lux is `overcast`, not `night`, and that boundary is the point: a lux
+/// reading is not a test for "is the sun up", it is a measurement of what
+/// arrived, and one lux did arrive.
 SkyCondition skyConditionFor(double lux) {
-  if (lux >= 55000) return SkyCondition.clear;
-  if (lux >= 28000) return SkyCondition.mostlyClear;
+  if (lux >= 28000) return SkyCondition.clear;
   if (lux >= 9000) return SkyCondition.partlyCloudy;
-  if (lux >= 1800) return SkyCondition.overcast;
-  return SkyCondition.heavilyOvercast;
+  if (lux > 0) return SkyCondition.overcast;
+  return SkyCondition.night;
 }
 
 extension SkyConditionLabel on SkyCondition {
-  /// The label, as the UI draws it: short, uppercase, human.
+  /// The label, as the UI draws it: short, sentence case, no punctuation, since
+  /// it sits inline in a card and is not a heading.
   String get label => switch (this) {
-    SkyCondition.clear => 'Clear sky',
-    SkyCondition.mostlyClear => 'Mostly clear',
+    SkyCondition.clear => 'Clear',
     SkyCondition.partlyCloudy => 'Partly cloudy',
     SkyCondition.overcast => 'Overcast',
-    SkyCondition.heavilyOvercast => 'Heavily overcast',
+    SkyCondition.night => 'Night',
   };
+
+  /// Whether there is usable daylight, i.e. anything other than [SkyCondition.night].
+  ///
+  /// Exists so a call site can ask the question without listing three values
+  /// and getting the fourth wrong when one is added.
+  bool get isDaylight => this != SkyCondition.night;
 }

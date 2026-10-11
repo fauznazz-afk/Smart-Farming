@@ -19,6 +19,7 @@ import '../services/thingsboard_realtime_service.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
+import '../utils/date_summary_stats.dart';
 import '../utils/poll_interval.dart';
 import '../widgets/liquid_glass.dart';
 import 'alarm_history_screen.dart';
@@ -36,6 +37,7 @@ import 'dashboard/widgets/chart_carousel.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
 import 'dashboard/widgets/date_strip.dart';
+import 'dashboard/widgets/date_summary_panel.dart';
 import 'dashboard/widgets/power_sub_tabs.dart';
 import 'dashboard/widgets/metric_grid.dart';
 import 'dashboard/widgets/metric_specs.dart';
@@ -1344,6 +1346,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       _clearHistoryCache();
     });
     _reloadHistoryForCurrentPage();
+    // Also for the Overview's period summary, which is not a page and so not
+    // covered by `_reloadHistoryForCurrentPage` — that reads `_selectedIndex`,
+    // and the Overview's index is 0, which resolves to no prefix at all.
+    _loadSummaryHistory();
   }
 
   Future<void> _pickDateFromCalendar() async {
@@ -1384,6 +1390,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       _clearHistoryCache();
     });
     _reloadHistoryForCurrentPage();
+    // Same reason as in `_selectDate`: the Overview is not a page, so
+    // `_reloadHistoryForCurrentPage` resolves to no prefix and the summary would
+    // never get its greenhouse and fish history.
+    _loadSummaryHistory();
   }
 
   void _reloadHistoryForCurrentPage() {
@@ -1712,6 +1722,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     // updated immediately, which made the stale card below it read as the wrong
     // page rather than as a slow refresh.
     _powerSubNotifier.value,
+    // **The selected date and range, because the Overview's period summary reads
+    // them.** `_selectDate` and `_pickDateFromCalendar` change all three in a
+    // plain `setState`, which rebuilds this screen but not a `Bound` whose token
+    // is unchanged — and `Bound` keeps its cached child in exactly that case.
+    // The history fetch that follows bumps `_chartRevision`, so without this the
+    // panel would update only when the network happened to answer: the numbers
+    // would be right and the *heading* would still name the previous day, and
+    // there is no exception to notice. The chart pages read the same state, so
+    // this is not a token added for one widget.
+    _selectedDate,
+    _selectedRangeStart,
+    _selectedRangeEnd,
   );
 
   /// Binds a polling-driven subtree to one listenable and one token.
@@ -1812,6 +1834,26 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => _dateStrip(),
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, () => _overviewPanel()),
+      // **The period summary, bound to `_chartRevision` and not `_liveRevision`.**
+      //
+      // It reads `_history`, which only the history fetch writes, and it reads
+      // nothing live — a day does not change because the meter ticked. Binding
+      // it to the live revision would rebuild it every ten seconds to produce
+      // identical numbers.
+      //
+      // The panel renders null for today's selection, which keeps it off the
+      // page entirely rather than showing an empty frame.
+      () => _bindRevision(_chartRevision, () {
+        final panel = _dateSummaryPanel();
+        return panel == null
+            ? const SizedBox.shrink()
+            : Column(
+                children: [
+                  const SizedBox(height: 8),
+                  panel,
+                ],
+              );
+      }),
       // **One panel, and it replaced four widgets.**
       //
       // The page used to be the live-power hero card, the sky card, the energy
@@ -1914,6 +1956,145 @@ class _DashboardScreenState extends State<DashboardScreen>
       rangeEnd: _selectedRangeEnd,
       onSelectDate: _selectDate,
       onPickRange: _pickDateFromCalendar,
+    );
+  }
+
+  // ── Period summary ──────────────────────────────────────────────────────────
+  //
+  // What the Overview shows for a day other than today: what came IN, what went
+  // OUT, and what the greenhouse and the fish tank did over the same window.
+  //
+  // **Today is excluded on purpose.** `OverviewPanel` already carries
+  // `ENERGY (24H)` with generation, load and the previous period, one screen
+  // above. Restating it in a second panel would be the same numbers twice, which
+  // is the "signal the same state three ways" failure the environment cards
+  // already committed once. For a past selection the Overview reports nothing,
+  // which is the gap this fills.
+
+  /// Whether the selected day or range is anything other than today.
+  ///
+  /// Compares calendar days, not instants. The strip's chips are days and
+  /// `_selectedDate` arrives from `DateTime.now()` when nothing has been picked,
+  /// so any comparison at second resolution would be false for the whole
+  /// morning.
+  bool get _isSummaryPeriod =>
+      _selectedRangeStart != null ||
+      startOfDay(_selectedDate) != startOfDay(DateTime.now());
+
+  /// Fetches the greenhouse and fish-tank history the summary needs.
+  ///
+  /// **Both go through the ordinary `_fetchHistoryFor`, so the summary and the
+  /// Environment and Fish charts read the same `_history` map and cannot
+  /// disagree.** A separate request into a separate field would be two copies of
+  /// the same series with no compiler check between them — the shape
+  /// `chart_groups.dart` exists to end.
+  ///
+  /// It also means navigating to those pages afterwards costs nothing, because
+  /// the data is already in hand and only the page's own poll was missing.
+  ///
+  /// Not called on startup: the initial selection is today, so the panel is not
+  /// on screen and the request would be for nothing.
+  void _loadSummaryHistory() {
+    if (!_isSummaryPeriod) return;
+    for (final prefix in const ['env', 'fish']) {
+      unawaited(_fetchHistoryFor(prefix));
+    }
+  }
+
+  /// The summary panel, or nothing when today is selected.
+  ///
+  /// Empty while the request is outstanding, so the panel does not flash its
+  /// "nothing recorded" state on the way to having rows. `_historyLoadFailed` is
+  /// accepted as settled too, or a device ThingsBoard rejects would leave the
+  /// panel blank forever instead of saying it has no data.
+  Widget? _dateSummaryPanel() {
+    if (!_isSummaryPeriod) return null;
+    final settled = _historyLoaded.contains('env') ||
+        _historyLoadFailed.contains('env') ||
+        _historyLoaded.contains('fish') ||
+        _historyLoadFailed.contains('fish');
+    if (!settled) return null;
+
+    final window = historyTimeWindow(
+      rangeStart: _selectedRangeStart ?? startOfDay(_selectedDate),
+      rangeEnd: _selectedRangeEnd,
+      now: DateTime.now(),
+    );
+    return DateSummaryPanel(
+      periodLabel: describeHistoryRange(
+        selectedDate: _selectedDate,
+        rangeStart: _selectedRangeStart,
+        rangeEnd: _selectedRangeEnd,
+      ),
+      // **The same `energyForPeriod` integral the ENERGY block uses, over the
+      // same `_energyHistory` map.** A second aggregation rule here would give
+      // the page two totals for one day and no way to tell which is right.
+      // `energyForCoveredPeriod` adds one thing `energyForPeriod` cannot do:
+      // return null rather than `0.0` when the window is not covered, because
+      // this history is a rolling fortnight and the picker reaches back ninety
+      // days.
+      solarKwh: energyForCoveredPeriod(
+        points: _energyHistory['power_dc'],
+        start: window.start,
+        end: window.end,
+      ),
+      loadKwh: energyForCoveredPeriod(
+        points: _energyHistory['power_ac'],
+        start: window.start,
+        end: window.end,
+      ),
+      environment: _summaryStats(kEnvironmentSpecs),
+      fish: _summaryStats(kFishSpecs),
+    );
+  }
+
+  /// Min/avg/max rows for one page's specs, from the history already in hand.
+  ///
+  /// **The rows are derived from `kEnvironmentSpecs` / `kFishSpecs` rather than
+  /// from a list written here.** Those are the declarations the metric grids
+  /// read, so a renamed label or a new sensor reaches this panel with no second
+  /// edit — and, the failure this repo has paid for twice, no way for the two to
+  /// drift apart silently.
+  ///
+  /// A spec with no history entry is skipped entirely rather than rendered as
+  /// `--`. `water_level_percent` is the case that matters: it is displayed on the
+  /// Fish grid and has no chart, so it is never requested, and a row of dashes
+  /// for it every time would read as a broken sensor rather than as a choice not
+  /// to chart a level.
+  List<DateSummaryStat> _summaryStats(List<MetricSpec> specs) {
+    return [
+      for (final spec in specs)
+        if (_history.containsKey(spec.key)) _summaryStat(spec),
+    ];
+  }
+
+  DateSummaryStat _summaryStat(MetricSpec spec) {
+    // Reduced once. The reduction is a full pass over the day's points and this
+    // runs for every spec on two pages on every chart revision.
+    final stats = periodStatsForPoints(_history[spec.key]);
+    final metric = spec.metric;
+    return DateSummaryStat(
+      label: spec.label,
+      stats: stats,
+      unit: spec.unit,
+      decimals: spec.decimals,
+      // The band comes from the same caption builder the grids use, so the
+      // summary grades against the thresholds in Settings and not against a
+      // default copied here.
+      limitLabel: environmentLimitLabel(spec, _thresholds),
+      // **Extrema, not the average.** A day that dipped to 12 °C for ten minutes
+      // has an average well inside the band, and the average is the one number
+      // that cannot say a limit was crossed.
+      //
+      // An unmonitored spec — `lux`, `PV_TEMP`, `water_level_percent` all carry
+      // no `metric` — cannot have breached, and reporting null is the only
+      // honest answer; guessing a bound here would invent an alarm the rules do
+      // not have.
+      breached: metric != null &&
+          stats.breached(
+            min: _thresholds.minFor(metric),
+            max: _thresholds.maxFor(metric),
+          ),
     );
   }
 

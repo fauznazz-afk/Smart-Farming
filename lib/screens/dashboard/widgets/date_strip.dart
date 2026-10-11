@@ -11,8 +11,8 @@ import '../utils/design_tokens.dart';
 /// **The chip itself is not in this file.** It is `DateStripChip` in
 /// `liquid_glass.dart`, and the brief's recipe for it lives there too: 4px
 /// corners (`AppRadius.sm`), unselected = [AppSurfaces.surface] with the neutral
-/// hairline, selected = a solid [AppPalette.primary] fill with
-/// [AppPalette.onHue] ink — the brief's `chip-active`, with no border and no
+/// hairline, selected = a solid [AppPalette.error] fill with
+/// [AppSurfaces.onSurface] ink — the brief's `chip-active`, with no border and no
 /// shadow of its own. The selected day label is also the one place in the brief
 /// that sets **italic at 900 weight**, on the theory that leaning the type
 /// forward implies motion.

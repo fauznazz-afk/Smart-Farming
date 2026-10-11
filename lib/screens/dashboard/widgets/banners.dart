@@ -59,21 +59,33 @@ class TelemetryErrorView extends StatelessWidget {
               style: AppType.bodySm.copyWith(color: faintColor),
             ),
             const SizedBox(height: 16),
-            // **The brief's `button-primary`, and the only large lime fill
-            // allowed anywhere in the app.** Acid lime fill, black ink,
+            // **The brief's `button-primary`, and the only large accent fill
+            // allowed anywhere in the app.** Red fill, white ink,
             // `button-label` type, 8px radius, 56dp tall, with the tinted
-            // displacement `4px 4px 0 rgba(198,255,0,0.2)` in place of the
+            // displacement `4px 4px 0` at 20% in the same hue in place of the
             // black one.
+            //
+            // It was lime, which is the clearest single instance of the bug the
+            // conversion is fixing: a saturated brand fill on a *retry* button
+            // is chrome, and chrome has one colour.
+            //
+            // **The ink is black, and that was measured rather than assumed.** The
+            // obvious thing on a red fill is white, and white on `#FF6B6B` is
+            // **2.78:1** — it fails AA for body text by a factor of 1.6 and is
+            // barely legible. Black is **7.57:1**. `AppPalette.onHue` is
+            // therefore not a lime-era leftover here; it is the correct token,
+            // and `color_helpers.dart`'s `onPrimaryInk` independently reaches the
+            // same answer from the fill's luminance rather than from its hue.
             //
             // The shadow sits on a wrapping `DecoratedBox` rather than on the
             // button's own style, because a `BoxShadow` in a `BoxDecoration`
             // follows that decoration's `borderRadius` — the same trick
-            // `AppCard` uses, and what stops the lime displacement poking out
+            // `AppCard` uses, and what stops the accent displacement poking out
             // of the button's rounded corners as a rectangle.
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: AppRadius.all(AppRadius.card),
-                boxShadow: AppShadows.stampedIn(AppPalette.primary),
+                boxShadow: AppShadows.stampedIn(AppPalette.error),
               ),
               child: FilledButton.icon(
                 onPressed: onRetry,
@@ -87,7 +99,7 @@ class TelemetryErrorView extends StatelessWidget {
                   style: AppType.buttonLabel.copyWith(color: AppPalette.onHue),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppPalette.primary,
+                  backgroundColor: AppPalette.error,
                   foregroundColor: AppPalette.onHue,
                   disabledBackgroundColor: AppSurfaces.surfaceAlt,
                   disabledForegroundColor: faintColor,

@@ -40,7 +40,14 @@ class ChartSectionHeader extends StatelessWidget {
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
     );
-    final accent = categoryColorForKey('power_dc') ?? AppPalette.primary;
+    // The accent, not a category hue. This used to be
+    // `categoryColorForKey('power_dc')`, which is the PV lime — a *chart
+    // series* colour being used to draw a live/polling dot and a spinner. Two
+    // separate jobs: the dot says "this connection is up", which is a condition
+    // about the app rather than a fact about solar, and it is chrome by any
+    // reading. Reading it from a telemetry key also meant the indicator's colour
+    // was a silent function of a constant string three files away.
+    const accent = AppPalette.error;
     return Row(
       children: [
         Expanded(
@@ -102,8 +109,6 @@ class _MetricSpec {
 
   String get label => series.label;
   String get unit => series.unit;
-
-  Color color() => categoryColorForKey(series.key) ?? AppPalette.primary;
 }
 
 IconData _iconForSeries(ChartSeriesSpec spec) => switch (spec.key) {
@@ -240,7 +245,7 @@ class TelemetryChartCard extends StatelessWidget {
   }
 
   List<_Scaled> _buildSeries(List<_MetricSpec> specs) {
-    // One series takes its category hue; more than one cannot, because the PV,
+    // One series takes the accent; more than one cannot, because the PV,
     // AC, battery and greenhouse-temperature groups each plot several series
     // that all belong to *one* category. See [kChartSeriesOrder].
     final multi = specs.length > 1;
@@ -255,12 +260,24 @@ class TelemetryChartCard extends StatelessWidget {
 
   // **No `accent` parameter.** It used to be threaded from `build` through here
   // and into `_SeriesLegend`, and read by nobody: every series resolved its hue
-  // from `categoryColorForKey` one line below, and the legend did the same. The
-  // parameter was verified unused before removal rather than removed on a
-  // hunch — this repo has already had a `_history` field deleted on a
-  /// well-argued and wrong dead-code claim. [override] replaces it, and unlike
-  /// it, it is read: a multi-series group's colour comes from the fixed order
-  /// rather than from the category.
+  // one line below, and the legend did the same. The parameter was verified
+  // unused before removal rather than removed on a hunch — this repo has already
+  // had a `_history` field deleted on a well-argued and wrong dead-code claim.
+  // [override] replaces it, and unlike it, it is read.
+  //
+  // **The `??` arm is the accent, and it is the single-series path only.**
+  // `_buildSeries` passes a colour for every series of a multi-series group, so
+  // this fallback is reached only by a group that plots exactly one thing — the
+  // six single-series charts (env humidity, lux and TDS; fish pH, temperature
+  // and turbidity). Those have nothing to distinguish themselves from, so there
+  // is no reason for each to arrive in a different hue; the category colour they
+  // used to take here made six charts on two pages disagree about what colour the
+  // app was.
+  //
+  // The old line was `override ?? categoryColorForKey(key) ?? AppPalette.primary`,
+  // and that trailing `?? AppPalette.primary` is worth naming: a key the category
+  // table did not know about fell back to lime, so *adding a telemetry key* was
+  // enough to change the colour of a chart.
   _Scaled _seriesFor(_MetricSpec spec, Color? override) {
     final key = spec.series.key;
     final seriesPoints = points[key] ?? const <TelemetryPoint>[];
@@ -270,7 +287,7 @@ class TelemetryChartCard extends StatelessWidget {
         spec.unit,
         seriesPoints,
         spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        override ?? spec.color(),
+        override ?? AppPalette.error,
         stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,
@@ -342,17 +359,18 @@ class TelemetryChartCard extends StatelessWidget {
             spots: item.series.spots,
             isCurved: false,
             barWidth: 2.5,
-            // **The category hue, and 0.85 is about crossings, not shade.**
+            // **The series hue, and 0.85 is about crossings, not shade.**
             //
             // The battery page plots current and power on one axis and both go
             // negative while the pack discharges, so two lines cross each other
             // repeatedly. Full opacity would make the later-drawn line erase the
             // earlier one at every crossing and the reader would lose a series
             // without any indication that it had gone. This is *not* a lightness
-            // ramp and must never become one: the hue itself comes from
-            // `categoryColorForKey` and the alpha is 0.85 for every series
-            // equally, so two series in different categories still read as two
-            // categories and two in the same category still read as one.
+            // ramp and must never become one: the hue is whatever the series
+            // resolved to — the accent for a group of one, a fixed slot in
+            // `kChartSeriesOrder` for a group of many — and the alpha is 0.85 for
+            // every series equally, so two series in different slots still read
+            // as two series and two in the same slot still read as one.
             color: item.series.color.withValues(alpha: 0.85),
             dotData: const FlDotData(show: false),
           ),
