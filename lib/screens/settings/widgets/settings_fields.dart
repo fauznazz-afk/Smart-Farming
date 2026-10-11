@@ -23,14 +23,21 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: AppCard(
         // The brief's `card-padding`, 16. It was 14/8, which is neither the
         // card scale nor anything else — the previous system had no 16.
+        //
+        // **Tightened to 12 on the drill-in page, and the direction is the
+        // user's.** Settings is a list of fields, not a showcase; at 16 the
+        // nine category cards each spent 32dp of their height on padding before
+        // a single control appeared. 12 keeps the card's silhouette and the
+        // hairline legible while giving the controls the room, which is what a
+        // settings page is for.
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.cardPadding,
-          AppSpacing.cardPadding,
-          AppSpacing.cardPadding,
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
           AppSpacing.sm,
         ),
         child: Column(
@@ -70,10 +77,15 @@ class SectionCard extends StatelessWidget {
                 ),
               ],
             ),
+            // **The divider sits closer than it did, and the gap under it is
+            // gone.** At `sm` top plus `xs` bottom the header block and the
+            // controls were 12dp apart inside a card that was already 16dp from
+            // its own edge — two spacings saying the same thing. One `xs` on
+            // each side now.
             Padding(
               // 34 badge + 12 gap, matching the row above rather than a second
               // hand-picked number.
-              padding: const EdgeInsets.only(left: 46, top: AppSpacing.sm),
+              padding: const EdgeInsets.only(left: 46, top: AppSpacing.xs),
               child: AppDivider(opacity: 0.12),
             ),
             const SizedBox(height: AppSpacing.xs),

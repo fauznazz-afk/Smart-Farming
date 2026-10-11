@@ -1816,6 +1816,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, () => _heroCard()),
       () => const SizedBox(height: 8),
+      // **The sky card, here rather than on Hydroponics.** It answers the
+      // question the PV card poses from the other side — not "why is the array
+      // producing that" but "what is the sky currently offering" — so the two
+      // belong on the same page. The Hydroponics tab keeps the sensor's
+      // *numbers* in the environment grid; a second reading of the same sensor
+      // one tab away is a duplication.
+      () => _bindRevision(
+        _sensorRevision,
+        () => SolarConditionCard(
+          lux: _sensor?.latestValues['lux'],
+          lastUpdate: _sensor?.lastUpdate,
+          staleMinutes: _staleTelemetryMinutes,
+        ),
+      ),
+      () => const SizedBox(height: 8),
       () => _bindRevision(_energyRevision, () => _energySummaryCard()),
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, () => _dualCards()),
@@ -2178,31 +2193,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
       () => const SizedBox(height: _cardGap),
-      // The sky, read off the greenhouse lux sensor.
-      //
-      // **Below the camera and above the environment grid, and that is the whole
-      // argument.** The grid it precedes is the one that carries `lux` as a bare
-      // number in a list of five; this card is the same sensor, converted to W/m²
-      // and named. Putting the interpretation immediately above the raw figure
-      // means the reader gets "412 W/m², partly cloudy" first and then the five
-      // readings it was derived from, rather than the two being separated by
-      // nothing in particular.
-      //
-      // It is on *this* page and not on Overview because this is where the
-      // greenhouse lux sensor lives — Overview has no lux reading to convert, and
-      // inventing one there would mean reaching across pages for a sensor the
-      // page does not own. What it answers is the question the PV card on
-      // Overview poses from the other side: not "why is the array producing
-      // that" but "what is the sky currently offering".
-      () => _bindRevision(
-        _sensorRevision,
-        () => SolarConditionCard(
-          lux: _sensor?.latestValues['lux'],
-          lastUpdate: _sensor?.lastUpdate,
-          staleMinutes: _staleTelemetryMinutes,
-        ),
-      ),
-      () => const SizedBox(height: 8),
       () => _bindRevision(_sensorRevision, () => _environmentGrid()),
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries

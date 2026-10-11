@@ -198,7 +198,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               radius: AppRadius.card,
               fill: AppSurfaces.surface,
               border: AppBorders.hairlineBorder,
-              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              // `md`, not `cardPadding`. The drill-in cards are the tight ones
+              // now and the list rows should match them: at 16 a category row
+              // spent 32dp on padding around a two-line `ListTile` that brings
+              // its own insets, and the eight of them filled the screen before
+              // the reader reached the end of the alphabet.
+              padding: const EdgeInsets.all(AppSpacing.md),
               // The transparent `Material` is the same arrangement `AppCard`
               // makes and for the same reason: a `Container`'s opaque fill
               // paints over the ink layer of any `Material` placed outside it,
@@ -261,11 +266,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDetailPage(BuildContext context, SettingsSection section) {
     return ListView(
       key: ValueKey('settings-${section.title}'),
+      // `sm` at the top rather than `md`, and `lg` at the bottom rather than
+      // `xl`. The gap between the app bar and the first card was 12dp and the
+      // gap *inside* the card above it was already 12dp, so the two added up to
+      // 24dp of nothing. The bottom was reserving space for a shadow that no
+      // longer exists.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.gutter,
-        AppSpacing.md,
+        AppSpacing.sm,
         AppSpacing.gutter,
-        AppSpacing.xl,
+        AppSpacing.lg,
       ),
       children: [
         SectionCard(
