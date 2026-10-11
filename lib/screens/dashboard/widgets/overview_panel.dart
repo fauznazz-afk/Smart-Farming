@@ -174,7 +174,11 @@ class OverviewPanel extends StatelessWidget {
           // The house draw, for the reason in the file doc.
           figure: slotNumber(r.acPower, decimals: 0),
           unit: 'W',
-          caption: 'House load',
+          // **The slot name, not a sentence.** `House load` in prose above an
+          // 88 dp figure was the loudest quiet thing on the page; `AC_LOAD` is in
+          // the panel's own voice, sits on the header row beside the stats, and
+          // labels the block instead of competing with it.
+          slot: 'AC_LOAD',
           secondary: [
             ('Peak', slotNumber(_todayPeak(r.acPower), decimals: 0)),
             ('Stale', r.pzemStale ? 'YES' : 'NO'),
@@ -373,16 +377,15 @@ class OverviewPanel extends StatelessWidget {
   static Widget _section(String label, {VoidCallback? onTap}) {
     final text = Text(
       label,
-      style: AppType.slotMicro.copyWith(color: AppSurfaces.onSurfaceVariant),
+      style: AppType.slotMicro.copyWith(color: AppPalette.error),
     );
     return Padding(
-      // **Top `md`, bottom `xs`.** The first cut used `md` on both sides, which
-      // is 12 dp of air above every heading and 12 below — so a heading floated
-      // in the middle of its own whitespace instead of sitting against the
-      // rows it introduces. A heading belongs to what is under it.
+      // **Top `sm`, bottom `xs`.** `md`/`md` was 12 dp of air on both sides, so
+      // a heading floated in the middle of its own whitespace instead of sitting
+      // against the rows it introduces. A heading belongs to what is under it.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
-        AppSpacing.md,
+        AppSpacing.sm,
         AppSpacing.cardPadding,
         AppSpacing.xs,
       ),
@@ -445,10 +448,10 @@ class _Header extends StatelessWidget {
                 ),
                 if (name.isNotEmpty)
                   Text(
+                    // Red, like the reference's station label. The name above
+                    // stays white so the two lines are not one red block.
                     'OVERVIEW',
-                    style: AppType.slotMicro.copyWith(
-                      color: AppSurfaces.onSurfaceVariant,
-                    ),
+                    style: AppType.slotMicro.copyWith(color: AppPalette.error),
                   ),
               ],
             ),

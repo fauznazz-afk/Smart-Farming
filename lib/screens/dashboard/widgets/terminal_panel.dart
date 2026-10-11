@@ -13,18 +13,21 @@
 /// hero figure, and a stack of labelled rows separated by hairlines, the way a
 /// rack-mounted unit presents itself.
 ///
-/// ## Monochrome, and what that costs
+/// ## One accent, and what it costs
 ///
 /// The rest of the app is categorical: PV lime, AC blue, Battery violet, and so
-/// on, so a hue means a category of data. **This panel is monochrome on purpose
-/// and that is a real divergence, not an oversight.** A terminal panel gets its
-/// hierarchy from weight, case, tracking and position, and a categorical hue
-/// sitting in every row would flatten exactly the structure the panel is
-/// building. Hue on this page is reserved for one thing: **a value that is out
-/// of bounds**, drawn in [AppPalette.error]. Red here means *wrong*, not
-/// *battery*.
+/// on, so a hue means a category of data. **This panel carries no category hue
+/// at all, and that is a real divergence, not an oversight.** A terminal panel
+/// gets its hierarchy from weight, case, tracking and position, and a
+/// categorical hue sitting in every row would flatten exactly the structure the
+/// panel is building.
 ///
-/// The other tabs keep their category hues. This is one page, not a new app.
+/// The panel is a black instrument with a single red accent: the hero figure,
+/// the section headings and the meter fills are [AppPalette.error], and the
+/// rows are white on black. **Red is the instrument's own colour, not a claim
+/// that something is wrong** — that is a deliberate change from the earlier
+/// monochrome rule, which reserved red for an out-of-bounds value. The category
+/// tabs keep their hues; this is one page, not a new app.
 ///
 /// ## The label vocabulary
 ///
@@ -144,7 +147,9 @@ class TerminalRow extends StatelessWidget {
     final body = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.cardPadding,
-        vertical: 9,
+        // 7, not 9. This panel should read as a packed readout; the extra 2 dp
+        // per row is air on a page whose whole claim is density.
+        vertical: 7,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -246,21 +251,27 @@ class _Dot extends StatelessWidget {
   }
 }
 
-/// The panel's hero: one figure, enormous, with a status tag above it.
+/// The panel's hero: one figure, enormous, in the accent.
 ///
 /// **The figure is the page.** Everything else in the panel is supporting data,
 /// and this is the one number that answers "what is happening" without a
-/// calculation. It is drawn at [AppType.heroFigure] rather than reusing
-/// [AppType.displayLg] because the tracking on the display scale is tuned for a
-/// short headline and a live figure with changing digit count needs the tighter,
-/// tabular setting — a value that changes width on every poll makes the whole
-/// panel twitch.
+/// calculation.
+///
+/// **It is drawn in [AppPalette.error] because red is the panel's accent, not
+/// because the reading is a breach.** The figure is the number the page is
+/// about, and an 88 dp glyph in the same red as every other accent on the panel
+/// is what makes this read as one instrument rather than as five widgets.
+///
+/// It is drawn at [AppType.heroFigure] rather than reusing [AppType.displayLg]
+/// because the tracking on the display scale is tuned for a short headline and a
+/// live figure with changing digit count needs the tighter, tabular setting — a
+/// value that changes width on every poll makes the whole panel twitch.
 class TerminalHero extends StatelessWidget {
   const TerminalHero({
     super.key,
     required this.figure,
     required this.unit,
-    required this.caption,
+    required this.slot,
     this.secondary = const [],
   });
 
@@ -270,11 +281,18 @@ class TerminalHero extends StatelessWidget {
   /// Its unit.
   final String unit;
 
-  /// The line under the figure — what the figure *is*.
-  final String caption;
+  /// What the figure *is*, in the panel's slot vocabulary — `AC_LOAD`.
+  ///
+  /// **This replaced a spelled-out caption ("House load") and it is not only a
+  /// space saving.** A caption in sentence case above a 72 dp figure is the
+  /// loudest quiet thing on the panel: it is set at the same size as every row's
+  /// key but is the only line of prose on the screen, so the eye goes there
+  /// first and then has to travel down to the number. Naming the slot in the
+  /// panel's own abbreviated, underscored voice puts it on the header row with
+  /// the stats, where it labels the whole block instead of competing with it.
+  final String slot;
 
-  /// Right-hand stats, as `(key, value)` pairs. Rendered in the panel's own
-  /// two-column key/value rhythm rather than as prose.
+  /// Right-hand stats, as `(key, value)` pairs.
   final List<(String, String)> secondary;
 
   @override
@@ -282,40 +300,59 @@ class TerminalHero extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
-        AppSpacing.lg,
+        AppSpacing.sm,
         AppSpacing.cardPadding,
         AppSpacing.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            caption.toUpperCase(),
-            style: AppType.slotKey.copyWith(
-              color: AppSurfaces.onSurfaceVariant,
-            ),
+          // **One header row: slot on the left, legend on the right.** The stats
+          // were briefly below the figure, which put a second line of small text
+          // under a 72 dp glyph and made the block read as a caption and a
+          // footnote rather than as a number with a legend.
+          Row(
+            children: [
+              Text(
+                slot,
+                style: AppType.slotKey.copyWith(color: AppPalette.error),
+              ),
+              const Spacer(),
+              if (secondary.isNotEmpty)
+                Wrap(
+                  spacing: AppSpacing.md,
+                  children: [
+                    for (final (key, value) in secondary)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            key.toUpperCase(),
+                            style: AppType.slotMicro.copyWith(
+                              color: AppSurfaces.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            value,
+                            style: AppType.slotValueSmall.copyWith(
+                              color: AppSurfaces.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          // **`Stack`, not a `Row` with a second column.** The figure is 72 dp
-          // tall and the stats are two 12 dp lines, so a `Row` with
-          // `crossAxisAlignment: end` left the stats hanging off the baseline of
-          // a glyph they have nothing to do with — on the device they sat below
-          // the number with a visible step, reading as an accidental second line
-          // of the caption rather than as a legend.
-          //
-          // Stacked, the stats sit directly under the figure's own baseline,
-          // left-aligned with it, which is where a legend belongs and costs no
-          // width. The figure keeps the full card width, so `1000` and `18` do not
-          // fight over 380 dp.
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 figure,
-                style: AppType.heroFigure.copyWith(
-                  color: AppSurfaces.onSurface,
-                ),
+                style: AppType.heroFigure.copyWith(color: AppPalette.error),
               ),
               const SizedBox(width: AppSpacing.sm),
               Text(
@@ -326,34 +363,6 @@ class TerminalHero extends StatelessWidget {
               ),
             ],
           ),
-          if (secondary.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.lg,
-              runSpacing: 2,
-              children: [
-                for (final (key, value) in secondary)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        key.toUpperCase(),
-                        style: AppType.slotMicro.copyWith(
-                          color: AppSurfaces.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        value,
-                        style: AppType.slotValueSmall.copyWith(
-                          color: AppSurfaces.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -418,6 +427,7 @@ class TerminalMeter extends StatelessWidget {
     super.key,
     required this.fraction,
     this.alert = false,
+    this.color,
     this.leftCaption,
     this.rightCaption,
     this.onTap,
@@ -427,6 +437,10 @@ class TerminalMeter extends StatelessWidget {
   final double fraction;
 
   final bool alert;
+
+  /// The fill colour. Defaults to the panel's red accent; a caller that needs
+  /// another accent can pass one rather than the widget carrying a second rule.
+  final Color? color;
   final String? leftCaption;
   final String? rightCaption;
 
@@ -443,7 +457,11 @@ class TerminalMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clamped = fraction.isNaN ? 0.0 : fraction.clamp(0.0, 1.0);
-    final fill = alert ? AppPalette.error : AppSurfaces.onSurface;
+    // **The fill is the panel's red accent whether or not this meter is
+    // alerting.** `alert` no longer changes the colour, because red is already
+    // the accent — a second shade of it would say "worse" in a way the panel
+    // cannot back up, and the row's own value already carries severity.
+    final fill = color ?? AppPalette.error;
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,

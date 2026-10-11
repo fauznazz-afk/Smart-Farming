@@ -546,29 +546,40 @@ class AppType {
 
   /// The panel's one enormous figure.
   ///
-  /// **72 px, and it is the only thing in the app set that large.** The Overview
-  /// has exactly one question, so it has exactly one hero. Tabular figures are
-  /// not decoration here either: this value changes digit count as the day
-  /// progresses, and a proportional 72 px figure would shift the whole row under
-  /// it on every poll.
+  /// **88 px, and it is the only thing in the app set this large.** The Overview
+  /// has exactly one question, so it has exactly one hero — and after the caption
+  /// was removed it became the page's entire opening statement, which is what
+  /// "88" is for. Tabular figures are not decoration here either: this value
+  /// changes digit count as the day progresses, and a proportional 88 px figure
+  /// would shift the whole row under it on every poll.
+  ///
+  /// **It has to fit four digits.** `10000 W` is the largest the panel can draw
+  /// (a 10 kW array at noon), and JetBrains Mono at 88 px is about 53 px per
+  /// digit — 212 px for five, against the ~379 dp the hero's content box has on
+  /// a 411 dp phone. That is the real constraint on this number, and it is why
+  /// this is not 110.
   ///
   /// The tracking is `-0.03 em`, *not* the `-0.04 em` on [displayLg]. JetBrains
   /// Mono is already monospaced, so a display-tuned negative tracking that looks
-  /// right on Inter visibly closes up the digits here — at 72 px that reads as
+  /// right on Inter visibly closes up the digits here — at 88 px that reads as
   /// kerning error rather than as tightness.
   static const TextStyle heroFigure = TextStyle(
     fontFamily: mono,
-    fontSize: 72,
+    fontSize: 88,
     fontWeight: FontWeight.w700,
     height: 0.92,
-    letterSpacing: -0.03 * 72,
+    letterSpacing: -0.03 * 88,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
-  /// The hero's unit, baseline-aligned beside a 72 px figure.
+  /// The hero's unit, baseline-aligned beside an 88 px figure.
+  ///
+  /// **20 px, up from 18** — a unit set in the same grey as every caption on the
+  /// panel disappears entirely next to a figure that grew by a quarter. It is
+  /// still a third the size of the number, which is the whole point of a unit.
   static const TextStyle heroUnit = TextStyle(
     fontFamily: mono,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: FontWeight.w500,
     height: 1.0,
   );

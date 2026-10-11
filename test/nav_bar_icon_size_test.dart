@@ -61,8 +61,9 @@ double paintedIconWidth(Element iconElement) {
 }
 
 void main() {
-  /// The painted width of each of the four expanded icons, left to right.
-  Future<List<double>> paintedIcons(WidgetTester tester) async {
+  /// Paint the bar. Every test in this file starts here, because the two readers
+  /// below need a laid-out tree and a `find` on an unpumped widget throws.
+  Future<void> paintBar(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1220, 2712);
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
@@ -86,11 +87,30 @@ void main() {
       ),
     );
     await tester.pump();
+  }
 
+  /// The size the destinations declare their icons at, read off the painted tree.
+  ///
+  /// **Read from the widget, not written as a literal here.** An earlier version
+  /// pinned `24` and failed the day the icon was retuned to 22 — correctly, but
+  /// for a reason that had nothing to do with the bug it exists for. The claim
+  /// is "the icons paint at the size they declare"; the number is the source's
+  /// business.
+  double declaredIconSize(WidgetTester tester) {
+    for (final element in find.byType(Icon).evaluate()) {
+      final box = element.renderObject! as RenderBox;
+      if (box.size.height > 32) continue; // the collapsed pill
+      return (element.widget as Icon).size!;
+    }
+    fail('the bar drew no expanded icons to read a declared size from');
+  }
+
+  /// The painted width of each of the four expanded icons, left to right.
+  List<double> paintedIcons(WidgetTester tester) {
     final widths = <double>[];
     for (final element in find.byType(Icon).evaluate()) {
       final box = element.renderObject! as RenderBox;
-      // The collapsed pill's icon is laid out in a 48 dp circle. It is off-screen
+      // The collapsed pill's icon is laid out in a 44 dp circle. It is off-screen
       // behind an opacity of 0 but still laid out, so it has to be excluded by
       // size rather than by visibility.
       if (box.size.height > 32) continue;
@@ -103,7 +123,8 @@ void main() {
     testWidgets('the four expanded icons are all the same width', (
       tester,
     ) async {
-      final widths = await paintedIcons(tester);
+      await paintBar(tester);
+      final widths = paintedIcons(tester);
       expect(widths.length, 4, reason: 'expected the four expanded icons');
 
       final min = widths.reduce((a, b) => a < b ? a : b);
@@ -118,78 +139,97 @@ void main() {
       );
     });
 
-    testWidgets('and that size is 24, not merely uniform', (tester) async {
+    testWidgets('and that size is the declared one, not merely uniform', (
+      tester,
+    ) async {
       // Uniformity alone is not the claim — a bar where every icon were 8 dp
       // would pass the test above. This says the number is the one the
       // destinations declare.
-      for (final w in await paintedIcons(tester)) {
+      //
+      // **Read off the widget rather than written here.** An earlier version
+      // pinned `24` literally, and the day the icon was retuned to 22 the test
+      // failed — correctly, but for a reason that had nothing to do with the bug
+      // it exists for. The claim is "the icons are painted at the size they
+      // declare"; the number is the source's business.
+      await paintBar(tester);
+      final declared = declaredIconSize(tester);
+      for (final w in paintedIcons(tester)) {
         expect(
           w,
-          closeTo(24, 0.5),
+          closeTo(declared, 0.5),
           reason:
-              'an icon painted at ${w.toStringAsFixed(1)} dp. A `FittedBox` '
-              'wrapping the icon as well as the label scales both together, and '
-              'the scale follows the length of the word underneath.',
+              'an icon declared at $declared dp paints at '
+              '${w.toStringAsFixed(1)} dp. A `FittedBox` wrapping the icon as well '
+              'as the label scales both together, and the scale follows the '
+              'length of the word underneath.',
         );
       }
     });
 
-    testWidgets('Hydroponics, the reported one, is 24 and not 8.6', (
+    testWidgets('Hydroponics, the reported one, is full size and not 8.6', (
       tester,
     ) async {
       // The specific complaint, named. "Hydroponics" is the longest label and
       // its icon was the smallest — 0.36x, because that is 123 dp squeezed into
       // a 44 dp slot.
-      final widths = await paintedIcons(tester);
+      await paintBar(tester);
+      final declared = declaredIconSize(tester);
+      final widths = paintedIcons(tester);
       final smallest = widths.reduce((a, b) => a < b ? a : b);
       expect(
         smallest,
-        closeTo(24, 0.5),
+        closeTo(declared, 0.5),
         reason:
-            'the smallest icon is ${smallest.toStringAsFixed(1)} dp, which is '
-            'the one the user reported as looking small',
+            'the smallest icon is ${smallest.toStringAsFixed(1)} dp against a '
+            'declared $declared dp, and it is the one the user reported as '
+            'looking small',
       );
     });
 
-    testWidgets('the label may still shrink, because it is prose', (
+    testWidgets('no icon is drawn below its declared size', (tester) async {
+      // Uniformity alone is satisfied by a bar where every icon is 8 dp, so this
+      // is the other half of the claim: the declared size is also the floor.
+      await paintBar(tester);
+      final declared = declaredIconSize(tester);
+      final widths = paintedIcons(tester);
+      expect(
+        widths.every((w) => w > declared - 0.5),
+        isTrue,
+        reason:
+            'declared $declared dp, painted '
+            '${widths.map((w) => w.toStringAsFixed(1)).join(' / ')}. An icon '
+            'below its declared size is being scaled by an enclosing fit.',
+      );
+    });
+
+    testWidgets('and the bar no longer prints a caption under each icon', (
       tester,
     ) async {
-      // The complement of the fix, and the reason the fix is not "delete the
-      // FittedBox". A destination label is prose and `scaleDown` is the right
-      // degradation for it; what must not happen is the icon being dragged
-      // along with it.
-      //
-      // `Hydroponics` is 123 dp of natural label in a 52 dp slot, so it *is*
-      // shrinking — and the icon beside it is still full size. That contrast is
-      // the whole claim, and asserting only "the icons match" would pass on a
-      // bar that had simply stopped fitting its labels.
-      final widths = await paintedIcons(tester);
-      expect(widths.every((w) => w > 23.5), isTrue);
+      // **This replaced the "the label may still shrink" test, which asserted a
+      // `Text` that no longer exists.** The captions are gone at the user's
+      // request, so the thing worth guarding is their *absence*: a bar that
+      // quietly grew one back would still pass every other test in this file,
+      // because the icons would remain uniform and full size. The names survive
+      // only as `Semantics(label:)`, which is not a `Text`.
+      await paintBar(tester);
+      expect(find.text('Hydroponics'), findsNothing);
+      expect(find.text('Overview'), findsNothing);
+      expect(find.text('Power'), findsNothing);
+      expect(find.text('Fish'), findsNothing);
 
-      // **The label's *painted* width, not its layout width.** Same reason as
-      // the icons: a `FittedBox` lays the label out at 123 dp and paints it at
-      // 44. Reading `RenderBox.size` here would report 123 and the test would
-      // pass for a label that was in fact being crushed.
-      final label = tester.renderObject<RenderBox>(find.text('Hydroponics'));
-      var labelPainted = label.size.width;
-      RenderObject? node = label;
-      while (node != null) {
-        if (node is RenderFittedBox) {
-          final child = node.child;
-          if (child is RenderBox && child.size.width > 0) {
-            labelPainted *= node.size.width / child.size.width;
-          }
-        }
-        node = node.parent;
-      }
+      // **Structural, not just by string.** A caption drawn from anywhere other
+      // than `NavDestination.label` would slip past the four finders above, so
+      // the check is that the bar contains no `Text` at all.
       expect(
-        labelPainted,
-        lessThan(label.size.width),
+        find.descendant(
+          of: find.byType(GlassNavBar),
+          matching: find.byType(Text),
+        ),
+        findsNothing,
         reason:
-            'the label lays out at ${label.size.width.toStringAsFixed(1)} dp '
-            'and paints at ${labelPainted.toStringAsFixed(1)} dp. If the two are '
-            'equal then nothing is scaling it, and this test says nothing about '
-            'whether the label is allowed to shrink independently of the icon.',
+            'the bar draws a Text. The captions were removed deliberately and the '
+            'accessible name now lives on `Semantics`, so a Text here is a '
+            'regression rather than a variant.',
       );
     });
   });

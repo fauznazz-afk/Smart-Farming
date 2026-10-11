@@ -34,6 +34,19 @@ class NavDestination {
 /// use multiple or low-contrast colors in a bottom navigation bar" — which is why
 /// every tab here renders the same accent and is told apart by label and icon.
 ///
+/// ## The captions are gone, and the labels survive as semantics
+///
+/// The user asked for the bar to stop printing a word under every icon, and it
+/// does — nothing under a destination renders text any more. `label` stays on the
+/// record because `_NavItem` and `_CollapsedNavItem` both hand it to
+/// `Semantics(label:)`; a caption that cannot be seen is still a caption a screen
+/// reader announces, and deleting the field would have taken that with it.
+///
+/// That is also what makes the four-tab count harder to revisit. The argument
+/// above for four was partly that "Hydroponics" measured 62 dp in a 60 dp slot —
+/// with no text on screen there is no label to collide, so the limit is now
+/// touch-target pitch alone rather than the width of a word.
+///
 /// ## The glyphs, and why each one was replaced
 ///
 /// The first set was `dashboard` / `bolt` / `eco` / `set_meal`. Two of the four
@@ -84,14 +97,18 @@ const List<NavDestination> kNavDestinations = [
 /// what the bar's own `SizedBox` and `AnimatedContainer` use, so the two cannot
 /// drift without the test failing.
 ///
-/// **76, and the brief chose it — which is a coincidence worth naming, because
-/// the literal `76` that caused the original defect was a *wrong* 76.** The
-/// brief's `tab-bar` states `height: 76px` with `paddingY: 16`, a bar tall
-/// enough that a 24dp icon and a 10sp label sit in it with real air rather than
-/// the label merely surviving inside it. The cost is real: the reservation grows
-/// by 24dp on every page, and `test/nav_bar_clearance_test.dart` is what proves
-/// the two halves of that cost move together instead of one being forgotten.
-/// The bar's own gap below it ([kGlassNavBarBottomGap]) is *not* part of the 76.
+/// **64, down from 76.** The brief chose 76 — which is a coincidence worth
+/// naming, because the literal `76` that caused the *original* defect was a
+/// *wrong* 76. At 76 the bar reserved 24 dp on every page to hold a 24 dp icon
+/// and a 10 sp label with "real air", and the air was mostly air.
+///
+/// The reduction is a third of the bar's height and it is not free: the
+/// reservation shrinks with it, which is the whole point, and
+/// `test/nav_bar_clearance_test.dart` is what proves the two halves moved
+/// together rather than one being forgotten — which is exactly what went wrong
+/// the first time a literal was written here.
+///
+/// The bar's own gap below it ([kGlassNavBarBottomGap]) is *not* part of the 64.
 ///
 /// **Four slots, four destinations, and there is no fifth slot.**
 /// [kNavDestinations] is the tab set and the row indexes it directly; the bar's
@@ -109,7 +126,7 @@ const List<NavDestination> kNavDestinations = [
 /// action button comes back here it needs something to act on, and the aura
 /// token documented for it (`AppPalette.aura`, still unused) is the place to
 /// start.
-const double kGlassNavBarHeight = 76;
+const double kGlassNavBarHeight = 64;
 
 /// The bar's own gap below the pill, and the floor for the safe-area inset.
 ///
@@ -153,9 +170,10 @@ double glassNavBarReservedHeight(BuildContext context) {
 
 /// Flat bottom navigation bar.
 ///
-/// The brief's tab bar: a flat dark bar with a hairline top border, active item
-/// = `primary` with no pill background and no underline, inactive = muted,
-/// labels `AppType.labelMicro`. No shadow pair, no gradient, no glass.
+/// The brief's tab bar: a flat dark bar with a hairline border, active item =
+/// `AppPalette.error` (red) with no pill background and no underline, inactive =
+/// muted. No shadow pair, no gradient, no glass. No captions either — the bar is
+/// four icons, and each one's name lives in its `Semantics` label.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
@@ -351,11 +369,12 @@ class _CollapsedNavItem extends StatelessWidget {
             builder: (pressed) => AnimatedContainer(
               duration: AppMotion.press,
               curve: AppMotion.enter,
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppPalette.primary,
+                // Red, with the lime accent gone: see `_NavDestination`.
+                color: AppPalette.error,
               ),
               // **`_kNavIconSize`, not 22.** The collapsed pill drew the same
               // glyphs as the expanded row at a different size, which meant the
@@ -364,6 +383,15 @@ class _CollapsedNavItem extends StatelessWidget {
               child: Icon(
                 destination.selectedIcon,
                 size: _kNavIconSize,
+                // **`onHue` stays, and it is worth saying why against red.**
+                // Its job is ink-on-fill, so it has to be re-measured rather than
+                // assumed whenever the fill changes. Black on `#FF6B6B` is
+                // 7.6:1 — comfortably past AA — because this red is light
+                // (relative luminance 0.33). The white that "feels" like the
+                // instrument-panel pairing is only 2.8:1 on the same fill, so
+                // swapping to `AppSurfaces.onSurface` here would have made it
+                // worse. The bar's own fill is a near-black page, so the white in
+                // this design is the *ink*, not the ink-on-red.
                 color: AppPalette.onHue,
               ),
             ),
@@ -404,7 +432,6 @@ class _NavItem extends StatelessWidget {
               selected: selected,
               selectedIcon: destination.selectedIcon,
               icon: destination.icon,
-              label: destination.label,
             ),
           ),
         ),
@@ -413,7 +440,13 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-/// A nav destination: glyph + label, coloured by selection only.
+/// A nav destination: the glyph alone, coloured by selection only.
+///
+/// **Icon-only.** The caption is gone at the user's request, so this is now a
+/// centred icon in a `_kNavItemWidth` slot and nothing else — no `Column`, no
+/// label, no `FittedBox`. The reason the last two were hard to remove is
+/// preserved below, because the guard against their return is the thing that
+/// matters now.
 ///
 /// **The active item shifts colour and nothing else.** No pill, no underline, no
 /// weight change — the brief's `tab-item-active` is `textColor: {colors.primary}`
@@ -422,78 +455,66 @@ class _NavItem extends StatelessWidget {
 /// selected icon and the outline icon are the only two variants in play: the
 /// brief's iconography is `solar bold` for both states, with the *filled* variant
 /// reserved for the selected one.
+///
+/// **Red, not lime.** The accent is [AppPalette.error] (`#FF6B6B`) to match the
+/// black+red instrument-panel design; the bar used to paint `AppPalette.primary`,
+/// the lime. The label's *name* survives only as `NavDestination.label`, which is
+/// now read solely by the `Semantics(label:)` on each item — a caption that is
+/// invisible is still a caption a screen reader needs, and dropping the field would
+/// have taken the accessibility label with it.
 class _NavDestination extends StatelessWidget {
   const _NavDestination({
     required this.selected,
     required this.selectedIcon,
     required this.icon,
-    required this.label,
   });
 
   final bool selected;
   final IconData selectedIcon;
   final IconData icon;
-  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppPalette.primary : AppSurfaces.onSurfaceVariant;
+    final color = selected ? AppPalette.error : AppSurfaces.onSurfaceVariant;
     return Pressable(
       pressedScale: 0.90,
       builder: (pressed) => AnimatedContainer(
         duration: AppMotion.press,
         curve: AppMotion.enter,
         width: _kNavItemWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 24, the brief's `tab-item-*.iconSize`. It was 22, which is
-            // neither the 24 of chrome nor the 20 of a button — a size that
-            // belongs to no tier.
-            //
-            // **The icon is NOT inside a `FittedBox`, and that is the fix for
-            // "the Hydroponics icon looks small".** The whole column used to be
-            // wrapped in one, so the *label* set the scale and the icon came
-            // along for the ride. Measured at the device's own density:
-            //
-            //   Hydroponics  scale 0.36   (label natural width 123 dp)
-            //   Overview     scale 0.49   ( 90 dp)
-            //   Power        scale 0.79   ( 56 dp)
-            //   Fish         scale 0.98   ( 45 dp)
-            //
-            // Four icons in one 72 dp row, drawn at **0.36 / 0.49 / 0.79 / 0.98
-            // of the size they were declared at** — a 2.7x spread that tracks the
-            // length of the word underneath and has nothing to do with the
-            // glyphs. The icon that looked small was the one with the longest
-            // label, which is why nobody found it by looking at the icons
-            // themselves.
-            //
-            // The label still shrinks, and that is fine: a label is prose and
-            // `scaleDown` is the correct degradation for it. But it now shrinks
-            // on its own, inside its own box, and cannot touch the icon.
-            Icon(
-              selected ? selectedIcon : icon,
-              size: _kNavIconSize,
-              color: color,
-            ),
-            const SizedBox(height: 3),
-            // **`width: double.infinity` is load-bearing, not tidy.** A
-            // `FittedBox` inside a `Column` is given an unbounded width, sizes
-            // to its child, and therefore never scales at all — so without this
-            // box the label would overflow rather than shrink, and moving the
-            // icon out of the old shared `FittedBox` would have been half a fix.
-            SizedBox(
-              width: double.infinity,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: AppType.labelMicro.copyWith(color: color),
-                ),
-              ),
-            ),
-          ],
+        // **The icon is NOT inside a `FittedBox`, and that is the fix for
+        // "the Hydroponics icon looks small".** The whole icon-plus-label column
+        // used to be wrapped in one, so the *label* set the scale and the icon
+        // came along for the ride. Measured at the device's own density:
+        //
+        //   Hydroponics  scale 0.36   (label natural width 123 dp)
+        //   Overview     scale 0.49   ( 90 dp)
+        //   Power        scale 0.79   ( 56 dp)
+        //   Fish         scale 0.98   ( 45 dp)
+        //
+        // Four icons in one row, drawn at **0.36 / 0.49 / 0.79 / 0.98 of the size
+        // they were declared at** — a 2.7x spread that tracked the length of the
+        // word underneath and had nothing to do with the glyphs. The icon that
+        // looked small was the one with the longest label, which is why nobody
+        // found it by looking at the icons themselves.
+        //
+        // Deleting the label removes the *cause* of that scale rather than
+        // fighting it, and `test/nav_bar_icon_size_test.dart` still measures the
+        // painted width of all four icons — so a future re-wrap in a `FittedBox`
+        // fails loudly instead of returning quietly.
+        //
+        // **`Center` is load-bearing here, and it replaced the `Column`.** The
+        // column passed loose constraints down to its children, which is why an
+        // `Icon` inside one drew at its declared size. Delete the column and the
+        // slot's tight 40 dp reaches the icon directly, and `Icon` obeys it: every
+        // glyph painted at the full slot width, which `test/nav_bar_icon_size_test`
+        // caught as 40 dp against a declared 22.
+        child: Center(
+          child: Icon(
+            selected ? selectedIcon : icon,
+            size: _kNavIconSize,
+            color: color,
+          ),
         ),
       ),
     );
@@ -506,22 +527,36 @@ class _NavDestination extends StatelessWidget {
 /// `4 * _kNavItemWidth + 4 * _kNavItemGap` wide, and the `56` that used to be
 /// written inline was that arithmetic done in the reader's head — which is how it
 /// drifted from the 48-wide slot it was supposed to describe.
-const double _kNavItemGap = 4;
+const double _kNavItemGap = 3;
 
 /// The icon's drawn size, in one place.
 ///
 /// **A constant rather than a literal at the call site**, because the collapsed
-/// item draws the same glyph and the two used to carry their own numbers — 24
-/// here, 22 there — so a retune of one silently desynchronised the other.
-const double _kNavIconSize = 24;
-
-/// The width a destination's icon and label are laid out in.
+/// item draws the same glyph and the two used to carry their own numbers — so a
+/// retune of one silently desynchronised the other.
 ///
-/// **52 dp, and it is wider than the 44 the old slot gave each tab.** The icon
-/// is drawn at 24 and the label at `labelMicro`; a 44 dp slot made the longest
-/// label shrink to about a third, which is where the reported bug started. 52
-/// gives `Hydroponics` room to be read without touching the icon.
-const double _kNavItemWidth = 52;
+/// **22, down from 24.** The bar is 12 dp shorter, so a 24 dp icon left the
+/// label crowdable against the top and bottom edges. 22 keeps the icon
+/// unmistakably larger than the 10 sp label without crowding it.
+///
+/// The label it was measured against is gone, so this number is now free to grow
+/// and was deliberately *not* grown: the icon-size test reads the declared value
+/// off the widget rather than pinning it, so a retune here is a design decision
+/// rather than a test failure, and nothing in the brief asked for a bigger glyph.
+const double _kNavIconSize = 22;
+
+/// The width a destination is laid out in.
+///
+/// **40 dp, down from 46, because there is no longer a label to fit.** Every step
+/// of this number so far has been argued in terms of the widest word underneath
+/// the icon — `Hydroponics` is 123 dp of natural text — and that constraint is
+/// gone. What is left is the ripple's `_kNavItemWidth` box, so the slot only has
+/// to clear the 22 dp icon with air around it: 9 dp on each side.
+///
+/// The bar's width is this constant times the destination count plus the gap, and
+/// that arithmetic lives in `GlassNavBar` rather than here, so the two halves move
+/// together when this moves.
+const double _kNavItemWidth = 40;
 
 // There were two getters here — `destination` and `selectedIndex` — that
 // recovered the label from the *icon* by searching [kNavDestinations] for the
