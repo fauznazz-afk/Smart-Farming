@@ -33,11 +33,38 @@ class NavDestination {
 /// destination label." Neither do they forbid the other escape route — "Don't
 /// use multiple or low-contrast colors in a bottom navigation bar" — which is why
 /// every tab here renders the same accent and is told apart by label and icon.
+///
+/// ## The glyphs, and why each one was replaced
+///
+/// The first set was `dashboard` / `bolt` / `eco` / `set_meal`. Two of the four
+/// were wrong for what the page *is*, and one of them was wrong in a way that
+/// only shows up when it is 24 dp tall:
+///
+///  - **`set_meal` is a plate of food.** It is Material's fish-on-a-dinner-plate
+///    glyph, which reads as a menu rather than as an aquarium. The Fish page is
+///    water quality — temperature, pH, turbidity — so the glyph is now `water`,
+///    which is what the page actually reports on.
+///  - **`dashboard` is a nine-square grid.** At 24 dp in a 72 dp slot the nine
+///    squares turn into a grey smudge, and `space_dashboard` draws the same idea
+///    as four panels with air between them, which survives being that small.
+///  - `bolt` and `eco` were right and only their *style* changed. `Icons.bolt`
+///    is a hairline zigzag and `Icons.eco` is a thin outline; both are the
+///    Material 2 weight. `*_rounded` is the same glyph at the weight the rest of
+///    the bar draws at, so an unselected tab is legible rather than merely
+///    correct.
+///
+/// The set is `*_outlined` / `*_rounded` throughout, and it has to be: mixing
+/// `Icons.bolt` with `Icons.space_dashboard` puts two different stroke weights
+/// and two different corner languages in one 72 dp row.
 const List<NavDestination> kNavDestinations = [
-  NavDestination(Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
-  NavDestination(Icons.bolt_outlined, Icons.bolt, 'Power'),
-  NavDestination(Icons.eco_outlined, Icons.eco, 'Hydroponics'),
-  NavDestination(Icons.set_meal_outlined, Icons.set_meal, 'Fish'),
+  NavDestination(
+    Icons.space_dashboard_outlined,
+    Icons.space_dashboard_rounded,
+    'Overview',
+  ),
+  NavDestination(Icons.bolt_outlined, Icons.bolt_rounded, 'Power'),
+  NavDestination(Icons.eco_outlined, Icons.eco_rounded, 'Hydroponics'),
+  NavDestination(Icons.water_outlined, Icons.water_rounded, 'Fish'),
 ];
 
 /// Height of the pill itself, excluding everything below it.
@@ -181,13 +208,30 @@ class GlassNavBar extends StatelessWidget {
                       // flat tier, and [AppShadows.stamped] would make it the only
                       // stamped thing at the bottom of the screen.
                       color: AppSurfaces.page,
-                      // **Rounded, and that is the brief's own radius.** The bar is
-                      // a floating pill, not a strip welded to the bottom edge: the
-                      // brief's `tab-bar` is `rounded-lg` with `px-6`, and a
-                      // full-bleed rectangle with a hairline across the whole width
-                      // reads as a divider rather than as a bar. 8px is the only
-                      // rectilinear radius in the scale, so the corners are that.
-                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      // **A stadium, not an 8px rectangle.** This was
+                      // `AppRadius.card`, and the user's read on it was "masih
+                      // kotak" — still square. That is a measurement, not a
+                      // preference: 8 px on a bar 76 dp tall is a corner radius
+                      // of 10% of the height, which at a phone's physical
+                      // density is about two millimetres. It reads as a
+                      // slightly chamfered rectangle, which is what it is.
+                      //
+                      // A tab bar is the one component in the app that is
+                      // *floating* — it is `extendBody: true`, painted over the
+                      // page, with a gap under it and page visible on both
+                      // sides. A floating object with near-square corners does
+                      // not read as floating; it reads as a strip that happens
+                      // to be inset. `AppRadius.pill` is the token that already
+                      // means "fully round" and it is what the pressed
+                      // `InkWell` in `_NavItem` uses, so the ripple and the
+                      // silhouette finally agree — the ripple was a capsule
+                      // over a chamfered rectangle.
+                      //
+                      // The bar's own clip below carries the same value, and the
+                      // test asserts the two are the same number, because that
+                      // disagreement is invisible in the source and visible on
+                      // the device.
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       // A full hairline, not a top-only one. A rounded rect with a
                       // border on one side only is a shape that cannot exist, and
                       // the top-only version left the two bottom corners square
@@ -207,7 +251,7 @@ class GlassNavBar extends StatelessWidget {
                     // radius being allowed to disagree is a shape that cannot
                     // exist.
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       child: Material(
                         type: MaterialType.transparency,
                         child: Stack(

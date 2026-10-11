@@ -72,6 +72,19 @@ class SolarConditionCard extends StatelessWidget {
     // the exclusion, so the summary competes with the tree instead of replacing
     // it. Two other cards in this app already pass `semanticLabel`; this is the
     // third, and it is the same call rather than a second way of doing it.
+    // **The reading is on the RIGHT of the header row, not on a line of its
+    // own below it.** The card used to be a single left-aligned column: a header
+    // row, the figure, the condition, the bar. On a 411 dp phone that is four
+    // lines of content in a card 387 dp wide, and the figure — the one thing on
+    // it worth reading — occupied about a fifth of the width with 300 dp of bare
+    // card to its right. That is the "banyak space kosong" the user reported, and
+    // it is a layout claim rather than a matter of taste: a card whose content
+    // fills a third of its own width is not a card, it is a paragraph.
+    //
+    // So the header row now carries the figure on its trailing edge, baseline-
+    // aligned with the condition, and the two halves are given a `Spacer` rather
+    // than each taking `MainAxisSize.min` in a column that grows downward. Same
+    // information, same tokens, one line shorter and roughly twice the density.
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       semanticLabel: reading == null
@@ -81,19 +94,73 @@ class SolarConditionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Icon(
-                Icons.wb_sunny_outlined,
-                size: 19,
+                Icons.wb_sunny_rounded,
+                size: 20,
                 color: AppPalette.primary,
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Sky',
-                style: AppType.labelUppercase.copyWith(color: faintColor),
+              // **The left half is the *name*, the right half is the *reading*.**
+              // `Expanded` on the label column rather than `Spacer` between
+              // fixed pieces, because the condition label is variable-width —
+              // `Heavily overcast` is nearly twice `Clear sky` — and a `Spacer`
+              // would let the figure slide left or right depending on which one
+              // the card happened to be showing.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Sky',
+                      style: AppType.labelUppercase.copyWith(color: faintColor),
+                    ),
+                    const SizedBox(height: 2),
+                    // **The condition is the answer, and it sits directly under
+                    // the label it qualifies.** The question the card exists to
+                    // answer is "is it bright enough for the array to be doing
+                    // something", and the words that answer it are worth more
+                    // than a second line of figure.
+                    Text(
+                      reading == null ? 'No reading' : condition!.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.labelUppercase.copyWith(
+                        color: reading == null
+                            ? faintColor
+                            : skyConditionColor(condition!),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
+              if (reading != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                // **The reading, in the sensor's own units.** No conversion and
+                // no derived quantity: the number is what the greenhouse lux
+                // sensor reported. A user who trusts the gauge can check it
+                // against the value in the environment grid on Hydroponics,
+                // which is the same number.
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '${reading.round()}',
+                      style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      'lx',
+                      style: AppType.labelMicro.copyWith(color: faintColor),
+                    ),
+                  ],
+                ),
+              ],
               if (stale) ...[
+                const SizedBox(width: AppSpacing.sm),
                 const Icon(Icons.schedule, size: 14, color: statusWarn),
                 const SizedBox(width: AppSpacing.xs),
                 Text(
@@ -104,95 +171,65 @@ class SolarConditionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          if (reading == null)
-            Text(
-              'No reading',
-              style: AppType.bodySm.copyWith(color: faintColor),
-            )
-          else ...[
-            // **The reading, in the sensor's own units.** No conversion and no
-            // derived quantity: the number is what the greenhouse lux sensor
-            // reported, and the sentence under it says what that means. A user
-            // who trusts the gauge can check it against the value in the
-            // environment grid on Hydroponics, which is the same number.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  '${reading.round()}',
-                  style: AppType.numeralLg.copyWith(color: appPrimaryText),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  'lx',
-                  style: AppType.labelMicro.copyWith(color: faintColor),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            // **The condition carries the answer, and it is the largest thing on
-            // the card after the number.** The question the card exists to answer
-            // is "is it bright enough for the array to be doing something", and
-            // five words in the answer's own slot is a stronger answer than a
-            // figure in a unit the reader has to interpret.
-            Text(
-              condition!.label,
-              style: AppType.labelUppercase.copyWith(
-                color: skyConditionColor(condition),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            // The bar is the fraction of one sun. It is driven by the same
-            // conversion the card no longer shows, because a bar needs a bounded
-            // quantity and "fraction of a clear noon" is exactly that — an
-            // un-clamped reading of 200 000 lx overflows the track, and a bar
-            // scaled by W/m2 directly is a number nobody can read off a track.
-            // **`width: double.infinity`, and it is load-bearing rather than
-            // tidy.** The column this sits in is `crossAxisAlignment: start`,
-            // so a child with no intrinsic width does not stretch — the track
-            // was sizing itself to its own child, which is a
-            // `FractionallySizedBox` of 0.5376 × the card's width. The result
-            // was a bar 208dp wide on a card 387dp *inside*, so every reading
-            // drew a bar that looked full and a caption that said otherwise.
-            //
-            // Nothing caught it for a while: the bar never overflowed its track
-            // (they were the same width), so `never draws wider than its track`
-            // passed, and the percentage was only ever asserted as *text*. The
-            // first widget test that read the bar's rendered width against the
-            // track's found it.
-            //
-            // It is the same conversion the card no longer displays in units: a
-            // fraction of one sun is a bounded thing to fill a track with, and
-            // the track has to be the full width for the fraction to mean
-            // anything.
-            Container(
-              width: double.infinity,
-              height: 8,
-              decoration: BoxDecoration(
-                color: AppSurfaces.track,
-                borderRadius: BorderRadius.circular(AppRadius.bar),
-                border: AppBorders.hairlineBorder,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.bar),
-                child: FractionallySizedBox(
-                  widthFactor: sunFraction(reading),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppPalette.primary,
-                      borderRadius: BorderRadius.circular(AppRadius.bar),
-                      boxShadow: AppShadows.glow(
-                        AppPalette.primary,
-                        strength: 0.35,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          _BrightnessBar(fraction: sunFraction(reading ?? 0)),
         ],
+      ),
+    );
+  }
+}
+
+/// The bar: how much of one sun the sky is currently offering.
+///
+/// **Extracted because the empty state needs one too.** The card used to draw
+/// the bar only when there was a reading, so a card whose sensor had never
+/// reported was a header row and nothing else — a short strip of card with a
+/// hole where the instrument should be. The track at rest reads as *nothing to
+/// report yet*, which is what is true, and it keeps the card the same shape in
+/// every state so the page does not jump when the sensor comes alive.
+///
+/// The bar is still driven by `sunFraction`, the conversion the card no longer
+/// prints in units: a fraction of one sun is a bounded quantity to fill a
+/// bounded track with. An un-clamped 200 000 lx reading would overflow it.
+///
+/// **`width: double.infinity`, and it is load-bearing rather than tidy.** The
+/// column this sits in is `crossAxisAlignment: start`, so a child with no
+/// intrinsic width does not stretch — the track was sizing itself to its own
+/// child, which is a `FractionallySizedBox` of 0.5376 × the card's width. The
+/// result was a bar 208 dp wide on a card 387 dp *inside*, so every reading drew
+/// a bar that looked full and a caption that said otherwise.
+///
+/// Nothing caught it for a while: the bar never overflowed its track (they were
+/// the same width), so `never draws wider than its track` passed, and the
+/// percentage was only ever asserted as *text*. The first widget test that read
+/// the bar's rendered width against the track's found it.
+class _BrightnessBar extends StatelessWidget {
+  const _BrightnessBar({required this.fraction});
+
+  /// The fraction of one sun, already clamped by `sunFraction`.
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 10,
+      decoration: BoxDecoration(
+        color: AppSurfaces.track,
+        borderRadius: BorderRadius.circular(AppRadius.bar),
+        border: AppBorders.hairlineBorder,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.bar),
+        child: FractionallySizedBox(
+          widthFactor: fraction,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppPalette.primary,
+              borderRadius: BorderRadius.circular(AppRadius.bar),
+              boxShadow: AppShadows.glow(AppPalette.primary, strength: 0.35),
+            ),
+          ),
+        ),
       ),
     );
   }

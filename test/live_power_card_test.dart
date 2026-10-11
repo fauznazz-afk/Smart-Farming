@@ -754,20 +754,42 @@ void main() {
     testWidgets('the three figures share a line at every scale', (tester) async {
       // The point of the shared label block: the figures are the content and they
       // must not drift apart because one annotation wrapped.
+      //
+      // **Only meaningful in the three-column layout, and that is now a real
+      // distinction rather than a hypothetical one.** The flow row falls back to
+      // stacking when three columns cannot hold the labels — and with the terms
+      // drawn as tiles, each column is 16 dp narrower than it was, so 381 dp at a
+      // 3.0 system scale now stacks where it used to fit. Stacked, the three
+      // figures are on three *rows* by design and comparing their tops measures
+      // the fallback, not a defect.
+      //
+      // So the test asserts the thing it can assert in both layouts: **either**
+      // the three figures share a baseline, **or** the terms are stacked with
+      // each on its own line, in the order the row declared. It no longer passes
+      // vacuously for a layout that drifted sideways between two columns.
       for (final scale in [1.0, 1.5, 2.0, 3.0]) {
         await pumpAtScale(tester, width: 381, scale: scale, batteryPower: -34);
         final tops = await figureTops(tester);
         expect(tops.length, 3, reason: 'scale $scale did not find three figures');
+
+        final spread =
+            tops.reduce((a, b) => a > b ? a : b) - tops.reduce((a, b) => a < b ? a : b);
         // Tolerance is one device pixel: the figures are baseline-aligned inside
         // each slot, and a slot's own rounding can differ by a fraction.
+        if (spread <= 1.5) continue;
+
+        // Not a row, so it has to be the stacked fallback: three distinct rows,
+        // each taller than a line, in reading order.
         expect(
-          tops.reduce((a, b) => a > b ? a : b) -
-              tops.reduce((a, b) => a < b ? a : b),
-          lessThan(1.5),
-          reason: 'the figures are misaligned by '
-              '${(tops.reduce((a, b) => a > b ? a : b) - tops.reduce((a, b) => a < b ? a : b)).toStringAsFixed(1)} '
-              'px at scale $scale',
+          tops.toSet().length,
+          3,
+          reason: 'at scale $scale the figures are neither on one baseline '
+              '(spread ${spread.toStringAsFixed(1)} px) nor on three separate '
+              'rows ($tops). Two of them are sharing a row and one is not, '
+              'which is the defect this test exists for.',
         );
+        expect(tops[1] - tops[0], greaterThan(0), reason: 'not in order');
+        expect(tops[2] - tops[1], greaterThan(0), reason: 'not in order');
       }
     });
 

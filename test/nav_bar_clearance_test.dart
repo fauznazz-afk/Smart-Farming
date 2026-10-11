@@ -142,10 +142,22 @@ void main() {
           .map((c) => c.decoration)
           .whereType<BoxDecoration>()
           .firstWhere((d) => d.borderRadius != null);
+
+      // **A stadium, and the assertion is `AppRadius.pill` rather than
+      // `AppRadius.card`.** The bar was 8 dp on a 76 dp tall shape, which is a
+      // corner radius of about 10% of the height — at a phone's density, roughly
+      // two millimetres. It rendered as a chamfered rectangle, which is exactly
+      // what the user reported: the tab bar is the one *floating* element in the
+      // app (`extendBody: true`, a gap under it, page on both sides), and a
+      // floating object with near-square corners does not read as floating.
+      //
+      // The test still asserts the *same* thing it always did — that the
+      // decoration and the clip agree — and now also pins the value, so the
+      // radius cannot be quietly walked back to a chamfer by someone tidying it.
       expect(
         decoration.borderRadius,
-        BorderRadius.circular(AppRadius.card),
-        reason: 'the bar is no longer rounded',
+        BorderRadius.circular(AppRadius.pill),
+        reason: 'the bar is no longer fully round',
       );
 
       final clip = tester.widget<ClipRRect>(find.byType(ClipRRect).first);

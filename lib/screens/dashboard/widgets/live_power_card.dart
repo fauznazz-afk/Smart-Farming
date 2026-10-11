@@ -86,7 +86,7 @@ class LivePowerCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _PowerFlow(
             pvPower: pvPower,
             acPower: acPower,
@@ -162,15 +162,30 @@ class _PowerFlow extends StatelessWidget {
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
+            // One style instance for the whole flow row. See
+            // [_resolveTermLabelStyle] for why the planner and the painter are
+            // not allowed to resolve their own.
+            final labelStyle = _resolveTermLabelStyle(context);
             final labels = [solarLabel, houseLabel, batteryLabel];
-            final natural = _labelNaturalWidths(context, labels);
-            final available = constraints.maxWidth - 2 * _kArrowWidth;
+            final natural = _labelNaturalWidths(context, labels, labelStyle);
+            // **The three tiles' own padding comes off the width the labels are
+            // planned against.** The plan decides how many lines a label needs at
+            // a given width, so it has to be planned at the width the text will
+            // actually have, which is the slot minus two insets — not the slot.
+            // Planning against the outer slot and painting inside it is how a
+            // label ends up one line longer than the block reserved for it.
+            const tileChrome = 6 * _kTilePadding;
+            final available = math.max(
+              0.0,
+              constraints.maxWidth - 2 * _kArrowWidth - tileChrome,
+            );
 
             // Measured, not arithmetic. See [_planLabelSlots] for why the
             // proportional split this replaced was wrong above a 2.0 text scale.
             final columns = _planLabelSlots(
               context,
               labels,
+              style: labelStyle,
               natural: natural,
               available: available,
             );
@@ -181,23 +196,50 @@ class _PowerFlow extends StatelessWidget {
             // per line. Stacked, each term gets the whole card width and the
             // worst label needs two lines.
             final stacked = columns.lines > _kMaxColumnLabelLines;
+
+            // **Stacked means each term gets the *whole* row, not a third of
+            // it.** The three tiles are one above another, so there is nothing
+            // sharing the width — and dividing it three ways anyway is what put
+            // `Solar` on a wrap cliff at 3.0 text scale: the planner measured
+            // five lines at the width it had handed out, allotted three, and
+            // the label was cut with no flag anywhere.
+            //
+            // A share also bought nothing. Stacking exists precisely because
+            // three columns could not hold the labels; giving each column back
+            // its width is the layout the fallback was asking for.
             final plan = stacked
                 ? _planLabelSlots(
                     context,
                     labels,
+                    style: labelStyle,
                     natural: natural,
-                    available: constraints.maxWidth,
+                    available: math.max(
+                      0.0,
+                      constraints.maxWidth - 2 * _kTilePadding,
+                    ),
                   )
                 : columns;
+            final termWidths = stacked
+                ? List.filled(labels.length, constraints.maxWidth)
+                : plan.widths;
 
+            // **[plan.widths] is already the *inner* width** — see the note on
+            // `tileChrome` above — which is exactly the box the figure row is
+            // fitted into, so nothing is subtracted here. Subtracting an inset
+            // that the planner never added is the mirror of the bug below: it
+            // budgets against a box narrower than the real one and shrinks
+            // every figure for no reason.
             final figureScale = _sharedFigureScale(
               context,
-              slotWidths: plan.widths,
+              slotWidths: [
+                for (final w in termWidths)
+                  stacked ? math.max(0, w - 2 * _kTilePadding) : w,
+              ],
               watts: [solarForBar, acPower, batteryPower],
               color: faint,
             );
 
-            final labelHeight = _labelBlockHeight(context, [plan.lines]);
+            final labelHeight = _labelBlockHeight(context, [plan.lines], labelStyle);
 
             Widget arrow(IconData glyph) => Padding(
               padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
@@ -208,6 +250,7 @@ class _PowerFlow extends StatelessWidget {
               _Term(
                 icon: Icons.wb_sunny_rounded,
                 label: solarLabel,
+                style: labelStyle,
                 labelHeight: labelHeight,
                 labelLines: plan.lines,
                 watts: solarForBar,
@@ -217,6 +260,7 @@ class _PowerFlow extends StatelessWidget {
               _Term(
                 icon: Icons.home_rounded,
                 label: houseLabel,
+                style: labelStyle,
                 labelHeight: labelHeight,
                 labelLines: plan.lines,
                 watts: acPower,
@@ -230,6 +274,7 @@ class _PowerFlow extends StatelessWidget {
                     ? Icons.battery_5_bar_rounded
                     : Icons.battery_std_rounded,
                 label: batteryLabel,
+                style: labelStyle,
                 labelHeight: labelHeight,
                 labelLines: plan.lines,
                 watts: batteryPower,
@@ -239,13 +284,19 @@ class _PowerFlow extends StatelessWidget {
             ];
 
             if (stacked) {
+              // **[termWidths] is the tile's own outer width here**, which is
+              // `constraints.maxWidth` in this branch — see the note where
+              // `stacked` is decided.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var i = 0; i < terms.length; i++) ...[
                     Align(
                       alignment: Alignment.topLeft,
-                      child: SizedBox(width: plan.widths[i], child: terms[i]),
+                      child: SizedBox(
+                        width: termWidths[i],
+                        child: terms[i],
+                      ),
                     ),
                     if (i < terms.length - 1)
                       Padding(
@@ -265,13 +316,30 @@ class _PowerFlow extends StatelessWidget {
               );
             }
 
-            final totalWidth = plan.widths.fold(0.0, (a, b) => a + b);
+            // **The flex shares are the plan's widths plus the tiles' own chrome,
+            // and this is the one place that has to be true.**
+            //
+            // `_planLabelSlots` returns the width a *label* needs, which is the
+            // width inside the tile's padding — so passing those numbers to
+            // `Flexible` makes every tile 16 dp narrower than it was planned for.
+            // The label then wraps to one more line than the shared block
+            // reserved, and because the flow labels carry no `maxLines` the
+            // extra line is *silently cut*: no flag, no stripe, no exception.
+            // `live_power_card_test.dart` caught exactly that — `Discharging`
+            // rendered as `Di…` at 381 dp, and `Solar` and `House` needed lines
+            // they had not been given.
+            //
+            // Adding the chrome back here also makes the row span the card again:
+            // without it the three tiles plus two arrows came to
+            // `maxWidth - 48` and left 48 dp of bare card on the right, which is
+            // the same "banyak space kosong" the tiles were meant to fix.
+            final outer = [
+              for (final w in plan.widths) w + 2 * _kTilePadding,
+            ];
+            final totalWidth = outer.fold(0.0, (a, b) => a + b);
 
             Widget slot(int index) => Flexible(
-              flex: (plan.widths[index] / totalWidth * 1000).round().clamp(
-                1,
-                1000,
-              ),
+              flex: (outer[index] / totalWidth * 1000).round().clamp(1, 1000),
               child: terms[index],
             );
 
@@ -291,7 +359,7 @@ class _PowerFlow extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         // **The brief's bar, and the height is the recipe.**
         // `progress-bar` is 12px tall on the page colour with a 1px `border`
         // hairline and full-round ends — a stadium, not a stripe of paint. This
@@ -339,9 +407,9 @@ class _PowerFlow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        _SocLine(soc: soc),
         const SizedBox(height: 8),
+        _SocLine(soc: soc),
+        const SizedBox(height: 6),
         Text(
           acPower == null
               ? 'House draw unavailable until the meter reports'
@@ -479,6 +547,25 @@ class _SocLine extends StatelessWidget {
 TextStyle _termLabelStyle(BuildContext context) =>
     DefaultTextStyle.of(context).style.copyWith(fontSize: 11);
 
+/// The label style, resolved once and threaded through the whole measurement.
+///
+/// **This exists because `DefaultTextStyle.of(context)` does not return the same
+/// style at every point in this card, and the planner was measuring with a
+/// different one than the text was drawn with.** Every function below used to
+/// call `_termLabelStyle(context)` with whatever context it happened to hold:
+/// the `LayoutBuilder`'s for the planning probes, `_Term`'s for the `Text`. If
+/// any widget between them introduces a `DefaultTextStyle` — and the tile does
+/// not, but `Material`/`AppCard` can — the two disagree, the planner measures a
+/// label as fitting in three lines at a width where the painter needs five, and
+/// the label is then **cut with no flag anywhere**: `maxLines` is set, so
+/// `didExceedMaxLines` goes true and the word loses its tail.
+///
+/// So there is now exactly one `TextStyle` instance for the flow labels. The
+/// planner, the minimum-width search and `_Term` all receive this object, and a
+/// mismatch is no longer expressible.
+TextStyle _resolveTermLabelStyle(BuildContext context) =>
+    _termLabelStyle(context);
+
 double _naturalWidth(BuildContext context, String text, TextStyle style) {
   final painter = TextPainter(
     text: TextSpan(text: text, style: style),
@@ -519,24 +606,77 @@ double _sharedFigureScale(
   ];
   final unitNeed = _naturalWidth(context, 'W', _termUnitStyle(color: color));
 
+  // **The 4:1 split, modelled, and this has to track `_Term` or the scaler
+  // budgets against widths the row is not laid out at.** It used to divide by
+  // two, which was correct while the figure and the unit each took half — and
+  // the moment the flex became 4:1 the divisor stayed at two, so the scaler
+  // guaranteed the figure fit half the row it actually has four fifths of. That
+  // is harmless in the direction of *smaller* figures and expensive in the
+  // other: every slot was shrunk by a factor of 0.4 more than it needed to be,
+  // which is the same collapse the padding change caused and the same reason the
+  // floor test exists.
+  const total = _kFigureFlex + _kUnitFlex;
+  const figureShare = _kFigureFlex / total;
+  const unitShare = _kUnitFlex / total;
+
   var scale = 1.0;
   for (var i = 0; i < watts.length; i++) {
-    final share = (slotWidths[i] - icon - gaps) / 2;
-    if (share <= 0) continue;
-    final text = math.max(figureNeeds[i], unitNeed);
-    if (text > 0) scale = math.min(scale, share / text);
+    final free = slotWidths[i] - icon - gaps;
+    if (free <= 0) continue;
+    final byFigure = figureNeeds[i] > 0
+        ? (free * figureShare) / figureNeeds[i]
+        : 1.0;
+    final byUnit = unitNeed > 0 ? (free * unitShare) / unitNeed : 1.0;
+    scale = math.min(scale, math.min(byFigure, byUnit));
   }
   return scale.clamp(0.0, 1.0);
 }
 
-List<double> _labelNaturalWidths(BuildContext context, List<String> labels) {
-  final style = _termLabelStyle(context);
+List<double> _labelNaturalWidths(
+  BuildContext context,
+  List<String> labels,
+  TextStyle style,
+) {
   return [for (final label in labels) _naturalWidth(context, label, style)];
 }
 
 /// The width one flow arrow takes: the 15 dp glyph plus the 2 dp of padding on
 /// each side of it.
 const double _kArrowWidth = 15 + 4;
+
+/// The inset inside one flow tile: horizontal and vertical.
+///
+/// **This is a layout constant and not a decoration, because three separate
+/// calculations subtract it and each one has to be right.** The label planner is
+/// given `available - 6 * _kTilePadding` so it wraps labels at the width the
+/// text will actually have, the figure scaler is given `slotWidth -
+/// 2 * _kTilePadding` for the same reason, and `_Term` paints the padding. If
+/// only the third of those is changed the tile clips its own label — which is
+/// the exact failure the previous column layout had, just one layer down.
+///
+/// **8, and it is the number the figure's size is paid for.** The tiles cost
+/// `6 * _kTilePadding` of horizontal chrome on a row that is under 350 dp wide,
+/// so every dp here is roughly 2% of the figure's width. `9` was tried and it
+/// pushed the shared figure size below the floor
+/// `live_power_card_figure_size_test.dart` pins — the test that exists precisely
+/// to catch "make it tidier by making the numbers smaller".
+const double _kTilePadding = 8;
+
+/// How the figure and its unit divide the width left in a tile.
+///
+/// **4:1, and it replaces two equal `Flexible`s — which was the single largest
+/// piece of dead space in this card.** `W` is one glyph; the figure beside it is
+/// up to five. Two equal `Flexible` children split the row in half each, so the
+/// figure was laid out against half the width it could have had and the other
+/// half stood empty holding a single letter. On a 100 dp slot that is ~35 dp of
+/// nothing, three times over, which is most of what "banyak space kosong" was
+/// describing.
+///
+/// The unit stays a `Flexible` with a `FittedBox` rather than a bare `Text`
+/// because at a 3.0 system scale `W` is 33 dp wide and a fixed-size child would
+/// overflow the tile on a narrow phone.
+const int _kFigureFlex = 4;
+const int _kUnitFlex = 1;
 
 /// The most lines a flow label may wrap to while the three terms still sit side
 /// by side. Past this the row is stacking -- see [_PowerFlow].
@@ -589,6 +729,7 @@ class _LabelPlan {
 _LabelPlan _planLabelSlots(
   BuildContext context,
   List<String> labels, {
+  required TextStyle style,
   required List<double> natural,
   required double available,
 }) {
@@ -610,7 +751,7 @@ _LabelPlan _planLabelSlots(
   for (var lines = first; lines <= _kMaxLabelLineProbe; lines++) {
     final minima = <double>[
       for (var i = 0; i < labels.length; i++)
-        _minWidthForLines(context, labels[i], lines, natural[i]),
+        _minWidthForLines(context, labels[i], lines, natural[i], style),
     ];
     best = _LabelPlan(lines, minima);
 
@@ -640,6 +781,7 @@ double _minWidthForLines(
   String label,
   int lines,
   double natural,
+  TextStyle style,
 ) {
   if (lines <= 1) return natural + 0.5;
 
@@ -647,7 +789,8 @@ double _minWidthForLines(
   var hi = natural;
   for (var i = 0; i < 7; i++) {
     final mid = (lo + hi) / 2;
-    if (_labelLineCount(context, label, slotWidth: mid) <= lines) {
+    if (_labelLineCount(context, label, slotWidth: mid, style: style) <=
+        lines) {
       hi = mid;
     } else {
       lo = mid;
@@ -660,7 +803,9 @@ double _minWidthForLines(
   var width = hi;
   for (
     var i = 0;
-    i < 4 && _labelLineCount(context, label, slotWidth: width) > lines;
+    i < 4 &&
+        _labelLineCount(context, label, slotWidth: width, style: style) >
+            lines;
     i++
   ) {
     width = math.min(natural, width + math.max(1.0, width * 0.05));
@@ -672,9 +817,10 @@ int _labelLineCount(
   BuildContext context,
   String label, {
   required double slotWidth,
+  required TextStyle style,
 }) {
   final painter = TextPainter(
-    text: TextSpan(text: label, style: _termLabelStyle(context)),
+    text: TextSpan(text: label, style: style),
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
   )..layout(maxWidth: slotWidth);
@@ -683,9 +829,13 @@ int _labelLineCount(
   return math.max(1, lines);
 }
 
-double _labelBlockHeight(BuildContext context, Iterable<int> lineCounts) {
+double _labelBlockHeight(
+  BuildContext context,
+  Iterable<int> lineCounts,
+  TextStyle style,
+) {
   final probe = TextPainter(
-    text: TextSpan(text: 'Solar', style: _termLabelStyle(context)),
+    text: TextSpan(text: 'Solar', style: style),
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
   )..layout();
@@ -702,6 +852,7 @@ class _Term extends StatelessWidget {
     required this.label,
     required this.watts,
     required this.color,
+    required this.style,
     this.labelHeight,
     this.labelLines,
     this.figureScale = 1,
@@ -710,6 +861,14 @@ class _Term extends StatelessWidget {
   final IconData icon;
   final String label;
   final double? labelHeight;
+
+  /// The one label style, handed down rather than resolved here.
+  ///
+  /// **Required, not optional, and that is the point.** Resolving
+  /// `DefaultTextStyle.of(context)` inside `_Term` is what let the planner and
+  /// the painter disagree in the first place; see
+  /// [_resolveTermLabelStyle].
+  final TextStyle style;
 
   /// The shared line count the slot was planned for, and the label's `maxLines`.
   ///
@@ -738,50 +897,74 @@ class _Term extends StatelessWidget {
     final labelText = Text(
       label,
       maxLines: labelLines,
-      style: _termLabelStyle(context).copyWith(color: faint),
+      style: style.copyWith(color: faint),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (labelHeight == null)
-          labelText
-        else
-          SizedBox(height: labelHeight, child: labelText),
-        const SizedBox(height: 2),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Icon(icon, size: 13, color: faint),
-            const SizedBox(width: 4),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _figureText(watts)!,
-                  style: _termFigureStyle(color: watts == null ? faint : color)
-                      .copyWith(fontSize: 24 * figureScale),
+    // **A tile, and the fill is [AppSurfaces.surfaceAlt] — the deepest step that
+    // still has to carry text.** The three terms used to be bare columns of text
+    // floating on the card's own fill, which is what the "banyak space kosong"
+    // complaint was actually about: with three short labels and three figures
+    // spread across 350 dp, roughly two thirds of the row was card showing
+    // through, and nothing in the layout said whether that space was a gap or a
+    // margin. A tile makes it a *container*, so the eye reads three stations
+    // rather than one row with holes in it.
+    //
+    // It is a tone step, not a border-and-shadow. The brief puts tiles on the
+    // flat tier, and this card already carries two glowing bars a few pixels
+    // below; a stamped shadow on each term would make the row louder than the
+    // numbers it is there to deliver.
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(_kTilePadding),
+      decoration: BoxDecoration(
+        color: AppSurfaces.surfaceAlt,
+        borderRadius: AppRadius.all(AppRadius.tile),
+        border: AppBorders.hairlineBorder,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (labelHeight == null)
+            labelText
+          else
+            SizedBox(height: labelHeight, child: labelText),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Icon(icon, size: 13, color: faint),
+              const SizedBox(width: 4),
+              Flexible(
+                flex: _kFigureFlex,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _figureText(watts)!,
+                    style: _termFigureStyle(color: watts == null ? faint : color)
+                        .copyWith(fontSize: 24 * figureScale),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 2),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'W',
-                  style: _termUnitStyle(color: faint)
-                      .copyWith(fontSize: 11 * figureScale),
+              const SizedBox(width: 2),
+              Flexible(
+                flex: _kUnitFlex,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'W',
+                    style: _termUnitStyle(color: faint)
+                        .copyWith(fontSize: 11 * figureScale),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
