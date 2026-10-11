@@ -1,5 +1,14 @@
 # [Unreleased]
 
+- Nav bar: the four icons are now drawn at the same size. They were declared at
+  24 dp and rendered at **8.6 / 11.8 / 18.9 / 23.6** — a 2.7x spread tracking the
+  length of each label, because one `FittedBox` wrapped the icon *and* the label
+  and the label set the scale. Fixed, and `nav_bar_icon_size_test.dart` pins it.
+- Overview: rows are 2 dp tighter, section headings sit against their rows, the
+  hero's legend moved under the figure, and the sky bar is gone — `LUX` and
+  `SKY_STATE` already say whether the sky is doing anything, and it was the only
+  figure on the page with no route behind it.
+
 ---
 
 # [1.10.0] - 2026-10-11

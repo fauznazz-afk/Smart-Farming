@@ -193,7 +193,15 @@ class GlassNavBar extends StatelessWidget {
                         ? kGlassNavBarHeight
                         : math.min(
                             constraints.maxWidth,
-                            kNavDestinations.length * 56.0,
+                            // **A 4 dp margin inside each pitch.** The slots
+                            // are `_kNavItemWidth` wide and sit
+                            // `spaceEvenly`, so without a gap the pill's rounded
+                            // ends butt straight into the first and last item's
+                            // box — which is what makes a floating bar read as
+                            // slightly cramped at the edges even when nothing
+                            // overlaps.
+                            kNavDestinations.length * _kNavItemWidth +
+                                kNavDestinations.length * _kNavItemGap,
                           ),
                     height: kGlassNavBarHeight,
                     decoration: BoxDecoration(
@@ -273,7 +281,16 @@ class GlassNavBar extends StatelessWidget {
                                       i++
                                     )
                                       SizedBox(
-                                        width: 48,
+                                        // **The slot is `_kNavItemWidth` wide,
+                                        // not 48.** A slot narrower than the
+                                        // box the item lays out in clips it, and
+                                        // the item draws its icon at 24 in a
+                                        // `_kNavItemWidth` box — so a 48 dp slot
+                                        // was already 4 dp too narrow for its own
+                                        // child, which is the kind of thing that
+                                        // reads as "the icon looks a bit off"
+                                        // rather than as a bug.
+                                        width: _kNavItemWidth,
                                         child: _NavItem(
                                           index: i,
                                           destination: kNavDestinations[i],
@@ -334,15 +351,19 @@ class _CollapsedNavItem extends StatelessWidget {
             builder: (pressed) => AnimatedContainer(
               duration: AppMotion.press,
               curve: AppMotion.enter,
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppPalette.primary,
               ),
+              // **`_kNavIconSize`, not 22.** The collapsed pill drew the same
+              // glyphs as the expanded row at a different size, which meant the
+              // tab you were on changed apparent size when the bar collapsed —
+              // the one moment where the icon is the entire content.
               child: Icon(
                 destination.selectedIcon,
-                size: 22,
+                size: _kNavIconSize,
                 color: AppPalette.onHue,
               ),
             ),
@@ -422,25 +443,85 @@ class _NavDestination extends StatelessWidget {
       builder: (pressed) => AnimatedContainer(
         duration: AppMotion.press,
         curve: AppMotion.enter,
-        width: 44,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 24, the brief's `tab-item-*.iconSize`. It was 22, which is
-              // neither the 24 of chrome nor the 20 of a button — a size that
-              // belongs to no tier.
-              Icon(selected ? selectedIcon : icon, size: 24, color: color),
-              const SizedBox(height: 2),
-              Text(label, style: AppType.labelMicro.copyWith(color: color)),
-            ],
-          ),
+        width: _kNavItemWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 24, the brief's `tab-item-*.iconSize`. It was 22, which is
+            // neither the 24 of chrome nor the 20 of a button — a size that
+            // belongs to no tier.
+            //
+            // **The icon is NOT inside a `FittedBox`, and that is the fix for
+            // "the Hydroponics icon looks small".** The whole column used to be
+            // wrapped in one, so the *label* set the scale and the icon came
+            // along for the ride. Measured at the device's own density:
+            //
+            //   Hydroponics  scale 0.36   (label natural width 123 dp)
+            //   Overview     scale 0.49   ( 90 dp)
+            //   Power        scale 0.79   ( 56 dp)
+            //   Fish         scale 0.98   ( 45 dp)
+            //
+            // Four icons in one 72 dp row, drawn at **0.36 / 0.49 / 0.79 / 0.98
+            // of the size they were declared at** — a 2.7x spread that tracks the
+            // length of the word underneath and has nothing to do with the
+            // glyphs. The icon that looked small was the one with the longest
+            // label, which is why nobody found it by looking at the icons
+            // themselves.
+            //
+            // The label still shrinks, and that is fine: a label is prose and
+            // `scaleDown` is the correct degradation for it. But it now shrinks
+            // on its own, inside its own box, and cannot touch the icon.
+            Icon(
+              selected ? selectedIcon : icon,
+              size: _kNavIconSize,
+              color: color,
+            ),
+            const SizedBox(height: 3),
+            // **`width: double.infinity` is load-bearing, not tidy.** A
+            // `FittedBox` inside a `Column` is given an unbounded width, sizes
+            // to its child, and therefore never scales at all — so without this
+            // box the label would overflow rather than shrink, and moving the
+            // icon out of the old shared `FittedBox` would have been half a fix.
+            SizedBox(
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: AppType.labelMicro.copyWith(color: color),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+/// The air between two destinations, inside the pill.
+///
+/// **A constant because it is half of the bar's width arithmetic.** The pill is
+/// `4 * _kNavItemWidth + 4 * _kNavItemGap` wide, and the `56` that used to be
+/// written inline was that arithmetic done in the reader's head — which is how it
+/// drifted from the 48-wide slot it was supposed to describe.
+const double _kNavItemGap = 4;
+
+/// The icon's drawn size, in one place.
+///
+/// **A constant rather than a literal at the call site**, because the collapsed
+/// item draws the same glyph and the two used to carry their own numbers — 24
+/// here, 22 there — so a retune of one silently desynchronised the other.
+const double _kNavIconSize = 24;
+
+/// The width a destination's icon and label are laid out in.
+///
+/// **52 dp, and it is wider than the 44 the old slot gave each tab.** The icon
+/// is drawn at 24 and the label at `labelMicro`; a 44 dp slot made the longest
+/// label shrink to about a third, which is where the reported bug started. 52
+/// gives `Hydroponics` room to be read without touching the icon.
+const double _kNavItemWidth = 52;
 
 // There were two getters here — `destination` and `selectedIndex` — that
 // recovered the label from the *icon* by searching [kNavDestinations] for the

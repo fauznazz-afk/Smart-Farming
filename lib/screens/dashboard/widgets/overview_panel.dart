@@ -250,11 +250,13 @@ class OverviewPanel extends StatelessWidget {
           value: r.lux == null ? '--' : skyConditionFor(r.lux!).label,
           divider: false,
         ),
-        TerminalMeter(
-          fraction: sunFraction(r.lux ?? 0),
-          leftCaption: '0%',
-          rightCaption: '100% SUN',
-        ),
+        // **No bar under the sky rows.** There are two meters in this panel and
+        // only one of them is actionable — `BAT_SOC` opens the Battery view.
+        // A second bar under `SKY_STATE` read as a second shortcut and drew the
+        // eye to the one figure on the page that has no route behind it.
+        // `LUX` and the condition together already say whether the sky is doing
+        // anything.
+        const SizedBox(height: AppSpacing.xs),
 
         const TerminalRule(),
         // **The heading carries the report's route.** `EnergySummaryCard`'s
@@ -374,11 +376,15 @@ class OverviewPanel extends StatelessWidget {
       style: AppType.slotMicro.copyWith(color: AppSurfaces.onSurfaceVariant),
     );
     return Padding(
+      // **Top `md`, bottom `xs`.** The first cut used `md` on both sides, which
+      // is 12 dp of air above every heading and 12 below — so a heading floated
+      // in the middle of its own whitespace instead of sitting against the
+      // rows it introduces. A heading belongs to what is under it.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
         AppSpacing.md,
         AppSpacing.cardPadding,
-        AppSpacing.sm,
+        AppSpacing.xs,
       ),
       child: onTap == null
           ? text

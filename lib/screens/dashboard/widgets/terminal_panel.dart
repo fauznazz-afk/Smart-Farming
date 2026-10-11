@@ -144,7 +144,7 @@ class TerminalRow extends StatelessWidget {
     final body = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.cardPadding,
-        vertical: 11,
+        vertical: 9,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -154,19 +154,20 @@ class TerminalRow extends StatelessWidget {
             _Dot(color: tint!),
             const SizedBox(width: AppSpacing.sm),
           ],
-          // **`FittedBox`, because the vocabulary has no short words.** `Discharging` and
-          // `Heavily overcast` are the values this panel actually renders, and on
-          // a 411 dp phone at a 2.0 system font both overflow the value column —
-          // `Discharging` lost its last two glyphs and `Heavily overcast` ran off
-          // the right edge of the card. A panel whose own labels get clipped is
-          // the one thing it must not do.
+          // **`Flexible` + `FittedBox`, because the vocabulary has no short
+          // words.** `Discharging` and `Heavily overcast` are values this panel
+          // actually renders, and at a 2.0 system font both overflowed the value
+          // column — `Discharging` lost its last two glyphs and `Heavily
+          // overcast` ran off the right edge of the card. A panel whose own
+          // labels get clipped is the one thing it must not do.
           //
-          // `scaleDown` only shrinks; a value that already fits is untouched, so
-          // this costs the short values nothing.
+          // The `Flexible` is load-bearing and is the second half of that fix: a
+          // `FittedBox` alone inside a `Row` gets an unbounded constraint, sizes
+          // to its child and never scales. Without it, `FittedBox` is decoration.
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
+              alignment: Alignment.centerLeft,
               child: Text(
                 label,
                 maxLines: 1,
@@ -176,7 +177,7 @@ class TerminalRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpacing.md),
           if (trailing != null) ...[trailing!, const SizedBox(width: AppSpacing.md)],
           // **The value is the one thing that must never be shortened**, so it is
           // outside the `FittedBox` and the *unit* is the one that yields when
@@ -281,76 +282,78 @@ class TerminalHero extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
-        AppSpacing.cardPadding,
+        AppSpacing.lg,
         AppSpacing.cardPadding,
         AppSpacing.lg,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  caption.toUpperCase(),
-                  style: AppType.slotKey.copyWith(
-                    color: AppSurfaces.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      figure,
-                      style: AppType.heroFigure.copyWith(
-                        color: AppSurfaces.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      unit,
-                      style: AppType.heroUnit.copyWith(
-                        color: AppSurfaces.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          Text(
+            caption.toUpperCase(),
+            style: AppType.slotKey.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
             ),
           ),
-          if (secondary.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: AppSpacing.xs),
+          // **`Stack`, not a `Row` with a second column.** The figure is 72 dp
+          // tall and the stats are two 12 dp lines, so a `Row` with
+          // `crossAxisAlignment: end` left the stats hanging off the baseline of
+          // a glyph they have nothing to do with — on the device they sat below
+          // the number with a visible step, reading as an accidental second line
+          // of the caption rather than as a legend.
+          //
+          // Stacked, the stats sit directly under the figure's own baseline,
+          // left-aligned with it, which is where a legend belongs and costs no
+          // width. The figure keeps the full card width, so `1000` and `18` do not
+          // fight over 380 dp.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                figure,
+                style: AppType.heroFigure.copyWith(
+                  color: AppSurfaces.onSurface,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                unit,
+                style: AppType.heroUnit.copyWith(
+                  color: AppSurfaces.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          if (secondary.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.lg,
+              runSpacing: 2,
               children: [
                 for (final (key, value) in secondary)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          key.toUpperCase(),
-                          style: AppType.slotMicro.copyWith(
-                            color: AppSurfaces.onSurfaceVariant,
-                          ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        key.toUpperCase(),
+                        style: AppType.slotMicro.copyWith(
+                          color: AppSurfaces.onSurfaceVariant,
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          value,
-                          style: AppType.slotValueSmall.copyWith(
-                            color: AppSurfaces.onSurface,
-                          ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        value,
+                        style: AppType.slotValueSmall.copyWith(
+                          color: AppSurfaces.onSurface,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
               ],
             ),
+          ],
         ],
       ),
     );
