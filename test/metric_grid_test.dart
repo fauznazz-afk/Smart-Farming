@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
 import 'package:plts_monitoring/utils/alarm_rules.dart';
 
 void main() {
   Widget wrap(Widget child) => MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: child)),
-      );
+    home: Scaffold(body: SingleChildScrollView(child: child)),
+  );
 
   // Slot names, not English words — the grid is a terminal panel now. The
   // telemetry keys stay as the device publishes them, which is the whole reason
@@ -29,14 +32,7 @@ void main() {
       metric: 'humidity_dht',
       decimals: 1,
     ),
-    const MetricSpec(
-      'ph',
-      'PH',
-      '',
-      Icons.science,
-      metric: 'ph',
-      decimals: 2,
-    ),
+    const MetricSpec('ph', 'PH', '', Icons.science, metric: 'ph', decimals: 2),
     const MetricSpec(
       'tds_ppm',
       'TDS',
@@ -46,18 +42,86 @@ void main() {
       decimals: 0,
     ),
     // Informational only — no configured limit, so never graded.
-    const MetricSpec(
-      'water_temp',
-      'WATER_T',
-      '°C',
-      Icons.waves,
-      decimals: 1,
-    ),
+    const MetricSpec('water_temp', 'WATER_T', '°C', Icons.waves, decimals: 1),
   ];
 
   final thresholds = AlarmThresholds.defaults;
 
+  /// The drawn height of each row's value figure.
+  ///
+  /// **Height rather than width, because width is the thing that does not
+  /// hold.** A value inside `TerminalRow` is wrapped in a
+  /// `FittedBox(scaleDown)`, so its laid-out width is what the *unscaled* text
+  /// wants — a long reading never reports a clipped width — while the drawn
+  /// height is what shrinks with it. An assertion of the form "the value has a
+  /// width" is the one that let 24 sp land with every long row scaled down by a
+  /// different factor.
+  ///
+  /// **Matched on the size rather than the token, because `TerminalRow` paints
+  /// `valueStyle.copyWith(color:)`.** An `identical` check against
+  /// `AppType.slotValue` matches nothing, which is a test that passes on an empty
+  /// list and asserts nothing.
+  List<double> valueHeights(WidgetTester tester) {
+    return tester
+        .widgetList<RichText>(find.byType(RichText))
+        .where((t) => t.text.style?.fontSize == AppType.slotValue.fontSize)
+        .map((t) {
+          final box =
+              find.byWidget(t).evaluate().single.renderObject
+                  as RenderParagraph;
+          return box.size.height;
+        })
+        .toList();
+  }
+
   group('MetricGrid', () {
+    // **One size for every value, and it is the Power page's 24 sp.** The user
+    // asked for Environment and Fish to look like Power, and the difference was
+    // scale: `slotValue` was 15 while `TelemetryCard`'s figure was 24. This
+    // pins the size that is drawn rather than the token that is named, because a
+    // test reading the token back would pass even if the `FittedBox` shrank
+    // every row to something else.
+    testWidgets('every value is drawn at the Power page figure size', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          MetricGrid(
+            title: 'ENVIRONMENT',
+            specs: specs,
+            values: const {
+              'temp_dht': 25.0,
+              'humidity_dht': 60.0,
+              'ph': 6.5,
+              'tds_ppm': 800,
+              'water_temp': 24.0,
+            },
+            thresholds: thresholds,
+            lastUpdate: DateTime.now(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final heights = valueHeights(tester);
+      expect(
+        heights,
+        isNotEmpty,
+        reason: 'the grid drew no value figures to measure',
+      );
+      // 24 sp at height 1.1 is 26.4 dp of line box. Tolerance is the renderer's
+      // own rounding, not a design slack.
+      for (final h in heights) {
+        expect(
+          h,
+          closeTo(26.4, 0.5),
+          reason:
+              'a value is drawn $h dp tall, so it is not the 24 sp figure the '
+              'Power page uses',
+        );
+      }
+    });
+
     testWidgets('renders with all values in range', (tester) async {
       await tester.pumpWidget(
         wrap(
@@ -195,8 +259,9 @@ void main() {
       expect(find.text('ENVIRONMENT'), findsOneWidget);
     });
 
-    testWidgets('renders one row per spec regardless of columns',
-        (tester) async {
+    testWidgets('renders one row per spec regardless of columns', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrap(
           MetricGrid(
@@ -223,8 +288,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('shows limit labels when limitLabelFor is provided',
-        (tester) async {
+    testWidgets('shows limit labels when limitLabelFor is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrap(
           MetricGrid(
@@ -276,8 +342,7 @@ void main() {
             },
             thresholds: thresholds,
             lastUpdate: DateTime.now(),
-            limitLabelFor: (spec) =>
-                spec.metric == null ? null : '0 – 100',
+            limitLabelFor: (spec) => spec.metric == null ? null : '0 – 100',
           ),
         ),
       );
@@ -289,8 +354,9 @@ void main() {
       expect(find.byType(TerminalMeter), findsNWidgets(3));
     });
 
-    testWidgets('suppresses the breach colour when showGridColors is false',
-        (tester) async {
+    testWidgets('suppresses the breach colour when showGridColors is false', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrap(
           MetricGrid(
@@ -328,8 +394,9 @@ void main() {
       );
     });
 
-    testWidgets('keeps the stale tag even when showGridColors is false',
-        (tester) async {
+    testWidgets('keeps the stale tag even when showGridColors is false', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrap(
           MetricGrid(

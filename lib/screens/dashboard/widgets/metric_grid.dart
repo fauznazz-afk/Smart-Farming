@@ -199,6 +199,15 @@ class _SpecRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // **No `valueStyle`**: these rows take `AppType.slotValue`, 24 sp, the
+        // same figure the Power page's card draws. That is what the user asked
+        // for and it is the default here, so there is nothing to write.
+        //
+        // A reading long enough to need shrinking still shrinks, the same way
+        // Power's does, because the value sits in a `FittedBox(scaleDown)` in
+        // `TerminalRow`. That was tried as an argument here and reverted: naming
+        // `slotValueSmall` for the whole grid made every reading 12 sp, which is
+        // the opposite of the request.
         TerminalRow(
           label: spec.label,
           value: slotNumber(value, decimals: spec.decimals),
