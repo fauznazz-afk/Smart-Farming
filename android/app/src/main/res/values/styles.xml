@@ -14,7 +14,18 @@
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
-        <item name="android:navigationBarColor">#101412</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <!-- **Transparent, where this used to be a hard-coded `#101412`.**
+
+             That hex was the page colour from when the app was dark-only, and
+             it cannot be right now: the app's light/dark is an in-app setting,
+             not the OS day/night qualifier these two folders encode. A fixed
+             value is wrong for whichever palette the user is not on.
+
+             Transparent hands the decision back to whatever the app painted
+             behind the bar, which already follows the palette. Note this is a
+             *correctness* change on API < 35 rather than a fix for anything
+             visible on API 36 - see the measured note in the night theme. -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 </resources>

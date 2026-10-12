@@ -76,7 +76,27 @@ The light theme, which was deferred twice, and a nav bar that stops floating.
 - **`MaterialApp.color` is `AppSurfaces.page`.** Docking the bar removed the
   accident that covered the edge-to-edge gesture inset, so the window now paints
   its own background there instead of relying on a `Scaffold` that does not
-  reach.
+  reach. Measured: the app's own page colour reaches y=2650 of a 2712 px screen.
+- **`android:navigationBarColor` is transparent in both themes.** It was a
+  hard-coded `#101412` - the page colour from when the app was dark-only - which
+  cannot be right now that light/dark is an in-app setting the OS day/night
+  resource qualifier cannot see.
+
+### Known, not fixed
+
+- **A 50 px black strip under the light theme, drawn by SystemUI.** `dumpsys
+  window displays` reports `mNavigationBar=Window{... NavigationBar0}` owned by
+  `com.android.systemui`, `fmt=TRANSLUCENT`, `flags=[SUPPRESS_SCRIM]`, spanning
+  the bottom 156 px. Sampling the screenshot puts the app's page colour at
+  y=2650 and pure black at y=2690, so the app is not what leaves it black.
+  Four candidates were built and measured, and none of them moved it:
+  `navigationBarColor = transparent`, `windowLightNavigationBar = true`,
+  `windowBackground = #FF00FF`, and `cmd uimode night no` - which is the
+  informative one, because MIUI draws that strip opaque regardless of the OS
+  theme either. The one remaining app-side lever is
+  `windowOptOutEdgeToEdgeEnforcement`, which restores `navigationBarColor` by
+  making the window stop extending behind the bar; it also un-does the full-bleed
+  app bar, and it still could not follow an in-app theme toggle. Not taken.
 
 ### Removed
 

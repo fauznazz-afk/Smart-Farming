@@ -14,5 +14,45 @@
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- **The three items below are correct and all three are inert on
+             `targetSdk` 36. This file exists to say so, because four attempts to
+             fix the black strip under the light theme all failed and the next
+             person will try a fifth.**
+
+             Measured on the Xiaomi 24090RA29G (`dumpsys window displays`):
+
+               mNavigationBar=Window{... NavigationBar0}
+                 mOwnerUid=1000  package=com.android.systemui
+                 frame=[0,2556][1220,2712]  fmt=TRANSLUCENT
+                 flags=[SUPPRESS_SCRIM]
+
+             So the bottom strip is a **separate window owned by SystemUI**,
+             painted on top of the app. Sampling the screenshot proves the app
+             is not the one leaving it black:
+
+               y=2650  #F2F3F0   <- the app's own page colour, Flutter's edge
+               y=2690  #000000   <- SystemUI's window
+
+             And each candidate was tested by building and sampling, not by
+             reading a document:
+
+               navigationBarColor = transparent      still #000000
+               windowLightNavigationBar = true       still #000000
+               windowBackground = #FF00FF            still #000000
+               `cmd uimode night no` (OS light)      still #000000
+
+             The last one is the useful one: it is not even the OS dark theme.
+             MIUI draws that strip opaque whatever the app or the system says.
+
+             `shortcut:` nothing here changes on API 36, so do not spend time
+             tuning it for this device. `windowOptOutEdgeToEdgeEnforcement` is
+             the one remaining app-side lever - it restores `navigationBarColor`
+             by making the window stop extending behind the bar - but it also
+             un-does the full-bleed app bar and `extendBodyBehindAppBar`, and it
+             cannot follow an in-app theme toggle anyway. Reach for it only if a
+             50 px strip is worth a layout regression. -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 </resources>
