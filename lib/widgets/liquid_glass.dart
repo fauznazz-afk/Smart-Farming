@@ -56,7 +56,7 @@ class AppSurface extends StatelessWidget {
     this.radius = AppRadius.card,
     this.circle = false,
     this.fill,
-    this.border = AppBorders.hairlineBorder,
+    this.border,
     this.padding,
   });
 
@@ -86,7 +86,7 @@ class AppSurface extends StatelessWidget {
         color: fill ?? AppSurfaces.surface,
         shape: circle ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: circle ? null : BorderRadius.circular(radius),
-        border: border,
+        border: border ?? AppBorders.hairlineBorder,
       ),
       child: child,
     );
@@ -515,8 +515,11 @@ class DateStripChip extends StatelessWidget {
   }
 }
 
-/// Primary type. A function in the previous version because it took a
-/// `bool isDark` and there were two dark ramps; with one ramp it is
-/// [AppSurfaces.onSurface], and keeping a wrapper around a constant would be the
-/// kind of vestigial signature that outlives the thing it was written for.
-const Color appPrimaryText = AppSurfaces.onSurface;
+/// Primary type.
+///
+/// **A getter, for the same reason [faintColor] is.** It was a top-level `final`
+/// reading the surface stack that was active when the library loaded — dark —
+/// and it stayed white after the palette swapped, which is white ink on a white
+/// card. A getter re-reads the stack on every use, which is what a static
+/// palette needs of everything derived from it.
+Color get appPrimaryText => AppSurfaces.onSurface;

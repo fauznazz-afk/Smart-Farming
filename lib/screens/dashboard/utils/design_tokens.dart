@@ -33,91 +33,55 @@ library;
 
 import 'package:flutter/material.dart';
 
-/// The three-layer dark stack, plus the deepest fill.
+/// The three-layer surface stack, plus the deepest fill.
 ///
-/// Strictly ordered: `page` < `surface` < `surfaceAlt` < `surfaceMuted`.
-/// Hierarchy is tonal; nothing here varies by theme, because there is one.
+/// **Swappable, and every value here is read through an instance.**
+///
+/// The stack used to be `static const`, which was honest while there was one
+/// appearance and impossible the moment there were two: a `const` cannot change
+/// at runtime, so the only way in would have been rewriting all 148 call sites
+/// into `Theme.of(context)` lookups — a mechanical change across 34 files with
+/// no way to prove none of them was missed.
+///
+/// So the names stay where they were and the *values* become a pair of
+/// immutable palettes behind a static accessor. A call site reads
+/// `AppSurfaces.page` exactly as before; what it resolves to depends on
+/// [AppTheme.brightness], which [AppTheme.apply] sets from the chosen theme
+/// mode before the tree that reads it is rebuilt.
+///
+/// **The order is per-palette, not global.** Dark runs `page` < `surface` <
+/// `surfaceAlt` < `surfaceMuted` going *up* out of the canvas; light runs the
+/// same ladder the other way, because "a step off the paper" is a step *down*
+/// into it. `bindingCaptionSurface` is the end that binds contrast — the
+/// lightest fill a caption is drawn on in dark, the darkest in light — and it is
+/// a getter for that reason.
 class AppSurfaces {
   const AppSurfaces._();
 
-  /// The page canvas and the depressed track inside a progress bar, `#000000`.
-  ///
-  /// **Pitch black, and it changed for the instrument-panel reference.** It was
-  /// `#1A1A1A`, which the old soft-UI rule demanded: that rule came from light
-  /// mode, where the page had to stay a mid-tone for a shadow to have somewhere
-  /// to fall. The panels are the other way round now — the reference is a black
-  /// instrument with red light, and depth comes from the hairline and the
-  /// segmented meter, not from a shadow. 21:1 for white text on it.
-  ///
-  /// If the stamped shadow ever stops being visible, this is the value to
-  /// question, and the answer is to raise the shadow rather than grey the page.
-  static const Color page = Color(0xFF000000);
+  static AppSurfacesPalette _palette = AppSurfacesPalette.dark;
 
-  /// The card layer, `#222222` — every card, input and list row.
+  /// Swaps the active palette. Called once per theme change, before the
+  /// subtree that reads these values is rebuilt.
   ///
-  /// **One step above [page], and the step is what the stamped shadow does its
-  /// work against.** A hard offset shadow needs a wall to fall on: on a fill
-  /// identical to the page the shadow reads as a second border rather than as a
-  /// displacement. 15.9:1 for white text on it.
-  static const Color surface = Color(0xFF222222);
+  /// Not a setter that notifies: there is nothing here to notify. The swap
+  /// happens inside the `setState` that also rebuilds `MaterialApp`, so the
+  /// tree that reads a static accessor is rebuilt by the same gesture.
+  static void apply(Brightness brightness) {
+    _palette = brightness == Brightness.light
+        ? AppSurfacesPalette.light
+        : AppSurfacesPalette.dark;
+  }
 
-  /// The secondary fill, `#2A2A2A` — chips and the tiles inside a card.
-  ///
-  /// **The binding surface for contrast.** It is the lightest of the three a
-  /// caption is ever drawn on, so anything that clears AA here clears AA
-  /// everywhere.
-  static const Color surfaceAlt = Color(0xFF2A2A2A);
-
-  /// The deepest fill, `#333333` — the empty state of a bar chart, the track of
-  /// an un-filled bar, a legend dot.
-  ///
-  /// **Not in [captionSurfaces], and that is a statement about where text goes
-  /// rather than about this value.** In this app nothing is read off a muted
-  /// fill: the empty-state sentence is drawn on the card, and the muted colour
-  /// is a shape. If a chip ever moves onto it, this comment is the thing to
-  /// change first.
-  static const Color surfaceMuted = Color(0xFF333333);
-
-  /// Primary type, `#FFFFFF`.
-  static const Color onSurface = Color(0xFFFFFFFF);
-
-  /// Secondary type and metadata, `#A1A1A1`.
-  ///
-  /// **Measured, not asserted:** 11.8:1 on [page], 10.6:1 on [surface] and 4.9:1
-  /// on [surfaceAlt] — the worst case anywhere in the app, and it clears AA with
-  /// room to spare.
-  static const Color onSurfaceVariant = Color(0xFFA1A1A1);
-
-  /// The universal hairline, `#333333`.
-  ///
-  /// The brief has one border colour and it sits between `surface` and
-  /// `surfaceAlt` tonally, which is what makes it read as an edge rather than as
-  /// a line. **It is deliberately the same value as [surfaceMuted]**: a border
-  /// and a deep fill are different roles that resolve to the same step, the way
-  /// `pill` and `round` do.
-  static const Color border = Color(0xFF333333);
-
-  /// Text-input fill. Same value as [surface]: an input is a card.
-  static const Color input = Color(0xFF222222);
-
-  /// The depressed track inside a progress bar — **the page value**, `#000000`.
-  ///
-  /// It was its own grey `#1A1A1A` and it only worked because the page was the
-  /// same grey. With the page going pitch black the two diverged, which broke
-  /// the invariant `design_tokens_test.dart` holds: the caption surface list is
-  /// exactly three entries, and `track` is one of them, so a track that is a
-  /// fourth value silently puts a measurable surface outside the list that
-  /// contrast is judged against.
-  ///
-  /// **The identity is also the right reading now.** An un-lit meter segment on
-  /// a pitch-black panel should be a hole, not a lighter grey; the reference
-  /// shows the empty segments at the page value. And the accent against it
-  /// measures 7.57:1 rather than 6.27, so nothing about AA moved.
-  static const Color track = page;
-
-  /// The tooltip, opaque because it must stay readable over an arbitrary series
-  /// crossing underneath it.
-  static const Color tooltip = Color(0xFF2A2A2A);
+  static Color get page => _palette.page;
+  static Color get surface => _palette.surface;
+  static Color get surfaceAlt => _palette.surfaceAlt;
+  static Color get surfaceMuted => _palette.surfaceMuted;
+  static Color get onSurface => _palette.onSurface;
+  static Color get onSurfaceVariant => _palette.onSurfaceVariant;
+  static Color get border => _palette.border;
+  static Color get input => _palette.input;
+  static Color get track => _palette.track;
+  static Color get tooltip => _palette.tooltip;
 
   /// Every surface the app paints a caption or a status colour on, in the order
   /// a reader should check them.
@@ -125,14 +89,144 @@ class AppSurfaces {
   /// **Derived, never written down.** A literal here is the copy that went
   /// stale twice in this repo and left three captions under AA with the suite
   /// green.
-  static List<Color> captionSurfaces() => const [
-    page,
-    surface,
-    surfaceAlt,
-  ];
+  static List<Color> captionSurfaces() => [page, surface, surfaceAlt];
 
-  /// The darkest step that still has to carry text. See [captionSurfaces].
+  /// The end of the ramp that still has to carry text.
+  ///
+  /// **`surfaceAlt` in both palettes, and that is measured rather than assumed.**
+  /// In dark it is the lightest fill a caption lands on. In light it is the
+  /// *darkest* — `surface` is a white card lifted off the paper and `surfaceAlt`
+  /// is an inset tile below it — and a dark ink on the darkest surface is the
+  /// same weakest pair, one step along the same ladder rather than the other
+  /// way round. So the name does not have to know which palette it is in.
+  ///
+  /// A palette edit that makes a different surface the binding one fails
+  /// `theme_palette_contrast_test.dart`, rather than letting every caption
+  /// clear AA against a more forgiving surface than the one rendering — the
+  /// failure this repo has already had twice.
   static Color get bindingCaptionSurface => surfaceAlt;
+}
+
+/// One appearance's worth of surfaces.
+///
+/// An immutable value rather than a theme extension, so that [AppSurfaces] can
+/// publish it through static accessors with no `BuildContext` in sight.
+class AppSurfacesPalette {
+  const AppSurfacesPalette({
+    required this.brightness,
+    required this.page,
+    required this.surface,
+    required this.surfaceAlt,
+    required this.surfaceMuted,
+    required this.onSurface,
+    required this.onSurfaceVariant,
+    required this.border,
+    required this.input,
+    required this.track,
+    required this.tooltip,
+  });
+
+  final Brightness brightness;
+
+  final Color page;
+  final Color surface;
+  final Color surfaceAlt;
+  final Color surfaceMuted;
+  final Color onSurface;
+  final Color onSurfaceVariant;
+  final Color border;
+  final Color input;
+  final Color track;
+  final Color tooltip;
+
+  /// The canvas and the depressed track inside a progress bar.
+  ///
+  /// **Pitch black, and it is deliberate.** It was `#1A1A1A`, a value that came
+  /// from light mode where the page had to stay a mid-tone for a shadow to fall
+  /// on. The instrument panels take their depth from the hairline and the
+  /// segmented bar instead, so that reason is gone and the reference won.
+  static const AppSurfacesPalette dark = AppSurfacesPalette(
+    brightness: Brightness.dark,
+    page: Color(0xFF000000),
+    surface: Color(0xFF222222),
+    surfaceAlt: Color(0xFF2A2A2A),
+    surfaceMuted: Color(0xFF333333),
+    onSurface: Color(0xFFFFFFFF),
+    onSurfaceVariant: Color(0xFFA1A1A1),
+    border: Color(0xFF333333),
+    input: Color(0xFF222222),
+    track: Color(0xFF000000),
+    tooltip: Color(0xFF2A2A2A),
+  );
+
+  /// The light counterpart: paper, not white.
+  ///
+  /// **`#F2F3F0` and not `#FFFFFF`, measured rather than chosen.** A pure white
+  /// page next to a white card gives the tonal step nowhere to go, which is the
+  /// same failure the previous dark system had when the page was near-black
+  /// with a near-black card. Every value below is scaled by one factor per
+  /// channel where it had to move, so hue holds.
+  ///
+  /// The ladder runs the other way from [dark]: `page` is the *lightest* and
+  /// `surfaceMuted` the darkest, so a card is a step down into the paper rather
+  /// than a step up out of it. `track` is the page value, the same rule dark
+  /// follows — an un-lit meter segment is a hole in the surface it sits on.
+  static const AppSurfacesPalette light = AppSurfacesPalette(
+    brightness: Brightness.light,
+    page: Color(0xFFF2F3F0),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFDFE2DE),
+    // `border` and `surfaceMuted` are the same value, as in the dark ramp and
+    // as the token documents: the brief has one border colour, and a border and
+    // a deep fill are different roles that resolve to the same step.
+    surfaceMuted: Color(0xFFB9BFB8),
+    onSurface: Color(0xFF111311),
+    onSurfaceVariant: Color(0xFF595F59),
+    border: Color(0xFFB9BFB8),
+    input: Color(0xFFFFFFFF),
+    track: Color(0xFFF2F3F0),
+    tooltip: Color(0xFFDFE2DE),
+  );
+}
+
+/// Which appearance is active, and the switch that changes it.
+///
+/// **A static, not an `InheritedWidget`, and that is the whole trick.** The
+/// surface stack is read through static accessors (`AppSurfaces.page`) so that
+/// 148 call sites in 34 files did not have to become `Theme.of(context)`
+/// lookups. A static needs somewhere to live, and this is it.
+///
+/// The swap is deliberately *not* reactive on its own. [apply] is called from
+/// the same `setState` that rebuilds `MaterialApp`, so the tree reading these
+/// accessors is rebuilt by the same gesture — a `ValueNotifier` here would be a
+/// second source of truth for something `MaterialApp` already rebuilds.
+class AppTheme {
+  const AppTheme._();
+
+  static Brightness _brightness = Brightness.dark;
+
+  /// The brightness the palette is currently resolved for.
+  ///
+  /// **`dark` until something says otherwise, on purpose.** The first frame
+  /// paints before the stored preference is read, and a light flash on launch
+  /// for a user who chose dark is the more visible of the two wrong answers.
+  static Brightness get brightness => _brightness;
+
+  /// Resolves [mode] against the platform and applies it.
+  static void applyMode(ThemeMode mode, Brightness platform) {
+    apply(switch (mode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => platform,
+    });
+  }
+
+  /// Swaps the palette. See [AppSurfaces.apply].
+  static void apply(Brightness brightness) {
+    _brightness = brightness;
+    AppSurfaces.apply(brightness);
+    AppPalette.apply(brightness);
+  }
 }
 
 /// Corner radii, on the brief's scale.
@@ -218,20 +312,20 @@ class AppBorders {
   /// **Neutral on purpose.** An earlier revision tinted this with the theme
   /// accent, which put a coloured outline on every card. A coloured border is a
   /// drawn edge, and hue is spoken for.
-  static const BorderSide hairline = BorderSide(
-    color: AppSurfaces.border,
-    width: 1,
-  );
+  static BorderSide get hairline => BorderSide(
+        color: AppSurfaces.border,
+        width: 1,
+      );
 
   /// The outline on a control the user can press.
   ///
   /// Same value as [hairline]: the brief has one border colour. Kept as a
   /// separate name because a tappable thing and a labelled thing are different
   /// roles, and a future revision is allowed to separate them.
-  static const BorderSide control = BorderSide(
-    color: AppSurfaces.border,
-    width: 1,
-  );
+  static BorderSide get control => BorderSide(
+        color: AppSurfaces.border,
+        width: 1,
+      );
 
   /// A neutral edge that clears WCAG 1.4.11's 3:1 for a UI component boundary.
   ///
@@ -248,9 +342,9 @@ class AppBorders {
   // and the mistake is silent at the call site and loud in the analyzer.**
   // `BoxDecoration.border` takes a `BoxBorder`, and `Border.all(color:)` does
   // not compile. Both shapes are named so no call site has to convert.
-  static const BoxBorder hairlineBorder = Border.fromBorderSide(hairline);
-  static const BoxBorder controlBorder = Border.fromBorderSide(control);
-  static const BoxBorder boundaryBorder = Border.fromBorderSide(boundary);
+  static BoxBorder get hairlineBorder => Border.fromBorderSide(hairline);
+  static BoxBorder get controlBorder => Border.fromBorderSide(control);
+  static BoxBorder get boundaryBorder => Border.fromBorderSide(boundary);
 
   /// The brief's categorical recipe: a 20%-alpha wash of the hue behind a
   /// full-strength foreground of the same hue.
@@ -685,30 +779,104 @@ Color appDivider({double opacity = 1.0}) =>
 class AppPalette {
   const AppPalette._();
 
+  /// Swaps the active palette. See [AppSurfaces.apply].
+  static void apply(Brightness brightness) {
+    _active = brightness == Brightness.light
+        ? AppPaletteTheme.light
+        : AppPaletteTheme.dark;
+  }
+
+  static AppPaletteTheme _active = AppPaletteTheme.dark;
+
+  static Color get error => _active.error;
+  static Color get primary => _active.primary;
+  static Color get secondary => _active.secondary;
+  static Color get accent => _active.accent;
+  static Color get statusAlert => _active.statusAlert;
+  static Color get statusBad => _active.statusBad;
+  static Color get success => _active.success;
+  static Color get chartViolet => _active.chartViolet;
+  static Color get chartCyan => _active.chartCyan;
+  static Color get onHue => _active.onHue;
+
+  /// **Deprecated: use [AppShadows].** `aura` was a blurred halo, and the brief
+  /// bans blur outright. Kept as a name because a call site may still reach
+  /// for it, and it now returns the one legal glow.
+  static List<BoxShadow> aura(Color hue, {double strength = 0.50}) =>
+      AppShadows.glow(hue, strength: strength);
+}
+
+/// One appearance's worth of the hue set.
+///
+/// Immutable, so that [AppPalette] can publish it through static accessors with
+/// no `BuildContext` in sight — the same trick [AppSurfacesPalette] plays for
+/// the surface stack.
+///
+/// **The hues had to become per-palette, and this is the finding of the light
+/// theme.** One red cannot serve both: on the dark ramp the accent is pinned at
+/// `#FF6B6B` because the AA floor against `surfaceMuted` caps how dark it may
+/// go, and against a light page that same red measures **2.49:1** — under the
+/// 3:1 even a graphic needs. The solver that produced the light column scales
+/// every channel of each hue by one factor until it clears AA on that palette's
+/// caption surfaces, which is the same rule this repo already states for caption
+/// colours: scaling preserves hue and saturation exactly, where stepping in HSL
+/// does not.
+///
+/// The accent is the one hand-picked light value — `#B3261E`, Material 3's own
+/// error red, at 5.72 / 6.53 / 4.73 — because the solver's `#A34444` is a
+/// maroon and the accent is the one hue that has to still read as red.
+class AppPaletteTheme {
+  const AppPaletteTheme({
+    required this.error,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+    required this.statusAlert,
+    required this.statusBad,
+    required this.success,
+    required this.chartViolet,
+    required this.chartCyan,
+    required this.onHue,
+  });
+
   /// **The accent.** Red, and the only colour the app spends on chrome.
   ///
-  /// Derived shade of the brief's `accent-red`. It is not a claim that something
-  /// is wrong — `terminal_panel.dart` states that deliberately, and the panel's
-  /// hero figure, its section headings and its meter fills are all this value on
-  /// a day when everything is perfectly nominal.
-  static const Color error = Color(0xFFFF6B6B);
+  /// It is not a claim that something is wrong — `terminal_panel.dart` states
+  /// that deliberately, and the panel's hero figure, its section headings and
+  /// its meter fills are all this value on a day when every reading is nominal.
+  final Color error;
 
   /// **No longer an accent.** Acid lime. Retained for the chart-series order and
   /// the PV category; a call site that reaches for it as decoration is the bug
   /// this doc exists to prevent.
-  static const Color primary = Color(0xFFC6FF00);
+  final Color primary;
 
   /// **No longer an accent.** Blue. Retained for the chart-series order and the
   /// AC category; see [primary].
-  static const Color secondary = Color(0xFF4A9EFF);
+  final Color secondary;
 
   /// Amber. The stale/warning severity. **A condition, not an identity** — it
   /// only appears beside the word that says what is stale.
-  static const Color accent = Color(0xFFFFB84D);
+  final Color accent;
+
+  /// An alert: serious, not yet a breach.
+  ///
+  /// **The one hue that is not in the brief's palette**, because the brief has
+  /// two semantic hues and the app has four severities. Collapsing alert into
+  /// `error` would have been the alternative and it loses information the alarm
+  /// history actually carries.
+  final Color statusAlert;
+
+  /// A breach, as **ink**.
+  ///
+  /// **Derived by scaling every channel of `#EF4444` by 1.35** — see
+  /// `color_helpers.dart` for the measurement that chose the factor, and for
+  /// why scaling preserves hue where stepping HSL does not.
+  final Color statusBad;
 
   /// Green. A healthy reading. **A condition, not an identity** — it is
   /// `statusOk` and nothing else, and it is never a page's own colour.
-  static const Color success = Color(0xFF4ADE80);
+  final Color success;
 
   /// Violet. Retained for the chart-series order and the battery category; see
   /// [primary].
@@ -717,34 +885,67 @@ class AppPalette {
   /// the whole point.** The obvious fix for a colour that fails contrast on a
   /// dark surface is to darken it, and that takes it further from white. Scaled
   /// rather than stepped in HSL, so the hue is preserved exactly.
-  static const Color chartViolet = Color(0xFFC084FC);
+  final Color chartViolet;
 
   /// Cyan. Retained for the chart-series order and the water category; see
   /// [primary].
-  static const Color chartCyan = Color(0xFF22D3EE);
+  final Color chartCyan;
 
   /// Ink on a saturated fill. The brief's `on-primary`.
   ///
-  /// **Black, and the name is misleading enough to be worth arguing here.**
-  /// `onHue` was written for lime, where black reads 14:1 and white 1.9:1, so it
-  /// looks like a leftover from the old brand hue rather than a rule. It is not:
-  /// it is *dark ink on a bright fill*, and the accent is bright. On
-  /// `#FF6B6B` black measures **7.57:1** and white measures **2.78:1** — white
-  /// fails AA for body text by a factor of 1.6, which is the reason both the
-  /// primary button (`banners.dart`) and the selected date chip
-  /// (`liquid_glass.dart`) keep reaching for this token rather than
-  /// `AppSurfaces.onSurface`.
+  /// **Dark in dark mode and white in light, and the flip is the point.**
+  /// On the dark ramp the fills are bright, so this is black and white would
+  /// measure 2.78:1 on the accent — under AA by 1.6x. On the light ramp the
+  /// fills are dark, so it is white and black would fail by the same factor.
+  /// Both the primary button (`banners.dart`) and the selected date chip
+  /// (`liquid_glass.dart`) reach for this token rather than
+  /// `AppSurfaces.onSurface`, and that is only defensible while the ratio holds
+  /// in the palette that is active.
+  ///
+  /// The name is misleading — `onHue` was written for lime, where black reads
+  /// 14:1 — but what it has always meant is *the ink that clears AA on this
+  /// palette's fills*, and that is a rule rather than a leftover.
   ///
   /// `color_helpers.dart`'s `onPrimaryInk` derives the same answer from the
-  /// fill's measured luminance instead of from its hue, and
+  /// fill's measured luminance instead of from its palette, and
   /// `accent_graphic_contrast_test.dart` holds that function to 4.5:1 for every
-  /// fill in the palette. Use this token when the fill is a known constant; use
-  /// `onPrimaryInk` when a caller supplies the fill.
-  static const Color onHue = Color(0xFF000000);
+  /// fill. Use this token when the fill is a known constant; use `onPrimaryInk`
+  /// when a caller supplies the fill.
+  final Color onHue;
 
-  /// **Deprecated: use [AppShadows].** `aura` was a blurred halo, and the brief
-  /// bans blur outright. Kept as a name because a call site may still reach
-  /// for it, and it now returns the one legal glow.
-  static List<BoxShadow> aura(Color hue, {double strength = 0.50}) =>
-      AppShadows.glow(hue, strength: strength);
+  /// The hues as shipped: bright, for ink on a near-black page.
+  ///
+  /// Every one of these is unchanged from the single-palette app, and that is
+  /// deliberate — the dark ramp is the one the values were originally solved
+  /// for.
+  static const AppPaletteTheme dark = AppPaletteTheme(
+    error: Color(0xFFFF6B6B),
+    primary: Color(0xFFC6FF00),
+    secondary: Color(0xFF4A9EFF),
+    accent: Color(0xFFFFB84D),
+    statusAlert: Color(0xFFFB923C),
+    statusBad: Color(0xFFFF5C5C),
+    success: Color(0xFF4ADE80),
+    chartViolet: Color(0xFFC084FC),
+    chartCyan: Color(0xFF22D3EE),
+    onHue: Color(0xFF000000),
+  );
+
+  /// The same hues, each scaled by one factor per channel until it clears AA on
+  /// the light caption surfaces. See the class doc for the derivation.
+  ///
+  /// **`onHue` inverts to white**, because every fill here is dark rather than
+  /// bright. That is the whole reason these are two sets and not one.
+  static const AppPaletteTheme light = AppPaletteTheme(
+    error: Color(0xFFB3261E),
+    primary: Color(0xFF536B00),
+    secondary: Color(0xFF2F65A3),
+    accent: Color(0xFF805C27),
+    statusAlert: Color(0xFF925523),
+    statusBad: Color(0xFFAD3F3F),
+    success: Color(0xFF256F40),
+    chartViolet: Color(0xFF77529C),
+    chartCyan: Color(0xFF126E7C),
+    onHue: Color(0xFFFFFFFF),
+  );
 }

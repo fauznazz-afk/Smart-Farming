@@ -36,7 +36,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
   // oversight: wrapping is decided by width alone, so 375 is what these tests
   // are about, while `ListView.builder` lays out lazily and a real 812dp phone
   // viewport (~692dp after app bar and save button) is not reliably enough to
-  // build all nine ~80dp tiles. `findsNWidgets(8)` would then fail on how many
+  // build all nine ~80dp tiles. `findsNWidgets(9)` would then fail on how many (nine since Appearance was added)
   // children the cache extent happened to reach, which has nothing to do with
   // the bug.
   tester.view.physicalSize = surface ?? const Size(900, 1600);
@@ -97,11 +97,15 @@ void main() {
   // settings_section.dart:144-165 builds one ListTile per section, so the
   // rendered tile count is the section count. This is what catches a section
   // that exists in the list but is never laid out.
+  //
+  // **Nine, since the Appearance section was added for the light theme.** The
+  // count moved once before this, for the same reason: a new category rather
+  // than a new behaviour on an existing one.
   testWidgets('renders one tile per category', (tester) async {
     await _pumpSettings(tester);
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
-    expect(find.byType(ListTile), findsNWidgets(8));
+    expect(find.byType(ListTile), findsNWidgets(9));
   });
 
   // The truncation regression. Eight of the nine category subtitles were
@@ -118,7 +122,7 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(8));
+    expect(tiles, findsNWidgets(9));
     for (var i = 0; i < 8; i++) {
       final tile = tester.widget<ListTile>(tiles.at(i));
       final title = (tile.title! as Text).data;
@@ -179,7 +183,7 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(8));
+    expect(tiles, findsNWidgets(9));
     for (var i = 0; i < 8; i++) {
       final height = tester.getSize(tiles.at(i)).height;
       expect(

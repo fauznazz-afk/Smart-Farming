@@ -68,19 +68,15 @@ void main() {
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
 
-    final collapsed = ValueNotifier<bool>(false);
-    addTearDown(collapsed.dispose);
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(padding: EdgeInsets.only(bottom: 34)),
         child: MaterialApp(
           home: Scaffold(
-            extendBody: true,
+            extendBody: false,
             bottomNavigationBar: GlassNavBar(
               selectedIndex: 0,
-              collapsed: collapsed,
               onSelect: (_) {},
-              onExpand: () {},
             ),
           ),
         ),
@@ -98,34 +94,25 @@ void main() {
   /// business.
   double declaredIconSize(WidgetTester tester) {
     for (final element in find.byType(Icon).evaluate()) {
-      final box = element.renderObject! as RenderBox;
-      if (box.size.height > 32) continue; // the collapsed pill
       return (element.widget as Icon).size!;
     }
-    fail('the bar drew no expanded icons to read a declared size from');
+    fail('the bar drew no icons to read a declared size from');
   }
 
-  /// The painted width of each of the four expanded icons, left to right.
+  /// The painted width of each of the four icons, left to right.
   List<double> paintedIcons(WidgetTester tester) {
     final widths = <double>[];
     for (final element in find.byType(Icon).evaluate()) {
-      final box = element.renderObject! as RenderBox;
-      // The collapsed pill's icon is laid out in a 44 dp circle. It is off-screen
-      // behind an opacity of 0 but still laid out, so it has to be excluded by
-      // size rather than by visibility.
-      if (box.size.height > 32) continue;
       widths.add(paintedIconWidth(element));
     }
     return widths;
   }
 
   group('every icon is drawn at the size it is declared at', () {
-    testWidgets('the four expanded icons are all the same width', (
-      tester,
-    ) async {
+    testWidgets('the four icons are all the same width', (tester) async {
       await paintBar(tester);
       final widths = paintedIcons(tester);
-      expect(widths.length, 4, reason: 'expected the four expanded icons');
+      expect(widths.length, 4, reason: 'expected the four icons');
 
       final min = widths.reduce((a, b) => a < b ? a : b);
       final max = widths.reduce((a, b) => a > b ? a : b);

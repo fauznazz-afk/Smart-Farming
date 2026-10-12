@@ -2,6 +2,111 @@
 
 ---
 
+# [1.12.0] - 2026-10-12
+
+The light theme, which was deferred twice, and a nav bar that stops floating.
+
+### Added
+
+- **A light theme, selectable in Settings - Appearance.** Light / Dark / Auto,
+  persisted in `SharedPreferences` and applied on the next launch. The token
+  layer became a facade over two immutable palettes (`AppSurfacesPalette.dark` /
+  `.light`, `AppPaletteTheme.dark` / `.light`) behind the existing static
+  getters, so all 148 `AppSurfaces` and 120 `AppPalette` call sites are
+  unchanged and only ~21 `const` sites had to break. Light values come from the
+  contrast solver (one scale factor per channel, so hue is preserved) except
+  `error`, which is M3's `#B3261E` - the solver's own answer was a maroon that
+  no longer reads as the app's red.
+  - `AppPalette.onHue` **inverts between the palettes**: the fill is a light red
+    in dark mode (black ink) and a dark red in light mode (white ink). It is not
+    `Colors.white`, and a hard-coded white is 2.8:1 on the dark palette's bubble.
+  - `color_helpers.dart`'s `statusOk` / `statusWarn` / `statusAlert` /
+    `statusBad` moved from module-level literals onto the palette - they could
+    not swap before, and `Sektor.dart` was drawing them directly.
+  - `appPrimaryText` and `faintColor` were top-level `final`s, which captured the
+    dark palette's values when the library loaded and never followed a swap. Both
+    are getters now. This is the same trap twice: a top-level `final` in a
+    tokenised codebase is a snapshot.
+  - Guarded by `test/theme_palette_contrast_test.dart` (18 tests), which
+    measures AA for both palettes against the real fills rather than against
+    white.
+
+### Fixed
+
+- **The light theme reverted to dark on every launch.** `_loadMode` stored the
+  mode and called `setState`, but never called `AppTheme.applyMode`. Both of
+  `MaterialApp`'s theme slots are built from `AppTheme.brightness`, so the app
+  came up dark while Settings said Light, and the first tap on the segmented
+  control was what fixed it.
+- **The nav bar was docked at the bottom instead of floating.** No 24 dp side
+  margin, no 10 dp gap, no stadium radius, a top hairline instead of a full
+  border, and `BorderRadius.zero` rather than `AppRadius.pill` - a docked bar's
+  bottom corners are the screen's corners, so a radius there paints
+  page-coloured notches in them.
+  - `extendBody` went to `false` with it. `extendBody: true` exists so an
+    overlay bar can sit over the content; nothing covers a docked bar's strip, so
+    the last row of the Overview panel showed through under it.
+  - `kGlassNavBarBottomGap` is 0, and `glassNavBarReservedHeightFor` no longer
+    has a non-zero floor to be flat below.
+
+### Changed
+
+- **The nav bar's collapse-on-scroll is gone**, along with `_navCollapsed`,
+  its `_downScrollDistance` accumulator, the `_CollapsedNavItem` crossfade and
+  the `glass_nav_bar_collapsed` golden. All four destinations are visible at all
+  times; a bar that hides its own destinations on scroll is a bar you cannot tap
+  your way back out of.
+- **The accent bubble travels.** One `AnimatedPositioned` disc slides to the
+  selected slot instead of a per-slot crossfade - a crossfade draws two bubbles
+  fading through each other while you swipe, and neither copy is where your
+  finger is. The selected glyph is `AppPalette.onHue` on the disc, not a red
+  glyph on the page.
+  - Destinations are laid out at a fixed 48 dp pitch, centred, rather than
+    `Expanded` across the bar: a quarter of a 360 dp screen put the icons 90 dp
+    apart for a 22 dp glyph, and the disc looked stranded between two empty
+    halves. `min(48, width / 4)` on a narrow screen.
+  - The disc and the glyph's colour share one clock - `AppMotion.container` and
+    `easeInOutCubic`. The glyph used to turn 170 ms before the disc arrived, so
+    it was white on a white page for most of a 192 dp slide.
+  - `AnimatedPositioned`, not `AnimatedAlign`: `Align` places a child by
+    `(W - childW) * ((x + 1) / 2)`, putting the *leading edge* on that
+    fraction rather than the centre - 16.5 dp off on the first slot.
+  - Pinned by `nav_bar_clearance_test.dart`, which walks all four indices and
+    measures the disc against its icon.
+- **`MaterialApp.color` is `AppSurfaces.page`.** Docking the bar removed the
+  accident that covered the edge-to-edge gesture inset, so the window now paints
+  its own background there instead of relying on a `Scaffold` that does not
+  reach.
+
+### Removed
+
+- `chartSeriesColor`, `statusBadFill` and `prefixTitle` - deleted outright, both
+  confirmed unreachable by search first. `statusBadFill` in particular had no
+  caller left once the sector grid stopped drawing a filled chip.
+- `_cctvKeepAlive` survives. It is referenced four times and appears to be dead,
+  but four references that all live in the same class are not four callers -
+  re-verify with a real call graph before removing it, and this entry is here so
+  the next person does not trust the count.
+
+### Known, not removed
+
+- `EnergySummaryCard` (488 lines) and `SystemStatusStrip` (239 lines) have no
+  production caller - every hit for either name in `lib/` is inside a comment
+  explaining why it stopped being used - but both files and their tests remain.
+  Deleting them is a separate change with its own review, not a footnote to a
+  nav bar diff.
+
+### Security
+
+- Audit over the alarm module, the ThingsBoard client, the CCTV WebView, the
+  manifest and the Dart services: no Critical, High or Medium findings, and no
+  path that exfiltrates a credential. Two fixes anyway: `_matchesBaseUrl` in
+  `thingsboard_api.dart` compared host only, so a scheme or port mismatch passed;
+  and `AlarmBridgePlugin.kt` logged the exception object rather than its class,
+  which on the token-refresh path could have embedded a JWT fragment.
+
+---
+
 # [1.11.0] - 2026-10-12
 
 Every accent becomes the red one. The canvas goes pitch black. The meters become

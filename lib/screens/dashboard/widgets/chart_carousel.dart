@@ -48,7 +48,7 @@ class _ChartCarouselState extends State<ChartCarousel> {
     // settles that, at length, for the panel that established the rule: red is
     // the instrument's own colour, and a meaning it carries only when a *word*
     // says so.
-    const accent = AppPalette.error;
+    final accent = AppPalette.error;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

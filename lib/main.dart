@@ -12,6 +12,7 @@ import 'widgets/brand_logo.dart';
 import 'screens/dashboard/utils/design_tokens.dart';
 import 'services/alarm_notification_service.dart';
 import 'services/secure_window.dart';
+import 'services/theme_mode.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +49,8 @@ void main() {
 /// `onHue` on every role it can sit on is not decoration. Black ink on
 /// `#FF6B6B` measures **7.57:1** and white measures **2.78:1**, so white fails
 /// AA for body text by a factor of 1.6 and black clears it by a wide margin.
-ColorScheme _appColorScheme() => const ColorScheme.dark(
+ColorScheme _appColorScheme() => ColorScheme(
+  brightness: AppTheme.brightness,
   primary: AppPalette.error,
   onPrimary: AppPalette.onHue,
   primaryContainer: AppPalette.error,
@@ -126,10 +128,10 @@ TextTheme _appTextTheme() {
 /// `AppShadows.stampedIn` — a solid offset rectangle in the accent at 20%.
 FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
   style: ButtonStyle(
-    backgroundColor: const WidgetStatePropertyAll(AppPalette.error),
-    foregroundColor: const WidgetStatePropertyAll(AppPalette.onHue),
+    backgroundColor: WidgetStatePropertyAll(AppPalette.error),
+    foregroundColor: WidgetStatePropertyAll(AppPalette.onHue),
     elevation: const WidgetStatePropertyAll(0),
-    shadowColor: const WidgetStatePropertyAll(AppPalette.error),
+    shadowColor: WidgetStatePropertyAll(AppPalette.error),
     minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -151,14 +153,14 @@ FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
 /// are transparent with the accent ink at the label size.
 OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
   style: ButtonStyle(
-    backgroundColor: const WidgetStatePropertyAll(AppSurfaces.page),
-    foregroundColor: const WidgetStatePropertyAll(AppSurfaces.onSurface),
+    backgroundColor: WidgetStatePropertyAll(AppSurfaces.page),
+    foregroundColor: WidgetStatePropertyAll(AppSurfaces.onSurface),
     elevation: const WidgetStatePropertyAll(0),
     minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     ),
-    side: const WidgetStatePropertyAll(AppBorders.hairline),
+    side: WidgetStatePropertyAll(AppBorders.hairline),
     shape: WidgetStatePropertyAll(
       RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
@@ -170,7 +172,7 @@ OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
 
 TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
   style: ButtonStyle(
-    foregroundColor: const WidgetStatePropertyAll(AppPalette.error),
+    foregroundColor: WidgetStatePropertyAll(AppPalette.error),
     elevation: const WidgetStatePropertyAll(0),
     minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
     textStyle: const WidgetStatePropertyAll(AppType.labelMicro),
@@ -206,7 +208,7 @@ SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
           // well under AA.
           : AppSurfaces.onSurfaceVariant,
     ),
-    side: const WidgetStatePropertyAll(AppBorders.hairline),
+    side: WidgetStatePropertyAll(AppBorders.hairline),
     shape: WidgetStatePropertyAll(
       RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -240,7 +242,7 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
   ),
   focusedBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.inset),
-    borderSide: const BorderSide(color: AppPalette.error, width: 2),
+    borderSide: BorderSide(color: AppPalette.error, width: 2),
   ),
   // Uppercase 700 with 0.1em tracking, per `label-uppercase-md`: a
   // placeholder in this system is a shout, not a hint.
@@ -261,7 +263,7 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
 /// answer is above.
 ThemeData _appThemeData() => ThemeData(
   useMaterial3: true,
-  brightness: Brightness.dark,
+  brightness: AppTheme.brightness,
   colorScheme: _appColorScheme(),
   textTheme: _appTextTheme(),
   scaffoldBackgroundColor: AppSurfaces.page,
@@ -279,7 +281,7 @@ ThemeData _appThemeData() => ThemeData(
       side: AppBorders.hairline,
     ),
   ),
-  dividerTheme: const DividerThemeData(
+  dividerTheme: DividerThemeData(
     color: AppSurfaces.border,
     space: 1,
     thickness: 1,
@@ -291,7 +293,7 @@ ThemeData _appThemeData() => ThemeData(
   inputDecorationTheme: _inputTheme(),
   // The brief's progress indicator: an accent line with no soft Material track
   // around it. `RefreshIndicator`'s spinner inherits it.
-  progressIndicatorTheme: const ProgressIndicatorThemeData(
+  progressIndicatorTheme: ProgressIndicatorThemeData(
     color: AppPalette.error,
     circularTrackColor: AppSurfaces.surfaceMuted,
   ),
@@ -318,11 +320,85 @@ Future<void> _initializeAlarmServices() async {
   }
 }
 
-class PltsMonitoringApp extends StatelessWidget {
+class PltsMonitoringApp extends StatefulWidget {
   const PltsMonitoringApp({super.key});
 
   @override
+  State<PltsMonitoringApp> createState() => _PltsMonitoringAppState();
+}
+
+class _PltsMonitoringAppState extends State<PltsMonitoringApp>
+    with WidgetsBindingObserver {
+  /// The chosen mode, and **the reason this widget is stateful at all.**
+  ///
+  /// There is one other piece of state here: `AppTheme`'s active palette, which
+  /// is a static because 148 call sites read it without a `BuildContext`. A
+  /// static cannot notify, so the rebuild comes from the same `setState` that
+  /// rebuilds `MaterialApp` — which also rebuilds every `theme:`-derived value
+  /// and the tree under it. So this one field drives both.
+  ThemeMode _mode = ThemeMode.system;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadMode();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Re-resolves `system` when the platform flips.
+  ///
+  /// **Without this, `ThemeMode.system` desyncs from itself.**
+  /// `MaterialApp` follows the platform on its own — that is what the mode
+  /// means — so the moment the user toggles Android's dark theme, the
+  /// `ThemeData` flips and `AppTheme` does not, because a static has no
+  /// platform listener. The result is the light palette telling Material it is
+  /// bright: white ink on white cards, with nothing thrown.
+  @override
+  void didChangePlatformBrightness() {
+    if (_mode != ThemeMode.system) return;
+    AppTheme.applyMode(_mode, platformBrightness());
+    setState(() {});
+  }
+
+  Future<void> _loadMode() async {
+    final stored = await loadThemeMode();
+    if (!mounted) return;
+    // **The palette has to be applied here, not just the mode stored.**
+    // `MaterialApp` reads `themeMode` and picks a slot, but both slots are built
+    // from `AppTheme.brightness` — which is still its `dark` default at this
+    // point, because nothing has called `AppTheme.applyMode` yet. Setting the
+    // mode alone gives Material a light slot that holds a dark `ThemeData`, so
+    // the app comes back up dark while the settings screen says Light, and the
+    // first tap on the segmented control is the thing that "fixes" it.
+    AppTheme.applyMode(stored, platformBrightness());
+    setState(() => _mode = stored);
+  }
+
+  /// Applies [mode]: swaps the palette *first*, then rebuilds.
+  ///
+  /// The order matters and is the one thing that cannot be got wrong here. If
+  /// the tree rebuilt before `AppTheme.apply` ran, one frame would paint with
+  /// the new `ThemeData` and the old surface stack — and on the light palette
+  /// that frame has white ink on white, which is the "white flash" this whole
+  /// static design was meant to avoid.
+  void _applyMode(ThemeMode mode) {
+    AppTheme.applyMode(mode, platformBrightness());
+    setState(() => _mode = mode);
+    // Persisted here rather than in Settings, because the root is the only
+    // place that owns the value Settings is editing. Writing it down at the
+    // call site would put a second writer in the app.
+    saveThemeMode(mode);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final light = AppTheme.brightness == Brightness.light;
     return MaterialApp(
       title: 'EnerGrow',
       debugShowCheckedModeBanner: false,
@@ -333,28 +409,53 @@ class PltsMonitoringApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
-      // **`theme:` only.** There is no `darkTheme` and no `themeMode`, because
-      // there is one appearance and it is dark. The old `builder:` resolved an
-      // `AppTheme` back out of what `MaterialApp` had published — a round trip
-      // through a `scaffoldBackgroundColor` comparison that existed solely because
-      // `MaterialApp` cannot express a third brightness. With one theme there is
-      // nothing to recover.
+      // **The page colour, because nothing else paints there.**
+      //
+      // `targetSdk` 36 is edge-to-edge, so the system gesture bar's own strip
+      // belongs to the app and the platform ignores
+      // `systemNavigationBarColor` below. The dashboard used to cover that
+      // strip by accident: with `extendBody: true` its body painted to the very
+      // bottom edge, past the nav bar. Docking the bar (`extendBody: false`)
+      // removed that accident, and the window's own background showed through —
+      // black, in both palettes, under the gesture pill.
+      //
+      // This is the one paint that has to follow the palette, so it reads
+      // `AppSurfaces.page` here rather than being left as `MaterialApp`'s
+      // default. Reading `AppSurfaces` in `build` is what makes the swap: the
+      // palette is already `applyMode`d by the time either theme slot is built.
+      color: AppSurfaces.page,
+      // **Both slots, and `themeMode` choosing between them.**
+      //
+      // `theme:` and `darkTheme:` are the *same* `ThemeData` built from the same
+      // tokens — what differs is which one `MaterialApp` publishes, and both
+      // read from `AppTheme`, which has already been swapped by the time either
+      // is built. Two slots rather than one rebuilt `theme:` because
+      // `MaterialApp` re-derives `Theme.of(context)` from the slot it picks, and
+      // only the slot mechanism animates and re-inherits that correctly.
       theme: _appThemeData(),
+      darkTheme: _appThemeData(),
+      themeMode: _mode,
       builder: (context, child) {
         // The system navigation bar is opaque and sits over the app's bottom
-        // edge. It has to match the page or there is a visible seam where the two
-        // meet. The icons are always light: the app is dark by design, so there
-        // is no platform brightness left to consult here either.
+        // edge, so it has to match the page or there is a visible seam. The
+        // icons now follow the palette rather than being pinned light: a light
+        // page with light icons is the second half of the bug this used to be.
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
+          value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
+            statusBarIconBrightness:
+                light ? Brightness.dark : Brightness.light,
             systemNavigationBarColor: AppSurfaces.page,
-            systemNavigationBarIconBrightness: Brightness.light,
+            systemNavigationBarIconBrightness:
+                light ? Brightness.dark : Brightness.light,
             systemNavigationBarDividerColor: AppSurfaces.page,
             systemNavigationBarContrastEnforced: false,
           ),
-          child: child!,
+          child: ThemeModeScope(
+            mode: _mode,
+            onChanged: _applyMode,
+            child: child!,
+          ),
         );
       },
       home: const _SplashRouter(),

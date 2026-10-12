@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/settings_keys.dart';
@@ -109,32 +108,24 @@ const double _cardGap = AppSpacing.md;
 /// header look attached to the card above it.
 const double _chartHeaderGap = 28;
 
-/// The gap between the floating nav bar's top edge and the last card.
+/// The gap between the docked nav bar's top edge and the last card.
 ///
-/// **This is the fix for the overlap, and the `76` it replaced was not a
-/// smaller version of the same number — it was an unrelated one.** The bar is
-/// the Scaffold's `bottomNavigationBar` with `extendBody: true`, so it is drawn
-/// *over* the page and the scrolling content has to reserve the space itself.
-/// The reserve was `MediaQuery.paddingOf(context).bottom + 76`, and the `76`
-/// was written when the bar was full-width; nothing tied it to the 52 the bar
-/// draws, so on the device the last line of the Energy analytics card sat under
-/// the pill with no way to scroll clear of it.
+/// **20, and the bar reserves nothing itself any more.** This used to be the
+/// fix for an overlap: the bar was the Scaffold's `bottomNavigationBar` with
+/// `extendBody: true`, so it painted *over* the page and the content had to
+/// reserve the bar's height itself or the last line sat underneath it.
 ///
-/// The reservation is now `glassNavBarReservedHeight(context)` — the bar's own
-/// height plus its own safe-area floor, from `nav_bar.dart` — and this gap on
-/// top of it.
+/// The bar is docked now, so `extendBody: false` and the Scaffold reserves the
+/// slot. Adding the reservation here as well would leave the content that much
+/// too high — the exact bug this number was introduced to stop, arriving from
+/// the other direction. So the body asks for the gap alone.
 ///
-/// **20 rather than something smaller, for the same reason [\_cardGap] is 20.**
-/// The nav bar carries the same `AppElevation.raised` pair as every card, so its
-/// ambient half reaches 20dp at 1 sigma. A gap below that lets the bar's shadow
-/// land on the last card, which is the same "there is something wrong here" look
-/// a clipped card shadow produces — so the content would be *uncovered* and still
-/// read as covered.
-///
-/// The `MediaQuery` is read from the State's context, which is above the
-/// `Scaffold`, and that matters: with `extendBody: true` the `Scaffold` republishes
-/// `padding.bottom` inside the body as the bar's height, so reading it from below
-/// would count the bar twice.
+/// **20 rather than something smaller.** The nav bar used to carry the same
+/// `AppElevation.raised` pair as every card, so its ambient half reached 20dp at
+/// 1 sigma, and a gap below that let the shadow land on the last card. It is a
+/// flat bar with no shadow now, so 20 is spacing rather than shadow clearance —
+/// which is the same number for a different reason, and worth saying so the next
+/// person does not "tidy" it back down on the strength of a stale comment.
 const double _navBarClearance = 20;
 
 /// Main monitoring dashboard: overview, PV, AC, battery, and CCTV tabs.
@@ -152,9 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Navigation & lifecycle ───────────────────────────────────────────────────
   final _pageController = PageController();
   final ValueNotifier<int> _selectedPage = ValueNotifier(0);
-  final ValueNotifier<bool> _navCollapsed = ValueNotifier(false);
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
-  double _downScrollDistance = 0;
   int _selectedIndex = 0;
 
   /// Which of PV / AC / Battery the Power tab is showing.
@@ -362,7 +351,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     _selectedPage.dispose();
     _powerSubNotifier.dispose();
     _historyBusyNotifier.dispose();
-    _navCollapsed.dispose();
     _appBarBlurProgress.dispose();
     _chartPointerActiveNotifier.dispose();
     _liveRevision.dispose();
@@ -403,24 +391,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
       return false;
     }
-    if (notification is UserScrollNotification) {
-      if (notification.direction == ScrollDirection.reverse) {
-        _downScrollDistance = 0;
-      } else if (notification.direction == ScrollDirection.forward) {
-        _downScrollDistance = 0;
-        _navCollapsed.value = false;
-      } else if (notification.metrics.pixels <= 0) {
-        _downScrollDistance = 0;
-        _navCollapsed.value = false;
-      }
-    } else if (notification is ScrollUpdateNotification &&
-        notification.scrollDelta != null &&
-        notification.scrollDelta! > 0) {
-      _downScrollDistance += notification.scrollDelta!;
-      if (_downScrollDistance >= 12 && !_navCollapsed.value) {
-        _navCollapsed.value = true;
-      }
-    }
+    // **The nav-bar collapse branch is gone.** There used to be a
+    // `_downScrollDistance` accumulator that, past 12 px of downward scroll,
+    // crossfaded all four destinations out and one enlarged icon in. The bar
+    // keeps all four icons at all times now, so there is nothing for the
+    // accumulator to measure — it and `_navCollapsed` were removed rather than
+    // left at `false` forever, which is what a "temporarily disabled" branch
+    // looks like six months later.
     final progress = ((notification.metrics.pixels - 4) / 44)
         .clamp(0.0, 1.0)
         .toDouble();
@@ -1473,15 +1450,25 @@ class _DashboardScreenState extends State<DashboardScreen>
       backgroundColor: Colors.transparent,
       appBar: _buildAppBar(),
       body: AppBackground(child: _buildBody()),
-      extendBody: true,
+      // **False, and it was `true` while the bar was a floating capsule.**
+      //
+      // `extendBody: true` lets the body paint all the way to the screen's
+      // bottom edge so an overlay bar can sit over the content. That is the
+      // right trade for a floating object and the wrong one for a docked bar:
+      // nothing covers the strip below it, so in the light palette — where the
+      // system navigation bar is translucent over a near-white page — the last
+      // row of the Overview panel showed through under the bar and through the
+      // gesture inset as well.
+      //
+      // The reservation in `glassNavBarReservedHeight` still applies. It was
+      // written for the overlay case, where the body had to reserve the space
+      // itself; with `extendBody: false` the `Scaffold` reserves the bar's slot
+      // as well, so the two now overlap rather than cover for each other.
+      extendBody: false,
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
-        builder: (context, _, _) => GlassNavBar(
-          selectedIndex: _selectedIndex,
-          collapsed: _navCollapsed,
-          onSelect: _selectPage,
-          onExpand: () => _navCollapsed.value = false,
-        ),
+        builder: (context, _, _) =>
+            GlassNavBar(selectedIndex: _selectedIndex, onSelect: _selectPage),
       ),
     );
   }
@@ -1653,7 +1640,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               kDashboardPageMargin,
               // The bar's real height plus [_navBarClearance], not a literal.
               // See that constant for why this was the wrong number before.
-              glassNavBarReservedHeight(context) + _navBarClearance,
+              _navBarClearance,
             ),
             itemCount: items.length,
             itemBuilder: (context, itemIndex) => items[itemIndex](),
@@ -1859,12 +1846,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final panel = _dateSummaryPanel();
         return panel == null
             ? const SizedBox.shrink()
-            : Column(
-                children: [
-                  const SizedBox(height: 8),
-                  panel,
-                ],
-              );
+            : Column(children: [const SizedBox(height: 8), panel]);
       }),
       // **One panel, and it replaced four widgets.**
       //
@@ -2021,7 +2003,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// panel blank forever instead of saying it has no data.
   Widget? _dateSummaryPanel() {
     if (!_isSummaryPeriod) return null;
-    final settled = _historyLoaded.contains('env') ||
+    final settled =
+        _historyLoaded.contains('env') ||
         _historyLoadFailed.contains('env') ||
         _historyLoaded.contains('fish') ||
         _historyLoadFailed.contains('fish');
@@ -2102,7 +2085,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       // no `metric` — cannot have breached, and reporting null is the only
       // honest answer; guessing a bound here would invent an alarm the rules do
       // not have.
-      breached: metric != null &&
+      breached:
+          metric != null &&
           stats.breached(
             min: _thresholds.minFor(metric),
             max: _thresholds.maxFor(metric),

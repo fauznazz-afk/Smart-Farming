@@ -223,7 +223,7 @@ class TerminalRow extends StatelessWidget {
           ],
           if (onTap != null) ...[
             const SizedBox(width: AppSpacing.xs),
-            const Icon(
+            Icon(
               Icons.swap_vert,
               size: 12,
               color: AppSurfaces.onSurfaceVariant,
@@ -514,7 +514,7 @@ class TerminalMeter extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(color: AppSurfaces.track),
                 ),
               ),

@@ -131,35 +131,19 @@ void main() {
   });
 
   group('visual audit goldens', () {
+    // **One nav-bar golden, and it used to be two.** There was a
+    // `glass_nav_bar_collapsed` variant for the vertical-scroll state that
+    // crossfaded four icons out and one enlarged icon in. That state is gone —
+    // the bar always shows all four destinations — so the collapsed golden
+    // rendered the same bar as the expanded one and its PNG was deleted rather
+    // than regenerated. A golden for a state that no longer exists is a file
+    // that has to be re-approved every time the bar changes, for a picture no
+    // user can reach.
     testWidgets('glass_nav_bar_expanded', (tester) async {
-      final collapsed = ValueNotifier<bool>(false);
-      addTearDown(collapsed.dispose);
       await _audit(
         tester,
         'glass_nav_bar_expanded',
-        GlassNavBar(
-          selectedIndex: 0,
-          collapsed: collapsed,
-          onSelect: (_) {},
-          onExpand: () => collapsed.value = false,
-        ),
-        height: 120,
-        mainAxisAlignment: MainAxisAlignment.end,
-      );
-    });
-
-    testWidgets('glass_nav_bar_collapsed', (tester) async {
-      final collapsed = ValueNotifier<bool>(true);
-      addTearDown(collapsed.dispose);
-      await _audit(
-        tester,
-        'glass_nav_bar_collapsed',
-        GlassNavBar(
-          selectedIndex: 1,
-          collapsed: collapsed,
-          onSelect: (_) {},
-          onExpand: () => collapsed.value = false,
-        ),
+        GlassNavBar(selectedIndex: 0, onSelect: (_) {}),
         height: 120,
         mainAxisAlignment: MainAxisAlignment.end,
       );
@@ -523,7 +507,7 @@ ThemeData _auditTheme() {
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: ColorScheme.dark(
       primary: AppPalette.primary,
       onPrimary: AppPalette.onHue,
       primaryContainer: AppPalette.primary,
@@ -562,8 +546,8 @@ ThemeData _auditTheme() {
     scaffoldBackgroundColor: AppSurfaces.page,
     filledButtonTheme: FilledButtonThemeData(
       style: ButtonStyle(
-        backgroundColor: const WidgetStatePropertyAll(AppPalette.primary),
-        foregroundColor: const WidgetStatePropertyAll(AppPalette.onHue),
+        backgroundColor: WidgetStatePropertyAll(AppPalette.primary),
+        foregroundColor: WidgetStatePropertyAll(AppPalette.onHue),
         elevation: const WidgetStatePropertyAll(0),
         minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
         padding: const WidgetStatePropertyAll(
@@ -589,7 +573,7 @@ ThemeData _auditTheme() {
               ? AppPalette.onHue
               : AppSurfaces.onSurfaceVariant,
         ),
-        side: const WidgetStatePropertyAll(AppBorders.hairline),
+        side: WidgetStatePropertyAll(AppBorders.hairline),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -620,7 +604,7 @@ ThemeData _auditTheme() {
         side: AppBorders.hairline,
       ),
     ),
-    dividerTheme: const DividerThemeData(
+    dividerTheme: DividerThemeData(
       color: AppSurfaces.border,
       space: 1,
       thickness: 1,

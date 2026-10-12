@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/nav_bar.dart';
 
 /// Covers the reservation the dashboard's scroll padding makes for the floating
@@ -57,12 +56,23 @@ void main() {
       );
     });
 
-    test('the inset floor is a floor and not a second addition', () {
-      // Below the floor the reservation is the same number, not the floor plus
-      // the inset. Adding both would double-count on a device that reports an
-      // inset, which is the mistake a "just add them" fix makes.
-      expect(glassNavBarReservedHeightFor(0), glassNavBarReservedHeightFor(4));
-      expect(glassNavBarReservedHeightFor(0), kGlassNavBarHeight + 10);
+    test('the inset is taken as a maximum, not added to the floor', () {
+      // The rule is `height + max(inset, gap)`, not `height + gap + inset`.
+      // Adding both double-counts on a device that reports an inset, which is
+      // the mistake a "just add them" fix makes — and it is the mistake this
+      // assertion is for.
+      //
+      // **It used to also assert a flat region below the floor, and it cannot
+      // any more.** That claim — `f(0) == f(4)` — was only ever true because the
+      // floor was 10. The bar is docked now, so the floor is 0, every non-zero
+      // inset is above it, and there is no flat region to assert. The rule it
+      // was a proxy for is asserted directly below instead.
+      expect(
+        glassNavBarReservedHeightFor(34),
+        kGlassNavBarHeight + 34,
+        reason: 'a reported inset is added once, not twice',
+      );
+      expect(kGlassNavBarBottomGap, 0);
     });
   });
 
@@ -73,8 +83,6 @@ void main() {
       WidgetTester tester, {
       required double bottomInset,
     }) async {
-      final collapsed = ValueNotifier<bool>(false);
-      addTearDown(collapsed.dispose);
       // The `MediaQuery` goes *outside* the `MaterialApp`, which is safe and is
       // the shape `system_status_strip_test.dart` already uses: `WidgetsApp`
       // never introduces a `MediaQuery` of its own, the `View` below it does, and
@@ -84,12 +92,10 @@ void main() {
           data: MediaQueryData(padding: EdgeInsets.only(bottom: bottomInset)),
           child: MaterialApp(
             home: Scaffold(
-              extendBody: true,
+              extendBody: false,
               bottomNavigationBar: GlassNavBar(
                 selectedIndex: 0,
-                collapsed: collapsed,
                 onSelect: (_) {},
-                onExpand: () {},
               ),
             ),
           ),
@@ -115,26 +121,20 @@ void main() {
       expect(measured, glassNavBarReservedHeightFor(34));
     });
 
-    testWidgets('the bar corners are rounded, and the clip agrees with them', (
+    testWidgets('the bar is square, and the clip agrees with the decoration', (
       tester,
     ) async {
       // **A decoration's radius and its clipper's radius being allowed to
-      // disagree is a shape that cannot exist.**
+      // disagree is a shape that cannot exist.** The claim here has not changed
+      // since the bar was a stadium — only the value has, because the bar is
+      // docked now.
       //
-      // The bar was asked to become rounded: the `BoxDecoration` got
-      // `AppRadius.card` on all four corners. It looked right in the source,
-      // threw nothing, and passed `flutter analyze` -- because the `ClipRRect`
-      // wrapping the bar's contents still had no radius, and in Flutter 3.47
-      // `ClipRRect.borderRadius` *defaults* to `BorderRadius.zero` rather than
-      // being required. So the clip was a plain rectangle painted over rounded
-      // corners, and the active tab's lime fill squared off the corners on the
-      // device.
-      //
-      // This is the third variant of a defect this repo has already paid for
-      // (AGENTS.md: an arithmetic relationship and a pixel are different
-      // claims). Nothing here is arithmetic -- it is two numbers in two widgets
-      // that have to be the same number, and only the device can show that they
-      // are not.
+      // It was `AppRadius.pill` on the grounds that a floating object needs
+      // round corners to read as floating. A docked bar has the opposite
+      // requirement: its bottom corners are the screen's own corners, so a
+      // radius there paints page-coloured notches in them, which read as a
+      // rendering fault rather than as a shape. `BorderRadius.zero` on both sides
+      // of the claim is the docked answer.
       await measureBar(tester, bottomInset: 0);
 
       final decoration = tester
@@ -143,34 +143,88 @@ void main() {
           .whereType<BoxDecoration>()
           .firstWhere((d) => d.borderRadius != null);
 
-      // **A stadium, and the assertion is `AppRadius.pill` rather than
-      // `AppRadius.card`.** The bar was 8 dp on a 76 dp tall shape, which is a
-      // corner radius of about 10% of the height — at a phone's density, roughly
-      // two millimetres. It rendered as a chamfered rectangle, which is exactly
-      // what the user reported: the tab bar is the one *floating* element in the
-      // app (`extendBody: true`, a gap under it, page on both sides), and a
-      // floating object with near-square corners does not read as floating.
-      //
-      // The test still asserts the *same* thing it always did — that the
-      // decoration and the clip agree — and now also pins the value, so the
-      // radius cannot be quietly walked back to a chamfer by someone tidying it.
       expect(
         decoration.borderRadius,
-        BorderRadius.circular(AppRadius.pill),
-        reason: 'the bar is no longer fully round',
+        BorderRadius.zero,
+        reason:
+            'a docked bar is square, and a radius here shows page-coloured '
+            'notches in the two screen corners',
       );
 
-      final clip = tester.widget<ClipRRect>(find.byType(ClipRRect).first);
+      // And the clip is `ClipRect` rather than a `ClipRRect` with a radius,
+      // because in Flutter 3.47 `ClipRRect.borderRadius` *defaults* to
+      // `BorderRadius.zero` rather than being required — which is how a rounded
+      // decoration ended up with a square clip painted over it, on a device,
+      // with the suite green.
       expect(
-        clip.borderRadius,
-        decoration.borderRadius,
+        find.byType(ClipRect),
+        findsOneWidget,
         reason:
-            'the clip is ${clip.borderRadius} but the decoration is '
-            '${decoration.borderRadius}. The clip is painted over the fill, so a '
-            'square clip squares off the rounded corners however round the '
-            'decoration is.',
+            'the clip must still clip the contents to the same shape the '
+            'decoration paints',
       );
     });
+  });
+
+  group('the accent bubble lands on the selected icon', () {
+    Future<void> paintWithIndex(WidgetTester tester, int index) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            extendBody: false,
+            bottomNavigationBar: GlassNavBar(
+              selectedIndex: index,
+              onSelect: (_) {},
+            ),
+          ),
+        ),
+      );
+      // Past `AppMotion.container`, so the bubble has finished travelling.
+      await tester.pumpAndSettle();
+    }
+
+    // **This is the claim the bubble exists to make, and nothing else checks
+    // it.** The bubble is positioned by an `Alignment` computed from
+    // `selectedIndex` while the icons are laid out by a `Row` of `Expanded`s —
+    // two independent expressions of "where is slot `i`", in the same widget.
+    // They agree for four destinations and would silently disagree the moment
+    // a fifth was added, which is why the row uses `Expanded` rather than
+    // `spaceEvenly`. A bubble 8 dp off its icon looks like a rendering fault,
+    // not like a layout that is nearly right.
+    for (final index in [0, 1, 2, 3]) {
+      testWidgets('index $index puts the bubble on that icon', (tester) async {
+        await paintWithIndex(tester, index);
+
+        // **The bubble's own `SizedBox`, not the widget that positions it.**
+        // `getCenter` on an `AnimatedPositioned` returns the centre of *its*
+        // render box, which here is the whole slot, not where the disc inside
+        // it was centred — the two happen to agree today because the bubble is
+        // a centred child of a full slot, and measuring the wrong one would keep
+        // passing for that reason.
+        final bubble = tester.getCenter(
+          find.descendant(
+            of: find.byKey(const ValueKey('nav-accent-bubble')),
+            matching: find.byType(SizedBox),
+          ),
+        );
+        final icons = find.byType(Icon).evaluate().toList();
+        expect(icons.length, greaterThanOrEqualTo(index + 1));
+
+        final icon = tester.getCenter(find.byWidget(icons[index].widget));
+        expect(
+          (bubble.dx - icon.dx).abs(),
+          lessThanOrEqualTo(0.5),
+          reason:
+              'the bubble is ${(bubble.dx - icon.dx).toStringAsFixed(1)}dp to '
+              'the side of icon $index',
+        );
+        expect(
+          (bubble.dy - icon.dy).abs(),
+          lessThanOrEqualTo(0.5),
+          reason: 'the bubble is not vertically centred on icon $index',
+        );
+      });
+    }
   });
 
   group('the dashboard actually reserves the space', () {
@@ -182,33 +236,40 @@ void main() {
     // was that the dashboard's scroll padding did not match either number.
     //
     // So this asserts the thing the user actually sees: with a list scrolled to
-    // its end, the last row of content must sit above the top of the pill. A
+    // its end, the last row of content must sit above the top of the bar. A
     // screen whose content is covered is the defect, and the only way to know it
     // is fixed is to look at where the content ends up.
+    //
+    // **The fixture is the bar's current shape, and it changed.** The bar is
+    // docked: `extendBody: false`, so the Scaffold reserves the slot itself, and
+    // the body asks only for the clearance gap. The fixture below used
+    // `extendBody: true` with the body reserving the bar's full height, which is
+    // the overlay shape this app no longer uses — a test that keeps passing
+    // against a layout the app does not have is worse than no test, because it
+    // reads as coverage.
     testWidgets('the last row of content clears the top of the nav bar', (
       tester,
     ) async {
       const clearance = 20.0;
-      final collapsed = ValueNotifier<bool>(false);
-      addTearDown(collapsed.dispose);
+      const bottomInset = 34.0;
 
       await tester.pumpWidget(
         MediaQuery(
-          data: const MediaQueryData(padding: EdgeInsets.only(bottom: 34)),
+          data: const MediaQueryData(
+            padding: EdgeInsets.only(bottom: bottomInset),
+          ),
           child: MaterialApp(
             home: Scaffold(
-              extendBody: true,
+              // Docked: the Scaffold reserves the bar, the body reserves only
+              // the gap. Mirrors `dashboard_screen.dart`.
+              extendBody: false,
               bottomNavigationBar: GlassNavBar(
                 selectedIndex: 0,
-                collapsed: collapsed,
                 onSelect: (_) {},
-                onExpand: () {},
               ),
               body: ListView(
                 // The padding the dashboard uses, and the thing under test.
-                padding: EdgeInsets.only(
-                  bottom: glassNavBarReservedHeightFor(34) + clearance,
-                ),
+                padding: const EdgeInsets.only(bottom: clearance),
                 children: [
                   for (var i = 0; i < 40; i++)
                     SizedBox(height: 60, child: Text('row $i')),
@@ -229,30 +290,24 @@ void main() {
       final gap = bar.top - tester.getBottomLeft(lastRow).dy;
 
       // The gap has to be **positive**, and the assertion is deliberately not
-      // `>= clearance`. Measured on this geometry: the reserved padding yields a
-      // gap of about +27.5dp, while the old literal `76` yields about **-7.6dp**
-      // - the content ends 7.6dp *below* the top of the bar, i.e. covered. A
-      // threshold sitting between the two is what distinguishes the fix from the
-      // defect; `clearance` (20) sits at the wrong end of that range, which is
-      // why an earlier draft of this test passed against the broken padding.
+      // `>= clearance`: `clearance` is what the body reserves, so requiring the
+      // gap to *equal* it would pass for a layout that happens to agree with
+      // itself and fail for one that does not.
       expect(
         gap,
         greaterThan(0),
         reason:
             'the last row of content ends ${-gap}dp below the top of the '
-            'nav bar, so the bar is painted over it. The gap measured '
-            '$gap; the reserved padding produces about +27.5 and the literal 76 '
-            'this replaced produced about -7.6.',
+            'nav bar, so the bar is painted over it. The gap measured $gap.',
       );
 
-      // And it must clear the bar's *shadow*, not merely its edge: the ambient
-      // half of `AppElevation.raised` reaches further than the pill does.
+      // And it must clear the bar's edge by the clearance, not merely touch it.
       expect(
         gap,
         greaterThanOrEqualTo(clearance - 8),
         reason:
-            'the content clears the bar by only $gap dp, which puts it '
-            'inside the drop shadow the bar casts.',
+            'the content clears the bar by only $gap dp, which puts it against '
+            'the hairline rather than below the reserved gap.',
       );
     });
   });

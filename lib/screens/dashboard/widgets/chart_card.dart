@@ -47,7 +47,7 @@ class ChartSectionHeader extends StatelessWidget {
     // about the app rather than a fact about solar, and it is chrome by any
     // reading. Reading it from a telemetry key also meant the indicator's colour
     // was a silent function of a constant string three files away.
-    const accent = AppPalette.error;
+    final accent = AppPalette.error;
     return Row(
       children: [
         Expanded(

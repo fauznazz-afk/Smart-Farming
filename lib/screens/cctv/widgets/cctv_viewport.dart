@@ -142,7 +142,7 @@ class CctvStandbyOverlay extends StatelessWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(999),
                       onTap: onStart,
-                      child: const Center(
+                      child: Center(
                         child: Icon(
                           Icons.videocam_outlined,
                           size: 30,
@@ -263,7 +263,7 @@ class CctvErrorOverlay extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.videocam_off_rounded,
               color: AppSurfaces.onSurface,
               size: 34,

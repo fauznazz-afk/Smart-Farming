@@ -43,7 +43,7 @@ class TelemetryErrorView extends StatelessWidget {
             // condition is a glyph and a word, never a block of colour. It was
             // inheriting the ambient default, which is not a colour the app
             // chose.
-            const Icon(Icons.cloud_off, size: 42, color: statusBad),
+            Icon(Icons.cloud_off, size: 42, color: statusBad),
             const SizedBox(height: 12),
             Text(
               'Failed to fetch telemetry from ThingsBoard.',
@@ -89,7 +89,7 @@ class TelemetryErrorView extends StatelessWidget {
               ),
               child: FilledButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(
+                icon: Icon(
                   Icons.refresh,
                   size: 20,
                   color: AppPalette.onHue,
@@ -208,7 +208,7 @@ class EnergyAlertBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.notifications_active_outlined, color: statusAlert),
+          Icon(Icons.notifications_active_outlined, color: statusAlert),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

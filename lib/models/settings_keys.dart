@@ -4,6 +4,9 @@
 /// Dashboard / alarm services (reads), so they are declared in one place to
 /// prevent the two sides from drifting apart.
 abstract final class SettingsKeys {
+  // Appearance
+  static const themeMode = 'theme_mode';
+
   // Monitoring
   static const autoRefresh = 'auto_refresh';
   static const refreshSeconds = 'refresh_seconds';

@@ -405,7 +405,7 @@ class EnergySummaryCard extends StatelessWidget {
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(AppRadius.bar),
                   backgroundColor: Colors.transparent,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
+                  valueColor: AlwaysStoppedAnimation<Color>(
                     AppPalette.error,
                   ),
                 ),

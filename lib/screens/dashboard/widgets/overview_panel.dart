@@ -409,7 +409,7 @@ class OverviewPanel extends StatelessWidget {
                 children: [
                   text,
                   const SizedBox(width: AppSpacing.xs),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
                     size: 12,
                     color: AppSurfaces.onSurfaceVariant,

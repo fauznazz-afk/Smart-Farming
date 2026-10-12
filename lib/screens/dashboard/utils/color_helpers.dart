@@ -148,7 +148,7 @@ Color categoryColor(MetricCategory category) => AppPalette.error;
 /// never extended. A group longer than four wraps, and adding a hue to fit a
 /// longer group would be the mistake the per-index rotation made in the other
 /// direction.
-const List<Color> kChartSeriesOrder = [
+List<Color> get kChartSeriesOrder => [
   AppPalette.primary,
   AppPalette.secondary,
   AppPalette.chartViolet,
@@ -196,11 +196,11 @@ Color? categoryColorForKey(String key) {
 /// the app needs a colour that means "nothing is wrong" and the brief has no
 /// green.** A status that clears AA on every surface is the constraint; anything
 /// darker moves the wrong way on a dark ramp.
-const Color statusOk = AppPalette.success;
+Color get statusOk => AppPalette.success;
 
 /// A warning. [AppPalette.accent] — amber is the brief's own caution colour and
 /// the only one in the palette that reads that way. 7.4:1.
-const Color statusWarn = AppPalette.accent;
+Color get statusWarn => AppPalette.accent;
 
 /// An alert: serious, not yet a breach. `#FB923C`, measured 6.58:1 on
 /// [AppSurfaces.surfaceAlt].
@@ -212,7 +212,14 @@ const Color statusWarn = AppPalette.accent;
 /// palette revision supplies an amber-orange, this is the value to replace —
 /// and the replacement has to clear 4.5:1 on `surfaceAlt`, which is the
 /// constraint that decides it.
-const Color statusAlert = Color(0xFFFB923C);
+/// An alert: serious, not yet a breach. See [AppPalette.statusAlert] for why the
+/// brief's palette has no fourth severity and this one does.
+///
+/// It used to be its own literal `#FB923C`, which compiled and looked fine until
+/// the app grew a light palette: a literal cannot swap, so it stayed
+/// amber-orange on a white page and measured **1.7:1**. It resolves to the
+/// pinned value now, and `theme_palette_contrast_test.dart` measures both ramps.
+Color get statusAlert => AppPalette.statusAlert;
 
 /// A breach, as a **fill**. [AppPalette.error], 3.96:1 on
 /// [AppSurfaces.surfaceAlt].
@@ -220,7 +227,7 @@ const Color statusAlert = Color(0xFFFB923C);
 /// **Below AA for text, which is why [statusBad] exists.** This value is for a
 /// solid block, a dot or a ring — somewhere the thing is a shape, not a
 /// sentence. Anything the user reads goes through [statusBad].
-const Color statusBadFill = AppPalette.error;
+Color get statusBadFill => AppPalette.error;
 
 /// A breach, as **ink**. `#FF5C5C` at 4.92:1 on [AppSurfaces.surfaceAlt].
 ///
@@ -236,7 +243,13 @@ const Color statusBadFill = AppPalette.error;
 /// stepping HSL lightness on a saturated colour moved `faintColor` from 150.00°
 /// to 146.67° at a 0.6% darkening, and a caption that shifts hue when you
 /// change it reads warm beside a green theme.
-const Color statusBad = Color(0xFFFF5C5C);
+/// A breach, as **ink**. See [AppPalette.statusBad] for the `#EF4444` scaling
+/// measurement that chose the value.
+///
+/// It was its own literal `#FF5C5C` for the same reason `statusAlert` was, and
+/// it failed the same way: a literal cannot swap, so the red stayed light on a
+/// white page at 2.3:1.
+Color get statusBad => AppPalette.statusBad;
 
 /// Alarm severity, for the alarm history list.
 ///
@@ -273,15 +286,19 @@ Color skyConditionColor(SkyCondition condition) => switch (condition) {
 
 /// The colour for secondary text: units, captions, timestamps.
 ///
-/// This is [#AppSurfaces.onSurfaceVariant] and it is no longer a function. The
+/// This is [AppSurfaces.onSurfaceVariant] and it is no longer a function. The
 /// version this replaces had a light/dark pair whose light value was re-measured
 /// twice against a page colour that had itself been restyled once, and the test
 /// that should have caught it measured against a hand-written surface list that
-/// had gone stale in the opposite direction. With one surface ramp there is one
-/// value and it is the same constant the surfaces are measured against.
+/// had gone stale in the opposite direction.
 ///
-/// 7.47:1 on the page, 6.78:1 on a card, 5.81:1 on a well.
-const Color faintColor = AppSurfaces.onSurfaceVariant;
+/// **A getter rather than a `final`, because it was the one that went quiet.**
+/// As a top-level `final` it captured whichever surface ramp was active when
+/// the library loaded — dark — and then never moved, so every caption drawn in
+/// it was white no matter what the user had picked. `test/theme_palette_
+/// contrast_test.dart` measures it against both ramps now, and the failure it
+/// caught was 1.11:1: white on white.
+Color get faintColor => AppSurfaces.onSurfaceVariant;
 
 /// The ink to put **on top of** a saturated categorical fill.
 ///

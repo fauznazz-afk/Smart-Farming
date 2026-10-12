@@ -102,7 +102,7 @@ class SolarConditionCard extends StatelessWidget {
               // hue also fills the brightness bar below, which is the one thing
               // on the card that is a meter, so the glyph and the meter now
               // agree with each other as well as with the rest of the app.
-              const Icon(
+              Icon(
                 Icons.wb_sunny_rounded,
                 size: 20,
                 color: AppPalette.error,
@@ -167,7 +167,7 @@ class SolarConditionCard extends StatelessWidget {
               ],
               if (stale) ...[
                 const SizedBox(width: AppSpacing.sm),
-                const Icon(Icons.schedule, size: 14, color: statusWarn),
+                Icon(Icons.schedule, size: 14, color: statusWarn),
                 const SizedBox(width: AppSpacing.xs),
                 Text(
                   'stale',
