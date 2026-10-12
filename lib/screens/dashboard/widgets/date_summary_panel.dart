@@ -163,7 +163,8 @@ class DateSummaryPanel extends StatelessWidget {
             // no "all within range" counterpart: a green badge on a healthy day
             // is a verdict on data the reader did not ask about, occupying the
             // space a real excursion needs.
-            if (breached > 0) TerminalTag(text: '$breached out of range', alert: true),
+            if (breached > 0)
+              TerminalTag(text: '$breached out of range', alert: true),
           ],
         ),
       ),
@@ -213,6 +214,20 @@ class DateSummaryPanel extends StatelessWidget {
   Widget _statRow(DateSummaryStat stat) {
     return TerminalRow(
       label: stat.label,
+      // **One size for every min / avg / max triple, and it is named rather than
+      // inherited.** `TerminalRow` puts the value in a `FittedBox(scaleDown)`,
+      // so the drawn size was whatever was left over after the slot name and the
+      // limit caption. On this panel that produced one size for the short
+      // triples and a smaller, different size for each long one — the same
+      // widget, the same column, a font size that tracked string length. The
+      // user read it as the Overview being inconsistent when looking at an older
+      // date, which is exactly what it was.
+      //
+      // `slotValueSmall` is the token the hero's own secondary figures use, so
+      // the summary's triples sit on the same scale as the rest of the panel's
+      // small figures. The `FittedBox` stays as the safety net for the longest
+      // triple, but it now has to shrink past a size every row shares.
+      valueStyle: AppType.slotValueSmall,
       value: stat.value,
       unit: stat.unit.isEmpty ? null : stat.unit,
       // Red is the panel's only severity colour and it means exactly one thing

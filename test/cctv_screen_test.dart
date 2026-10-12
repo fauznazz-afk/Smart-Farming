@@ -34,8 +34,7 @@ void main() {
 
     tearDown(() => cctvWebDataScrubber = original);
 
-    test('with no WebView platform registered it is a no-op, not a throw',
-        () async {
+    test('with no WebView platform registered it is a no-op, not a throw', () async {
       // The real function, on the host this suite actually runs on: a widget
       // test registers no `WebViewPlatform`, so this is the path where
       // `WebViewCookieManager`'s `assert` would fire. A throw here would be the
@@ -45,8 +44,9 @@ void main() {
       await expectLater(scrubCctvWebData(controller: null), completes);
     });
 
-    testWidgets('leaving the screen scrubs once, not on every rebuild',
-        (tester) async {
+    testWidgets('leaving the screen scrubs once, not on every rebuild', (
+      tester,
+    ) async {
       // A rejected URL, so the screen never builds a controller and the scrub is
       // reached with `controller: null`. That is not a corner case: playback is
       // user-initiated, so an idle screen *always* has no controller, and an
@@ -63,7 +63,11 @@ void main() {
       // scrubbing the user's session on every frame the dashboard polls.
       await tester.pump();
       await tester.pump();
-      expect(calls, isEmpty, reason: 'a mounted screen must not scrub anything');
+      expect(
+        calls,
+        isEmpty,
+        reason: 'a mounted screen must not scrub anything',
+      );
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
       await tester.pump();
@@ -82,7 +86,11 @@ void main() {
 
       await clearCctvUrl();
 
-      expect(calls.length, 1, reason: 'clearCctvUrl must scrub the WebView too');
+      expect(
+        calls.length,
+        1,
+        reason: 'clearCctvUrl must scrub the WebView too',
+      );
       // With no controller, because logout has none: the cookie half does not
       // need one and this is the path that would skip the clear if the call were
       // made conditional on a controller existing.
@@ -101,24 +109,41 @@ void main() {
 
       expect(find.text('CCTV Monitoring'), findsOneWidget);
       expect(find.text('STANDBY'), findsOneWidget);
-      expect(find.text('Play camera'), findsOneWidget);
-      // The viewport already says "Camera ready" and "The stream does not run
-      // until you press Play", with the button above. This used to assert a *fourth*
-      // rendering of the same fact, in a bordered box, directly beneath the other
-      // three -- found on an emulator, not by reading the code.
-      expect(find.text('Camera ready'), findsOneWidget);
+      // **The play control, and nothing but it.** The viewport used to render
+      // four statements of the same fact — a camera glyph, "Camera ready",
+      // "The stream does not run until you press Play", and a "Play camera"
+      // button — and the glyph on the circle was a *camera*, not a play
+      // triangle, so the control that starts the stream did not look like one.
+      // The label now lives in `Semantics`, so the button is asserted through
+      // its accessible name rather than through a caption that is not drawn.
+      // Matched by the label itself rather than by ancestor: every widget in the
+      // tree sits under a `Semantics` node somewhere, so `find.ancestor` returns
+      // several and `WidgetController.widget` throws "Too many elements".
+      final play = tester.widget<Semantics>(
+        find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.label == 'Play camera',
+        ),
+      );
+      expect(play.properties.label, 'Play camera');
+      expect(play.properties.button, isTrue);
+      // And the three captions that went with it are gone, not relocated.
+      expect(find.text('Camera ready'), findsNothing);
       expect(
         find.text('The stream does not run until you press Play'),
-        findsOneWidget,
+        findsNothing,
       );
       // And the bar that duplicated it is gone entirely while idle, rather than
       // being present and empty.
-      expect(find.text('The stream is running on an internet connection.'),
-          findsNothing);
+      expect(
+        find.text('The stream is running on an internet connection.'),
+        findsNothing,
+      );
       expect(find.byTooltip('Reload camera'), findsNothing);
     });
 
-    testWidgets('the idle screen says the same thing exactly once', (tester) async {
+    testWidgets('the idle screen says the same thing exactly once', (
+      tester,
+    ) async {
       // Counted rather than spot-checked. The defect was duplication, so the
       // assertion that catches it is the one about how *many* things say it, and
       // a test that only looks for a specific string cannot notice a second copy
@@ -142,15 +167,18 @@ void main() {
 
       expect(
         text.length,
-        lessThanOrEqualTo(1),
-        reason: 'the idle screen says "$text" -- the viewport already covers it, '
-            'and a second copy is a permanent notice occupying the space a real '
-            'warning needs',
+        lessThanOrEqualTo(0),
+        reason:
+            'the idle screen says "$text" -- the viewport is a play button '
+            'and nothing else, so any sentence at all is a caption the user asked '
+            'to be removed, and a second copy would be a permanent notice sitting '
+            'where a real warning needs to go',
       );
     });
 
-    testWidgets('shows an error state for a rejected stream url',
-        (tester) async {
+    testWidgets('shows an error state for a rejected stream url', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(

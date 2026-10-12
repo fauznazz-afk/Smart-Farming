@@ -1447,7 +1447,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     // reads the same token file.
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
+      // **The page colour, not transparent — and this is the black strip under
+      // the nav bar in the light theme.**
+      //
+      // The Scaffold's rect covers the whole screen, but its *body* slot stops at
+      // the nav bar, and `AppBackground` paints only the body. So the strip below
+      // the bar — the `SafeArea`'s bottom padding, the system gesture inset — was
+      // painted by nothing at all, and in the dark palette that reads as correct
+      // because the page is nearly black anyway. In the light palette it read as
+      // a black band under a white bar.
+      //
+      // The settings screen has always been right on this: it leaves
+      // `backgroundColor` unset, so it takes `scaffoldBackgroundColor`, which is
+      // `AppSurfaces.page` and opaque. That is the whole difference, and this is
+      // now the same one line.
+      //
+      // Four Android-side levers were tried first and none of them moved it —
+      // `navigationBarColor`, `windowLightNavigationBar`, `windowBackground` and
+      // the OS dark-mode setting. They could not have: `dumpsys window` does
+      // report a SystemUI window down there, but what is showing through it was
+      // never painted by us. The measurement that settled it was sampling the
+      // screenshot — the app's own colour at y=2650 and black at y=2690 — with
+      // `windowBackground` deliberately set to magenta, which did not appear.
+      backgroundColor: AppSurfaces.page,
       appBar: _buildAppBar(),
       body: AppBackground(child: _buildBody()),
       // **False, and it was `true` while the bar was a floating capsule.**
@@ -1887,6 +1909,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       readings: OverviewReadings(
         displayName: _displayName,
         pvPower: pzem?.latestValues['power_dc'],
+        // **The highest PV output in the window on screen, not the current
+        // one.** This used to be absent and the panel derived "Peak" from
+        // `pvPower`, so the hero's secondary figure repeated the hero. The PV
+        // history is already fetched for the chart carousel, so this costs
+        // nothing extra — it is the same series, read a different way.
+        //
+        // Negative samples are skipped rather than clamped: an inverter
+        // mid-switchover can report a small negative the same way the BMS
+        // reports `-0.01 A`, and a peak that is the *highest* reading is not
+        // the *least negative* one.
+        pvPeak: _pvPeakForWindow(),
         acPower: pzem?.latestValues['power_ac'],
         // Read from the BMS's own `power` key, never multiplied out from
         // voltage and current. The device reports all three, and deriving it
@@ -1923,6 +1956,16 @@ class _DashboardScreenState extends State<DashboardScreen>
         // a feature the user can still configure a target for. Two rows is what
         // it costs.
         forecastTargetProgress: forecast.targetProgress,
+        // **Measured, not extrapolated.** `forecast.targetProgress` divides a
+        // 24-hour *projection* of the day's production by the daily target, so
+        // at midday it reads past 100% on a good day — a forecast of a forecast
+        // on a row labelled `TARGET`, which the reader takes as progress made.
+        // This is the production actually recorded today over the same target.
+        productionProgress:
+            _dailyProductionTargetKwh != null && _dailyProductionTargetKwh! > 0
+            ? (forecast.observedProductionKwh / _dailyProductionTargetKwh!)
+                  .clamp(0.0, double.infinity)
+            : null,
         forecastBatteryHours: forecast.batteryDepletionHours,
         weekly: _weeklyEnergySummary,
         activeAlerts: _activeAlertIds.length,
@@ -1965,7 +2008,29 @@ class _DashboardScreenState extends State<DashboardScreen>
   // already committed once. For a past selection the Overview reports nothing,
   // which is the gap this fills.
 
-  /// Whether the selected day or range is anything other than today.
+  /// The highest PV output in the selected window, or null when there is none.
+///
+/// **Read from the history the chart already holds**, rather than tracked in the
+/// panel as values arrive. A running max in a widget is a max since the app
+/// launched: it resets on every cold start and on every process death, which for
+/// something labelled "Peak" is a claim that silently stops being true. The
+/// series is the one `chart_groups.dart` points the PV chart at, so the number
+/// here and the plot cannot describe different periods.
+double? _pvPeakForWindow() {
+  var peak = double.negativeInfinity;
+  var seen = false;
+  for (final key in chartKeysForPrefix('pv')) {
+    for (final point in _history[key] ?? const <TelemetryPoint>[]) {
+      final value = point.value;
+      if (value.isNaN || value < 0) continue;
+      seen = true;
+      if (value > peak) peak = value;
+    }
+  }
+  return seen ? peak : null;
+}
+
+/// Whether the selected day or range is anything other than today.
   ///
   /// Compares calendar days, not instants. The strip's chips are days and
   /// `_selectedDate` arrives from `DateTime.now()` when nothing has been picked,

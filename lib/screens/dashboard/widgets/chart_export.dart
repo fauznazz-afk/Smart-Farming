@@ -77,6 +77,12 @@ Future<void> exportChartImage(
 /// 1920 x 1080 is the smallest size a picture of this kind survives being put
 /// into a gallery, a document or a chat. Exported PNG bytes, so nothing about
 /// the source is resampled on the way out.
+/// **A chart card is portrait and 16:9 is not, so most of the canvas is
+/// letterbox.** A card is roughly 343 x 472, which is 1.38 tall for every 1 wide;
+/// fitted into 1920 x 1080 that leaves about 570 px of page colour down each
+/// side. The caption is drawn inside that margin rather than above the card, so
+/// the left edge of the file lines up with the left edge of the card and the
+/// empty space reads as a margin instead of as a crop.
 const Size kChartExportSize = Size(1920, 1080);
 
 /// Renders [boundary] plus a drawn caption into a [kChartExportSize] PNG.
@@ -98,7 +104,6 @@ Future<ByteData?> composeChartImage(
   required TextScaler textScaler,
 }) async {
   const padX = 16.0;
-  const padY = 16.0;
   const gap = 4.0;
 
   final width = boundary.size.width;
@@ -143,21 +148,28 @@ Future<ByteData?> composeChartImage(
     0,
     (sum, line) => sum + line.ascent.abs() + line.descent,
   );
-  final titleBottom = padY + titleInk;
-  final headerHeight = titleBottom + gap + subtitleInk + padY;
-  final logical = Size(width, headerHeight + boundary.size.height);
-
+  // **Height-driven, with a reserved gutter for the caption.** The card is
+  // portrait and the canvas is not, so centring it leaves the width half empty -
+  // the file was mostly page colour. Filling the height and putting the caption
+  // in the leftover width uses all 1920 px.
+  //
+  // The width term reserves [_captionGutterMin] rather than taking the whole
+  // remainder, which is what keeps a card that is *not* portrait from pushing
+  // the caption off the canvas: it letterboxes vertically instead, and the
+  // composition below needs no second branch.
+  const captionGutterMin = 220.0;
+  final fit = math.min(
+    (kChartExportSize.width - captionGutterMin) / width,
+    kChartExportSize.height / boundary.size.height,
+  );
   // **The capture ratio is the fit factor, not a round 3.** That makes the
   // source raster one output pixel per pixel — the alternative is capturing at
   // device scale and then upscaling it into the canvas, which ships a blurred
   // file that is nominally 1920 wide.
-  final fit = math.min(
-    kChartExportSize.width / logical.width,
-    kChartExportSize.height / logical.height,
-  );
   final captureRatio = fit < 1 ? 1.0 : fit;
 
   final chart = await boundary.toImage(pixelRatio: captureRatio);
+
   try {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -165,16 +177,57 @@ Future<ByteData?> composeChartImage(
       Offset.zero & kChartExportSize,
       Paint()..color = AppSurfaces.page,
     );
+
+    // **Landscape: the card fills the height on the right and the caption takes
+    // the margin on the left.** The card is portrait — about 343 x 472 on a
+    // phone — and the canvas is 16:9, so centring it left roughly 570 px of
+    // page colour down each side and a caption band above it. The user's read was
+    // "make it wide", and the honest reading of that is that the frame was not
+    // being used: the file was mostly empty.
+    //
+    // Putting the caption in that margin rather than above the card is what makes
+    // the space read as a margin instead of as a crop, and it buys back the band
+    // the plot was losing. The card's own aspect is untouched — a chart's
+    // proportions carry its Y axis, and stretching one changes what its heights
+    // mean.
+    final cardWidth = width * fit;
+    final captionGutter = kChartExportSize.width - cardWidth;
+
+    canvas.save();
     canvas.scale(fit);
-    canvas.translate(
-      (kChartExportSize.width / fit - logical.width) / 2,
-      (kChartExportSize.height / fit - logical.height) / 2,
+    canvas.translate(captionGutter / fit, 0);
+
+    // **`drawImageRect`, not `drawImage`, and this is the bug that made the card
+    // come out cropped.** `drawImage` paints the image at its own *pixel*
+    // dimensions in the current coordinate space; it does not take a size. The
+    // canvas here is already scaled by `fit`, and the raster is already
+    // `captureRatio` times the logical size, so `drawImage` drew it
+    // `fit * captureRatio` times too big: the card ran off the right edge of the
+    // 1920 px canvas and the bottom of the plot was cut mid-axis.
+    canvas.drawImageRect(
+      chart,
+      Rect.fromLTWH(0, 0, chart.width.toDouble(), chart.height.toDouble()),
+      Rect.fromLTWH(0, 0, width, boundary.size.height),
+      Paint(),
     );
-    // **Below the caption, not at the origin.** The card's own first row is the
-    // legend; pasted at `Offset.zero` it printed straight through the title.
-    canvas.drawImage(chart, Offset(0, headerHeight), Paint());
-    titlePainter.paint(canvas, const Offset(padX, padY));
-    subtitlePainter.paint(canvas, Offset(padX, titleBottom + gap));
+
+    // **The caption is painted in the same scaled space as the card, and that
+    // is the whole difference between this and the version that looked wrong.**
+    // Drawn unscaled, a 24 sp title sat in a 1153 px margin at 1:1 while
+    // everything beside it was 2.3x larger: two words of caption in the corner
+    // of a near-empty page, too small to read. Scaling both by the same factor
+    // is what makes the caption look like the app's own heading rather than a
+    // stray label.
+    //
+    // Vertically centred against the card rather than the canvas, so it reads
+    // beside the middle of the plot instead of floating at the top of an empty
+    // column.
+    final captionTop =
+        (boundary.size.height - (titleInk + gap + subtitleInk)) / 2;
+    titlePainter.paint(canvas, Offset(padX, captionTop));
+    subtitlePainter.paint(canvas, Offset(padX, captionTop + titleInk + gap));
+    canvas.restore();
+
     titlePainter.dispose();
     subtitlePainter.dispose();
 

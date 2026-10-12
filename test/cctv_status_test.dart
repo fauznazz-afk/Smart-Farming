@@ -139,8 +139,19 @@ void main() {
     testWidgets('standby offers a play button', (tester) async {
       await tester.pumpWidget(host(CctvStatus.standby));
 
-      expect(find.text('Camera ready'), findsOneWidget);
-      expect(find.text('Play camera'), findsOneWidget);
+      // **The play button and nothing else.** The standby overlay used to render a
+      // camera glyph, "Camera ready", "The stream does not run until you press
+      // Play" and a "Play camera" button — four statements of one fact. The
+      // caption is gone at the user's request and the label now lives in
+      // `Semantics`, so the button is asserted by its accessible name.
+      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      expect(find.text('Camera ready'), findsNothing);
+      expect(
+        find.text('Play camera'),
+        findsNothing,
+        reason: 'the label lives in Semantics; a drawn caption is what was '
+            'asked to be removed',
+      );
     });
 
     testWidgets('connecting shows a spinner and no play button',

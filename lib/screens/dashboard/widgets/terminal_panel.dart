@@ -87,10 +87,7 @@ class TerminalPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (header != null) ...[
-            header!,
-            const Divider(),
-          ],
+          if (header != null) ...[header!, const Divider()],
           ...children,
         ],
       ),
@@ -118,7 +115,24 @@ class TerminalRow extends StatelessWidget {
     this.tint,
     this.trailing,
     this.onTap,
+    this.valueStyle,
   });
+
+  /// The figure's type, and it exists because [AppType.slotValue] is too large
+  /// for a row carrying three of them.
+  ///
+  /// **The value sits in a `FittedBox(scaleDown)`, so without this the size is
+  /// decided by how much room is left over** — which is not a property of the
+  /// value. On the Overview's own panel every row fits and draws at
+  /// `slotValue`; on the period—summary panel the ENVIRONMENT and FISH rows
+  /// carry `min / avg / max` triples plus a limit caption, and each one was
+  /// shrunk by a *different* amount depending on how long its own numbers were.
+  /// Two rows in the same column, the same widget, two font sizes, and the
+  /// difference tracked string length rather than meaning. A caller that knows
+  /// its values are all the same shape can name the size instead.
+  ///
+  /// [AppType.slotValueSmall] is what the summary panel passes.
+  final TextStyle? valueStyle;
 
   /// The slot name — `PV_OUT`, `BAT_SOC`, `SKY_LUX`.
   final String label;
@@ -198,7 +212,10 @@ class TerminalRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          if (trailing != null) ...[trailing!, const SizedBox(width: AppSpacing.md)],
+          if (trailing != null) ...[
+            trailing!,
+            const SizedBox(width: AppSpacing.md),
+          ],
           // **The value is the one thing that must never be shortened**, so it is
           // outside the `FittedBox` and the *unit* is the one that yields when
           // the row is tight. `kW` becoming `k` would be wrong; `W` becoming
@@ -210,7 +227,9 @@ class TerminalRow extends StatelessWidget {
               child: Text(
                 value,
                 maxLines: 1,
-                style: AppType.slotValue.copyWith(color: valueColor),
+                style: (valueStyle ?? AppType.slotValue).copyWith(
+                  color: valueColor,
+                ),
               ),
             ),
           ),
@@ -218,7 +237,9 @@ class TerminalRow extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
             Text(
               unit!,
-              style: AppType.slotUnit.copyWith(color: AppSurfaces.onSurfaceVariant),
+              style: AppType.slotUnit.copyWith(
+                color: AppSurfaces.onSurfaceVariant,
+              ),
             ),
           ],
           if (onTap != null) ...[

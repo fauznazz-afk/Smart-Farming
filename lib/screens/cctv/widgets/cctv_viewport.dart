@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../widgets/liquid_glass.dart';
-import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../utils/cctv_status.dart';
 
@@ -108,105 +107,59 @@ class CctvStandbyOverlay extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // `FittedBox` on the way down, because this column is taller than the
-        // viewport at the largest text scales and a `Center` inside a `Stack`
-        // reports the overflow as a yellow stripe over the video. `scaleDown`
-        // shrinks it to fit rather than growing the box.
+        // **A play button and nothing else, at the user's request.** This used
+        // to be a `FittedBox` around a column: a *camera* glyph in an accent
+        // circle, the headline "Camera ready", the sentence "The stream does not
+        // run until you press Play", and a `FilledButton` labelled "Play camera".
+        // Four things saying one thing, and the glyph on the circle was a camera
+        // rather than a play triangle, so the control that starts the stream did
+        // not look like the control that starts the stream.
+        //
+        // What replaces it is that one circle, and the glyph inside is the same
+        // `play_arrow_rounded` the button was drawing - so removing the button
+        // removed a duplicate rather than the affordance. The `FittedBox` went
+        // with it: it existed only because a heading and two sentences made the
+        // column taller than a 16:9 panel, and one fixed-size circle cannot.
+        //
+        // The label did not disappear with the text; it moved into `Semantics`.
+        // An unlabelled 68 dp circle is a button with no name.
         Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Solid accent circle with onHue ink (FAB-circle style).
-                //
-                // **Flat, and the two blurred shadows are gone.** They were a
-                // black 10px-blur offset plus a white 4px-blur highlight — the
-                // soft-UI vocabulary the brief bans outright ("don't apply
-                // blurred/soft shadows; the shadow language is hard, offset,
-                // no-blur"). What gives this control its edge over arbitrary
-                // camera pixels is `AppBorders.boundary`, which is the one edge
-                // in the system that carries a 3:1 claim and the reason it is
-                // kept here rather than swapped for a hairline.
-                Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: AppPalette.error,
-                    shape: BoxShape.circle,
-                    border: AppBorders.boundaryBorder,
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: onStart,
-                      child: Center(
-                        child: Icon(
-                          Icons.videocam_outlined,
-                          size: 30,
-                          color: AppPalette.onHue,
-                        ),
-                      ),
+          child: Semantics(
+            button: true,
+            label: 'Play camera',
+            excludeSemantics: true,
+            child: Container(
+              // Solid accent circle with onHue ink (FAB-circle style).
+              //
+              // **Flat, and the two blurred shadows are gone.** They were a
+              // black 10px-blur offset plus a white 4px-blur highlight - the
+              // soft-UI vocabulary the brief bans outright ("don't apply
+              // blurred/soft shadows; the shadow language is hard, offset,
+              // no-blur"). What gives this control its edge over arbitrary
+              // camera pixels is `AppBorders.boundary`, the one edge in the
+              // system that carries a 3:1 claim.
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: AppPalette.error,
+                shape: BoxShape.circle,
+                border: AppBorders.boundaryBorder,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: onStart,
+                  child: Center(
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      size: 32,
+                      color: AppPalette.onHue,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                // The state headline, in the brief's `headline-md` slot — the
-                // same treatment the error overlay's title takes, so the two
-                // overlays read as one component rather than as two ad-hoc
-                // captions. The hand-written 15px/700 it replaces was a fifth
-                // size chosen in a widget.
-                //
-                // 20px inside a 16:9 panel is tight, and that is exactly what
-                // the `FittedBox` guard is for: the overlay scales into the
-                // panel rather than overflowing it.
-                Text(
-                  'Camera ready',
-                  style: AppType.headlineMd.copyWith(
-                    color: AppSurfaces.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'The stream does not run until you press Play',
-                  textAlign: TextAlign.center,
-                  // 70% of white rather than the `0xB3FFFFFF` literal it was —
-                  // the same colour, expressed through the token it is made of.
-                  style: AppType.labelMicro.copyWith(
-                    color: AppSurfaces.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // The brief's `button-primary`, with `primary` taken from the
-                // theme rather than from the palette so a test host can still
-                // drive this widget with a colour of its own.
-                // `onPrimaryInk(primary)` rather than a hard-coded ink.
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadius.all(AppRadius.card),
-                    boxShadow: AppShadows.stampedIn(primary),
-                  ),
-                  child: FilledButton.icon(
-                    onPressed: onStart,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                    label: const Text('Play camera'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: primary,
-                      foregroundColor: onPrimaryInk(primary),
-                      textStyle: AppType.buttonLabel,
-                      minimumSize: const Size(0, 56),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xl,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.all(AppRadius.card),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

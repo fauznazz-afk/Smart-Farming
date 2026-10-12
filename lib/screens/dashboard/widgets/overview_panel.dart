@@ -54,6 +54,7 @@ class OverviewReadings {
   const OverviewReadings({
     this.displayName = '',
     this.pvPower,
+    this.pvPeak,
     this.acPower,
     this.batteryPower,
     this.soc,
@@ -70,6 +71,7 @@ class OverviewReadings {
     this.energyLoading = false,
     this.energyError,
     this.forecastTargetProgress,
+    this.productionProgress,
     this.forecastBatteryHours,
     this.weekly = false,
     this.activeAlerts = 0,
@@ -80,6 +82,20 @@ class OverviewReadings {
   final String displayName;
 
   final double? pvPower;
+
+  /// The highest PV output reached so far in the window on screen.
+  ///
+  /// **A separate field because `Peak` used to be `pvPower` with a clamp on it.**
+  /// That made the hero's own secondary figure report the present as if it were
+  /// the best the day has done, which is not a rounding difference: at 11:00 on a
+  /// rising curve they are equal, and every other minute they are not. The user
+  /// read it as "the peak just follows the PV number".
+  ///
+  /// `null` when no history is in hand, in which case the row says so rather than
+  /// quietly falling back to the current figure - a fallback that looks identical
+  /// to the bug is not worth having.
+  final double? pvPeak;
+
   final double? acPower;
   final double? batteryPower;
   final double? soc;
@@ -120,6 +136,20 @@ class OverviewReadings {
   /// showing `0%`, because "no target configured" and "produced nothing" are
   /// different facts and only one of them is a failure.
   final double? forecastTargetProgress;
+
+  /// Today's *actual* production against the daily target, as a fraction.
+  ///
+  /// **This is what the Overview's `TARGET` row shows, and it is deliberately
+  /// not [forecastTargetProgress].** That one divides a 24-hour extrapolation of
+  /// the day's production by the daily target, which is a forecast of a forecast:
+  /// at 13:00 on a good day it reads well past 100% because it has already
+  /// assumed the afternoon it is halfway through. The row is labelled `TARGET`
+  /// next to a production figure, so the reader takes it as progress made, and
+  /// the user read 176% at midday as the number being wrong.
+  ///
+  /// The forecast's own estimate is still correct for what it is, and
+  /// `EnergySummaryCard` labels it as an estimate; this is the measurement.
+  final double? productionProgress;
 
   /// Hours of runtime the forecast projects, or null when it cannot say.
   ///
@@ -189,7 +219,7 @@ class OverviewPanel extends StatelessWidget {
           // labels the block instead of competing with it.
           slot: 'PV_OUT',
           secondary: [
-            ('Peak', slotNumber(_todayPeak(r.pvPower), decimals: 0)),
+            ('Peak', slotNumber(r.pvPeak ?? r.pvPower ?? 0, decimals: 0)),
             ('Stale', r.pzemStale ? 'YES' : 'NO'),
           ],
         ),
@@ -313,10 +343,10 @@ class OverviewPanel extends StatelessWidget {
             alert: true,
             divider: false,
           )
-        else if (r.forecastTargetProgress != null)
+        else if (r.productionProgress != null)
           TerminalRow(
             label: 'TARGET',
-            value: (r.forecastTargetProgress! * 100).toStringAsFixed(0),
+            value: (r.productionProgress! * 100).toStringAsFixed(0),
             unit: '%',
             divider: false,
           ),
@@ -369,14 +399,14 @@ class OverviewPanel extends StatelessWidget {
   static double _socFraction(double? soc) =>
       soc == null ? 0 : (soc / 100).clamp(0.0, 1.0);
 
-  /// The house draw, clamped at zero.
+  /// **Deleted: it was never a peak.**
   ///
-  /// **Negative load is not a thing and is not the sensor's fault.** An inverter
-  /// mid-switchover can report a small negative, the same way the BMS reports
-  /// `-0.01 A` while idle, and a hero figure that reads `-3 W` is a number the
-  /// reader has to work out the sign of. Zero is what "not drawing" means.
-  static double _todayPeak(double? acPower) =>
-      acPower == null ? 0 : (acPower < 0 ? 0 : acPower);
+  /// It read `acPower` - clamped at zero - and was called from the *PV* hero, so
+  /// "Peak" was the current PV figure whenever the caller passed `pvPower` in.
+  /// The name said one thing, the argument said another, and the panel rendered
+  /// the present as though it were the best the day has managed. It is now
+  /// [OverviewReadings.pvPeak], which the dashboard computes from the history it
+  /// already holds.
 
   /// A section heading: a small monospace key above a group of rows.
   ///
