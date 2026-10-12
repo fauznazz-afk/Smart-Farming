@@ -2,6 +2,85 @@
 
 ---
 
+# [1.13.0] - 2026-10-12
+
+The black strip under the nav bar, a Peak that was not a peak, a TARGET that was
+a forecast, and three panels that now sit on the Power page's scale.
+
+### Fixed
+
+- **The black strip under the nav bar in the light theme.** I had concluded four
+  times that it was a SystemUI window and was not ours to fix. It was ours.
+  `dumpsys window` does report `NavigationBar0` down there, and
+  `navigationBarColor`, `windowLightNavigationBar`, `windowBackground` and the OS
+  dark-mode setting all failed to move it — none of them could have. The
+  Scaffold's body slot stops at the nav bar and `AppBackground` paints only the
+  body, so the strip below it was painted by nothing at all: invisible in the dark
+  palette because the page is nearly black, and a black band under a white bar in
+  the light one. Settings was always right — it leaves `backgroundColor` unset and
+  takes `scaffoldBackgroundColor`. The dashboard now sets the same one line.
+  What settled it was sampling the screenshot with `windowBackground` deliberately
+  set to magenta, which did not appear in the strip.
+- **`Peak` was never a peak.** `_todayPeak` clamped the current reading and was
+  called with `pvPower` from the PV hero, so the hero's secondary figure repeated
+  the hero. It is now `OverviewReadings.pvPeak`, computed in the dashboard from
+  the PV history the chart carousel already fetches — not from a running max in a
+  widget, which would silently reset on every cold start.
+- **`TARGET` was a forecast of a forecast.** `forecast.targetProgress` divides a
+  24-hour *extrapolation* of the day's production by the daily target, so it read
+  176% at midday on a good day. The row sits next to a production figure, so the
+  reader takes it as progress made. The Overview now divides observed production
+  by the same target; the estimate is still what `EnergySummaryCard` shows,
+  labelled as one.
+- **The CCTV standby overlay is a play button and nothing else.** One accent circle
+  with `play_arrow_rounded`, where it used to be a camera glyph plus two sentences
+  plus a duplicate button. The label moved to `Semantics`, because an unlabelled
+  68 dp circle is a button with no name.
+
+### Changed
+
+- **The Overview, Environment and Fish panels are on the Power page's scale.**
+  `slotValue` 15 -> 24, `slotKey` and `slotUnit` 11, `slotMicro` 10,
+  `slotValueSmall` 12 — `TelemetryCard`'s figure, label and unit, verbatim. The
+  middle step (18/12/12) was a guess at "a bit bigger"; 24 is the number that was
+  actually on the other page.
+  - **The mono family is the one thing that stays.** Power's card inherits
+    `DefaultTextStyle` and lands on Inter; these five tokens are mono and
+    `design_tokens_test.dart` pins that. Matching the scale is what the eye reads
+    as "same app"; matching the typeface would erase the one thing that says a
+    panel is instrumentation rather than a list of readings — and it would take
+    the meters, the hero figure and `TerminalTag` out of the comparison anyway,
+    because `TelemetryCard` has none of those, so swapping to it would be a
+    deletion dressed as a restyle.
+  - These five tokens are the only type in the three panels, so one edit moves
+    all of them together.
+- **`TerminalRow` takes an optional `valueStyle`.** The value sits in a
+  `FittedBox(scaleDown)`, so without it the drawn size was whatever was left over
+  after the slot name and the limit caption. On the period summary that produced
+  one size for the short triples and a smaller, different size for each long one —
+  the same widget, the same column, a font size that tracked string length.
+- **The date strip's gap is a ladder** (6 / 4 / 2 / 0) and the chip's horizontal
+  padding is 6 rather than 8. A fixed 6 dp gap meant the seventh day scrolled off
+  the right edge on a 381 dp phone, which the user reported as a cut-off calendar.
+  The gap gives way before the type does; shrinking the day name is not available,
+  because `liquid_glass.dart` documents that a `FittedBox` there was tried and
+  reverted for silently inverting the user's font scale.
+- **The chart export is landscape.** The card fills the height on the right and the
+  caption takes the gutter on the left, scaled with the card so it reads as the
+  app's own heading rather than two words lost in a corner. The canvas is a fixed
+  1920 x 1080 rather than a pixel ratio over the card's logical width, which was
+  about 950 px on a phone — seven series across that are one pixel each, which is
+  what the user reported as "the data is not visible".
+
+### Known, not fixed
+
+- **A 50 px black strip under the light theme, drawn by SystemUI.** Recorded in
+  1.12.0 and now known to be wrong — see the fix above. The note is left in place
+  because the four measurements it lists are still true and are the reason the
+  conclusion took four attempts to reverse.
+
+---
+
 # [1.12.0] - 2026-10-12
 
 The light theme, which was deferred twice, and a nav bar that stops floating.
