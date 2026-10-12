@@ -460,20 +460,33 @@ class AppType {
 
   // ── Displays ─────────────────────────────────────────────────────────────────
 
-  /// The panel's own type scale, all mono, all one step up from where it started.
+  /// The panel's own type scale, matched to the Power page's card.
   ///
-  /// **15 -> 18 for the value is the user's read on it, not a refinement.** The
-  /// Power page's card draws its figure at 24 and the Overview's terminal panel
-  /// at 15, side by side in the same app on the same phone, and the second read
-  /// as "too small" rather than as a different style. The label tokens moved
-  /// 11 -> 12 and 10 -> 11 for the same reason: a row whose label is a third of
-  /// its value's height is a row you read twice.
+  /// **24 / 11 / 11 is `TelemetryCard`'s figure, label and unit, verbatim.** The
+  /// user asked for the Overview, Environment and Fish panels to look like the
+  /// Power page, and they are the same app on the same phone: Power's numbers
+  /// read at 24 and the panels' at 15. "Too small" was the report, twice, and it
+  /// was a difference of scale rather than a difference of taste - which is the
+  /// one kind of difference a reader cannot argue with.
   ///
-  /// These five tokens are the *only* type in the Overview, Environment and Fish
-  /// panels, so this is one edit that moves all three pages together rather than
-  /// three edits that could drift apart. The mono family is unchanged and
-  /// `design_tokens_test.dart` still pins it - the panel reads as instrumentation
-  /// because of the typeface, not because of the size.
+  /// **The mono family is the one thing that stays.** Power's card inherits
+  /// `DefaultTextStyle` and lands on Inter; these five tokens are mono and
+  /// `design_tokens_test.dart` pins that. Matching the *scale* is what the eye
+  /// reads as "same app"; matching the typeface would erase the one thing that
+  /// says a panel is instrumentation rather than a list of readings, and it
+  /// would take the meters, the hero figure and the `TerminalTag` out of the
+  /// comparison anyway - `TelemetryCard` has none of those, so swapping to it
+  /// would be a deletion dressed as a restyle.
+  ///
+  /// **These five tokens are the only type in the Overview, Environment and Fish
+  /// panels**, so this is one edit that moves all three together rather than
+  /// three edits that could drift apart.
+  ///
+  /// The scale went 15/11/11 -> 18/12/12 -> 24/11/11. The middle step was me
+  /// guessing at "a bit bigger"; 24 is the number that was actually on the other
+  /// page, which is why it is written down here.
+  ///
+
   /// The screen-defining headline, two-line stacked, `display-lg`.
   static const TextStyle displayLg = TextStyle(
     fontFamily: heading,
@@ -627,7 +640,7 @@ class AppType {
   /// advance width, so a stack of them aligns without any layout work.
   static const TextStyle slotKey = TextStyle(
     fontFamily: mono,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: FontWeight.w500,
     height: 1.2,
     letterSpacing: 0.06 * 11,
@@ -637,7 +650,7 @@ class AppType {
   /// The micro variant, for the panel header's id and a meter caption.
   static const TextStyle slotMicro = TextStyle(
     fontFamily: mono,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: FontWeight.w500,
     height: 1.2,
     letterSpacing: 0.08 * 10,
@@ -652,7 +665,7 @@ class AppType {
   /// would be a wall of grey.
   static const TextStyle slotValue = TextStyle(
     fontFamily: mono,
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: FontWeight.w700,
     height: 1.1,
     letterSpacing: -0.01 * 15,
@@ -662,7 +675,7 @@ class AppType {
   /// The hero's secondary stats.
   static const TextStyle slotValueSmall = TextStyle(
     fontFamily: mono,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: FontWeight.w700,
     height: 1.2,
     fontFeatures: [FontFeature.tabularFigures()],
@@ -671,7 +684,7 @@ class AppType {
   /// A unit, set smaller and muted beside its figure.
   static const TextStyle slotUnit = TextStyle(
     fontFamily: mono,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: FontWeight.w500,
     height: 1.1,
   );
