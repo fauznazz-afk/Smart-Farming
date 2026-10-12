@@ -108,10 +108,36 @@ Future<ByteData?> composeChartImage(
 
   final width = boundary.size.width;
 
+  // **Height-driven, with a reserved gutter for the caption.** The card is
+  // portrait and the canvas is not, so centring it leaves the width half empty -
+  // the file was mostly page colour. Filling the height and putting the caption
+  // in the leftover width uses all 1920 px.
+  //
+  // The width term reserves [captionGutterMin] rather than taking the whole
+  // remainder, which is what keeps a card that is *not* portrait from pushing
+  // the caption off the canvas: it letterboxes vertically instead, and the
+  // composition below needs no second branch.
+  const captionGutterMin = 220.0;
+  final fit = math.min(
+    (kChartExportSize.width - captionGutterMin) / width,
+    kChartExportSize.height / boundary.size.height,
+  );
+  final captionGutterPixels = kChartExportSize.width - width * fit;
+
   // **Measured with the real styles, not guessed heights.** A fixed header
   // height is how a caption ends up half-drawn at a 2x system font scale — the
   // text grows and the band does not, so the export looks fine at 1.0 and is
   // cropped at 2.0. Same trap as the date strip's day-name probe.
+  //
+  // **Laid out against the gutter, not against the card.** The caption is drawn
+  // in the margin to the card's left, so `width - padX * 2` is the wrong budget
+  // twice over: it is wider than the space the caption actually has, and it is
+  // wider than the gutter once the card is wide. This is that space.
+  final captionLogicalWidth = math.max(
+    80.0,
+    captionGutterPixels / (fit < 1 ? 1.0 : fit) - padX * 2,
+  );
+
   final titlePainter = TextPainter(
     text: TextSpan(
       text: title,
@@ -123,7 +149,7 @@ Future<ByteData?> composeChartImage(
     textDirection: textDirection,
     textScaler: textScaler,
     maxLines: 2,
-  )..layout(maxWidth: width - padX * 2);
+  )..layout(maxWidth: captionLogicalWidth);
 
   final subtitlePainter = TextPainter(
     text: TextSpan(
@@ -133,7 +159,7 @@ Future<ByteData?> composeChartImage(
     textDirection: textDirection,
     textScaler: textScaler,
     maxLines: 2,
-  )..layout(maxWidth: width - padX * 2);
+  )..layout(maxWidth: captionLogicalWidth);
 
   // **Ink extents, not `TextPainter.height`.** `height` is the laid-out line box,
   // which for a display weight is *shorter* than the glyphs inside it, so it
@@ -148,20 +174,7 @@ Future<ByteData?> composeChartImage(
     0,
     (sum, line) => sum + line.ascent.abs() + line.descent,
   );
-  // **Height-driven, with a reserved gutter for the caption.** The card is
-  // portrait and the canvas is not, so centring it leaves the width half empty -
-  // the file was mostly page colour. Filling the height and putting the caption
-  // in the leftover width uses all 1920 px.
-  //
-  // The width term reserves [_captionGutterMin] rather than taking the whole
-  // remainder, which is what keeps a card that is *not* portrait from pushing
-  // the caption off the canvas: it letterboxes vertically instead, and the
-  // composition below needs no second branch.
-  const captionGutterMin = 220.0;
-  final fit = math.min(
-    (kChartExportSize.width - captionGutterMin) / width,
-    kChartExportSize.height / boundary.size.height,
-  );
+
   // **The capture ratio is the fit factor, not a round 3.** That makes the
   // source raster one output pixel per pixel — the alternative is capturing at
   // device scale and then upscaling it into the canvas, which ships a blurred
@@ -190,8 +203,7 @@ Future<ByteData?> composeChartImage(
     // the plot was losing. The card's own aspect is untouched — a chart's
     // proportions carry its Y axis, and stretching one changes what its heights
     // mean.
-    final cardWidth = width * fit;
-    final captionGutter = kChartExportSize.width - cardWidth;
+    final captionGutter = captionGutterPixels;
 
     canvas.save();
     canvas.scale(fit);
@@ -211,17 +223,16 @@ Future<ByteData?> composeChartImage(
       Paint(),
     );
 
-    // **The caption is painted in the same scaled space as the card, and that
-    // is the whole difference between this and the version that looked wrong.**
-    // Drawn unscaled, a 24 sp title sat in a 1153 px margin at 1:1 while
-    // everything beside it was 2.3x larger: two words of caption in the corner
-    // of a near-empty page, too small to read. Scaling both by the same factor
-    // is what makes the caption look like the app's own heading rather than a
-    // stray label.
-    //
-    // Vertically centred against the card rather than the canvas, so it reads
-    // beside the middle of the plot instead of floating at the top of an empty
-    // column.
+    // **The caption is painted in the same scaled space as the card, but on the
+    // other side of the gutter — and those are two separate claims that were
+    // confused for one.** Drawn unscaled, a 24 sp title sat in a 1134 px margin
+    // at 1:1 while everything beside it was 2.3x larger: two words of caption in
+    // the corner of a near-empty page, too small to read. Drawn inside the
+    // card's translated space, it came out scaled correctly and sitting *on* the
+    // axis labels, because the translate had already moved the origin to the
+    // card's left edge. So: same `scale`, no `translate`.
+    canvas.save();
+    canvas.scale(fit);
     final captionTop =
         (boundary.size.height - (titleInk + gap + subtitleInk)) / 2;
     titlePainter.paint(canvas, Offset(padX, captionTop));
