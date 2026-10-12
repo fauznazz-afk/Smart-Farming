@@ -153,15 +153,42 @@ class DateStrip extends StatelessWidget {
         const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {
-            const gap = 6.0;
+            // **The gap is a ladder, and it steps down before the type does.**
+            //
+            // This was one fixed `6`, and when the widest day name needed more
+            // than a fair share the whole row went into a
+            // `SingleChildScrollView` — so a 381 dp phone showed six days and
+            // half of the seventh with no scrollbar and no hint that a seventh
+            // existed. The user's read was "the calendar is cut off", which is
+            // exactly right.
+            //
+            // The alternatives were considered and rejected: shrinking the font
+            // is out (`liquid_glass.dart` documents why, and
+            // `absent_and_failed_states_test.dart` catches it), and clipping is
+            // the defect itself. What *can* give is the air between the chips,
+            // so the strip now takes the widest gap it can afford and only
+            // falls through to scrolling when even zero does not fit — which is
+            // the 3x system-font case the scroll view was actually built for.
+            final needed = _widestDayNameWidth(context) + 12 + 1;
+            final slack =
+                (constraints.maxWidth - needed * days.length) /
+                (days.length - 1);
+            const ladder = [6.0, 4.0, 2.0, 0.0];
+            final gap = ladder.firstWhere(
+              (g) => g <= slack,
+              orElse: () => ladder.last,
+            );
+
             final fairShare =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
 
-            // The chip's own padding is 8 per side. There is no border width to
-            // add any more: the unselected chip draws a 1px hairline, which sits
-            // *inside* the padding rather than outside it, so it changes the visual
-            // weight of the edge and not the box.
-            final needed = _widestDayNameWidth(context) + 16 + 1;
+            // **12, not 16, and it has to agree with the chip.** This is 6 per
+            // side of `DateStripChip`'s padding plus the unselected chip's 1 px
+            // hairline, which sits *inside* the padding rather than outside it —
+            // so it changes the visual weight of the edge and not the box. It was
+            // written as 16 while the chip was padded 8, which is the kind of
+            // duplication that survives until one of the two moves. If the chip's
+            // padding changes, this is the number to change with it.
             final chipWidth = needed > fairShare ? needed : fairShare;
             final scrolls = chipWidth > fairShare + 0.5;
 
@@ -169,7 +196,7 @@ class DateStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < days.length; i++) ...[
-                  if (i > 0) const SizedBox(width: gap),
+                  if (i > 0) SizedBox(width: gap),
                   SizedBox(
                     width: chipWidth,
                     child: DateStripChip(

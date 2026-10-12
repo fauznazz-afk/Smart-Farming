@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
+import 'chart_export.dart';
 import 'chart_groups.dart';
 import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
@@ -142,7 +143,7 @@ class _Scaled {
 }
 
 /// Glass card plotting voltage, current and power for one device prefix.
-class TelemetryChartCard extends StatelessWidget {
+class TelemetryChartCard extends StatefulWidget {
   const TelemetryChartCard({
     super.key,
     required this.prefix,
@@ -173,7 +174,53 @@ class TelemetryChartCard extends StatelessWidget {
   final ValueChanged<bool> onPointerActive;
 
   @override
+  State<TelemetryChartCard> createState() => _TelemetryChartCardState();
+}
+
+/// **Stateful only to own the export boundary's key and the busy flag.**
+///
+/// The card was a `StatelessWidget` and the export could not be added to it
+/// honestly: `RenderRepaintBoundary.toImage` needs a key, and a stateless
+/// widget's own `context` resolves to the render object *above* it — capturing
+/// that would take the whole dashboard column, not one chart. A `Builder` gets
+/// the same problem one level down. Holding the key is the smallest change that
+/// captures exactly the legend, the plot and the statistics.
+class _TelemetryChartCardState extends State<TelemetryChartCard> {
+  final GlobalKey _exportKey = GlobalKey();
+  bool _exporting = false;
+
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await exportChartImage(
+        context,
+        _exportKey,
+        title: widget.group.title,
+        subtitle: describeHistoryRange(
+          selectedDate: widget.selectedDate,
+          rangeStart: widget.rangeStart,
+          rangeEnd: widget.rangeEnd,
+        ),
+        fileName:
+            '${widget.prefix}_${widget.group.title.toLowerCase().replaceAll(' ', '_')}.png',
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final group = widget.group;
+    final boundsCache = widget.boundsCache;
+    final loading = widget.loading;
+    final loadFailed = widget.loadFailed;
+    final selectedDate = widget.selectedDate;
+    final rangeStart = widget.rangeStart;
+    final rangeEnd = widget.rangeEnd;
+    final prefix = widget.prefix;
+    final onPointerActive = widget.onPointerActive;
     final specs = _specsFor(group);
     final scaled = _buildSeries(specs);
     final bounds = boundsCache.putIfAbsent(
@@ -193,54 +240,70 @@ class TelemetryChartCard extends StatelessWidget {
     // from also walking them, so the summary sentence was read and then every
     // `Text` under it was read again. `AppCard` pairs the caller's summary with
     // `excludeSemantics: true`, which is the behaviour the summary exists for.
-    return AppCard(
-      height: (loading || !hasData) ? 170 : (group.height ?? 400),
-      padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-      semanticLabel:
-          '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
-          '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
-      child: loading
-          ? const Center(child: CircularProgressIndicator())
-          : !hasData
-          ? Center(
-              child: Text(
-                loadFailed
-                    ? 'Could not load this range'
-                    : 'No data for this range',
-                style: AppType.bodyMd.copyWith(color: faintColor),
-              ),
-            )
-          : Column(
-              children: [
-                _SeriesLegend(series: scaled),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Listener(
-                    onPointerDown: (_) => onPointerActive(true),
-                    onPointerUp: (_) => onPointerActive(false),
-                    onPointerCancel: (_) => onPointerActive(false),
-                    child: RepaintBoundary(
+    // **The export boundary is *outside* `AppCard`, and that placement is the
+    // fix, not a preference.** `AppCard` already wraps its content in a
+    // `RepaintBoundary` of its own, so a boundary placed inside the card is a
+    // nested repaint boundary. Rasterising the inner one produced a capture that
+    // was correct at the top and simply stopped partway down: the legend and the
+    // first two axis labels came out, the data lines and the statistics row did
+    // not, and the bottom of the plot was cut off mid-axis. The outer boundary's
+    // layer is the one the capture rasterises, and `AppCard`'s boundary is then
+    // an ordinary child of it.
+    return RepaintBoundary(
+      key: _exportKey,
+      child: AppCard(
+        height: (loading || !hasData) ? 170 : (group.height ?? 400),
+        padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
+        semanticLabel:
+            '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
+            '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : !hasData
+            ? Center(
+                child: Text(
+                  loadFailed
+                      ? 'Could not load this range'
+                      : 'No data for this range',
+                  style: AppType.bodyMd.copyWith(color: faintColor),
+                ),
+              )
+            : Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _SeriesLegend(series: scaled)),
+                      _ExportButton(busy: _exporting, onPressed: _export),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: Listener(
+                      onPointerDown: (_) => onPointerActive(true),
+                      onPointerUp: (_) => onPointerActive(false),
+                      onPointerCancel: (_) => onPointerActive(false),
                       child: LineChart(
                         _lineChartData(scaled, bounds),
                         duration: Duration.zero,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                if (scaled.length == 1)
-                  _SingleSeriesStatistics(scaled.first)
-                else
-                  Row(
-                    children: [
-                      for (var i = 0; i < scaled.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 16),
-                        _SeriesStatistics(scaled[i]),
+                  const SizedBox(height: 10),
+                  if (scaled.length == 1)
+                    _SingleSeriesStatistics(scaled.first)
+                  else
+                    Row(
+                      children: [
+                        for (var i = 0; i < scaled.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 16),
+                          _SeriesStatistics(scaled[i]),
+                        ],
                       ],
-                    ],
-                  ),
-              ],
-            ),
+                    ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -280,15 +343,15 @@ class TelemetryChartCard extends StatelessWidget {
   // enough to change the colour of a chart.
   _Scaled _seriesFor(_MetricSpec spec, Color? override) {
     final key = spec.series.key;
-    final seriesPoints = points[key] ?? const <TelemetryPoint>[];
+    final seriesPoints = widget.points[key] ?? const <TelemetryPoint>[];
     return _Scaled(
       ChartSeries(
         spec.label,
         spec.unit,
         seriesPoints,
-        spots.putIfAbsent(key, () => processSpots(seriesPoints)),
+        widget.spots.putIfAbsent(key, () => processSpots(seriesPoints)),
         override ?? AppPalette.error,
-        stats[key] ?? SeriesStats.fromPoints(seriesPoints),
+        widget.stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,
     );
@@ -645,6 +708,45 @@ class _SeriesStatistics extends StatelessWidget {
 }
 
 /// One row per series: swatch, name, and the live value in its own unit.
+/// The download affordance on a chart card.
+///
+/// **44 x 44, not the 48 used on the calendar button next to the date strip.**
+/// Those two are 4 dp apart and the calendar is a header control while this one
+/// competes with a `Wrap` of legend entries, so the icon is nudged in to keep the
+/// legend from reflowing when it appears. 44 is still Material's minimum tap
+/// size, which is the floor that actually matters here — the user is pointing at
+/// a 22 dp glyph and needs the whole 44 to hit it.
+///
+/// **A spinner rather than a disabled icon, and the button stays in the layout
+/// while it exports.** Swapping it for a placeholder would move the legend one
+/// frame and back; the user's eye is already on the chart that is being captured.
+class _ExportButton extends StatelessWidget {
+  const _ExportButton({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: IconButton(
+        tooltip: 'Download chart as an image',
+        onPressed: busy ? null : onPressed,
+        padding: EdgeInsets.zero,
+        icon: busy
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(Icons.download_outlined, size: 18, color: faintColor),
+      ),
+    );
+  }
+}
+
 class _SeriesLegend extends StatelessWidget {
   const _SeriesLegend({required this.series});
 

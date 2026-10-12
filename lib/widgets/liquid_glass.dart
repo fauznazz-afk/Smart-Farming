@@ -437,7 +437,18 @@ class DateStripChip extends StatelessWidget {
           curve: AppMotion.enter,
           width: width,
           constraints: const BoxConstraints(minHeight: 68),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          // **6, not 8, and it is the strip's width budget rather than a look.**
+          // Seven chips share one card's inner width, and every dp here is
+          // multiplied by seven. At the user's 381 dp viewport the card's inner
+          // width is about 317, so 8+8 per chip is 112 dp of the 317 spent on
+          // padding — and the leftover could not fit "WED" at 10 sp w700 with
+          // `letterSpacing: 0.12em`, which is why the seventh day was scrolled
+          // off the right edge instead of being visible.
+          //
+          // 6 still clears the day number (14 sp, ~9 dp wide) by a wide margin,
+          // and it is `AppSpacing.xs` + 2 rather than a new token because
+          // nothing else in the app pairs with a 6 dp chip inset.
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
           decoration: BoxDecoration(
             color: fill,
             // A day cell is the brief's `rounded.sm`, not the card radius: the
