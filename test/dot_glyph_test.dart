@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart' show RenderCustomPaint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/dot_glyph.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/overview_panel.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
 import 'package:plts_monitoring/utils/solar_irradiance.dart';
 
 void main() {
@@ -140,14 +141,14 @@ void main() {
       expect(find.byType(DotGlyph), findsOneWidget);
     });
   });
-
-  group('OverviewPanel draws the sky as a block of its own', () {
-    // **72 dp, and the number is the whole point of the change.** The mark was
-    // 22 dp inline on the `SKY_STATE` row, where the lamps measured 0.84 dp
-    // across - smaller than the gap beside them, so eleven of them in a row read
-    // as texture. The user reported it as "11 px", which is exactly what eleven
-    // dots that size are.
-    testWidgets('the block is large enough to be looked at', (tester) async {
+  group('OverviewPanel carries the sky mark on SKY_STATE', () {
+    // **44 dp at the right edge, and both numbers were answers to a complaint.**
+    // 22 dp put each lamp at 0.84 dp, smaller than the gaps between them, and
+    // the mark read as texture - the user counted the lamps and said "11 px". A
+    // centred 72 dp block fixed the size and broke the layout: in a column of
+    // 43 dp rows it read as a section heading. So the size is 44 and the slot is
+    // `trailing`.
+    testWidgets('the mark is on the row, at the end of it', (tester) async {
       tester.view.physicalSize = const Size(381, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -167,23 +168,34 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        tester.getSize(find.byType(DotGlyph)).width,
-        greaterThanOrEqualTo(64),
-        reason: 'the sky mark is still small enough to read as decoration',
+      final row = find.ancestor(
+        of: find.byType(DotGlyph),
+        matching: find.byType(TerminalRow),
       );
-      // **The name is under it, not beside it.** A shape and its label stacked
-      // are one unit; side by side they are two rows of a table, which is what
-      // the inline version was.
-      expect(find.text('SKY_STATE'), findsOneWidget);
-      expect(find.text('PARTLY CLOUDY'), findsOneWidget);
+      expect(row, findsOneWidget, reason: 'the mark belongs to the SKY row');
+
+      final size = tester.getSize(find.byType(DotGlyph)).width;
+      expect(size, greaterThanOrEqualTo(40), reason: 'still too small to read');
+
+      // **At the right edge, past the value.** The slot name keeps the left
+      // edge, and the mark is the last thing in the row.
+      final mark = tester.getRect(find.byType(DotGlyph));
+      final value = tester.getRect(find.text('Partly cloudy'));
+      expect(
+        mark.left,
+        greaterThan(value.right),
+        reason: 'the mark is not past the value, so it is not on the right',
+      );
+      expect(
+        value.right - mark.right,
+        lessThan(40),
+        reason: 'the mark is floating in the middle rather than on the edge',
+      );
     });
 
-    // **A sky nobody measured says so.** The block is always drawn - a gap in
-    // the panel would look like a layout fault - but the mark is muted and the
-    // label reads NO READING, because a dot matrix is a confident drawing of a
-    // condition and `--` is not one.
-    testWidgets('an absent reading is named rather than drawn', (tester) async {
+    // **No reading, no mark.** A dot matrix is a confident drawing of a
+    // condition, and `--` is not one.
+    testWidgets('an absent reading draws no mark', (tester) async {
       tester.view.physicalSize = const Size(381, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -201,9 +213,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(DotGlyph), findsOneWidget);
-      expect(find.text('NO READING'), findsOneWidget);
-      expect(find.text('PARTLY CLOUDY'), findsNothing);
+      expect(find.byType(DotGlyph), findsNothing);
+      expect(find.text('--'), findsWidgets);
     });
   });
 }
