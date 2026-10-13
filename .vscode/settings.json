@@ -3,5 +3,6 @@
         "flutter": true,
         "dart": true,
         "C:\\src\\flutter\\bin\\flutter.bat": true
-    }
+    },
+    "cmake.sourceDirectory": "D:/POLSRI/SEMESTER_7/AndroidDashboard/plts_monitoring/windows"
 }

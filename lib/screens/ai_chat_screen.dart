@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../services/ai_chat_service.dart';
 import '../services/ai_settings.dart';
 import '../utils/ai_provider.dart';
-import 'dashboard/utils/design_tokens.dart';
+import '../widgets/formatted_markdown_text.dart';
 import '../widgets/liquid_glass.dart';
+import 'dashboard/utils/color_helpers.dart';
+import 'dashboard/utils/design_tokens.dart';
 
 /// Ask the model a question about the current telemetry.
 ///
@@ -171,16 +173,54 @@ class _AiChatScreenState extends State<AiChatScreen> {
       itemCount: _messages.length + (_sending ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _messages.length) {
-          return const Padding(
-            padding: EdgeInsets.all(AppSpacing.sm),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox.square(
-                  dimension: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                Container(
+                  width: 32,
+                  height: 32,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: AppPalette.error.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppPalette.error.withValues(alpha: 0.35),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 16,
+                    color: AppPalette.error,
+                  ),
                 ),
-                SizedBox(width: AppSpacing.sm),
-                Text('Thinking...'),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppSurfaces.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: AppBorders.hairlineBorder,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'Analyzing telemetry...',
+                        style: AppType.bodySm.copyWith(color: faintColor),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -253,11 +293,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        Text('Ask about the readings below', style: AppType.labelUppercase),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppPalette.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                Icons.analytics_outlined,
+                size: 16,
+                color: AppPalette.error,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('Current Telemetry Snapshot', style: AppType.labelUppercase),
+          ],
+        ),
         const SizedBox(height: AppSpacing.sm),
-        // The summary is on screen, not just in the prompt. The user is being
-        // told exactly what the model can see, which is the honest way to answer
-        // "what are you sending?".
         AppCard(
           padding: EdgeInsets.zero,
           child: Padding(
@@ -271,14 +325,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
+        Text('SUGGESTED QUESTIONS', style: AppType.labelMicro.copyWith(color: faintColor)),
+        const SizedBox(height: AppSpacing.xs),
         Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: [
             for (final suggestion in _suggestions)
               ActionChip(
-                label: Text(suggestion),
+                avatar: Icon(Icons.bolt, size: 14, color: AppPalette.error),
+                backgroundColor: AppSurfaces.surface,
+                side: AppBorders.hairline,
+                label: Text(suggestion, style: AppType.bodySm),
                 onPressed: _sending ? null : () => _askSuggestion(suggestion),
               ),
           ],
@@ -375,8 +434,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 }
 
-/// One message. The user's turns are tinted with the accent; the model's are a
-/// plain card.
+/// One message bubble with distinct user vs assistant styling,
+/// markdown formatting, and avatar icons.
 class _Bubble extends StatelessWidget {
   const _Bubble({required this.turn});
 
@@ -385,19 +444,93 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = turn.role == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isUser
-              ? AppSurfaces.surfaceAlt
-              : AppSurfaces.surface,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: AppBorders.hairlineBorder,
-        ),
-        child: Text(turn.text, style: AppType.bodyMd),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isUser) ...[
+            Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(right: 8, top: 2),
+              decoration: BoxDecoration(
+                color: AppPalette.error.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppPalette.error.withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: AppPalette.error,
+              ),
+            ),
+          ],
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.78,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? AppSurfaces.surfaceAlt
+                    : AppSurfaces.surface,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(AppRadius.card),
+                  topRight: const Radius.circular(AppRadius.card),
+                  bottomLeft: Radius.circular(isUser ? AppRadius.card : 2),
+                  bottomRight: Radius.circular(isUser ? 2 : AppRadius.card),
+                ),
+                border: isUser
+                    ? Border.all(color: AppPalette.error.withValues(alpha: 0.25), width: 1)
+                    : AppBorders.hairlineBorder,
+                boxShadow: isUser
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          offset: const Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+              ),
+              child: FormattedMarkdownText(
+                text: turn.text,
+                isUser: isUser,
+                baseStyle: AppType.bodyMd.copyWith(
+                  height: 1.45,
+                  color: isUser ? AppSurfaces.onSurface : null,
+                ),
+              ),
+            ),
+          ),
+          if (isUser) ...[
+            Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(left: 8, top: 2),
+              decoration: BoxDecoration(
+                color: AppSurfaces.surfaceAlt,
+                shape: BoxShape.circle,
+                border: AppBorders.hairlineBorder,
+              ),
+              child: Icon(
+                Icons.person_outline,
+                size: 18,
+                color: AppSurfaces.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

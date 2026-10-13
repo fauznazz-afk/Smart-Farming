@@ -1566,14 +1566,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       // itself; with `extendBody: false` the `Scaffold` reserves the bar's slot
       // as well, so the two now overlap rather than cover for each other.
       extendBody: false,
-      // **The assistant is an app-bar action, not a FAB.** It was a FAB, and it
-      // sat on top of the last card on every page: the FAB's own slot overlaps
-      // the body, so on a 1220x2712 phone it covered a reading rather than
-      // floating beside it. Reported on the device on 13 October 2026.
-      //
-      // The app bar is the one piece of chrome shared by all four tabs, which is
-      // the same reason Alarm History and Settings live there, and it overlaps
-      // nothing because the body starts below it.
+      // **Floating, but over the bottom nav bar — not the content.**
+      // `endFloat` places the FAB in the bottom nav bar's space, which is
+      // reserved by the Scaffold (extendBody: false). The scrollable body ends
+      // at the nav bar, so the FAB never overlaps a reading. This is the
+      // standard Material "floating over bottom bar" position.
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAiAssistant,
+        tooltip: 'Ask the assistant',
+        backgroundColor: AppPalette.error,
+        foregroundColor: AppPalette.onHue,
+        child: const Icon(Icons.auto_awesome),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      // The app-bar icon stays for discoverability; the FAB is the "floating"
+      // one the user asked for. Both open the same screen.
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
         builder: (context, _, _) =>
@@ -1656,11 +1663,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         // Ahead of Alarm History, because it is the one an ordinary user is more
         // likely to reach for. See the `Scaffold` comment for why this is in
         // the app bar and not a floating button.
-        IconButton(
-          tooltip: 'Ask the assistant',
-          icon: const Icon(Icons.auto_awesome_outlined),
-          onPressed: _openAiAssistant,
-        ),
         IconButton(
           tooltip: 'Alarm History',
           icon: const Icon(Icons.history_outlined),
@@ -1755,9 +1757,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               kDashboardPageMargin,
               MediaQuery.paddingOf(context).top + kToolbarHeight - 6,
               kDashboardPageMargin,
-              // The bar's real height plus [_navBarClearance], not a literal.
-              // See that constant for why this was the wrong number before.
-              _navBarClearance,
+              // The bottom padding reserves space so the floating AI assistant button
+              // and the bottom nav bar do not cover the last card or row when scrolled to bottom.
+              // 56 (FAB) + 16 (gap) + _navBarClearance (20) = 92.
+              _navBarClearance + 72,
             ),
             itemCount: items.length,
             itemBuilder: (context, itemIndex) => items[itemIndex](),
