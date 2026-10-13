@@ -239,6 +239,19 @@ class DateSummaryPanel extends StatelessWidget {
           ? null
           : Text(
               stat.limitLabel!,
+              // **`maxLines: 1`, and without it the caption wrapped to four
+              // lines.** `TerminalRow` gives `trailing` a `Flexible` of its own
+              // so it can yield space to the figure, and a loose constraint is
+              // an invitation to a `Text` to wrap. Measured at a 2.0 system font
+              // — a real accessibility setting, not a synthetic one — `15-50`
+              // laid out 120 dp tall, which is four lines of a caption that is
+              // meant to be five characters on one.
+              //
+              // Ellipsis rather than the default `clip`, so a caption that
+              // genuinely cannot fit says so instead of losing its right edge
+              // silently.
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: AppType.slotMicro.copyWith(
                 color: AppSurfaces.onSurfaceVariant,
               ),

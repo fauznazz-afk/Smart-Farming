@@ -301,20 +301,22 @@ class TerminalRow extends StatelessWidget {
           // side of the row: the slot name owns the left edge, the figure owns
           // the right edge, and the caption hangs off the figure.
           //
-          // `Fit.loose` plus an `Align` is what keeps the figure from being
-          // pulled left by the caption's own width. A loose child may take
-          // *less* than its share but never more, so the caption yields first
-          // when the row is tight, and the `Align` paints it at the right edge
-          // of the share it did take rather than beside the unit it follows.
+          // **`trailing` is not flexible, and that is deliberate.** Both
+          // flexible boxes above are `tight`, so they take whatever the caption
+          // leaves - but only because the caption is measured *first*.
+          // `RenderFlex` lays out non-flexible children against the row's own
+          // width and divides what is left between the flexible ones, so a
+          // non-flexible caption is measured at its natural width and can never
+          // wrap.
+          //
+          // A `Flexible` here wrapped instead, and not at a synthetic size: at a
+          // 2.0 system font `15-50` - five characters - laid out 120 dp tall,
+          // which is four lines. A loose constraint is an invitation to a `Text`
+          // to wrap, and the caption is the one thing in the row with no shorter
+          // form to fall back on.
           if (trailing != null) ...[
             const SizedBox(width: AppSpacing.md),
-            Flexible(
-              fit: FlexFit.loose,
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: trailing!,
-              ),
-            ),
+            trailing!,
           ],
           if (onTap != null) ...[
             const SizedBox(width: AppSpacing.xs),

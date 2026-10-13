@@ -47,15 +47,24 @@ void main() {
 
   final thresholds = AlarmThresholds.defaults;
 
-  /// The drawn height of each row's value figure.
+  /// The declared line box of every value figure the grid drew.
   ///
-  /// **Height rather than width, because width is the thing that does not
-  /// hold.** A value inside `TerminalRow` is wrapped in a
-  /// `FittedBox(scaleDown)`, so its laid-out width is what the *unscaled* text
-  /// wants — a long reading never reports a clipped width — while the drawn
-  /// height is what shrinks with it. An assertion of the form "the value has a
-  /// width" is the one that let 24 sp land with every long row scaled down by a
-  /// different factor.
+  /// **This is the declaration, not the size that reaches the glass, and the
+  /// distinction is worth keeping rather than papering over.** A value sits
+  /// inside a `FittedBox(scaleDown)`, and `FittedBox` scales with a
+  /// *transform* rather than by re-laying out its child - so the child's own
+  /// size is what it would have been unscaled. Measured: `Heavily overcast` at a
+  /// 2.0 font scale reports 53 dp, its full unscaled height, inside a 160 dp
+  /// box. A height assertion cannot see a shrink.
+  ///
+  /// **That is why there is no scale assertion here, and it took a probe to
+  /// learn.** Reading the applied scale as the ratio of the `FittedBox`'s width
+  /// to its child's, every value on this grid measures between 1.8 and 4.5 -
+  /// the grid draws one short number per row and never shrinks any of them. A
+  /// guard that cannot fail is worse than no guard, because it reads as
+  /// coverage. Where a shrink genuinely happens is the period summary, whose
+  /// rows carry `min / avg / max` triples, and that panel is the one that names
+  /// a size for them.
   ///
   /// **Matched on the size rather than the token, because `TerminalRow` paints
   /// `valueStyle.copyWith(color:)`.** An `identical` check against
@@ -78,10 +87,10 @@ void main() {
     // **One size for every value, and it is the Power page's 24 sp.** The user
     // asked for Environment and Fish to look like Power, and the difference was
     // scale: `slotValue` was 15 while `TelemetryCard`'s figure was 24. This
-    // pins the size that is drawn rather than the token that is named, because a
-    // test reading the token back would pass even if the `FittedBox` shrank
-    // every row to something else.
-    testWidgets('every value is drawn at the Power page figure size', (
+    // pins the declared size rather than the token that is named, because a
+    // test reading the token back would pass even if `TerminalRow` painted the
+    // value at a different size.
+    testWidgets('every value is declared at the Power page figure size', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -109,15 +118,15 @@ void main() {
         isNotEmpty,
         reason: 'the grid drew no value figures to measure',
       );
-      // 24 sp at height 1.1 is 26.4 dp of line box. Tolerance is the renderer's
-      // own rounding, not a design slack.
+      // 24 sp at the token's own line height is 26.4 dp. Tolerance is the
+      // renderer's rounding, not a design slack.
       for (final h in heights) {
         expect(
           h,
           closeTo(26.4, 0.5),
           reason:
-              'a value is drawn $h dp tall, so it is not the 24 sp figure the '
-              'Power page uses',
+              'a value is declared $h dp tall, so it is not the 24 sp figure '
+              'the Power page uses',
         );
       }
     });
