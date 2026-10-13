@@ -7,9 +7,17 @@ sekarang terlihat di layar.
 Nomornya minor karena ada fitur dan ada permukaan baru: satu tombol, satu
 layar, satu bagian Settings.
 
+> **Rilis ini mengandung cacat, dan semuanya diperbaiki pada 13 Oktober 2026.**
+> API key yang diketik **tidak tersimpan** kecuali tombol Enter keyboard
+> ditekan; Gemini dan Groq **tidak bisa dipakai sama sekali** karena model
+> default-nya sudah di-shut-down provider sebelum rilis; setiap permintaan
+> OpenAI akan gagal 400; dan tombolnya **menutupi satu pembacaan**. Rilis ini mengandung
+> sebaiknya diperlakukan sebagai percobaan pertama yang gagal — bukan fondasi
+> untuk dibangun. Daftar perbaikannya ada di bagian [Yang diperbaiki] di bawah.
+
 ## Yang ditambahkan
 
-- **Tombol mengambang di dashboard** membuka layar chat. Kosong, layar itu
+- **Tombol di app bar dashboard** membuka layar chat. Kosong, layar itu
   menampilkan blok telemetry yang **persis sama** dengan yang dikirim ke model,
   jadi sebelum bertanya pertama kali user sudah bisa melihat sendiri apa yang
   aplikasi lihat.
@@ -25,6 +33,32 @@ layar, satu bagian Settings.
 - **Snapshot telemetri**, bukan isi aplikasi. Empat device (baterai, PZEM,
   sensor lingkungan, kolam ikan) plus total kWh hari ini, diformat jadi satu
   blok dan ditanam ke system prompt.
+
+## Yang diperbaiki
+
+Lima cacat, semuanya ditemukan di perangkat pada 13 Oktober 2026 — setelah
+rilis ini, satu demi satu:
+
+- **API key tidak tersimpan.** Section hanya menulis pada `onSubmitted`, yaitu
+  tombol "done" di keyboard. Tempel key lalu tap back — yang dilakukan semua
+  orang — tidak menulis apa pun. Sekarang writes di-debounce saat mengetik dan
+  di-flush saat section ditutup, lewat jalur mana pun.
+- **Layar asisten tidak membaca ulang key.** Buka Settings dari layar chat,
+  tambah key, langsung kembali — dan layar yang sama masih menulis "No API key
+  yet". Terlihat seperti save-nya gagal padahal tidak.
+- **Dua dari enam model default sudah di-shut-down provider-nya.**
+  `gemini-2.0-flash` di-retire Google pada 1 Juni 2026 dan
+  `llama-3.3-70b-versatile` oleh Groq pada 16 Agustus 2026 — keduanya sudah
+  mati **sebelum** rilis ini, jadi Gemini dan Groq menjawab 404 sejak awal.
+  Semua default sekarang dibaca ulang dari daftar model provider, dan 404
+  sekarang menyebut nama modelnya tidak dikenali, bukan sekadar angka status.
+- **Setiap permintaan OpenAI akan gagal 400.** Body mengirim `temperature` dan
+  `max_tokens`, dua parameter yang ditolak model reasoning OpenAI sekarang
+  sebagai parameter tidak didukung. Keduanya tidak dikirim lagi; panjang jawaban
+  dikendalikan lewat prompt.
+- **Tombolnya menutupi satu pembacaan.** `FloatingActionButton` berada di atas
+  kartu terakhir di setiap halaman. Sekarang ikon di app bar, sebelah Alarm
+  History — tidak menutup apa pun, dan ada di keempat tab seperti yang lain.
 
 ## Sanitasi input
 
@@ -63,9 +97,11 @@ terlihat.
 - **Yang dikirim adalah snapshot.** Blok itu berisi kondisi *sekarang*;
   pertanyaan tentang "kemarin" atau tren tidak ada isinya, dan model
   diarahkan untuk mengatakannya.
-- **Model default tebakan.** Provider sering mengganti nama model tanpa
-  pemberitahuan. Namanya bisa diedit di Settings, jadi yang salah berjarak satu
-  ketikan dari diperbaiki.
+- **Nama model bisa basi tanpa pemberitahuan.** Dua dari enam default di rilis
+  ini memang sudah mati waktu rilis itu terbit, jadi ini bukan risiko teoretis.
+  Semuanya sekarang dibaca dari daftar model provider pada 13 Oktober 2026 dan
+  bisa diedit di Settings, tapi tabel ini akan basi lagi — satu test menjaga
+  supaya tidak ada nama yang **sudah** di-shut-down yang masuk ke sini.
 - **Biaya dan privasi ada di tangan pengguna.** Provider yang dipilih adalah
   pihak ketiga; snapshot telemetri — termasuk SOC baterai dan kondisi kolam —
   terkirim ke sana setiap kali user bertanya.
@@ -81,16 +117,30 @@ terlihat.
   `504d13ee…64b5`
 - `versionName=1.15.0`, `versionCode=30`, scheme v2 `true`
 - `aapt2 dump xmltree` atas APK release: **tidak ada** `AlarmDebugReceiver`
-- 25 test baru di `test/ai_provider_test.dart` menutup sanitasi, batas panjang,
-  pemangkasan riwayat, kedua dialek provider, dan parse balasan
+- 28 test di `test/ai_provider_test.dart` menutup sanitasi, batas panjang,
+  pemangkasan riwayat, kedua dialek provider, parse balasan, dan — setelah dua
+  default mati ditemukan — daftar nama model yang sudah di-shut-down
+- 5 test di `test/ai_settings_test.dart` menutup "key tersimpan tanpa Enter dan
+  tanpa tekan back", flush saat section ditutup, dan penghapusan key yang tidak
+  dibatalkan oleh write yang masih tertunda
 
 ## Yang belum pernah dilihat di perangkat
 
-Layar chat dan bagian Settings **belum diuji di perangkat sungguhan** —
-keduanya hanya lewat analyzer dan test. Belum terbukti: bubble benar-benar
-tampil dengan tinggi yang wajar di layar sempit, keyboard tidak menutupi
-composer, dan satu jawaban model nyata melewati parse untuk keenam provider.
-Nomor model default juga belum pernah dicoba terhadap endpoint aslinya.
+Bagian ini berlaku untuk **rilis 1.15.0 apa adanya**. Setelah lima cacat di
+atas diperbaiki, tiga hal sudah terbukti di perangkat: key tersimpan tanpa
+tombol apa pun, 404 Google muncul sebagai pesan yang benar tentang nama
+model, dan tombolnya tidak lagi menutupi pembacaan.
+
+Yang **masih** belum terbukti:
+
+- Satu jawaban model nyata melewati parse untuk keenam provider. Gemini sudah
+  terbukti bisa menjawab (error-nya 404, artinya request-nya sampai), tapi belum
+  ada satu balasan sukses pun yang terlihat di layar.
+- Bubble chat tampil dengan tinggi yang wajar di layar sempit, dan keyboard
+  tidak menutupi composer.
+- Nama model default yang baru dibaca dari daftar provider — sudah dicocokkan ke
+  dokumen resmi masing-masing, belum dicoba satu per satu terhadap endpoint
+  aslinya memakai key milik orang.
 
 ## Cara memasang
 

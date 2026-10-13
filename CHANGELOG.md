@@ -1,10 +1,37 @@
 # [Unreleased]
 
+### Fixed
+
+- **A typed API key was not saved.** The AI assistant's settings section wrote
+  on `onSubmitted` only — the keyboard's done key — so pasting a key and tapping
+  the back arrow, which is what people actually do, wrote nothing. Writes are
+  now debounced while typing and flushed when the section closes, by any route.
+- **The assistant screen did not re-read the key after Settings.** Opening
+  Settings from the chat screen, adding a key and coming straight back landed on
+  the same "No API key yet" screen, which reads as a failed save.
+- **Two of the six provider defaults were models their provider had already shut
+  down.** `gemini-2.0-flash` was retired by Google on 1 June 2026 and
+  `llama-3.3-70b-versatile` by Groq on 16 August 2026, so both answered 404 out
+  of the box. Every default has been re-read from the provider's own model list,
+  and a 404 now says the model name is not recognised instead of printing a bare
+  status.
+- **Every OpenAI request would have failed with a 400.** The body sent
+  `temperature` and `max_tokens`, both of which OpenAI's current reasoning
+  models reject as unsupported parameters. Neither is sent; reply length is
+  controlled by the prompt.
+- **The assistant's button covered a reading.** A floating action button sits
+  over the last card on every page. It is an app-bar action now, beside Alarm
+  History, which overlaps nothing and is on all four tabs the same way.
+
+---
+
+# [1.15.0] - 2026-10-13
+
 ### Added
 
-- **AI assistant.** A floating action button on the dashboard opens a chat screen
-  that answers questions about the current readings ("how much is the battery
-  doing?"). Open it with the FAB, or tap one of the four suggested questions.
+- **AI assistant.** An app-bar button on the dashboard opens a chat screen that
+  answers questions about the current readings ("how much is the battery
+  doing?"), or tap one of the four suggested questions.
 - **Your own API key, in Settings > AI assistant.** Pick a provider (OpenAI,
   Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter, or any OpenAI-compatible
   endpoint), paste your key, and confirm the model name. **The app ships no key
@@ -21,9 +48,12 @@
   collapsed, length bounded. The transcript lives in memory only and is gone when
   the screen closes.
 
----
-
-# [1.14.1] - 2026-10-13
+> **Shipped with five defects, all fixed on 13 October 2026** — a key that did
+> not save, two provider defaults pointing at models their provider had already
+> retired, an OpenAI body that would have 400'd, and a button over a reading.
+> They are listed under [Unreleased] because that is where a reader looks for
+> them. The release as published did not have a working assistant on Gemini, so
+> treat 1.15.0 as a broken first attempt rather than a release to build on.
 
 Figures on the right edge, a sky that reads as a picture, a home-screen widget,
 and a way to find out a new build exists.

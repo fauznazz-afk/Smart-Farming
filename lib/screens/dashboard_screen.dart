@@ -1566,20 +1566,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       // itself; with `extendBody: false` the `Scaffold` reserves the bar's slot
       // as well, so the two now overlap rather than cover for each other.
       extendBody: false,
-      // **A FAB, not a nav-bar tab.** The assistant is a mode, not a place: five
-      // tabs is already the whole width of the bar, and a sixth would make every
-      // existing tab narrower to accommodate a screen that is only useful once in
-      // a while.
-      // Plain, with no listenable around it: the summary is built at tap time
-      // in [_aiTelemetrySummary], so nothing on this button can go stale and
-      // there is nothing to rebuild it for.
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAiAssistant,
-        tooltip: 'Ask the assistant',
-        backgroundColor: AppPalette.error,
-        foregroundColor: AppPalette.onHue,
-        child: const Icon(Icons.auto_awesome),
-      ),
+      // **The assistant is an app-bar action, not a FAB.** It was a FAB, and it
+      // sat on top of the last card on every page: the FAB's own slot overlaps
+      // the body, so on a 1220x2712 phone it covered a reading rather than
+      // floating beside it. Reported on the device on 13 October 2026.
+      //
+      // The app bar is the one piece of chrome shared by all four tabs, which is
+      // the same reason Alarm History and Settings live there, and it overlaps
+      // nothing because the body starts below it.
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
         builder: (context, _, _) =>
@@ -1659,6 +1653,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         // control is wanted back, the app bar is still the only chrome shared by
         // all four tabs -- but it should be a single control that also carries the
         // current date, not an icon that duplicates what the date strip says.
+        // Ahead of Alarm History, because it is the one an ordinary user is more
+        // likely to reach for. See the `Scaffold` comment for why this is in
+        // the app bar and not a floating button.
+        IconButton(
+          tooltip: 'Ask the assistant',
+          icon: const Icon(Icons.auto_awesome_outlined),
+          onPressed: _openAiAssistant,
+        ),
         IconButton(
           tooltip: 'Alarm History',
           icon: const Icon(Icons.history_outlined),

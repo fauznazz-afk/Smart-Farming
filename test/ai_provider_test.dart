@@ -104,16 +104,34 @@ void main() {
     test('OpenAI dialect keeps system as a message', () {
       final body = buildAiRequestBody(
         preset: presetFor(AiProvider.openai),
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.6-luna',
         telemetrySummary: 'sum',
         history: const [],
         question: 'q',
       );
-      expect(body['model'], 'gpt-4o-mini');
+      expect(body['model'], 'gpt-5.6-luna');
       expect(body.containsKey('system'), isFalse);
       expect((body['messages'] as List).first['role'], 'system');
-      expect(body['temperature'], 0.2);
-      expect(body['max_tokens'], kMaxReplyTokens);
+    });
+
+    test('sends neither temperature nor max_tokens', () {
+      // Both were sent, and both are rejected by OpenAI's current reasoning
+      // models as unsupported parameters -- a 400 before any token is
+      // generated. Every provider's body goes through the same function, so the
+      // check runs over the whole table rather than one preset.
+      for (final provider in AiProvider.values) {
+        final body = buildAiRequestBody(
+          preset: presetFor(provider),
+          model: 'm',
+          telemetrySummary: 'sum',
+          history: const [],
+          question: 'q',
+        );
+        expect(body.containsKey('temperature'), isFalse,
+            reason: 'temperature is rejected by current OpenAI models');
+        expect(body.containsKey('max_tokens'), isFalse,
+            reason: 'max_tokens must be max_completion_tokens or omitted');
+      }
     });
 
     test('Anthropic lifts system out of messages', () {
@@ -259,6 +277,57 @@ void main() {
           .map((p) => p.provider)
           .toList();
       expect(special, [AiProvider.anthropic]);
+    });
+
+    test('no default model is one a provider has shut down', () {
+      // **The table rots, and the symptom is a 404 with no explanation.** Two of
+      // the first release's defaults had been retired by their providers before
+      // the release shipped: Google shut `gemini-2.0-flash` down on 1 June 2026
+      // and Groq shut `llama-3.3-70b-versatile` down on 16 August 2026. Both
+      // were still here on 13 October 2026, discovered only because a user tried
+      // one and saw "The model request failed (404)".
+      //
+      // A guard cannot stop a provider retiring a model tomorrow. What it can do
+      // is fail a test the next time somebody adds a default that is *already*
+      // retired, which is the case that is actually preventable here.
+      const retired = {
+        // Gemini, shut down 1 June 2026.
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-2.0-flash-001',
+        'gemini-2.0-flash-lite-001',
+        // Gemini, shut down 2026.
+        'gemini-3-pro-preview',
+        'gemini-3.1-flash-lite-preview',
+        // Groq, shut down 16 August 2026 for free and developer tiers.
+        'llama-3.1-8b-instant',
+        'llama-3.3-70b-versatile',
+        'qwen/qwen3-32b',
+        // OpenAI, snapshots on the 23 October 2026 deprecation list.
+        'gpt-3.5-turbo-0125',
+        'gpt-4-0613',
+        'gpt-4-turbo',
+        'gpt-4o-2024-05-13',
+        'o1-2024-12-17',
+        'o3-mini-2025-01-31',
+        'o4-mini-2025-04-16',
+        // Anthropic, retired or superseded by the 5.x line.
+        'claude-3-5-sonnet-latest',
+        'claude-3-5-haiku-20241022',
+        'claude-sonnet-4-20250514',
+        'claude-opus-4-20250514',
+        'claude-opus-4-1-20250805',
+        // DeepSeek, aliases DeepSeek announced it would retire.
+        'deepseek-chat',
+        'deepseek-reasoner',
+        'deepseek-v4-flash',
+        'deepseek-v4-flash-vision-exp',
+      };
+      for (final preset in kAiProviderPresets) {
+        expect(retired, isNot(contains(preset.defaultModel)),
+            reason: '${preset.label} defaults to a retired model. Check the '
+                "provider's own model list before changing this.");
+      }
     });
   });
 }

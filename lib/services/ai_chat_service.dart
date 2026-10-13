@@ -89,6 +89,19 @@ class AiChatService {
         'The API key was rejected. Check it in Settings.',
       );
     }
+    if (response.statusCode == 404) {
+      // **The most likely cause by far is a retired model name**, so the error
+      // says that rather than printing a bare status. Reported on the device on
+      // 13 October 2026: Gemini answered 404 because the shipped default was
+      // `gemini-2.0-flash`, which Google shut down on 1 June 2026. Google's
+      // error body for that case is terse, and the generic message turned a
+      // one-field fix into a hunt.
+      throw AiChatException(
+        'The provider does not recognise the model "${_safeModelName(model)}". '
+        'Model names change and retired ones are removed — check the Model '
+        'field in Settings.',
+      );
+    }
     if (response.statusCode == 429) {
       throw const AiChatException(
         'The provider rate limit was reached. Wait a moment and try again.',
@@ -156,6 +169,18 @@ class AiChatService {
     } on FormatException {
       return const {};
     }
+  }
+
+  /// The model name as typed, for an error message.
+  ///
+  /// **Clipped and stripped.** It is the only value in this class that came from
+  /// a text field, and it is about to be rendered into a SnackBar-sized string;
+  /// an unbounded one is a layout problem and a control character in it is a
+  /// rendering one.
+  String _safeModelName(String model) {
+    final cleaned = model.replaceAll(RegExp(r'[\x00-\x1F]'), '').trim();
+    if (cleaned.isEmpty) return '(empty)';
+    return cleaned.length <= 64 ? cleaned : '${cleaned.substring(0, 64)}...';
   }
 
   /// The provider's own error text, which names the problem (`model not found`,

@@ -44,9 +44,16 @@ class AiProviderPreset {
   /// the user typed.
   final String endpoint;
 
-  /// Prefilled in the model field. Every one of these is editable: providers
-  /// rename models without warning, and a wrong default is one edit away from
-  /// fixed.
+  /// Prefilled in the model field. Every one of these is editable.
+  ///
+  /// **These are read off each provider's own model list, not recalled, because
+  /// a retired model name is a 404 and a 404 looks like a broken app.** The first
+  /// version shipped `gemini-2.0-flash`, `llama-3.3-70b-versatile` and
+  /// `claude-3-5-sonnet-latest`; the first two were shut down by their providers
+  /// (Gemini on 1 June 2026, Groq on 16 August 2026) and the third was
+  /// superseded, so two thirds of the table 404'd out of the box. Verified
+  /// against Google's model list, Groq's supported-models table, Anthropic's
+  /// model-deprecations page and DeepSeek's `GET /models` on 13 October 2026.
   final String defaultModel;
 
   bool get isAnthropic => provider == AiProvider.anthropic;
@@ -58,38 +65,52 @@ const List<AiProviderPreset> kAiProviderPresets = [
     provider: AiProvider.openai,
     label: 'OpenAI',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    defaultModel: 'gpt-4o-mini',
+    // Luna is OpenAI's cheap tier of the current generation. `gpt-4o-mini` was
+    // the previous default here and its snapshots are on the October 2026
+    // deprecation list.
+    defaultModel: 'gpt-5.6-luna',
   ),
   AiProviderPreset(
     provider: AiProvider.anthropic,
     label: 'Anthropic (Claude)',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-3-5-sonnet-latest',
+    // Anthropic's own API uses hyphens in the version, not the dot OpenRouter
+    // uses: `claude-haiku-5-5` here, `claude-haiku-5.5` there.
+    defaultModel: 'claude-haiku-5-5',
   ),
   AiProviderPreset(
     provider: AiProvider.gemini,
     label: 'Google Gemini',
     // Google's OpenAI-compatible surface, so Gemini needs no second client.
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    defaultModel: 'gemini-2.0-flash',
+    endpoint:
+        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    // Stable, and the newest text model Google lists. The first version shipped
+    // `gemini-2.0-flash`, which Google shut down on 1 June 2026 — every request
+    // against it returned 404 with an error body that said nothing useful.
+    defaultModel: 'gemini-3.8-flash',
   ),
   AiProviderPreset(
     provider: AiProvider.deepseek,
     label: 'DeepSeek',
     endpoint: 'https://api.deepseek.com/chat/completions',
-    defaultModel: 'deepseek-chat',
+    // `deepseek-chat` was a moving alias that DeepSeek announced it would
+    // retire; `deepseek-flash` is the concrete id for V4.1-Flash in their
+    // current `GET /models` response.
+    defaultModel: 'deepseek-flash',
   ),
   AiProviderPreset(
     provider: AiProvider.groq,
     label: 'Groq',
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    defaultModel: 'llama-3.3-70b-versatile',
+    // What Groq itself recommends as the replacement for `llama-3.3-70b-versatile`
+    // on the free and developer tiers, and still classed as a Production model.
+    defaultModel: 'openai/gpt-oss-120b',
   ),
   AiProviderPreset(
     provider: AiProvider.openrouter,
     label: 'OpenRouter',
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    defaultModel: 'meta-llama/llama-3.3-70b-instruct',
+    defaultModel: 'openai/gpt-oss-120b',
   ),
   AiProviderPreset(
     provider: AiProvider.custom,
@@ -115,6 +136,9 @@ const int kMaxHistoryTurns = 6;
 
 /// Upper bound on the reply, in tokens. The app renders plain text, so a long
 /// answer is a scroll, not a truncation.
+///
+/// **Not sent.** Kept as a named value because it documents the intent, but see
+/// [buildAiRequestBody]: OpenAI's current models reject `max_tokens`.
 const int kMaxReplyTokens = 900;
 
 /// Sanitises one user question before it becomes a `user` message.
@@ -211,9 +235,17 @@ List<Map<String, String>> buildAiMessages({
 
 /// Builds the request body for [preset].
 ///
-/// Anthropic takes `system` outside `messages` and has no `temperature` on
-/// every model, so it gets the two-field form. Everything else is the OpenAI
+/// Anthropic takes `system` outside `messages`; everything else is the OpenAI
 /// dialect verbatim.
+///
+/// **Neither `temperature` nor `max_tokens` is sent, and both were removed on
+/// purpose.** OpenAI's current generation is a reasoning model and rejects both
+/// as unsupported parameters — `max_tokens` because it wants
+/// `max_completion_tokens`, and `temperature` because it will not take anything
+/// but the default. Those two rejections are a 400 before a single token is
+/// generated, so a "tune the answer" parameter was costing every OpenAI user a
+/// working request. Reply length is controlled by the prompt instead, which is
+/// where the instruction was already.
 Map<String, dynamic> buildAiRequestBody({
   required AiProviderPreset preset,
   required String model,
@@ -236,9 +268,7 @@ Map<String, dynamic> buildAiRequestBody({
   final body = <String, dynamic>{
     'model': model,
     'messages': messages,
-    'max_tokens': kMaxReplyTokens,
   };
-  if (!preset.isAnthropic) body['temperature'] = 0.2;
   if (system != null) body['system'] = system;
   return body;
 }

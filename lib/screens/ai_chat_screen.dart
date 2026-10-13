@@ -25,9 +25,9 @@ class AiChatScreen extends StatefulWidget {
   /// The block the model is allowed to answer from. See [buildTelemetrySummary].
   final String telemetrySummary;
 
-  /// Sends the user to the assistant's settings. Optional so a test can skip
-  /// the navigation.
-  final VoidCallback? openSettings;
+  /// Pushes the assistant's settings, awaited so the key can be re-read on the
+  /// way back. Optional so a test can skip the navigation.
+  final Future<void> Function()? openSettings;
 
   @override
   State<AiChatScreen> createState() => _AiChatScreenState();
@@ -221,7 +221,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             FilledButton.icon(
-              onPressed: widget.openSettings,
+              onPressed: _openSettings,
               icon: const Icon(Icons.settings_outlined, size: 20),
               label: const Text('Open settings'),
               style: FilledButton.styleFrom(
@@ -233,6 +233,20 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ),
       ),
     );
+  }
+
+  /// Pushes Settings and **re-reads the key on the way back**.
+  ///
+  /// Without the re-read this screen keeps the `_settings` it loaded in
+  /// `initState`, and the user who taps "Open settings", pastes a key and comes
+  /// straight back lands on the same "No API key yet" screen they left — which
+  /// reads as the save having failed when nothing did.
+  Future<void> _openSettings() async {
+    final open = widget.openSettings;
+    if (open == null) return;
+    await open();
+    if (!mounted) return;
+    await _load();
   }
 
   Widget _intro() {

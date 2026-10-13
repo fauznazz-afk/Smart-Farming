@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../services/ai_settings.dart';
@@ -12,13 +14,19 @@ import '../widgets/settings_fields.dart';
 /// across restarts. It goes to `flutter_secure_storage` beside the ThingsBoard
 /// token, never to `SharedPreferences`.
 ///
-/// **This section saves itself, on change, rather than joining the screen's Save
-/// button.** The button calls `SettingsController.save`, which validates and
-/// writes everything at once; a key that only reaches storage when the user
+/// **This section saves itself, as you type, rather than joining the screen's
+/// Save button.** The button calls `SettingsController.save`, which validates
+/// and writes everything at once; a key that only reaches storage when the user
 /// remembers to press Save on an unrelated page is a worse default than an
 /// immediate write, and a credential is exactly the field where "I typed it but
 /// is it saved" should never be a question. Every other field on that screen
 /// keeps the button.
+///
+/// **Typing is enough, and no gesture is required.** The first version saved on
+/// `onSubmitted` alone — the keyboard's done key — so pasting a key and tapping
+/// the back arrow, which is what everyone does, wrote nothing. [dispose] now
+/// flushes as well, so leaving the section by any route persists what is on
+/// screen. Every other field on that screen keeps the button.
 class AiSection extends StatefulWidget {
   const AiSection({super.key});
 
@@ -34,6 +42,14 @@ class _AiSectionState extends State<AiSection> {
   AiProvider _provider = AiProvider.openai;
   bool _loading = true;
   bool _saved = false;
+
+  /// Pending debounced write, cancelled and restarted on every keystroke.
+  ///
+  /// **Debounced rather than written per keystroke** because
+  /// `flutter_secure_storage` is a platform channel into the Android keystore —
+  /// a round trip per character is a visible stall in the field the user is
+  /// typing into.
+  Timer? _saveDebounce;
 
   @override
   void initState() {
@@ -58,6 +74,14 @@ class _AiSectionState extends State<AiSection> {
 
   @override
   void dispose() {
+    // **Flush, and read the controllers before they are disposed.** A debounced
+    // write that has not fired yet holds the last keystrokes, and the back
+    // gesture is the ordinary way to leave this screen — so without this the
+    // common case is the one that loses the key. Not awaited, because `dispose`
+    // cannot, and deliberately not guarded: the write reads plain strings and
+    // calls nothing on this State afterwards.
+    _saveDebounce?.cancel();
+    unawaited(_current.save());
     _apiKey.dispose();
     _model.dispose();
     _endpoint.dispose();
@@ -72,8 +96,27 @@ class _AiSectionState extends State<AiSection> {
   );
 
   Future<void> _persist() async {
+    _saveDebounce?.cancel();
     await _current.save();
     if (mounted) setState(() => _saved = true);
+  }
+
+  /// Writes shortly after typing stops, so a keystroke is not a keystore round
+  /// trip and leaving quickly still persists.
+  void _schedulePersist() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(
+      const Duration(milliseconds: 600),
+      () => unawaited(_persist()),
+    );
+  }
+
+  void _onTextChanged() {
+    // Unconditional, because the API key's "Remove" button is derived from the
+    // controller's text at build time. Skipping this when nothing had been saved
+    // yet left the button absent until the debounce happened to rebuild.
+    setState(() => _saved = false);
+    _schedulePersist();
   }
 
   void _onProviderChanged(AiProvider? provider) {
@@ -86,10 +129,14 @@ class _AiSectionState extends State<AiSection> {
       _model.text = presetFor(provider).defaultModel;
       _saved = false;
     });
-    _persist();
+    unawaited(_persist());
   }
 
   Future<void> _clearKey() async {
+    // A pending debounced write holds the key the user is deleting, so it is
+    // cancelled first: it would otherwise fire after the delete and put the key
+    // back.
+    _saveDebounce?.cancel();
     await _current.clearApiKey();
     if (!mounted) return;
     setState(() {
@@ -136,7 +183,7 @@ class _AiSectionState extends State<AiSection> {
             label: 'Model',
             prefixIcon: const Icon(Icons.memory),
           ),
-          onSubmitted: (_) => _persist(),
+          onChanged: (_) => _onTextChanged(),
         ),
         // Only Custom needs a URL, so only Custom shows one. A field that is
         // ignored is a field whose contents the user cannot trust.
@@ -149,7 +196,7 @@ class _AiSectionState extends State<AiSection> {
               label: 'Chat endpoint (HTTPS)',
               prefixIcon: const Icon(Icons.link),
             ),
-            onSubmitted: (_) => _persist(),
+            onChanged: (_) => _onTextChanged(),
           ),
         ],
         const SizedBox(height: AppSpacing.sm),
@@ -172,8 +219,7 @@ class _AiSectionState extends State<AiSection> {
                     onPressed: _clearKey,
                   ),
           ),
-          onChanged: (_) => setState(() => _saved = false),
-          onSubmitted: (_) => _persist(),
+          onChanged: (_) => _onTextChanged(),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
