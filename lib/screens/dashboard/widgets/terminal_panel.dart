@@ -198,7 +198,36 @@ class TerminalRow extends StatelessWidget {
           // The `Flexible` is load-bearing and is the second half of that fix: a
           // `FittedBox` alone inside a `Row` gets an unbounded constraint, sizes
           // to its child and never scales. Without it, `FittedBox` is decoration.
+          // **`FlexFit.tight`, and it is what puts the figure on the right edge.**
+          //
+          // Measured on an unmodified build (`test/zz_probe_test`, since deleted)
+          // at 381 and 320 dp, with the real `TerminalPanel` around it:
+          //
+          // | slot | left | right |
+          // |---|---|---|
+          // | `AC_LOAD` | 16.0 | 97.6 |
+          // | `26` | 109.6 | 157.3 |
+          // | `W` | 161.3 | 172.6 |
+          //
+          // The row is 381 wide and the figure ends at 172.6 - 208 dp of empty
+          // card to the right of the reading. `Flexible` defaults to
+          // `FlexFit.loose`, so the `FittedBox` shrink-wraps to its own width and
+          // `RenderFlex` packs every child from the start using the child's
+          // *actual* size, not the space it was allocated. The leftover that
+          // `mainAxisAlignment` would have distributed lands at the end of the
+          // row, which is exactly where the figure was supposed to be.
+          //
+          // `tight` forces each flexible box to fill the share it was given, and
+          // *then* the two alignments do what they already say: the slot name
+          // paints from the left edge of its share and the figure paints to the
+          // right edge of its own. The label walks away from the figure and the
+          // figure walks to the right edge, in one change.
+          //
+          // The `FittedBox`es stay. A slot name long enough to need shrinking
+          // still shrinks - that is the same `scaleDown` it has always had, only
+          // now against a share that is actually its box.
           Flexible(
+            fit: FlexFit.tight,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -212,15 +241,26 @@ class TerminalRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          if (trailing != null) ...[
-            trailing!,
-            const SizedBox(width: AppSpacing.md),
-          ],
           // **The value is the one thing that must never be shortened**, so it is
           // outside the `FittedBox` and the *unit* is the one that yields when
           // the row is tight. `kW` becoming `k` would be wrong; `W` becoming
           // nothing would not.
           Flexible(
+            // **`tight` here too, for the reason written on the label above.**
+            // The figure's share has to be a box the figure can be pushed to the
+            // right edge *of*; under the default `loose` the share is only a
+            // ceiling and the box collapses to the glyphs.
+            //
+            // **`flex: 2`, and the caption is why.** The caption on the other
+            // side of the unit is also flexible, so the free space is split by
+            // flex ratio. At 1:1 the limit caption took half the row and the
+            // figure's right edge stopped a third of the way short - measured
+            // at 320 dp, a `40.1 / 71.6 / 94.9` triple ended at 193.5 of 320
+            // with `15-50` filling the right. The figure is the reading and the
+            // caption is metadata about it, so the figure gets the wider share
+            // and the caption yields first.
+            flex: 2,
+            fit: FlexFit.tight,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
@@ -239,6 +279,40 @@ class TerminalRow extends StatelessWidget {
               unit!,
               style: AppType.slotUnit.copyWith(
                 color: AppSurfaces.onSurfaceVariant,
+              ),
+            ),
+          ],
+          // **The caption sits at the right edge, after the figure, and never
+          // between the slot name and it.**
+          //
+          // Measured with the caption in the slot before the value
+          // (`test/zz_probe_test`, since deleted), 381 and 320 dp:
+          //
+          // | text | left | right |
+          // |---|---|---|
+          // | `AMBIENT_T` | 17.0 | 113.4 |
+          // | `15-50` | 125.4 | 179.4 |
+          // | `40.1 / 71.6 / 94.9` | 191.4 | 287.8 |
+          //
+          // The caption was painted 6.8 dp from the slot name and 12 dp from the
+          // figure, so the three read as one run of text with the caption
+          // attached to the label - which is the one thing a caption must not
+          // do. The limit belongs to the *figure*, so it goes on the figure's
+          // side of the row: the slot name owns the left edge, the figure owns
+          // the right edge, and the caption hangs off the figure.
+          //
+          // `Fit.loose` plus an `Align` is what keeps the figure from being
+          // pulled left by the caption's own width. A loose child may take
+          // *less* than its share but never more, so the caption yields first
+          // when the row is tight, and the `Align` paints it at the right edge
+          // of the share it did take rather than beside the unit it follows.
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.md),
+            Flexible(
+              fit: FlexFit.loose,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: trailing!,
               ),
             ),
           ],

@@ -68,7 +68,7 @@ void main() {
     final span = lit == 0
         ? 0.0
         : (tester.getRect(boxes.at(count - 1)).right - trackRect.left) /
-            track.width;
+              track.width;
     return (
       track: track,
       block: lit == 0 ? Size.zero : tester.getSize(boxes.at(1)),
@@ -118,12 +118,17 @@ void main() {
     ) async {
       for (final bad in [1.7, -0.4, double.nan, double.infinity]) {
         final m = await pumpMeter(tester, bad);
-        expect(m.lit, inInclusiveRange(0, 20), reason: '$bad lit ${m.lit} blocks');
+        expect(
+          m.lit,
+          inInclusiveRange(0, 20),
+          reason: '$bad lit ${m.lit} blocks',
+        );
         // The span is clamped, not forced: a negative input legitimately lights nothing.
         expect(
           m.span,
           inInclusiveRange(0.0, 1.001),
-          reason: '$bad spans ${(m.span * 100).toStringAsFixed(1)}% of the track',
+          reason:
+              '$bad spans ${(m.span * 100).toStringAsFixed(1)}% of the track',
         );
       }
     });
@@ -142,7 +147,11 @@ void main() {
         const MaterialApp(
           home: Scaffold(
             body: SingleChildScrollView(
-              child: TerminalMeter(fraction: 0.95, leftCaption: '0', rightCaption: '1'),
+              child: TerminalMeter(
+                fraction: 0.95,
+                leftCaption: '0',
+                rightCaption: '1',
+              ),
             ),
           ),
         ),
@@ -183,15 +192,19 @@ void main() {
       expect(
         second.left - first.right,
         greaterThan(0),
-        reason: 'two blocks are flush, so the meter reads as one continuous bar',
+        reason:
+            'two blocks are flush, so the meter reads as one continuous bar',
       );
 
       for (final box in [boxes.first, boxes.at(1)]) {
         final decoration = tester.widget<DecoratedBox>(box).decoration;
         expect(
           decoration,
-          isA<BoxDecoration>()
-              .having((d) => d.borderRadius, 'borderRadius', null),
+          isA<BoxDecoration>().having(
+            (d) => d.borderRadius,
+            'borderRadius',
+            null,
+          ),
           reason:
               'a rounded block or track is a pill again. The reference is '
               'flat-ended.',
@@ -229,6 +242,125 @@ void main() {
     });
   });
 
+  group('the figure belongs to the right edge', () {
+    // **Measured on the unmodified build, and it said the opposite.**
+    //
+    // `Flexible` defaults to `FlexFit.loose`, so the `FittedBox` around each
+    // text shrink-wrapped to its own glyphs and `RenderFlex` packed every child
+    // from the start. The row was 381 wide and the figure ended at 172.6:
+    //
+    // | text | left | right |
+    // |---|---|---|
+    // | `AC_LOAD` | 16.0 | 97.6 |
+    // | `26` | 109.6 | 157.3 |
+    // | `W` | 161.3 | 172.6 |
+    //
+    // 208 dp of empty card to the right of the reading, and the figure sitting
+    // 12 dp from its own label. This asserts where the ink lands rather than
+    // that the widget tree is shaped correctly, because the tree was correct
+    // when this shipped.
+    testWidgets(
+      'the figure paints to the right edge and the label to the left',
+      (tester) async {
+        tester.view.physicalSize = const Size(381, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: TerminalPanel(
+                  children: const [
+                    TerminalRow(label: 'AC_LOAD', value: '26', unit: 'W'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final panel = tester.getRect(find.byType(TerminalPanel).first);
+        final unit = tester.getRect(find.text('W'));
+        final label = tester.getRect(find.text('AC_LOAD'));
+
+        // **Within a pixel or two of the card's own edge.** The panel's padding
+        // is 16 dp and the row's border is 1 px at the panel's outer edge, so
+        // the figure's right edge should sit 16-17 dp inside the panel. A
+        // tolerance of 2 dp is the renderer's own rounding, not a design slack.
+        expect(
+          panel.right - unit.right,
+          inInclusiveRange(15.0, 18.0),
+          reason:
+              'the figure ends ${panel.right - unit.right} dp from the panel\'s '
+              'right edge - it is not on the edge it was measured to be off',
+        );
+
+        // **And a long way from the label.** The whole complaint was that the
+        // two read as one run of text. `AppSpacing.md` is 12 dp, so anything
+        // under about 60 dp means the label is still beside the figure.
+        expect(
+          unit.left - label.right,
+          greaterThan(60),
+          reason:
+              'the figure is only ${unit.left - label.right} dp from its label',
+        );
+      },
+    );
+
+    // **The caption goes on the figure's side of the row, never between the
+    // label and it.** Measured before the move, the limit caption `15-50` was
+    // painted 6.8 dp from `AMBIENT_T` and 12 dp from `40.1 / 71.6 / 94.9` -
+    // attached to the label, which is the one thing a caption must not do.
+    testWidgets('the caption paints past the figure, not beside the label', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: TerminalPanel(
+                children: const [
+                  TerminalRow(
+                    label: 'AMBIENT_T',
+                    value: '40.1 / 71.6 / 94.9',
+                    unit: 'C',
+                    trailing: Text('15-50'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final panel = tester.getRect(find.byType(TerminalPanel).first);
+      final caption = tester.getRect(find.text('15-50'));
+      final label = tester.getRect(find.text('AMBIENT_T'));
+      final value = tester.getRect(find.text('40.1 / 71.6 / 94.9'));
+
+      // The caption is the right-most ink in the row.
+      expect(
+        panel.right - caption.right,
+        inInclusiveRange(15.0, 18.0),
+        reason: 'the caption is not on the right edge',
+      );
+
+      // **Decisively past the figure, not merely past it.** Before the move the
+      // caption started 6.8 dp after the label's right edge. Now it has to sit
+      // to the right of everything the row draws, which on a 320 dp card means
+      // at least the width of a `md` gap clear of the figure.
+      expect(caption.left, greaterThan(value.right));
+      expect(caption.left - label.right, greaterThan(60));
+    });
+  });
+
   group('rows never clip their own text', () {
     // **The vocabulary has no short words.** `Discharging` and
     // `Heavily overcast` are values this panel actually renders, and on the
@@ -242,9 +374,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(size: Size(381, 900)).copyWith(
-              textScaler: const TextScaler.linear(2.0),
-            ),
+            data: const MediaQueryData(size: Size(381, 900))
+                .copyWith(textScaler: const TextScaler.linear(2.0)),
             child: const Scaffold(
               body: SingleChildScrollView(
                 child: TerminalRow(
