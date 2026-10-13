@@ -24,7 +24,7 @@ bool _isAncestorOf(Element ancestor, Element descendant) {
 }
 
 Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
-  // A tall surface keeps all nine category tiles laid out at once, so the
+  // A tall surface keeps all ten category tiles laid out at once, so the
   // lazily built ListView does not need scrolling in these assertions.
   //
   // [surface] overrides it for the subtitle tests. They need a phone *width* --
@@ -36,7 +36,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
   // oversight: wrapping is decided by width alone, so 375 is what these tests
   // are about, while `ListView.builder` lays out lazily and a real 812dp phone
   // viewport (~692dp after app bar and save button) is not reliably enough to
-  // build all nine ~80dp tiles. `findsNWidgets(9)` would then fail on how many (nine since Appearance was added)
+  // build all ten ~80dp tiles. `findsNWidgets(10)` would then fail on how many (ten since the AI assistant section was added)
   // children the cache extent happened to reach, which has nothing to do with
   // the bug.
   tester.view.physicalSize = surface ?? const Size(900, 1600);
@@ -63,7 +63,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
 
 void main() {
   // Order and strings are taken from buildSettingsSections in
-  // lib/screens/settings/settings_section.dart, which returns nine sections.
+  // lib/screens/settings/settings_section.dart, which returns ten sections.
   //
   // There were ten. "Performance" was the tenth, holding one switch that
   // promised frosted cards and smoother scrolling, and it went when the surface
@@ -81,34 +81,35 @@ void main() {
       // is one design, and colour is now categorical -- a hue means a category
       // of data -- so letting the user repaint the app would destroy the one
       // thing the palette is for. The count below is what notices that.
-      'Monitoring', // settings_section.dart:40
-      'Energy alerts', // settings_section.dart:46
-      'Environment alerts', // settings_section.dart:52
-      'Fish tank alerts', // settings_section.dart:58
-      'CCTV source', // settings_section.dart:64
-      'Background checks', // settings_section.dart:70
-      'About', // settings_section.dart:76
-      'Account', // settings_section.dart:82
+      'Monitoring', // settings_section.dart:41
+      'Energy alerts', // settings_section.dart:47
+      'Environment alerts', // settings_section.dart:53
+      'Fish tank alerts', // settings_section.dart:59
+      'CCTV source', // settings_section.dart:65
+      'AI assistant', // settings_section.dart:71
+      'Background checks', // settings_section.dart:77
+      'About', // settings_section.dart:83
+      'Account', // settings_section.dart:89
     ]) {
       expect(find.text(title), findsOneWidget, reason: 'missing $title');
     }
   });
 
-  // settings_section.dart:144-165 builds one ListTile per section, so the
+  // settings_screen.dart builds one ListTile per section, so the
   // rendered tile count is the section count. This is what catches a section
   // that exists in the list but is never laid out.
   //
-  // **Nine, since the Appearance section was added for the light theme.** The
-  // count moved once before this, for the same reason: a new category rather
-  // than a new behaviour on an existing one.
+  // **Ten, since the AI assistant section was added.** The count moved before
+  // this too, for the same reason: a new category rather than a new
+  // behaviour on an existing one.
   testWidgets('renders one tile per category', (tester) async {
     await _pumpSettings(tester);
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
-    expect(find.byType(ListTile), findsNWidgets(9));
+    expect(find.byType(ListTile), findsNWidgets(10));
   });
 
-  // The truncation regression. Eight of the nine category subtitles were
+  // The truncation regression. Eight of the ten category subtitles were
   // clipped to one line with an ellipsis on a 375dp phone, so the only prose on
   // the screen explaining what a category does was unreadable on every tile
   // whose string was longer than one line -- all of them except "Application
@@ -122,8 +123,8 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(9));
-    for (var i = 0; i < 8; i++) {
+    expect(tiles, findsNWidgets(10));
+    for (var i = 0; i < 9; i++) {
       final tile = tester.widget<ListTile>(tiles.at(i));
       final title = (tile.title! as Text).data;
       final subtitle = tile.subtitle! as Text;
@@ -170,7 +171,7 @@ void main() {
   // to be edited 128 -> 144 with no explanation, and the next reader has no way
   // to tell a re-derivation from a nudge.
   //
-  // The cost is real: nine tiles at those heights rather than nine at 72 is about
+  // The cost is real: ten tiles at those heights rather than nine at 72 is about
   // 200dp more scrolling. That is the cheap direction in which to be wrong,
   // because a clipped subtitle cannot be recovered by scrolling and a taller
   // tile can. The Save button is in `bottomNavigationBar`, so it is pinned by
@@ -183,8 +184,8 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1600));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(9));
-    for (var i = 0; i < 8; i++) {
+    expect(tiles, findsNWidgets(10));
+    for (var i = 0; i < 9; i++) {
       final height = tester.getSize(tiles.at(i)).height;
       expect(
         height,

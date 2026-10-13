@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'sections/about_section.dart';
+import 'sections/ai_section.dart';
 import 'sections/alerts_section.dart';
 import 'sections/appearance_section.dart';
 import 'sections/background_status_section.dart';
@@ -65,6 +66,12 @@ List<SettingsSection> buildSettingsSections({
         subtitle: 'Set the secure camera stream page.',
         icon: Icons.videocam_outlined,
         builder: (_, settings) => CctvSection(settings: settings),
+      ),
+      SettingsSection(
+        title: 'AI assistant',
+        subtitle: 'Ask questions about your telemetry. Uses your own API key.',
+        icon: Icons.auto_awesome_outlined,
+        builder: (_, settings) => const AiSection(),
       ),
       SettingsSection(
         title: 'Background checks',

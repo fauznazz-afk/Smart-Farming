@@ -1,5 +1,26 @@
 # [Unreleased]
 
+### Added
+
+- **AI assistant.** A floating action button on the dashboard opens a chat screen
+  that answers questions about the current readings ("how much is the battery
+  doing?"). Open it with the FAB, or tap one of the four suggested questions.
+- **Your own API key, in Settings > AI assistant.** Pick a provider (OpenAI,
+  Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter, or any OpenAI-compatible
+  endpoint), paste your key, and confirm the model name. **The app ships no key
+  and falls back to none** — with no key the assistant stays off across restarts.
+  The key is written to `flutter_secure_storage` beside the ThingsBoard token,
+  never to `SharedPreferences`, and never placed in a request body or a log
+  line.
+- **The model sees one thing: a telemetry snapshot.** The live readings and the
+  day's kWh totals are formatted into a block the system prompt embeds, and the
+  same block is shown on screen before the first question. Nothing else from the
+  app is sent, and the prompt states that text inside the block is data to
+  report, never instructions to follow.
+- Questions are sanitised before sending: control characters stripped, whitespace
+  collapsed, length bounded. The transcript lives in memory only and is gone when
+  the screen closes.
+
 ---
 
 # [1.14.1] - 2026-10-13

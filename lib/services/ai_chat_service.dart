@@ -1,0 +1,189 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../utils/ai_provider.dart';
+
+/// Calls the user's model endpoint and returns the reply text.
+///
+/// The API key is the user's own and exists only in a header built by
+/// [buildAiHeaders]. It is never logged, never placed in the body, and never
+/// included in an error message — an error surfaces the provider's own message
+/// and the status code only.
+class AiChatService {
+  const AiChatService();
+
+  /// Covers headers and body together. A model call is slower than a ThingsBoard
+  /// poll but this is a user-initiated request on a phone, not a tick.
+  static const Duration _timeout = Duration(seconds: 45);
+
+  /// A chat reply is text. Anything larger is a mistake or an attack, and the
+  /// fold stops reading rather than buffering it — the same cap the ThingsBoard
+  /// client uses for its snapshots.
+  static const int _maxReplyBytes = 256 * 1024;
+
+  /// Sends one question and returns the assistant's reply.
+  ///
+  /// Throws [AiChatException] with a message meant to be shown to the user. Any
+  /// transport failure is wrapped in the same type, so the screen has exactly
+  /// one error path.
+  Future<String> ask({
+    required AiProviderPreset preset,
+    required String apiKey,
+    required String model,
+    required String telemetrySummary,
+    required List<AiTurn> history,
+    required String question,
+  }) async {
+    final questionText = sanitizeQuestion(question);
+    if (questionText.isEmpty) {
+      throw const AiChatException('Ask a question first.');
+    }
+
+    final uri = _resolveEndpoint(preset);
+    final body = buildAiRequestBody(
+      preset: preset,
+      model: model,
+      telemetrySummary: telemetrySummary,
+      history: history,
+      question: questionText,
+    );
+    final request = http.Request('POST', uri)
+      ..headers.addAll(buildAiHeaders(preset, apiKey))
+      // **Redirects are refused, as in the ThingsBoard client.** A 307 would
+      // replay the request — headers included — to whatever host the redirect
+      // names, which would hand the user's key to that host. The key travels in
+      // a header, so this is the same risk as the access-token redirect there.
+      ..followRedirects = false
+      ..body = jsonEncode(body);
+
+    final client = http.Client();
+    late final http.Response response;
+    try {
+      response = await _send(client, request);
+    } on _ReplyTooLarge {
+      throw const AiChatException('The model reply was too large to read.');
+    } on TimeoutException {
+      throw const AiChatException(
+        'The model took too long to answer. Try again.',
+      );
+    // `dart:io` is never imported in this app, so a raw `SocketException`
+    // cannot be named here. `http`'s IO client wraps it in `ClientException`,
+    // which is the case below.
+    } on http.ClientException {
+      throw const AiChatException('Could not reach the model endpoint.');
+    } on FormatException {
+      throw const AiChatException('The model returned an unreadable reply.');
+    } finally {
+      client.close();
+    }
+
+    if (response.statusCode >= 300 && response.statusCode < 400) {
+      throw const AiChatException(
+        'The model endpoint redirected. Refused, so your key is not forwarded.',
+      );
+    }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw const AiChatException(
+        'The API key was rejected. Check it in Settings.',
+      );
+    }
+    if (response.statusCode == 429) {
+      throw const AiChatException(
+        'The provider rate limit was reached. Wait a moment and try again.',
+      );
+    }
+
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AiChatException(_providerMessage(decoded, response.statusCode));
+    }
+    final reply = parseAiReply(preset, decoded);
+    if (reply == null) {
+      throw const AiChatException('The model returned an unreadable reply.');
+    }
+    return reply;
+  }
+
+  /// HTTPS only, no userinfo, and a typed endpoint is required.
+  ///
+  /// Same reasoning as `parseAllowedCctvUrl`: an endpoint is a URL the user typed
+  /// and it carries a credential, so `https://evil.example@…` and a non-443 port
+  /// are both refused rather than normalised. There is no allowlist here — the
+  /// user is pointing at their own provider — but the scheme check is not
+  /// optional, because a cleartext POST would put the key on the wire in the
+  /// clear.
+  Uri _resolveEndpoint(AiProviderPreset preset) {
+    final raw = preset.endpoint.trim();
+    final uri = Uri.tryParse(raw);
+    if (uri == null || uri.scheme.toLowerCase() != 'https') {
+      throw const AiChatException(
+        'The model endpoint must be an HTTPS URL. Set it in Settings.',
+      );
+    }
+    if (uri.host.isEmpty || uri.userInfo.isNotEmpty) {
+      throw const AiChatException('The model endpoint is not a valid URL.');
+    }
+    return uri;
+  }
+
+  Future<http.Response> _send(http.Client client, http.Request request) async {
+    final streamed = await client.send(request).timeout(_timeout);
+    // Inside the timeout, not just around `send`: a server that sends headers
+    // and then stalls would otherwise hold this future open indefinitely.
+    final bytes = await streamed.stream.timeout(_timeout).fold<List<int>>(
+      <int>[],
+      (acc, chunk) {
+        if (acc.length + chunk.length > _maxReplyBytes) {
+          throw const _ReplyTooLarge();
+        }
+        return acc..addAll(chunk);
+      },
+    );
+    return http.Response.bytes(
+      bytes,
+      streamed.statusCode,
+      headers: streamed.headers,
+      request: request,
+    );
+  }
+
+  Map<String, dynamic> _decode(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> ? decoded : const {};
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  /// The provider's own error text, which names the problem (`model not found`,
+  /// `invalid api key`) in a way "request failed (400)" does not.
+  String _providerMessage(Map<String, dynamic> body, int statusCode) {
+    final error = body['error'];
+    final message = switch (error) {
+      final Map<String, dynamic> map => map['message'],
+      final String text => text,
+      _ => null,
+    };
+    final text = message is String ? message.trim() : '';
+    if (text.isEmpty) return 'The model request failed ($statusCode).';
+    // Bounded: a provider echoing a long HTML error page is not a message.
+    return text.length <= 300 ? text : '${text.substring(0, 300)}...';
+  }
+}
+
+/// Anything the assistant could not answer, phrased for the user.
+class AiChatException implements Exception {
+  const AiChatException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class _ReplyTooLarge implements Exception {
+  const _ReplyTooLarge();
+}

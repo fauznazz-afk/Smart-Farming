@@ -21,9 +21,11 @@ import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
 import '../utils/app_update.dart';
+import '../utils/ai_provider.dart';
 import '../utils/date_summary_stats.dart';
 import '../utils/poll_interval.dart';
 import '../widgets/liquid_glass.dart';
+import 'ai_chat_screen.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
@@ -1471,6 +1473,36 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// The snapshot the AI assistant is allowed to answer from.
+  ///
+  /// Built here rather than inside the chat screen because the live values are
+  /// this screen's state, and the whole point of the layering rule in AGENTS.md
+  /// is that a widget receives its data instead of reaching into a screen.
+  String _aiTelemetrySummary() => buildTelemetrySummary(
+        devices: {
+          'battery': _battery?.latestValues ?? const {},
+          'pzem meter': _pzem?.latestValues ?? const {},
+          'environment sensor': _sensor?.latestValues ?? const {},
+          'fish tank sensor': _fish?.latestValues ?? const {},
+        },
+        totals: {
+          'solar_kwh_today': _solarKwh,
+          'load_kwh_today': _loadKwh,
+        },
+      );
+
+  void _openAiAssistant() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiChatScreen(
+          telemetrySummary: _aiTelemetrySummary(),
+          openSettings: _openSettings,
+        ),
+      ),
+    );
+  }
+
   // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -1534,6 +1566,20 @@ class _DashboardScreenState extends State<DashboardScreen>
       // itself; with `extendBody: false` the `Scaffold` reserves the bar's slot
       // as well, so the two now overlap rather than cover for each other.
       extendBody: false,
+      // **A FAB, not a nav-bar tab.** The assistant is a mode, not a place: five
+      // tabs is already the whole width of the bar, and a sixth would make every
+      // existing tab narrower to accommodate a screen that is only useful once in
+      // a while.
+      // Plain, with no listenable around it: the summary is built at tap time
+      // in [_aiTelemetrySummary], so nothing on this button can go stale and
+      // there is nothing to rebuild it for.
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAiAssistant,
+        tooltip: 'Ask the assistant',
+        backgroundColor: AppPalette.error,
+        foregroundColor: AppPalette.onHue,
+        child: const Icon(Icons.auto_awesome),
+      ),
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
         builder: (context, _, _) =>
