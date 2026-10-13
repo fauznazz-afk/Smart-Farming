@@ -4,7 +4,40 @@
 **Cakupan:** Rilis aplikasi Flutter untuk Android melalui GitHub Releases
 **Dokumen:** 1.4
 **Status:** Prosedur kerja untuk rilis berikutnya
-**Rilis acuan:** 1.9.1 (build 19), tag `v1.9.1`
+**Rilis acuan:** 1.15.0 (build 30), tag `v1.15.0`
+
+**1.15.0 — 13 Oktober 2026.** Rilis fitur; asisten AI di dalam aplikasi yang
+menjawab pertanyaan tentang pembacaan dari sebuah snapshot telemetri. Nomornya
+minor karena ada fitur dan ada permukaan baru: satu tombol, satu layar, satu
+bagian Settings. Build naik 29 → 30.
+
+Pemeriksaan fingerprint `apksigner` di §3 berjalan untuk 1.15.0 dan cocok dengan
+nilai yang diharapkan di Bagian 3. Unduhan pasca-publikasi dengan pembandingan
+SHA-256 terhadap build lokal juga berjalan, untuk APK **dan** `CHANGELOG.md` yang
+terlampir:
+
+| | |
+|---|---|
+| SHA-256 APK lokal dan unduhan | `E63D5E06B77F5FB031BD19CDB1BF21FCF2D0E51CCEA3A4F2AA64680836F2CCBE` |
+| SHA-256 `CHANGELOG.md` lokal dan unduhan | `655982C227F51492D4FC0E5C5F1325DB2D4ED369A7A3CD5B2A69AF795FC28A99` |
+| Fingerprint sertifikat APK | `504d13ee0bbfa8df2a24c20ef3cc59bde4f35b69596a12ceabb709cf702564b5` |
+| `versionName` / `versionCode` APK | `1.15.0` / `30` |
+| Scheme v2 | `true` |
+| Release APK menyertakan `AlarmDebugReceiver`? | **tidak** |
+| `flutter analyze` | bersih |
+| `flutter test` | 800 lulus di 62 file, per-file |
+
+**Satu langkah §5 dilewati, dan itu karena perangkat tidak ada:** `adb install -r`
+untuk menguji upgrade antar-rilis. `.\gradlew.bat :app:testDebugUnitTest` tetap
+dijalankan dan lulus, meski tidak ada aturan alarm yang berubah.
+
+Dua hal pada 1.15.0 **belum pernah dilihat di perangkat**: layar chat dan
+bagian Settings AI. Keduanya hanya lewat analyzer dan test — bubble dengan
+tinggi yang wajar di layar sempit, keyboard yang tidak menutupi composer, dan
+satu jawaban model nyata melewati parse untuk keenam provider belum terbukti.
+Dinyatakan terbuka di `RELEASE_NOTES_v1.15.0.md`.
+
+---
 
 **1.9.1 — 11 Oktober 2026.** Rilis perbaikan; kartu kondisi langit pindah ke
 Overview, satuannya W/m² → lx, dan Settings diperketat per blok. Satu bug nyata
