@@ -6,6 +6,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import tech.mbkm.energrow.alarm.AlarmBridgePlugin
+import tech.mbkm.energrow.widget.EnergyWidgetProvider
 
 /**
  * The app's host activity, and the place its own plugins are registered.
@@ -36,6 +37,26 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // The widget's refresh, kept off the secure-window channel because it is
+        // the opposite kind of call: that one configures this activity, this one
+        // asks the system to redraw something on the home screen.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            WIDGET_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                // **Not off the UI thread, unlike `setSecure`.** This touches no
+                // window and no view - it reads a preference and fills
+                // `RemoteViews` - and doing it on the platform thread keeps the
+                // launcher update off the frame the user is looking at.
+                "refreshWidget" -> {
+                    EnergyWidgetProvider.refresh(applicationContext)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     /**
@@ -53,5 +74,6 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val CHANNEL = "tech.mbkm.energrow/secure_window"
+        const val WIDGET_CHANNEL = "tech.mbkm.energrow/widget"
     }
 }

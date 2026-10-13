@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher's widget picker entry.
+
+  `updatePeriodMillis` is 1800000, which is the floor Android imposes on a
+  declared period and is therefore the only value it would honour. It is written
+  explicitly rather than left out so the picker shows something honest; the real
+  refresh comes from Dart, after every telemetry write, so the thirty-minute tick
+  is a backstop for the app having been closed for a while.
+
+  `initialLayout` must name a layout that inflates with no data at all, which is
+  why the layout's TextViews carry placeholder text rather than empty strings:
+  the launcher draws it before any broadcast has been delivered.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_energy"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The widget's surface.
+
+  **Opaque and the dark palette's `#1E1E1E`, not the app's `#000000` page.** A
+  widget is a rectangle the launcher composites, not a card inside the app, and a
+  true-black rectangle on a home screen reads as a hole rather than as a panel -
+  the same reason the app's own page is black *because* the app is edge-to-edge
+  and there is nothing behind it to blend into.
+
+  A 16 dp radius is a platform convention for widgets rather than a house style:
+  the launcher draws its own rounded mask on some versions and this is the shape
+  it expects underneath.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#1E1E1E" />
+    <corners android:radius="16dp" />
+</shape>

@@ -16,6 +16,7 @@ import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
+import '../services/widget_refresh.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
@@ -590,12 +591,19 @@ class _DashboardScreenState extends State<DashboardScreen>
       // Fire-and-forget because it is a best-effort offline fallback: the values
       // are already in memory and on screen, and nothing should wait on storage.
       unawaited(
-        widget.api.cacheTelemetrySnapshot({
-          ThingsBoardApi.deviceBattery: results[0],
-          ThingsBoardApi.devicePzem: results[1],
-          ThingsBoardApi.deviceSensor: results[2],
-          ThingsBoardApi.deviceFish: results[3],
-        }),
+        widget.api
+            .cacheTelemetrySnapshot({
+              ThingsBoardApi.deviceBattery: results[0],
+              ThingsBoardApi.devicePzem: results[1],
+              ThingsBoardApi.deviceSensor: results[2],
+              ThingsBoardApi.deviceFish: results[3],
+            })
+            // **After the write, and that ordering is the whole contract.** The
+            // widget reads `cached_telemetry`, so a refresh that ran before the
+            // write would redraw the previous tick's numbers and look like a
+            // widget that updates one step behind - which is a harder bug to see
+            // than one that does not update at all.
+            .then((_) => const WidgetRefresh().refresh()),
       );
       _lastSuccessfulTelemetryAt = now;
       _loading = false;

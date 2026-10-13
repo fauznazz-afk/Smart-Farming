@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home-screen readout.
+
+  A `RemoteViews` layout, which is a restricted subset: only `TextView`,
+  `ImageView`, `LinearLayout`, `FrameLayout`, `GridLayout`, `Button` and a few
+  others inflate, and a `MaterialCardView` does not. So the card look is built
+  from a background drawable on the root, not from a widget.
+
+  `layout_width="match_parent"` with a `maxWidth` of 320 dp on the provider, so
+  the widget is phone-sized rather than stretching across a home screen.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_pv"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="-- W"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:fontFamily="monospace" />
+
+        <TextView
+            android:id="@+id/widget_load"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="-- W"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_battery"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="-- %"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="monospace" />
+
+        <TextView
+            android:id="@+id/widget_lux"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="-- lx"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
+    <!--
+      The age, in plain words rather than a clock time.
+
+      A timestamp the reader has to subtract is a timestamp that tells a grower
+      nothing at a glance, and the whole point of putting the figure on the home
+      screen is that it can be read without being interpreted.
+    -->
+    <TextView
+        android:id="@+id/widget_updated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="never updated"
+        android:textColor="#A1A1A1"
+        android:textSize="12sp" />
+</LinearLayout>
