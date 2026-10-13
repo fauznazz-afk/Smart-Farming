@@ -2,6 +2,50 @@
 
 ---
 
+# [1.14.1] - 2026-10-13
+
+Figures on the right edge, a sky that reads as a picture, a home-screen widget,
+and a way to find out a new build exists.
+
+### Fixed
+
+- **Every figure sat 208 dp from the card's right edge.** `Flexible` defaults to
+  `FlexFit.loose`, so the `FittedBox` around each value shrink-wrapped to its own
+  glyphs and `RenderFlex` packed the row from the start, leaving the leftover at
+  the end. `AC_LOAD  26 W` measured with the reading 12 dp from its own label and
+  208 dp of empty card to its right. `tight` on both boxes.
+- **A limit caption printed 6.8 dp from its slot name**, reading as part of the
+  label rather than as a note about the figure. It moved to the far edge.
+- **The caption wrapped to four lines at a 2.0 system font** - `15-50`, five
+  characters, laid out 120 dp tall.
+- **Switching light or dark left every panel in the previous palette for up to
+  ten seconds.** `_visualToken` had no palette entry, so each `Bound` saw an
+  unchanged token and kept its cached child. The symptom was the app in one
+  colour and one panel in the other.
+
+### Added
+
+- **The sky as a dot matrix** on `SKY_STATE`, drawn from the same lux as the
+  word beside it. 44 dp at the row's right edge.
+- **A home-screen widget**: PV output, house load, state of charge and lux, with
+  the age of the reading. It reads the cache the app already writes and does not
+  poll, so with the app closed it is as old as the last time the app was open -
+  which is why it says so.
+- **An update check.** Once a day, the latest GitHub release is compared with the
+  installed version and a banner appears when there is one. It opens the release
+  page in the browser; it does not download or install anything. Settings →
+  About → Check for updates bypasses the daily gate.
+
+### Known limits
+
+- The home-screen widget is dark in both themes. A `RemoteViews` layout cannot
+  read `Theme.of`, and making it follow would mean a layout swap driven from a
+  method channel on every theme change.
+- The update check needs GitHub to be reachable. Offline, rate-limited or an
+  unexpected response shape all produce no banner and no error.
+
+---
+
 # [1.13.0] - 2026-10-12
 
 The black strip under the nav bar, a Peak that was not a peak, a TARGET that was

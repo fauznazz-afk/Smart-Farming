@@ -8,7 +8,8 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.47.5-02569A?logo=flutter&logoColor=white">
   <img alt="Android" src="https://img.shields.io/badge/Android-24%2B-3DDC84?logo=android&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-581%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-775%20Dart%20%2B%2011%20Kotlin-4CAF50">
+  <img alt="Release" src="https://img.shields.io/badge/release-v1.14.1-3DDC84">
 </p>
 
 Aplikasi Android untuk memantau sistem **PLTS (Pembangkit Listrik Tenaga Surya) hybrid**
@@ -38,8 +39,9 @@ android.title = "EnerGrow: Warning alarm"
 android.text  = "Kelembapan tinggi: 88.9 % (batas 80.0 %)"
 ```
 
-**450 milidetik**, dengan aplikasi di background — *lima belas menit* per deteksi, bukan
-setiap sepuluh detik seperti saat aplikasi kebuka.
+**450 milidetik**, dengan aplikasi di background — **satu menit** per deteksi
+(`AlarmScheduler.INTERVAL_MINUTES`), bukan setiap sepuluh detik seperti saat
+aplikasi kebuka.
 
 Yang membuatnya murah adalah karangannya. Pengecekan ini **tidak menjalankan Flutter
 Engine sama sekali** — murni Kotlin, `HttpURLConnection` + `NotificationCompat`, seperti
@@ -85,9 +87,12 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 
 **Analisis energi**
 
-- Ringkasan harian dan mingguan: estimasi produksi PV, pemakaian AC, dan perbandingan
-  terhadap periode sebelumnya
-- Laporan harian/bulanan dari histori time-series, dapat diekspor ke **CSV**
+- Ringkasan harian dan mingguan: produksi PV terukur, pemakaian AC, dan
+  perbandingan terhadap periode sebelumnya
+- **Ringkasan periode** saat memilih tanggal lalu: min / avg / max tiap sensor
+  lingkungan dan ikan, beserta caption rentang batasnya
+- Laporan harian/bulanan dari histori time-series, dapat diekspor ke **CSV**,
+  dan tiap chart dapat diunduh sebagai **PNG 1920×1080**
 - Proyeksi runtime baterai, dengan konvensi tanda discharge BMS yang sering tidak
   konsisten antar vendor sudah ditangani
 
@@ -112,8 +117,24 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 - Dua stream CCTV (go2rtc) — greenhouse di Hydroponics dan `?src=cam2` di Fish —
   dengan allowlist host, dan status koneksi yang jujur
   (standby / connecting / live / offline)
-- Dark & light mode, empat pilihan aksen, dan sistem permukaan **soft-UI opaque**
-  (kartu se warna halaman, kedalaman dari pasangan bayangan satu arah cahaya)
+- **Tampilan panel instrumen**: pitch black, aksen merah tunggal, nama slot
+  monospace (`PV_OUT`, `AC_LOAD`, `BAT_SOC`), dan meter segmented 20 blok. Angka
+  rata kanan, caption rentang di tepi, jadi label dan nilainya tidak pernah
+  bersebelahan
+- **Langit sebagai dot matrix** di baris `SKY_STATE`, digambar dari lux yang sama
+  dengan kata di sebelahnya — empat kondisi, satu sumber angka
+- **Widget layar utama**: produksi PV, beban AC, SOC, dan lux, beserta **usia
+  datanya**. Ia membaca cache yang sudah ditulis aplikasi dan tidak polling
+  sendiri, jadi dengan aplikasi tertutup angkanya setua terakhir aplikasi dibuka —
+  dan itu tertulis di widget, bukan disembunyikan
+- **Pemberitahuan versi baru**: sekali sehari membandingkan rilis GitHub terbaru
+  dengan versi terpasang, dan muncul banner kalau ada yang lebih baru. Membuka
+  halaman rilis di browser; **tidak mengunduh atau memasang apa pun**
+- Dark & light mode (Light / Dark / Auto, persisten lintas restart), empat
+  pilihan aksen, dan sistem permukaan **soft-UI opaque** (kartu se warna
+  halaman, kedalaman dari pasangan bayangan satu arah cahaya)
+- **Ekspor chart sebagai PNG 1920×1080** dengan judul dan keterangan rentang,
+  dari tombol unduh di setiap kartu grafik
 - Konfigurasi ThingsBoard tersimpan di secure storage, bukan di teks biasa
 
 ---
@@ -282,17 +303,20 @@ Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
 - [x] Chart Hydroponics (Temperature dua sensor, Humidity, Light, TDS) dan Fish (pH, Temperature, Turbidity)
 - [x] Energy analytics, termasuk proyeksi runtime baterai
 - [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
-- [x] go2rtc CCTV live, video decode berjalan
+- go2rtc CCTV live, video decode berjalan
 - [x] **Alarm background**: notifikasi muncul saat app tertutup, 450 ms, tanpa duplikat
 - [x] Alarm dijalankan ulang setelah reboot (`BOOT_COMPLETED`)
-- [ ] Halaman Hydroponics dan Fish — lolos test, **belum pernah dibuka di perangkat**
+- [x] Halaman Hydroponics dan Fish — seluruh baris panel dan chart terverifikasi di perangkat
+- [x] Install build bertanda tangan di atas build sebelumnya (`-r`, token & preferensi ikut bertahan)
 
 OpenWeatherMap dihapus dari aplikasi pada 1.6.0 (termasuk izin lokasi dan API
 key-nya); baris verifikasinya ikut ditarik.
 
-Release build 1.6.0 (build 12) terbit 28 September 2026; fingerprint signing
-terverifikasi terhadap `PRD_GitHub_Release_Process.md` §3. Cold launch terakhir
-diukur pada 1.4.0: 1038 ms.
+Release terbaru **1.14.1**; fingerprint signing build terakhir **terverifikasi
+cocok** dengan `PRD_GitHub_Release_Process.md` §3
+(`504d13ee…64b5`), dan `aapt2 dump xmltree` atas APK release memastikan
+`AlarmDebugReceiver` tidak ikut terbawa. Cold launch terakhir diukur pada 1.4.0:
+1038 ms.
 
 ---
 

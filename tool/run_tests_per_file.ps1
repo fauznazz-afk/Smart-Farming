@@ -22,7 +22,27 @@ foreach ($f in $files) {
     }
     elseif ($attempt -eq ($Retries + 1)) {
       $failed += $f.Name
-      Write-Host ("FAIL  {0,-52} attempts {1}" -f $f.Name, $attempt) -ForegroundColor Red
+      # **Name the cause, because "FAIL" on its own is ambiguous.**
+      #
+      # `dart_test.yaml`'s comment describes two symptoms of the same thing: the
+      # whole rest of a file reported as "did not complete", and a bare
+      # "loading <file>.dart" failure. Neither is an assertion failure, and
+      # treating them as one is how a machine problem gets reported as a bug -
+      # which is what happened here three times before anyone checked.
+      #
+      # An assertion failure carries the test's own `reason` string, which is
+      # what makes it useful. This branch is reached only when the run failed
+      # three times, so the distinction at this point is the difference between
+      # "fix the code" and "the file is too big for 7 GB".
+      $oom = $out -match 'did not complete' -or $out -match "loading .*_test\.dart"
+      if ($oom) {
+        Write-Host ("FAIL  {0,-52} attempts {1}  [OOM: isolate killed, not an assertion]" -f `
+          $f.Name, $attempt) -ForegroundColor Yellow
+      }
+      else {
+        Write-Host ("FAIL  {0,-52} attempts {1}  [assertion]" -f `
+          $f.Name, $attempt) -ForegroundColor Red
+      }
     }
     else {
       Start-Sleep -Seconds 3

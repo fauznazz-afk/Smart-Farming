@@ -127,6 +127,24 @@ void main() {
     });
   });
 
+  group('the force path', () {
+    // **The gate is right for the automatic check and wrong for a button.** A
+    // phone on a metered connection should not ask GitHub on every launch, which
+    // is what `kUpdateCheckInterval` is for. But that makes the banner invisible
+    // to anyone who wants to see it now, including the developer who just
+    // published the release. `force: true` is what the Settings button passes,
+    // and it is the difference between a button and a decoration.
+    test('isDue is what force bypasses, and it holds a real timestamp', () {
+      final now = DateTime(2026, 10, 13, 9);
+      final thisMorning = DateTime(2026, 10, 13, 8);
+      expect(isDue(thisMorning, now), isFalse);
+      // The service stamps the time *before* the request, so a second check in
+      // the same session is not due - which is exactly the case force exists
+      // for.
+      expect(isDue(now, now), isFalse);
+    });
+  });
+
   group('the once-a-day gate', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
