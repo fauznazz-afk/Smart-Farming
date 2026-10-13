@@ -38,6 +38,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/battery_sign.dart';
 import '../../../utils/solar_irradiance.dart';
 import '../utils/design_tokens.dart';
+import 'dot_glyph.dart';
 import 'terminal_panel.dart';
 
 /// The panel's inputs, resolved once by the screen.
@@ -290,6 +291,14 @@ class OverviewPanel extends StatelessWidget {
         TerminalRow(
           label: 'SKY_STATE',
           value: r.lux == null ? '--' : skyConditionFor(r.lux!).label,
+          // **The dot matrix, and it is drawn from the same lux as the word.**
+          // One call to `skyConditionFor` feeds both, so the mark and the label
+          // can never disagree - which is the failure mode of storing the
+          // condition twice, one as text and one as an icon.
+          //
+          // Nothing when there is no reading: a glyph next to `--` would be a
+          // confident picture of a sky nobody has measured.
+          glyph: r.lux == null ? null : DotGlyph(skyConditionFor(r.lux!)),
           divider: false,
         ),
         // **No bar under the sky rows.** There are two meters in this panel and

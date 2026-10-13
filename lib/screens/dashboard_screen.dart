@@ -10,6 +10,7 @@ import '../services/alarm_bridge.dart';
 import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
 import '../services/alarm_settings.dart';
+import '../services/app_update_service.dart';
 import '../services/cctv_url.dart';
 import '../services/connection_health_service.dart';
 import '../services/energy_forecast_service.dart';
@@ -18,6 +19,7 @@ import '../services/thingsboard_realtime_service.dart';
 import '../utils/alarm_helpers.dart';
 import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
+import '../utils/app_update.dart';
 import '../utils/date_summary_stats.dart';
 import '../utils/poll_interval.dart';
 import '../widgets/liquid_glass.dart';
@@ -32,6 +34,7 @@ import 'dashboard/utils/energy_helpers.dart';
 import 'dashboard/utils/history_range.dart';
 import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
+import 'dashboard/widgets/update_banner.dart';
 import 'dashboard/widgets/chart_carousel.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
@@ -248,6 +251,20 @@ class _DashboardScreenState extends State<DashboardScreen>
   final _alarmHistoryService = AlarmHistoryService();
   final ValueNotifier<List<String>> _alertMessages = ValueNotifier(const []);
 
+  // ── App update ───────────────────────────────────────────────────────────────
+  /// The newest release found, or null. A `ValueNotifier` because the banner is
+  /// the only thing that reads it and it arrives long after the first frame.
+  final ValueNotifier<AppRelease?> _pendingUpdate = ValueNotifier(null);
+
+  /// Dismissed for this session only.
+  ///
+  /// **Not persisted, on purpose.** The check itself is gated to once a day, so
+  /// a user who taps LATER sees the banner again tomorrow - which is the point,
+  /// because they still have the old build. Persisting the dismissal would mean
+  /// the one time a release matters most is the time the banner had been
+  /// silenced.
+  bool _updateDismissed = false;
+
   /// Alarms currently raised, and the subset of them already reported.
   ///
   /// Seeded from the native alarm module so an alarm the background check
@@ -331,9 +348,31 @@ class _DashboardScreenState extends State<DashboardScreen>
     // has to stand down before its next tick rather than at the first resume
     // callback, which may not arrive for a while.
     unawaited(AlarmBridge.instance.setForeground(true));
+    // **After everything above, and it does not gate anything.** The update
+    // check is a request to a third party during startup; the dashboard has to
+    // paint whether it answers or not, so this is deliberately not awaited
+    // before `_fetchAll` and nothing waits on its result.
+    unawaited(_checkForAppUpdate());
     // If the app was launched by tapping an alarm notification, navigate to the
     // alarm history screen so the user can see what fired.
     unawaited(_checkLaunchAlarm());
+  }
+
+  /// Asks whether a newer release exists, and publishes it if so.
+  ///
+  /// **One `try` around the whole thing, and the reason is the service's own
+  /// contract**: `check` returns null for "up to date", "not due", "offline" and
+  /// "the API changed shape" alike. Anything that escapes it is a bug rather
+  /// than a condition, and a bug in an optional banner must not take the
+  /// dashboard with it - so it is swallowed here, where it can be logged, rather
+  /// than left to reach a `Future` nobody awaits.
+  Future<void> _checkForAppUpdate() async {
+    try {
+      final release = await const AppUpdateService().check();
+      if (release != null && mounted) _pendingUpdate.value = release;
+    } catch (_) {
+      // Nothing to report and nothing to retry; the next attempt is a day away.
+    }
   }
 
   Future<void> _checkLaunchAlarm() async {
@@ -1641,7 +1680,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Connection state is different and stays everywhere, because a page of
     // numbers that cannot be trusted needs to say so wherever it is displayed.
     final items = <Widget Function()>[
-      () => _statusStripBuilder(showAlerts: index == 0),
+      () => _statusStripWithUpdate(showAlerts: index == 0),
       ..._pageContentFor(index),
     ];
     return RepaintBoundary(
@@ -1860,6 +1899,39 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       return const SizedBox.shrink();
     });
+  }
+
+  /// The status strip, with the update banner above it when one is pending.
+  ///
+  /// **Stacked rather than merged into the status strip's precedence**, and the
+  /// reason is that the two answer different questions. The strip is "is my data
+  /// trustworthy" and it takes strict precedence because a wrong number is worse
+  /// than a missing one. An available update is neither; folding it into that
+  /// chain would mean hiding it behind an unrelated stale-device warning, and a
+  /// banner that only appears when everything else is fine is a banner most
+  /// users never see.
+  ///
+  /// Its own `Bound` on `_pendingUpdate` rather than a read of the notifier
+  /// inside `_statusStripBuilder`: the strip is rebuilt by
+  /// `_connectionChromeListenable` and `_liveRevision`, neither of which the
+  /// update touches, so reading it there would mean the banner only appeared on
+  /// the next poll.
+  Widget _statusStripWithUpdate({required bool showAlerts}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Bound(
+          listenable: _pendingUpdate,
+          token: _pendingUpdate.value?.version ?? '',
+          builder: () => UpdateBannerSwitcher(
+            release: _pendingUpdate.value,
+            visible: _pendingUpdate.value != null && !_updateDismissed,
+            onDismiss: () => _updateDismissed = true,
+          ),
+        ),
+        _statusStripBuilder(showAlerts: showAlerts),
+      ],
+    );
   }
 
   /// Feeds the same readings the rule engine uses, so the banner and the alarms

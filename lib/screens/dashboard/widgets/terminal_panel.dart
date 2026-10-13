@@ -113,10 +113,20 @@ class TerminalRow extends StatelessWidget {
     this.alert = false,
     this.divider = true,
     this.tint,
+    this.glyph,
     this.trailing,
     this.onTap,
     this.valueStyle,
   });
+
+  /// A fixed-size mark drawn just before the figure, e.g. [DotGlyph].
+  ///
+  /// **A separate slot rather than folding it into `trailing`, because the two
+  /// sit on opposite sides of the row and mean opposite things.** `trailing` is
+  /// metadata *about* the figure and hangs off the right edge. A glyph *is* the
+  /// figure's subject - it is the sky, drawn - so it belongs with the value, on
+  /// the value's side of the label.
+  final Widget? glyph;
 
   /// The figure's type, and it exists because [AppType.slotValue] is too large
   /// for a row carrying three of them.
@@ -241,6 +251,10 @@ class TerminalRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
+          if (glyph != null) ...[
+            glyph!,
+            const SizedBox(width: AppSpacing.xs),
+          ],
           // **The value is the one thing that must never be shortened**, so it is
           // outside the `FittedBox` and the *unit* is the one that yields when
           // the row is tight. `kW` becoming `k` would be wrong; `W` becoming
