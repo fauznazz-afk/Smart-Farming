@@ -46,6 +46,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool _loading = true;
   bool _sending = false;
   String? _error;
+  
+  // For streaming: index of the assistant message being streamed
+  int? _streamingIndex;
+  String? _lastUserQuestion;
 
   @override
   void initState() {
@@ -73,34 +77,116 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final settings = _settings;
     final question = _input.text;
     if (settings == null || !settings.isConfigured || _sending) return;
-    // The sanitised text is what is appended, so the bubble on screen and the
-    // text on the wire are the same string. Sending one and showing the other is
-    // how a length cut becomes invisible.
     final sanitized = sanitizeQuestion(question);
     if (sanitized.isEmpty) return;
+
+    _lastUserQuestion = sanitized;
 
     setState(() {
       _sending = true;
       _error = null;
       _messages.add(AiTurn(role: 'user', text: sanitized));
+      // Add empty assistant message for streaming
+      _messages.add(AiTurn(role: 'assistant', text: ''));
+      _streamingIndex = _messages.length - 1;
       _input.clear();
     });
     _scrollToEnd();
 
     try {
-      final reply = await _service.ask(
+      final stream = _service.askStream(
         preset: settings.preset,
         apiKey: settings.apiKey,
         model: settings.model,
         telemetrySummary: widget.telemetrySummary,
-        history: _messages.sublist(0, _messages.length - 1),
+        history: _messages.sublist(0, _messages.length - 2), // exclude the empty assistant msg
         question: sanitized,
       );
+      
+      await for (final chunk in stream) {
+        if (!mounted) return;
+        setState(() {
+          if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+            final current = _messages[_streamingIndex!];
+            _messages[_streamingIndex!] = AiTurn(
+              role: current.role,
+              text: current.text + chunk,
+            );
+          }
+        });
+        _scrollToEnd();
+      }
+      
+      // Streaming complete
       if (!mounted) return;
-      setState(() => _messages.add(AiTurn(role: 'assistant', text: reply)));
+      setState(() => _streamingIndex = null);
     } on AiChatException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() {
+        _error = e.message;
+        // Remove the empty assistant message on error
+        if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+          _messages.removeAt(_streamingIndex!);
+        }
+        _streamingIndex = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+        _scrollToEnd();
+      }
+    }
+  }
+
+  Future<void> _retryLastQuestion() async {
+    final settings = _settings;
+    final question = _lastUserQuestion;
+    if (settings == null || !settings.isConfigured || _sending || question == null) return;
+
+    setState(() {
+      _sending = true;
+      _error = null;
+      _messages.add(AiTurn(role: 'user', text: question));
+      _messages.add(AiTurn(role: 'assistant', text: ''));
+      _streamingIndex = _messages.length - 1;
+    });
+    _scrollToEnd();
+
+    try {
+      final stream = _service.askStream(
+        preset: settings.preset,
+        apiKey: settings.apiKey,
+        model: settings.model,
+        telemetrySummary: widget.telemetrySummary,
+        history: _messages.sublist(0, _messages.length - 2),
+        question: question,
+      );
+      
+      await for (final chunk in stream) {
+        if (!mounted) return;
+        setState(() {
+          if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+            final current = _messages[_streamingIndex!];
+            _messages[_streamingIndex!] = AiTurn(
+              role: current.role,
+              text: current.text + chunk,
+            );
+          }
+        });
+        _scrollToEnd();
+      }
+      
+      if (!mounted) return;
+      setState(() => _streamingIndex = null);
+    } on AiChatException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+          _messages.removeAt(_streamingIndex!);
+        }
+        _streamingIndex = null;
+      });
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -170,8 +256,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      itemCount: _messages.length + (_sending ? 1 : 0),
+      itemCount: _messages.length + (_sending && _streamingIndex == null ? 1 : 0),
       itemBuilder: (context, index) {
+        // Only show "Thinking..." indicator when NOT streaming (i.e., waiting for full response)
+        // When streaming, the partial response is already in the bubble
         if (index == _messages.length) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -373,6 +461,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(message, style: AppType.bodySm),
+          ),
+          TextButton(
+            onPressed: _sending ? null : _retryLastQuestion,
+            child: const Text('Retry'),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),

@@ -119,6 +119,137 @@ class AiChatService {
     return reply;
   }
 
+  /// Streams the assistant's reply as a sequence of text chunks.
+  ///
+  /// Returns a [Stream<String>] that emits each token/delta as it arrives.
+  /// The stream completes when the model signals `[DONE]` (OpenAI) or the
+  /// final event (Anthropic), or errors with [AiChatException] on failure.
+  ///
+  /// The existing [ask] method remains unchanged for backward compatibility.
+  Stream<String> askStream({
+    required AiProviderPreset preset,
+    required String apiKey,
+    required String model,
+    required String telemetrySummary,
+    required List<AiTurn> history,
+    required String question,
+  }) async* {
+    final questionText = sanitizeQuestion(question);
+    if (questionText.isEmpty) {
+      throw const AiChatException('Ask a question first.');
+    }
+
+    final uri = _resolveEndpoint(preset);
+    final body = buildAiRequestBody(
+      preset: preset,
+      model: model,
+      telemetrySummary: telemetrySummary,
+      history: history,
+      question: questionText,
+      stream: true,
+    );
+    final request = http.Request('POST', uri)
+      ..headers.addAll(buildAiHeaders(preset, apiKey))
+      ..headers.addAll({'Accept': 'text/event-stream'})
+      ..followRedirects = false
+      ..body = jsonEncode(body);
+
+    final client = http.Client();
+    late final http.StreamedResponse streamed;
+    try {
+      streamed = await client.send(request).timeout(_timeout);
+    } on TimeoutException {
+      client.close();
+      throw const AiChatException(
+        'The model took too long to answer. Try again.',
+      );
+    } on http.ClientException {
+      client.close();
+      throw const AiChatException('Could not reach the model endpoint.');
+    }
+
+    if (streamed.statusCode >= 300 && streamed.statusCode < 400) {
+      client.close();
+      throw const AiChatException(
+        'The model endpoint redirected. Refused, so your key is not forwarded.',
+      );
+    }
+    if (streamed.statusCode == 401 || streamed.statusCode == 403) {
+      client.close();
+      throw const AiChatException(
+        'The API key was rejected. Check it in Settings.',
+      );
+    }
+    if (streamed.statusCode == 404) {
+      client.close();
+      throw AiChatException(
+        'The provider does not recognise the model "${_safeModelName(model)}". '
+        'Model names change and retired ones are removed — check the Model '
+        'field in Settings.',
+      );
+    }
+    if (streamed.statusCode == 429) {
+      client.close();
+      throw const AiChatException(
+        'The provider rate limit was reached. Wait a moment and try again.',
+      );
+    }
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      // Read error body for provider message
+      final errorBytes = await streamed.stream
+          .timeout(_timeout)
+          .fold<List<int>>(<int>[], (acc, chunk) {
+        if (acc.length + chunk.length > _maxReplyBytes) {
+          throw const _ReplyTooLarge();
+        }
+        return acc..addAll(chunk);
+      });
+      client.close();
+      final errorBody = _decodeBytes(errorBytes);
+      throw AiChatException(_providerMessage(errorBody, streamed.statusCode));
+    }
+
+    final decoder = utf8.decoder;
+    String buffer = '';
+    bool done = false;
+
+    await for (final chunk in streamed.stream.timeout(_timeout)) {
+      if (done) continue;
+      buffer += decoder.convert(chunk);
+
+      // Split on double newline (SSE event separator)
+      final events = buffer.split('\n\n');
+      buffer = events.removeLast(); // Keep incomplete event in buffer
+
+      for (final event in events) {
+        if (preset.isAnthropic) {
+          final delta = parseAnthropicStreamChunk(event);
+          if (delta != null) yield delta;
+        } else {
+          final delta = parseOpenAiStreamChunk(event);
+          if (delta != null) yield delta;
+          if (event.trim() == 'data: [DONE]') {
+            done = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Flush any remaining buffer
+    if (buffer.isNotEmpty && !done) {
+      if (preset.isAnthropic) {
+        final delta = parseAnthropicStreamChunk(buffer);
+        if (delta != null) yield delta;
+      } else {
+        final delta = parseOpenAiStreamChunk(buffer);
+        if (delta != null) yield delta;
+      }
+    }
+
+    client.close();
+  }
+
   /// HTTPS only, no userinfo, and a typed endpoint is required.
   ///
   /// Same reasoning as `parseAllowedCctvUrl`: an endpoint is a URL the user typed
@@ -165,6 +296,15 @@ class AiChatService {
   Map<String, dynamic> _decode(http.Response response) {
     try {
       final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> ? decoded : const {};
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  Map<String, dynamic> _decodeBytes(List<int> bytes) {
+    try {
+      final decoded = jsonDecode(utf8.decode(bytes));
       return decoded is Map<String, dynamic> ? decoded : const {};
     } on FormatException {
       return const {};

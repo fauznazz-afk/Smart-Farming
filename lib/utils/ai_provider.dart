@@ -8,6 +8,10 @@
 /// Nothing in this file sends a key anywhere: the caller passes it in headers.
 library;
 
+import 'dart:convert';
+
+import '../models/telemetry_model.dart';
+
 /// A model endpoint the assistant can talk to.
 ///
 /// Six of the seven presets speak the OpenAI `chat/completions` dialect and
@@ -246,12 +250,15 @@ List<Map<String, String>> buildAiMessages({
 /// generated, so a "tune the answer" parameter was costing every OpenAI user a
 /// working request. Reply length is controlled by the prompt instead, which is
 /// where the instruction was already.
+///
+/// If [stream] is true, adds `stream: true` to enable SSE streaming.
 Map<String, dynamic> buildAiRequestBody({
   required AiProviderPreset preset,
   required String model,
   required String telemetrySummary,
   required List<AiTurn> history,
   required String question,
+  bool stream = false,
 }) {
   final turns = buildAiMessages(
     telemetrySummary: telemetrySummary,
@@ -270,6 +277,7 @@ Map<String, dynamic> buildAiRequestBody({
     'messages': messages,
   };
   if (system != null) body['system'] = system;
+  if (stream) body['stream'] = true;
   return body;
 }
 
@@ -316,13 +324,57 @@ String? parseAiReply(AiProviderPreset preset, Map<String, dynamic> body) {
   return text.isEmpty ? null : text;
 }
 
+/// Parses a single SSE chunk from an OpenAI-compatible streaming response.
+///
+/// Expected format: `data: {json}\n\n` where json has `choices[0].delta.content`.
+/// Returns the text delta, or null if the chunk is `[DONE]` or has no content.
+String? parseOpenAiStreamChunk(String chunk) {
+  final trimmed = chunk.trim();
+  if (trimmed == 'data: [DONE]') return null;
+  if (!trimmed.startsWith('data: ')) return null;
+  try {
+    final json = jsonDecode(trimmed.substring(6));
+    final choices = json['choices'];
+    if (choices is! List || choices.isEmpty) return null;
+    final delta = choices.first['delta'];
+    if (delta is! Map) return null;
+    final content = delta['content'];
+    if (content is! String) return null;
+    return content;
+  } on FormatException {
+    return null;
+  }
+}
+
+/// Parses a single SSE chunk from an Anthropic streaming response.
+///
+/// Expected format: `event: content_block_delta\ndata: {json}\n\n`
+/// where json has `delta.text`. Returns the text delta, or null if the chunk
+/// is a non-delta event or has no text.
+String? parseAnthropicStreamChunk(String chunk) {
+  final trimmed = chunk.trim();
+  if (trimmed.isEmpty) return null;
+  if (!trimmed.startsWith('data: ')) return null;
+  try {
+    final json = jsonDecode(trimmed.substring(6));
+    final type = json['type'];
+    if (type != 'content_block_delta') return null;
+    final delta = json['delta'];
+    if (delta is! Map) return null;
+    final text = delta['text'];
+    if (text is! String) return null;
+    return text;
+  } on FormatException {
+    return null;
+  }
+}
+
 /// Formats live telemetry into the block the system prompt embeds.
 ///
+/// Only includes the most important metrics to save context window.
 /// Keys are emitted as stored — this app's telemetry keys already carry their
 /// unit (`tds_ppm`, `temp_c`, `power_w`) — and values are rounded to two
-/// decimals so a wall of digits does not eat the context window. A device with
-/// no readings is listed as such rather than omitted, because a missing device
-/// and an absent question look identical to the model otherwise.
+/// decimals. A device with no readings is listed as such rather than omitted.
 String buildTelemetrySummary({
   required Map<String, Map<String, double>> devices,
   Map<String, double> totals = const {},
@@ -334,15 +386,34 @@ String buildTelemetrySummary({
       lines.add('- $name: no reading');
       return;
     }
-    final keys = values.keys.toList()..sort();
-    lines.add(
-      '- $name: ${keys.map((k) => '$k=${_round2(values[k]!)}').join(', ')}',
-    );
+    // Only show the most relevant metrics per device
+    final importantKeys = <String>[];
+    if (name.contains('battery')) {
+      importantKeys.addAll(['soc', 'power', 'voltage', 'current']);
+    } else if (name.contains('pzem')) {
+      importantKeys.addAll(['power', 'voltage', 'current', 'energy', 'frequency', 'pf']);
+    } else if (name.contains('environment')) {
+      importantKeys.addAll(['temp', 'humidity', 'tds']);
+    } else if (name.contains('fish')) {
+      importantKeys.addAll(['ph', 'temp', 'turbidity']);
+    }
+    final shown = <String>[];
+    for (final k in importantKeys) {
+      if (values.containsKey(k)) {
+        shown.add('$k=${_round2(values[k]!)}');
+      }
+    }
+    // Fallback: if no important keys found, show first 5 keys
+    if (shown.isEmpty && values.isNotEmpty) {
+      final keys = values.keys.toList()..sort();
+      shown.addAll(keys.take(5).map((k) => '$k=${_round2(values[k]!)}'));
+    }
+    lines.add('- $name: ${shown.join(', ')}');
   });
   if (totals.isNotEmpty) {
     final keys = totals.keys.toList()..sort();
     lines.add(
-      '- period totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
+      '- totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
     );
   }
   if (lines.isEmpty) return emptyNote;
@@ -351,3 +422,88 @@ String buildTelemetrySummary({
 
 String _round2(double value) =>
     value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toStringAsFixed(2);
+
+/// Builds an extended telemetry summary including historical data.
+///
+/// [devices] - live telemetry per device (existing behavior)
+/// [totals] - period totals like solar_kwh_today, load_kwh_today (existing)
+/// [history] - optional Map of device key -> List of historical TelemetryPoint
+///             for the last 7 days. If provided, daily kWh summaries are added.
+String buildTelemetrySummaryWithHistory({
+  required Map<String, Map<String, double>> devices,
+  Map<String, double> totals = const {},
+  Map<String, List<TelemetryPoint>> history = const {},
+  String emptyNote = 'No telemetry is available yet.',
+}) {
+  final lines = <String>[];
+  
+  // Live devices (concise)
+  devices.forEach((name, values) {
+    if (values.isEmpty) {
+      lines.add('- $name: no reading');
+      return;
+    }
+    final importantKeys = <String>[];
+    if (name.contains('battery')) {
+      importantKeys.addAll(['soc', 'power', 'voltage']);
+    } else if (name.contains('pzem')) {
+      importantKeys.addAll(['power', 'voltage', 'current']);
+    } else if (name.contains('environment')) {
+      importantKeys.addAll(['temp', 'humidity', 'tds']);
+    } else if (name.contains('fish')) {
+      importantKeys.addAll(['ph', 'temp', 'turbidity']);
+    }
+    final shown = <String>[];
+    for (final k in importantKeys) {
+      if (values.containsKey(k)) {
+        shown.add('$k=${_round2(values[k]!)}');
+      }
+    }
+    if (shown.isEmpty && values.isNotEmpty) {
+      final keys = values.keys.toList()..sort();
+      shown.addAll(keys.take(3).map((k) => '$k=${_round2(values[k]!)}'));
+    }
+    lines.add('- $name: ${shown.join(', ')}');
+  });
+  
+  // Period totals
+  if (totals.isNotEmpty) {
+    final keys = totals.keys.toList()..sort();
+    lines.add(
+      '- totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
+    );
+  }
+  
+  // Historical daily summaries (last 7 days) - only solar/load kWh
+  if (history.isNotEmpty) {
+    lines.add('- daily kWh (last 7 days):');
+    final now = DateTime.now();
+    for (int i = 0; i < 7; i++) {
+      final day = now.subtract(Duration(days: i));
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final dayStr = '${day.day}/${day.month}';
+      
+      final dayLines = <String>[];
+      // Only show solar and load energy
+      for (final key in ['solar_kwh', 'load_kwh', 'energy', 'solar_energy']) {
+        final points = history[key];
+        if (points != null) {
+          final dayPoints = points.where((p) => 
+            p.timestamp.isAfter(dayStart) && p.timestamp.isBefore(dayEnd)).toList();
+          if (dayPoints.isNotEmpty) {
+            final values = dayPoints.map((p) => p.value).toList()..sort();
+            final sum = values.fold(0.0, (a, b) => a + b);
+            dayLines.add('$key=${_round2(sum)} kWh');
+          }
+        }
+      }
+      if (dayLines.isNotEmpty) {
+        lines.add('  $dayStr: ${dayLines.join(', ')}');
+      }
+    }
+  }
+  
+  if (lines.isEmpty) return emptyNote;
+  return lines.join('\n');
+}

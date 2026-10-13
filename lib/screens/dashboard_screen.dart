@@ -1478,7 +1478,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Built here rather than inside the chat screen because the live values are
   /// this screen's state, and the whole point of the layering rule in AGENTS.md
   /// is that a widget receives its data instead of reaching into a screen.
-  String _aiTelemetrySummary() => buildTelemetrySummary(
+  String _aiTelemetrySummary() => buildTelemetrySummaryWithHistory(
         devices: {
           'battery': _battery?.latestValues ?? const {},
           'pzem meter': _pzem?.latestValues ?? const {},
@@ -1489,6 +1489,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           'solar_kwh_today': _solarKwh,
           'load_kwh_today': _loadKwh,
         },
+        history: _history,
       );
 
   void _openAiAssistant() {
