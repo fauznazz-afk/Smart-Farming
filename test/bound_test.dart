@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/bound.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
 /// Covers [Bound], the granular-rebuild primitive the dashboard's whole polling
 /// architecture rests on.
@@ -20,14 +21,11 @@ import 'package:plts_monitoring/screens/dashboard/utils/bound.dart';
 /// token comparison that makes a sub-view switch honest.
 void main() {
   Widget wrap(Widget child) => MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(child: child),
-        ),
-      );
+    home: Scaffold(body: SingleChildScrollView(child: child)),
+  );
 
   group('Bound caches its child', () {
-    testWidgets('runs the builder exactly once while mounting',
-        (tester) async {
+    testWidgets('runs the builder exactly once while mounting', (tester) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
       final built = <Widget>[];
@@ -51,14 +49,16 @@ void main() {
       expect(
         built,
         hasLength(1),
-        reason: 'The child is built eagerly in initState. Building it again on '
+        reason:
+            'The child is built eagerly in initState. Building it again on '
             'the first build would be a second invocation for one mount, and '
             'the eager build exists precisely so the first frame is not empty.',
       );
     });
 
-    testWidgets('an unrelated ancestor rebuild does not re-invoke the builder',
-        (tester) async {
+    testWidgets('an unrelated ancestor rebuild does not re-invoke the builder', (
+      tester,
+    ) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
       final token = Object();
@@ -92,7 +92,8 @@ void main() {
       expect(
         built,
         hasLength(1),
-        reason: 'Caching is the entire point of the widget. A parent setState '
+        reason:
+            'Caching is the entire point of the widget. A parent setState '
             'that changes neither the listenable nor the token hands `Bound` a '
             'fresh widget with a fresh builder closure, and the cached child '
             'has to survive it — otherwise every poll would rebuild the tree '
@@ -102,23 +103,22 @@ void main() {
 
       // Not just "the right text" but the very instance produced on mount.
       final displayed = tester.widget<Text>(
-        find.descendant(
-          of: find.byType(Bound),
-          matching: find.byType(Text),
-        ),
+        find.descendant(of: find.byType(Bound), matching: find.byType(Text)),
       );
       expect(
         identical(built.single, displayed),
         isTrue,
-        reason: 'The mounted widget must be the cached instance itself, not an '
+        reason:
+            'The mounted widget must be the cached instance itself, not an '
             'equal-looking rebuild of it.',
       );
     });
   });
 
   group('the listenable drives the rebuild', () {
-    testWidgets('a notification re-invokes the builder exactly once',
-        (tester) async {
+    testWidgets('a notification re-invokes the builder exactly once', (
+      tester,
+    ) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
       final built = <Widget>[];
@@ -162,10 +162,10 @@ void main() {
       addTearDown(live.dispose);
       final built = <Widget>[];
       Widget Function() builderFor(String label) => () {
-            final child = Text(label);
-            built.add(child);
-            return child;
-          };
+        final child = Text(label);
+        built.add(child);
+        return child;
+      };
 
       await tester.pumpWidget(
         wrap(
@@ -188,7 +188,8 @@ void main() {
       expect(
         built,
         hasLength(2),
-        reason: 'A new token must re-run the builder even with the same '
+        reason:
+            'A new token must re-run the builder even with the same '
             'listenable instance that has never notified. This is the '
             'theme/threshold/sub-view change path, which arrives as a plain '
             'setState on the dashboard and therefore as no notification at all.',
@@ -202,10 +203,10 @@ void main() {
       final token = Object();
       final built = <Widget>[];
       Widget Function() builderFor(String label) => () {
-            final child = Text(label);
-            built.add(child);
-            return child;
-          };
+        final child = Text(label);
+        built.add(child);
+        return child;
+      };
 
       await tester.pumpWidget(
         wrap(
@@ -226,7 +227,8 @@ void main() {
       expect(
         built,
         hasLength(1),
-        reason: 'The token is the contract, not the closure. Rebuilding on '
+        reason:
+            'The token is the contract, not the closure. Rebuilding on '
             'closure identity would defeat the cache, because every parent '
             'build allocates a new one.',
       );
@@ -234,16 +236,17 @@ void main() {
       expect(find.text('second'), findsNothing);
     });
 
-    testWidgets('an int token behaves like the dashboard\'s Object.hash one',
-        (tester) async {
+    testWidgets('an int token behaves like the dashboard\'s Object.hash one', (
+      tester,
+    ) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
       final built = <Widget>[];
       Widget Function() builderFor(String label) => () {
-            final child = Text(label);
-            built.add(child);
-            return child;
-          };
+        final child = Text(label);
+        built.add(child);
+        return child;
+      };
 
       await tester.pumpWidget(
         wrap(
@@ -258,8 +261,9 @@ void main() {
 
       // Same value, recomputed — what a parent rebuild that recomputes
       // `Object.hash(_visualToken, isDark)` actually delivers.
-      _parent(tester)
-          .reconfigure(token: Object.hash(1, false), builder: builderFor('pv2'));
+      _parent(
+        tester,
+      ).reconfigure(token: Object.hash(1, false), builder: builderFor('pv2'));
       await tester.pump();
       expect(built, hasLength(1), reason: 'Equal ints must compare equal.');
 
@@ -272,8 +276,9 @@ void main() {
   });
 
   group('the listener moves when the listenable changes', () {
-    testWidgets('the old listenable is detached and the new one attached',
-        (tester) async {
+    testWidgets('the old listenable is detached and the new one attached', (
+      tester,
+    ) async {
       final old = _TrackingListenable();
       final fresh = _TrackingListenable();
       final built = <Widget>[];
@@ -304,8 +309,7 @@ void main() {
       expect(built, hasLength(2));
     });
 
-    testWidgets('firing the old listenable no longer rebuilds',
-        (tester) async {
+    testWidgets('firing the old listenable no longer rebuilds', (tester) async {
       final old = ValueNotifier<int>(0);
       final fresh = ValueNotifier<int>(0);
       addTearDown(old.dispose);
@@ -336,7 +340,8 @@ void main() {
       expect(
         builds,
         afterSwap,
-        reason: 'A stale listener left on the old listenable is the mechanism '
+        reason:
+            'A stale listener left on the old listenable is the mechanism '
             'behind the reused-State bug: the card on screen would keep '
             'rebuilding from a revision counter the sub-view no longer uses, '
             'while the one it should follow stays silent.',
@@ -378,8 +383,9 @@ void main() {
   });
 
   group('dispose', () {
-    testWidgets('the listener is removed and a late notification is inert',
-        (tester) async {
+    testWidgets('the listener is removed and a late notification is inert', (
+      tester,
+    ) async {
       final live = _TrackingListenable();
       var builds = 0;
 
@@ -403,7 +409,8 @@ void main() {
       expect(
         live.attached,
         0,
-        reason: 'A `Bound` that outlives nothing must not leave a closure '
+        reason:
+            'A `Bound` that outlives nothing must not leave a closure '
             'holding its defunct State alive through the notifier. The notifier '
             'is owned by the screen, so it outlives every card on the page.',
       );
@@ -414,13 +421,105 @@ void main() {
       expect(
         builds,
         1,
-        reason: 'The builder is invoked before the `mounted` check in '
+        reason:
+            'The builder is invoked before the `mounted` check in '
             '`_refresh`, so a leaked listener would run it against a disposed '
             'State. No build means no listener, not just no setState.',
       );
     });
   });
 
+  group('the palette swap', () {
+    // **This is the dashboard's 1.13.0 light-theme bug, at the size it can be
+    // tested.**
+    //
+    // `AppSurfaces` and `AppPalette` are static getters, so a panel reads the
+    // current palette at build time and a rebuild is all it needs to follow a
+    // theme switch. `_applyMode` in `main.dart` calls `AppTheme.applyMode` and
+    // then `setState`, so the whole tree does rebuild — and every `Bound` in it
+    // gets `didUpdateWidget` with an unchanged listenable and an unchanged
+    // token, which is precisely the case in which `Bound` keeps its cached
+    // child. Nothing rebuilt. The panels were left in the old palette until the
+    // next ten-second poll bumped a revision, so the app was one colour and one
+    // panel another.
+    //
+    // The dashboard's `_visualToken` did not contain the palette at all, even
+    // though the comment on `_bindRevision` says that is the very reason a
+    // token exists. This test is the missing half of that sentence: it shows
+    // that the swap is invisible without it and immediate with it.
+    tearDown(() => AppTheme.apply(Brightness.dark));
+
+    // **The swap is what `main.dart` does**: `AppTheme.applyMode`, then a
+    // `setState` on the root, which rebuilds this host and every `Bound` under
+    // it with an unchanged listenable.
+    Future<void> swapPalette(WidgetTester tester) async {
+      AppTheme.apply(Brightness.light);
+      tester.state<_PaletteHostState>(find.byType(_PaletteHost)).refresh();
+      await tester.pumpAndSettle();
+    }
+
+    Color paintedAccent(WidgetTester tester) => tester
+        .widget<Text>(
+          find.descendant(of: find.byType(Bound), matching: find.byType(Text)),
+        )
+        .style!
+        .color!;
+
+    testWidgets('a token without the palette keeps the old ink', (
+      tester,
+    ) async {
+      final live = ValueNotifier<int>(0);
+      addTearDown(live.dispose);
+      AppTheme.apply(Brightness.dark);
+
+      await tester.pumpWidget(
+        wrap(_PaletteHost(live: live, tokenCarriesPalette: false)),
+      );
+      final dark = AppPalette.error;
+
+      await swapPalette(tester);
+
+      expect(
+        AppPalette.error,
+        isNot(dark),
+        reason:
+            'The palette really did change - otherwise this proves nothing.',
+      );
+      expect(
+        paintedAccent(tester),
+        dark,
+        reason:
+            'The Bound kept its cached child, so the panel is still painted in '
+            'the previous palette. This is the failure. Nothing throws; the app '
+            'just shows two palettes at once until the next poll.',
+      );
+    });
+
+    testWidgets('the palette in the token repaints immediately', (
+      tester,
+    ) async {
+      final live = ValueNotifier<int>(0);
+      addTearDown(live.dispose);
+      AppTheme.apply(Brightness.dark);
+
+      await tester.pumpWidget(
+        wrap(_PaletteHost(live: live, tokenCarriesPalette: true)),
+      );
+      final dark = AppPalette.error;
+
+      await swapPalette(tester);
+
+      final painted = paintedAccent(tester);
+      expect(
+        painted,
+        AppPalette.error,
+        reason:
+            'The brightness changed the token, the builder re-ran, and the panel '
+            'is in the new palette on the same frame.',
+      );
+      expect(painted, isNot(dark));
+    });
+  });
   group('a Bound reused at a spliced tree position', () {
     // The scenario the whole class was hardened against, in miniature. PV, AC
     // and Battery are three lists of closures rendered into the same `Column`,
@@ -428,8 +527,7 @@ void main() {
     // three, and slot 4 is a `Bound` for the chart on all three. No key
     // distinguishes them, so a sub-view switch reuses their State.
 
-    testWidgets('the State is genuinely reused, without a key',
-        (tester) async {
+    testWidgets('the State is genuinely reused, without a key', (tester) async {
       final live = ValueNotifier<int>(0);
       final selected = ValueNotifier<int>(0);
       addTearDown(live.dispose);
@@ -437,17 +535,15 @@ void main() {
 
       await tester.pumpWidget(
         wrap(
-          _SubViewHost(
-            live: live,
-            selected: selected,
-            builds: {},
-            charts: {},
-          ),
+          _SubViewHost(live: live, selected: selected, builds: {}, charts: {}),
         ),
       );
 
       final before = tester.state<State<Bound>>(find.byType(Bound).first);
-      expect(tester.state<State<Bound>>(find.byType(Bound).last), isNot(before));
+      expect(
+        tester.state<State<Bound>>(find.byType(Bound).last),
+        isNot(before),
+      );
 
       _select(tester, 1);
       await tester.pump();
@@ -458,14 +554,16 @@ void main() {
       expect(
         identical(before, after),
         isTrue,
-        reason: 'Both slots are the same type with no key, so Flutter reuses '
+        reason:
+            'Both slots are the same type with no key, so Flutter reuses '
             'the State. The token comparison is the only thing standing '
             'between that and a wrong page.',
       );
     });
 
-    testWidgets('the card and chart under a header match that sub-view',
-        (tester) async {
+    testWidgets('the card and chart under a header match that sub-view', (
+      tester,
+    ) async {
       final live = ValueNotifier<int>(0);
       final selected = ValueNotifier<int>(0);
       addTearDown(live.dispose);
@@ -515,15 +613,17 @@ void main() {
         expect(
           builds[title],
           isNotNull,
-          reason: 'The "$title" card never rendered, so this switch did not '
+          reason:
+              'The "$title" card never rendered, so this switch did not '
               'actually reach it.',
         );
         expect(charts[title], isNotNull);
       }
     });
 
-    testWidgets('the reused Bound still follows the shared revision counter',
-        (tester) async {
+    testWidgets('the reused Bound still follows the shared revision counter', (
+      tester,
+    ) async {
       final live = ValueNotifier<int>(0);
       final selected = ValueNotifier<int>(0);
       addTearDown(live.dispose);
@@ -552,7 +652,8 @@ void main() {
       expect(
         builds['AC Status'],
         beforePoll + 1,
-        reason: 'The listenable is the same instance across all three '
+        reason:
+            'The listenable is the same instance across all three '
             'sub-views, so the listener has to survive the switch intact. This '
             'is the case that breaks when a `Bound` lands on a reused tree '
             'position: the card stops updating while its header keeps moving.',
@@ -647,12 +748,12 @@ class _BoundHarnessState extends State<_BoundHarness> {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          Text('bumps: $bumps'),
-          Text('unrelated: $_unrelated'),
-          Bound(listenable: _listenable, token: _token, builder: _builder),
-        ],
-      );
+    children: [
+      Text('bumps: $bumps'),
+      Text('unrelated: $_unrelated'),
+      Bound(listenable: _listenable, token: _token, builder: _builder),
+    ],
+  );
 }
 
 /// The dashboard's power page, cut down to the part that matters: three
@@ -685,34 +786,74 @@ class _SubViewHostState extends State<_SubViewHost> {
   }
 
   List<Widget Function()> _closures(String title) => [
-        // The header is a plain widget, so it updates the instant the
-        // sub-view changes. That is what made a stale card below it read as
-        // the wrong page rather than as a slow refresh.
-        () => Text('$title header'),
-        () => const SizedBox(height: 10),
-        () => Bound(
-              listenable: widget.live,
-              token: Object.hash(widget.selected.value, title),
-              builder: () {
-                widget.builds[title] = (widget.builds[title] ?? 0) + 1;
-                return Text('$title card');
-              },
-            ),
-        () => const SizedBox(height: 16),
-        () => Bound(
-              listenable: widget.live,
-              token: Object.hash(widget.selected.value, title, 'chart'),
-              builder: () {
-                widget.charts[title] = (widget.charts[title] ?? 0) + 1;
-                return Text('$title chart');
-              },
-            ),
-      ];
+    // The header is a plain widget, so it updates the instant the
+    // sub-view changes. That is what made a stale card below it read as
+    // the wrong page rather than as a slow refresh.
+    () => Text('$title header'),
+    () => const SizedBox(height: 10),
+    () => Bound(
+      listenable: widget.live,
+      token: Object.hash(widget.selected.value, title),
+      builder: () {
+        widget.builds[title] = (widget.builds[title] ?? 0) + 1;
+        return Text('$title card');
+      },
+    ),
+    () => const SizedBox(height: 16),
+    () => Bound(
+      listenable: widget.live,
+      token: Object.hash(widget.selected.value, title, 'chart'),
+      builder: () {
+        widget.charts[title] = (widget.charts[title] ?? 0) + 1;
+        return Text('$title chart');
+      },
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          for (final make in _closures(titles[widget.selected.value])) make(),
-        ],
-      );
+    children: [
+      for (final make in _closures(titles[widget.selected.value])) make(),
+    ],
+  );
+}
+
+/// A `Bound` whose token is computed in `build`, which is how the dashboard does
+/// it: `_visualToken` is a getter, so a parent rebuild recomputes it.
+///
+/// **The flag is the whole experiment.** With [tokenCarriesPalette] false the
+/// token is `Object.hash` of the same two constants across a palette swap, so
+/// `Bound` sees no change and keeps its child - the bug. With it true the
+/// brightness is in the hash, so the token differs and the builder re-runs.
+/// A token frozen by the test instead of computed here would make the first
+/// case pass for the wrong reason.
+class _PaletteHost extends StatefulWidget {
+  const _PaletteHost({required this.live, required this.tokenCarriesPalette});
+
+  final ValueNotifier<int> live;
+  final bool tokenCarriesPalette;
+
+  @override
+  State<_PaletteHost> createState() => _PaletteHostState();
+}
+
+class _PaletteHostState extends State<_PaletteHost> {
+  int _bumps = 0;
+
+  void refresh() => setState(() => _bumps++);
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text('bumps: $_bumps'),
+      Bound(
+        listenable: widget.live,
+        token: widget.tokenCarriesPalette
+            ? Object.hash('pv', AppTheme.brightness)
+            : Object.hash('pv', 0),
+        builder: () =>
+            Text('accent', style: TextStyle(color: AppPalette.error)),
+      ),
+    ],
+  );
 }

@@ -1752,9 +1752,31 @@ class _DashboardScreenState extends State<DashboardScreen>
     // would be right and the *heading* would still name the previous day, and
     // there is no exception to notice. The chart pages read the same state, so
     // this is not a token added for one widget.
-    _selectedDate,
     _selectedRangeStart,
     _selectedRangeEnd,
+    // **The palette's brightness, and this was the gap that froze the app on
+    // the old theme's colours for up to a full poll interval.**
+    //
+    // `_applyMode` in `main.dart` calls `AppTheme.applyMode` and then
+    // `setState`, so the root rebuilds, `MaterialApp` rebuilds and this screen
+    // rebuilds. Every `Bound` below it gets `didUpdateWidget` with the same
+    // listenable and the same token, and `Bound`'s one rule is to keep its
+    // cached child in exactly that case - so not one panel, grid, chart or
+    // banner was rebuilt. `AppSurfaces` and `AppPalette` are static getters
+    // resolved at build time, so the panels would have read the *new* palette
+    // the moment they next rebuilt; they simply had no reason to until the
+    // telemetry poll bumped a revision, which is up to ten seconds away.
+    //
+    // The symptom is the whole app in one palette and one panel in the other,
+    // which is worse than either being wrong on its own: the Overview and the
+    // Power tab disagree about what colour the accent is.
+    //
+    // **`Brightness`, not `ThemeMode`.** Two modes resolve to one brightness -
+    // `ThemeMode.dark` and a `ThemeMode.system` on a dark phone - and what the
+    // panels read is the palette, not the preference. Hashing the mode would
+    // rebuild every bound subtree on a preference change that painted no
+    // different pixel.
+    AppTheme.brightness,
   );
 
   /// Binds a polling-driven subtree to one listenable and one token.
@@ -2431,7 +2453,12 @@ double? _pvPeakForWindow() {
       // thing you want to check most often is the thing furthest from the top.
       () => Bound(
         listenable: _cctvKeepAlive,
-        token: '$_cctvUrl|$_selectedIndex',
+        // **`AppTheme.brightness` is in this token for the same reason it is in
+        // `_visualToken`.** `CctvScreen`'s standby overlay is drawn from
+        // `AppPalette`/`AppSurfaces`, and without the brightness a light/dark
+        // switch left the play glyph and its ring painted in the other theme's
+        // accent until the next poll.
+        token: '$_cctvUrl|$_selectedIndex|${AppTheme.brightness}',
         builder: () => CctvScreen(
           streamUrl: _cctvUrl,
           // Hydroponics is tab 2 of the four in `AppDestination` order. The
@@ -2480,7 +2507,7 @@ double? _pvPeakForWindow() {
       // lands rather than below three charts.
       () => Bound(
         listenable: _cctvKeepAlive,
-        token: '$_cctvUrlFish|$_selectedIndex',
+        token: '$_cctvUrlFish|$_selectedIndex|${AppTheme.brightness}',
         builder: () =>
             CctvScreen(streamUrl: _cctvUrlFish, isVisible: _selectedIndex == 3),
       ),
