@@ -136,11 +136,15 @@ class _DotMatrixPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final grid = _gridFor(condition);
     final cell = size.shortestSide / _rows;
-    // **0.42 of the cell, and the number is the style.** A dot that fills its
-    // cell reads as a solid blob and the gaps vanish; one that is much under
-    // half reads as dust. 0.42 leaves a clear gutter between lamps at every
-    // size, so the grid still looks like a grid at 22 dp and at 96.
-    final radius = cell * 0.21;
+    // **0.58 of the cell, up from 0.42, and the measurement is why.**
+    //
+    // At 0.42 and a 22 dp box the dots were **0.84 dp across**. Measured, not
+    // guessed: that is smaller than the gap between them, so the glyph stopped
+    // reading as a picture and became texture - the user saw "11 px" because
+    // eleven sub-pixel specks in a row is what it actually is. 0.58 closes the
+    // gap to a third of a cell, so neighbouring lamps almost touch and the shape
+    // carries the eye instead of the spacing.
+    final radius = cell * 0.29;
     final paint = Paint()..color = color;
     for (var y = 0; y < _rows; y++) {
       final row = grid[y];

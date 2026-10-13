@@ -38,6 +38,40 @@ void main() {
       }
     });
 
+    // **A dot you cannot see is not a dot.** At 22 dp with the radius this shipped
+    // at first, each lamp measured **0.84 dp across** - smaller than the gap
+    // beside it, so eleven of them in a row read as texture rather than as a
+    // picture, and the user reported the mark as "11 px". The threshold is on
+    // the dot, not on the box, because the box is what was fine.
+    testWidgets('a lamp is big enough to read, not just to exist', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            // The size the Overview panel actually uses.
+            body: Center(child: DotGlyph(SkyCondition.clear, size: 72)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final box = tester.getSize(find.byType(DotGlyph));
+      final cell = box.width / 11;
+      final diameter = cell * 0.58;
+      expect(
+        diameter,
+        greaterThan(3.0),
+        reason:
+            'each lamp is $diameter dp across at ${box.width} dp, which '
+            'reads as texture rather than as a shape',
+      );
+      // **And the lamps still nearly touch.** A dot that fills its own cell
+      // stops being a grid; one that leaves a wide gap stops being a picture.
+      expect(diameter, greaterThan(cell * 0.5));
+      expect(diameter, lessThan(cell * 0.66));
+    });
+
     testWidgets('the mark is square and the requested size', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -107,29 +141,69 @@ void main() {
     });
   });
 
-  group('OverviewPanel draws the sky mark on SKY_STATE', () {
-    // The row that carries it is the one the user asked for, so this is the
-    // assertion that says it is wired at all. The glyph only appears when there
-    // is a reading: a mark beside `--` would be a confident picture of a sky
-    // nobody measured.
-    testWidgets('the mark appears only when lux is known', (tester) async {
-      Future<void> pump(double? lux) => tester.pumpWidget(
+  group('OverviewPanel draws the sky as a block of its own', () {
+    // **72 dp, and the number is the whole point of the change.** The mark was
+    // 22 dp inline on the `SKY_STATE` row, where the lamps measured 0.84 dp
+    // across - smaller than the gap beside them, so eleven of them in a row read
+    // as texture. The user reported it as "11 px", which is exactly what eleven
+    // dots that size are.
+    testWidgets('the block is large enough to be looked at', (tester) async {
+      tester.view.physicalSize = const Size(381, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: OverviewPanel(readings: OverviewReadings(lux: lux)),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(381, 1400)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: OverviewPanel(
+                  readings: const OverviewReadings(lux: 16000),
+                ),
+              ),
             ),
           ),
         ),
       );
-
-      await pump(16000);
       await tester.pumpAndSettle();
+
+      expect(
+        tester.getSize(find.byType(DotGlyph)).width,
+        greaterThanOrEqualTo(64),
+        reason: 'the sky mark is still small enough to read as decoration',
+      );
+      // **The name is under it, not beside it.** A shape and its label stacked
+      // are one unit; side by side they are two rows of a table, which is what
+      // the inline version was.
+      expect(find.text('SKY_STATE'), findsOneWidget);
+      expect(find.text('PARTLY CLOUDY'), findsOneWidget);
+    });
+
+    // **A sky nobody measured says so.** The block is always drawn - a gap in
+    // the panel would look like a layout fault - but the mark is muted and the
+    // label reads NO READING, because a dot matrix is a confident drawing of a
+    // condition and `--` is not one.
+    testWidgets('an absent reading is named rather than drawn', (tester) async {
+      tester.view.physicalSize = const Size(381, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(381, 1400)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: OverviewPanel(readings: const OverviewReadings()),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
       expect(find.byType(DotGlyph), findsOneWidget);
-
-      await pump(null);
-      await tester.pumpAndSettle();
-      expect(find.byType(DotGlyph), findsNothing);
+      expect(find.text('NO READING'), findsOneWidget);
+      expect(find.text('PARTLY CLOUDY'), findsNothing);
     });
   });
 }

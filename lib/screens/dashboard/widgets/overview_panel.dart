@@ -288,19 +288,16 @@ class OverviewPanel extends StatelessWidget {
           unit: 'lx',
           divider: false,
         ),
-        TerminalRow(
-          label: 'SKY_STATE',
-          value: r.lux == null ? '--' : skyConditionFor(r.lux!).label,
-          // **The dot matrix, and it is drawn from the same lux as the word.**
-          // One call to `skyConditionFor` feeds both, so the mark and the label
-          // can never disagree - which is the failure mode of storing the
-          // condition twice, one as text and one as an icon.
-          //
-          // Nothing when there is no reading: a glyph next to `--` would be a
-          // confident picture of a sky nobody has measured.
-          glyph: r.lux == null ? null : DotGlyph(skyConditionFor(r.lux!)),
-          divider: false,
-        ),
+        // **A block, not a row.** The mark was inline on `SKY_STATE` at 22 dp, and
+        // measured that put its dots at 0.84 dp across - sub-pixel specks, which
+        // is a texture and not a picture. The user read it as "11 px", which is
+        // exactly what eleven dots that small are.
+        //
+        // So it gets its own row and its own space, the way the reference does:
+        // the sky is the one thing on this panel that has a *shape*, and it is
+        // the only reading a grower glances at rather than reads. Giving it a
+        // label column beside it competes with the number it is meant to replace.
+        _SkyBlock(condition: r.lux == null ? null : skyConditionFor(r.lux!)),
         // **No bar under the sky rows.** There are two meters in this panel and
         // only one of them is actionable — `BAT_SOC` opens the Battery view.
         // A second bar under `SKY_STATE` read as a second shortcut and drew the
@@ -456,6 +453,62 @@ class OverviewPanel extends StatelessWidget {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// The sky, drawn large, with its condition named underneath.
+///
+/// **72 dp and centred, and both halves of that are decisions.** 72 is roughly
+/// three times the inline size that measured as texture, which puts the dots at
+/// 3.8 dp across - a lamp you can actually see. Centred because a mark that is
+/// left-aligned under a label reads as a caption on that label rather than as a
+/// figure in its own right.
+///
+/// The word is under the mark rather than beside it, for the same reason the
+/// reference is arranged that way: a shape and its name stacked read as one
+/// unit, and side by side they read as two rows of a table.
+class _SkyBlock extends StatelessWidget {
+  const _SkyBlock({required this.condition});
+
+  /// Null when there has been no reading, and then the block says so rather
+  /// than drawing a sky nobody measured.
+  final SkyCondition? condition;
+
+  @override
+  Widget build(BuildContext context) {
+    final known = condition != null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Semantics(
+            label: known ? 'Sky: ${condition!.label}' : 'Sky: no reading',
+            excludeSemantics: true,
+            child: DotGlyph(
+              // `--` rather than a picture: an unknown sky has no shape, and
+              // the dot matrix is a confident drawing of a condition.
+              condition ?? SkyCondition.night,
+              size: 72,
+              color: known
+                  ? AppSurfaces.onSurface
+                  : AppSurfaces.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            known ? 'SKY_STATE' : 'SKY_STATE  --',
+            style: AppType.slotMicro.copyWith(
+              color: known ? AppPalette.error : AppSurfaces.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            known ? condition!.label.toUpperCase() : 'NO READING',
+            style: AppType.slotKey.copyWith(color: AppSurfaces.onSurface),
+          ),
+        ],
+      ),
     );
   }
 }
