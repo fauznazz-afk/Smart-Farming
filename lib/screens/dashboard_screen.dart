@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../utils/csv_export.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
@@ -244,6 +249,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// user supplies them — see `_loadPreferences`.
   double? _electricityTariffPerKwh;
   double? _pvInstalledWp;
+
+  /// Whether a CSV is being fetched and built, so the action cannot be pressed
+  /// twice and a second fetch cannot race the first one's share sheet.
+  bool _exportingCsv = false;
   static const _energyForecastService = EnergyForecastService();
 
   // ── Refresh & preferences ────────────────────────────────────────────────────
@@ -2019,6 +2028,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => const SizedBox(height: 8),
       () => _dateStrip(),
       () => const SizedBox(height: 8),
+      // **Under the date strip, not in the app bar.** The strip is what chooses
+      // the range this exports, and the app bar is shared by all four tabs — the
+      // user already had a control removed from there for reading as clutter
+      // next to the wordmark. A text action belongs beside the control it acts
+      // on, and a CSV is not something to reach for on every visit.
+      () => _exportCsvAction(),
       () => _bindRevision(_liveRevision, () => _overviewPanel()),
       // **Cost and array performance, below the panel that reports the kWh it
       // is derived from.**
@@ -2177,6 +2192,115 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// `DateTime.now()` and ignores the selected date, so a card bound to the date
   /// strip and integrals of its own would show last-today's window while the row
   /// above it showed something else.
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  Widget _exportCsvAction() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _exportingCsv ? null : _exportCsv,
+        icon: _exportingCsv
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.download_outlined, size: 16),
+        label: Text(
+          _exportingCsv ? 'Preparing CSV…' : 'Export CSV for this period',
+        ),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: AppSurfaces.onSurfaceVariant,
+          textStyle: AppType.slotMicro,
+        ),
+      ),
+    );
+  }
+
+  /// Fetches every telemetry key for the selected window and shares a CSV.
+  ///
+  /// **It fetches rather than dumping what is on screen.** `_history` only holds
+  /// the current tab's prefix, so exporting it would produce a file whose columns
+  /// depend on which tab the user happened to be on — a CSV that silently
+  /// changes shape is worse than no CSV at all.
+  ///
+  /// **Columns are prefixed with the device.** The four devices publish keys
+  /// this app knows about and nothing currently collides, so a bare key name
+  /// would work today. It would not survive a second voltage sensor, and the
+  /// collision would overwrite one column with another rather than fail.
+  Future<void> _exportCsv() async {
+    if (_exportingCsv) return;
+    setState(() => _exportingCsv = true);
+    try {
+      final window = historyTimeWindow(
+        rangeStart: _selectedRangeStart ?? _selectedDate,
+        rangeEnd: _selectedRangeEnd,
+        now: DateTime.now(),
+      );
+      final columns = <String, List<TelemetryPoint>>{};
+      for (final entry in ThingsBoardApi.deviceKeysById.entries) {
+        final prefix = _deviceColumnPrefix(entry.key);
+        final histories = await widget.api.fetchHistoryForKeys(
+          entry.key,
+          entry.value,
+          start: window.start,
+          end: window.end,
+          intervalMs: 30 * 60 * 1000,
+          limit: 2000,
+        );
+        for (final series in histories.entries) {
+          columns['$prefix.${series.key}'] = series.value;
+        }
+      }
+      if (!mounted) return;
+      final csv = buildTelemetryCsv(history: columns);
+      if (csv.isEmpty) {
+        _showExportNote('Nothing was recorded in this period.');
+        return;
+      }
+      final stamp = describeHistoryRange(
+        selectedDate: _selectedDate,
+        rangeStart: _selectedRangeStart,
+        rangeEnd: _selectedRangeEnd,
+        now: DateTime.now(),
+      );
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'EnerGrow telemetry',
+          subject: 'EnerGrow telemetry — $stamp',
+          files: [
+            XFile.fromData(
+              Uint8List.fromList(utf8.encode(csv)),
+              mimeType: 'text/csv',
+              name: 'energrow.csv',
+            ),
+          ],
+          fileNameOverrides: ['energrow.csv'],
+        ),
+      );
+    } catch (error) {
+      if (mounted) _showExportNote('Could not export: $error');
+    } finally {
+      if (mounted) setState(() => _exportingCsv = false);
+    }
+  }
+
+  /// A stable, short column prefix per device, so a file from two installations
+  /// of this app reads the same way.
+  static String _deviceColumnPrefix(String deviceId) => switch (deviceId) {
+    ThingsBoardApi.devicePzem => 'pzem',
+    ThingsBoardApi.deviceBattery => 'bat',
+    ThingsBoardApi.deviceSensor => 'env',
+    ThingsBoardApi.deviceFish => 'fish',
+    _ => 'dev',
+  };
+
+  void _showExportNote(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Widget? _costSummaryPanel() {
     if (_electricityTariffPerKwh == null && _pvInstalledWp == null) return null;
     return CostSummaryPanel(
