@@ -106,21 +106,28 @@ class EnergyForecastService {
         ? null
         : usage.reduce((a, b) => a.value >= b.value ? a : b);
 
+    // **`remain_capacity_ah` is already the energy that is left in the pack, so
+    // it is multiplied by the pack voltage and nothing else.**
+    //
+    // This used to be `capacity * (soc / 100)`, which counted the state of
+    // charge twice: the BMS derives `soc` from `remain_capacity_ah` and
+    // `full_capacity_ah`, so the two are not independent measurements. The error
+    // was invisible on a full pack — at 94% the runtime read 6% low, which looks
+    // like rounding — and grew as the pack emptied: at 30% it claimed less than a
+    // third of the runtime that was actually left, which is the opposite of what
+    // a runtime figure is for. `full_capacity_ah` is published separately, and
+    // that is the key a SOC multiplier would have needed.
     double? depletionHours;
-    final socValue = soc?.value;
-    if (socValue != null && socValue > 0) {
-      final capacity =
-          remainingAh != null && voltage != null
-              ? remainingAh.value * voltage.value / 1000
-              : null;
-      final loadWatts = estimateBatteryDischargeWatts(
-        latest: latest,
-        solar: production,
-        usage: usage,
-      );
-      if (capacity != null && capacity > 0 && loadWatts != null && loadWatts > 0) {
-        depletionHours = capacity * (socValue / 100) / (loadWatts / 1000);
-      }
+    final capacity = remainingAh != null && voltage != null
+        ? remainingAh.value * voltage.value / 1000
+        : null;
+    final loadWatts = estimateBatteryDischargeWatts(
+      latest: latest,
+      solar: production,
+      usage: usage,
+    );
+    if (capacity != null && capacity > 0 && loadWatts != null && loadWatts > 0) {
+      depletionHours = capacity / (loadWatts / 1000);
     }
 
     final progress =

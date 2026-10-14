@@ -152,9 +152,13 @@ void main() {
 
   group('battery runtime projection', () {
     test('uses the battery discharge, not the AC peak', () {
-      // 30 Ah remaining at 48 V is 1.44 kWh. At 94% SOC that is 1.3536 kWh.
-      // Dividing by a 30 W discharge gives ~45 h; using the 16 W AC peak would
-      // have claimed ~85 h.
+      // 30 Ah remaining at 48 V is 1.44 kWh. Dividing by a 30 W discharge gives
+      // 48 h; using the 16 W AC peak would have claimed ~90 h.
+      //
+      // **And nothing multiplies that by the SOC again.** This case used to
+      // expect 45.1 h, because the remaining capacity was scaled by 94% on top
+      // of already being the remaining capacity. The 6% gap here is the size of
+      // the bug on a nearly-full pack; on a pack at 30% it was a factor of three.
       final result = const EnergyForecastService().calculate(
         referenceDate: DateTime(2026, 1, 1, 21),
         history: {
@@ -175,7 +179,7 @@ void main() {
         },
       );
 
-      expect(result.batteryDepletionHours, closeTo(45.1, 0.5));
+      expect(result.batteryDepletionHours, closeTo(48.0, 0.5));
       expect(result.peakUsageWatts, 16, reason: 'peak usage is a separate stat');
     });
 
@@ -193,6 +197,34 @@ void main() {
       );
 
       expect(result.batteryDepletionHours, isNull);
+    });
+
+    // **The runtime depends on the energy that is left, not on the percentage.**
+    // Two packs with the same remaining capacity at different states of charge
+    // have the same time to empty, because `remain_capacity_ah` already carries
+    // the state of charge. A SOC multiplier makes the second case report a third
+    // of the first, which is the shape of the old bug and the reason this is
+    // pinned separately from the expected value above.
+    test('same remaining capacity gives the same runtime at any SOC', () {
+      double? runtimeAt(double soc) => const EnergyForecastService()
+          .calculate(
+            referenceDate: DateTime(2026, 1, 1, 21),
+            history: {
+              'power': [
+                TelemetryPoint(timestamp: DateTime(2026, 1, 1, 21), value: 30),
+              ],
+            },
+            latest: {
+              'soc': soc,
+              'power': 30,
+              'voltage': 48,
+              'remain_capacity_ah': 30,
+            },
+          )
+          .batteryDepletionHours;
+
+      expect(runtimeAt(94), closeTo(48.0, 1e-9));
+      expect(runtimeAt(30), closeTo(runtimeAt(94)!, 1e-9));
     });
   });
 }
