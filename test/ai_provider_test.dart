@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/models/telemetry_model.dart';
 import 'package:plts_monitoring/utils/ai_provider.dart';
 
 void main() {
@@ -255,6 +256,56 @@ void main() {
     });
   });
 
+  group('buildTelemetrySummaryWithHistory', () {
+    // **The daily-kWh rows integrate power, and the integration is the part that
+    // can be silently wrong.** The row is labelled `kWh`, so summing the raw
+    // samples would print a number that reads as energy while being something
+    // else. These pin the trapezoid and the zero guard.
+    test('integrates power over time into kWh per day', () {
+      final today = DateTime.now();
+      DateTime at(int hour) =>
+          DateTime(today.year, today.month, today.day, hour);
+
+      final summary = buildTelemetrySummaryWithHistory(
+        devices: const {},
+        history: {
+          // A 0 -> 2000 W ramp over one hour: 1000 Wh = 1 kWh.
+          'power_dc': [
+            TelemetryPoint(timestamp: at(1), value: 0),
+            TelemetryPoint(timestamp: at(2), value: 2000),
+          ],
+          // A steady 500 W for two hours: 1000 Wh = 1 kWh.
+          'power_ac': [
+            TelemetryPoint(timestamp: at(1), value: 500),
+            TelemetryPoint(timestamp: at(3), value: 500),
+          ],
+        },
+      );
+
+      expect(summary, contains('daily kWh (last 7 days):'));
+      expect(summary, contains('solar=1 kWh'));
+      expect(summary, contains('load=1 kWh'));
+    });
+
+    test('a flat zero history adds no row', () {
+      final today = DateTime.now();
+      DateTime at(int hour) =>
+          DateTime(today.year, today.month, today.day, hour);
+
+      final summary = buildTelemetrySummaryWithHistory(
+        devices: const {},
+        history: {
+          'power_dc': [
+            TelemetryPoint(timestamp: at(1), value: 0),
+            TelemetryPoint(timestamp: at(2), value: 0),
+          ],
+        },
+      );
+
+      expect(summary, isNot(contains('solar=')));
+    });
+  });
+
   group('provider table', () {
     test('every preset is https and has a default model except custom', () {
       for (final preset in kAiProviderPresets) {
@@ -328,6 +379,36 @@ void main() {
             reason: '${preset.label} defaults to a retired model. Check the '
                 "provider's own model list before changing this.");
       }
+    });
+  });
+
+  group('parseOpenAiStreamChunk', () {
+    // A real Groq stream opens with `delta: {content: ""}` and closes with
+    // `delta: {}`, and both used to be counted as content. The empty bubble on
+    // the device came from the first of those.
+    test('empty content is not a delta', () {
+      expect(
+        parseOpenAiStreamChunk('data: {"choices":[{"delta":{"content":""}}]}'),
+        isNull,
+      );
+    });
+
+    test('a missing content key is not a delta', () {
+      expect(
+        parseOpenAiStreamChunk('data: {"choices":[{"delta":{}}]}'),
+        isNull,
+      );
+    });
+
+    test('real content passes through', () {
+      expect(
+        parseOpenAiStreamChunk('data: {"choices":[{"delta":{"content":"12.4 W"}}]}'),
+        '12.4 W',
+      );
+    });
+
+    test('[DONE] is not a delta', () {
+      expect(parseOpenAiStreamChunk('data: [DONE]'), isNull);
     });
   });
 }

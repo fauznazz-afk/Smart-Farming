@@ -212,9 +212,15 @@ class AiChatService {
     final decoder = utf8.decoder;
     String buffer = '';
     bool done = false;
+    int streamedBytes = 0;
 
     await for (final chunk in streamed.stream.timeout(_timeout)) {
       if (done) continue;
+      streamedBytes += chunk.length;
+      if (streamedBytes > _maxReplyBytes) {
+        client.close();
+        throw const AiChatException('The model reply was too large to read.');
+      }
       buffer += decoder.convert(chunk);
 
       // Split on double newline (SSE event separator)
@@ -225,10 +231,26 @@ class AiChatService {
         if (preset.isAnthropic) {
           final delta = parseAnthropicStreamChunk(event);
           if (delta != null) yield delta;
+          // Anthropic signals completion with message_stop event
+          if (event.contains('event: message_stop')) {
+            done = true;
+            break;
+          }
         } else {
           final delta = parseOpenAiStreamChunk(event);
           if (delta != null) yield delta;
-          if (event.trim() == 'data: [DONE]') {
+          // OpenAI signals completion with [DONE] or finish_reason
+          final trimmed = event.trim();
+          if (trimmed == 'data: [DONE]') {
+            done = true;
+            break;
+          }
+          // Some providers send finish_reason without [DONE]. It must be a
+          // *string* value: every intermediate chunk carries
+          // `"finish_reason": null`, and a bare `contains('"finish_reason"')`
+          // matched those too, ending the stream on the first chunk.
+          if (trimmed.startsWith('data: ') &&
+              RegExp(r'"finish_reason"\s*:\s*"').hasMatch(trimmed)) {
             done = true;
             break;
           }

@@ -68,6 +68,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   void dispose() {
+    // Clean up any partial streaming message so it doesn't persist
+    // if the user navigates away mid-stream
+    if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+      final msg = _messages[_streamingIndex!];
+      if (msg.text.trim().isEmpty) {
+        _messages.removeAt(_streamingIndex!);
+      }
+    }
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -94,29 +102,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _scrollToEnd();
 
     try {
-      final stream = _service.askStream(
-        preset: settings.preset,
-        apiKey: settings.apiKey,
-        model: settings.model,
-        telemetrySummary: widget.telemetrySummary,
-        history: _messages.sublist(0, _messages.length - 2), // exclude the empty assistant msg
-        question: sanitized,
-      );
-      
-      await for (final chunk in stream) {
-        if (!mounted) return;
-        setState(() {
-          if (_streamingIndex != null && _streamingIndex! < _messages.length) {
-            final current = _messages[_streamingIndex!];
-            _messages[_streamingIndex!] = AiTurn(
-              role: current.role,
-              text: current.text + chunk,
-            );
-          }
-        });
-        _scrollToEnd();
-      }
-      
+      await _askStreaming(settings: settings, question: sanitized);
+
       // Streaming complete
       if (!mounted) return;
       setState(() => _streamingIndex = null);
@@ -153,29 +140,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _scrollToEnd();
 
     try {
-      final stream = _service.askStream(
-        preset: settings.preset,
-        apiKey: settings.apiKey,
-        model: settings.model,
-        telemetrySummary: widget.telemetrySummary,
-        history: _messages.sublist(0, _messages.length - 2),
-        question: question,
-      );
-      
-      await for (final chunk in stream) {
-        if (!mounted) return;
-        setState(() {
-          if (_streamingIndex != null && _streamingIndex! < _messages.length) {
-            final current = _messages[_streamingIndex!];
-            _messages[_streamingIndex!] = AiTurn(
-              role: current.role,
-              text: current.text + chunk,
-            );
-          }
-        });
-        _scrollToEnd();
-      }
-      
+      await _askStreaming(settings: settings, question: question);
+
       if (!mounted) return;
       setState(() => _streamingIndex = null);
     } on AiChatException catch (e) {
@@ -193,6 +159,69 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _scrollToEnd();
       }
     }
+  }
+
+  /// Streams one reply into the pending assistant turn, and falls back to a
+  /// single non-streaming call when the stream delivers nothing.
+  ///
+  /// **The fallback exists because a provider is free to ignore `stream: true`
+  /// and answer with one JSON body.** The SSE parser reads no events from that,
+  /// so the `await for` completes with zero chunks — a silent empty bubble, which
+  /// is the "the assistant does not answer" report. One non-streaming call is
+  /// cheap and turns that case into a reply.
+  ///
+  /// Throws [AiChatException] when neither path yields text, so the caller
+  /// surfaces the reason rather than an empty bubble. Both call sites (`_send`
+  /// and `_retryLastQuestion`) must have appended `user` + an empty `assistant`
+  /// turn before calling this — the history slice below assumes it.
+  Future<void> _askStreaming({
+    required AiSettings settings,
+    required String question,
+  }) async {
+    var receivedAnyChunk = false;
+    final stream = _service.askStream(
+      preset: settings.preset,
+      apiKey: settings.apiKey,
+      model: settings.model,
+      telemetrySummary: widget.telemetrySummary,
+      history: _messages.sublist(0, _messages.length - 2),
+      question: question,
+    );
+
+    await for (final chunk in stream) {
+      receivedAnyChunk = true;
+      if (!mounted) return;
+      setState(() {
+        if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+          final current = _messages[_streamingIndex!];
+          _messages[_streamingIndex!] = AiTurn(
+            role: current.role,
+            text: current.text + chunk,
+          );
+        }
+      });
+      _scrollToEnd();
+    }
+    if (receivedAnyChunk) return;
+
+    if (!mounted) return;
+    final reply = await _service.ask(
+      preset: settings.preset,
+      apiKey: settings.apiKey,
+      model: settings.model,
+      telemetrySummary: widget.telemetrySummary,
+      history: _messages.sublist(0, _messages.length - 2),
+      question: question,
+    );
+    if (reply.isEmpty) {
+      throw const AiChatException('The model returned an empty reply.');
+    }
+    if (!mounted) return;
+    setState(() {
+      if (_streamingIndex != null && _streamingIndex! < _messages.length) {
+        _messages[_streamingIndex!] = AiTurn(role: 'assistant', text: reply);
+      }
+    });
   }
 
   void _scrollToEnd() {

@@ -108,6 +108,8 @@ const List<AiProviderPreset> kAiProviderPresets = [
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
     // What Groq itself recommends as the replacement for `llama-3.3-70b-versatile`
     // on the free and developer tiers, and still classed as a Production model.
+    // Groq lists this id with the `openai/` prefix; fetching it without the
+    // prefix is a 404, so do not "tidy" it away.
     defaultModel: 'openai/gpt-oss-120b',
   ),
   AiProviderPreset(
@@ -137,13 +139,6 @@ const int kMaxQuestionChars = 500;
 /// The transcript is in-memory only and is thrown away when the screen closes,
 /// so this bound is about request size and cost, not privacy.
 const int kMaxHistoryTurns = 6;
-
-/// Upper bound on the reply, in tokens. The app renders plain text, so a long
-/// answer is a scroll, not a truncation.
-///
-/// **Not sent.** Kept as a named value because it documents the intent, but see
-/// [buildAiRequestBody]: OpenAI's current models reject `max_tokens`.
-const int kMaxReplyTokens = 900;
 
 /// Sanitises one user question before it becomes a `user` message.
 ///
@@ -327,7 +322,15 @@ String? parseAiReply(AiProviderPreset preset, Map<String, dynamic> body) {
 /// Parses a single SSE chunk from an OpenAI-compatible streaming response.
 ///
 /// Expected format: `data: {json}\n\n` where json has `choices[0].delta.content`.
-/// Returns the text delta, or null if the chunk is `[DONE]` or has no content.
+/// Returns the text delta, or null if the chunk is `[DONE]`, has no content, or
+/// carries an empty content string.
+///
+/// **An empty content string returns null, and the caller treats null as "no
+/// chunk".** Groq's first chunk carries `delta: {content: ""}` (its reasoning
+/// models stream an empty content before the first token, and the terminal
+/// chunk carries `delta: {}`), so yielding `''` counted as a received chunk,
+/// which suppressed the non-streaming fallback and left the assistant bubble
+/// empty with no error. Appending nothing is not a chunk.
 String? parseOpenAiStreamChunk(String chunk) {
   final trimmed = chunk.trim();
   if (trimmed == 'data: [DONE]') return null;
@@ -340,7 +343,7 @@ String? parseOpenAiStreamChunk(String chunk) {
     if (delta is! Map) return null;
     final content = delta['content'];
     if (content is! String) return null;
-    return content;
+    return content.isEmpty ? null : content;
   } on FormatException {
     return null;
   }
@@ -386,38 +389,45 @@ String buildTelemetrySummary({
       lines.add('- $name: no reading');
       return;
     }
-    // Only show the most relevant metrics per device
-    final importantKeys = <String>[];
-    if (name.contains('battery')) {
-      importantKeys.addAll(['soc', 'power', 'voltage', 'current']);
-    } else if (name.contains('pzem')) {
-      importantKeys.addAll(['power', 'voltage', 'current', 'energy', 'frequency', 'pf']);
-    } else if (name.contains('environment')) {
-      importantKeys.addAll(['temp', 'humidity', 'tds']);
-    } else if (name.contains('fish')) {
-      importantKeys.addAll(['ph', 'temp', 'turbidity']);
-    }
-    final shown = <String>[];
-    for (final k in importantKeys) {
-      if (values.containsKey(k)) {
-        shown.add('$k=${_round2(values[k]!)}');
-      }
-    }
-    // Fallback: if no important keys found, show first 5 keys
-    if (shown.isEmpty && values.isNotEmpty) {
-      final keys = values.keys.toList()..sort();
-      shown.addAll(keys.take(5).map((k) => '$k=${_round2(values[k]!)}'));
-    }
+    final shown = _pickImportantKeys(name, values, fallbackLimit: 5);
     lines.add('- $name: ${shown.join(', ')}');
   });
   if (totals.isNotEmpty) {
     final keys = totals.keys.toList()..sort();
     lines.add(
-      '- totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
+      '- period totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
     );
   }
   if (lines.isEmpty) return emptyNote;
   return lines.join('\n');
+}
+
+List<String> _pickImportantKeys(
+  String name,
+  Map<String, double> values, {
+  int fallbackLimit = 5,
+}) {
+  final importantKeys = <String>[];
+  if (name.contains('battery')) {
+    importantKeys.addAll(['soc', 'power', 'voltage', 'current']);
+  } else if (name.contains('pzem')) {
+    importantKeys.addAll(['power', 'voltage', 'current', 'energy', 'frequency', 'pf']);
+  } else if (name.contains('environment')) {
+    importantKeys.addAll(['temp', 'humidity', 'tds']);
+  } else if (name.contains('fish')) {
+    importantKeys.addAll(['ph', 'temp', 'turbidity']);
+  }
+  final shown = <String>[];
+  for (final k in importantKeys) {
+    if (values.containsKey(k)) {
+      shown.add('$k=${_round2(values[k]!)}');
+    }
+  }
+  if (shown.isEmpty && values.isNotEmpty) {
+    final keys = values.keys.toList()..sort();
+    shown.addAll(keys.take(fallbackLimit).map((k) => '$k=${_round2(values[k]!)}'));
+  }
+  return shown;
 }
 
 String _round2(double value) =>
@@ -427,8 +437,10 @@ String _round2(double value) =>
 ///
 /// [devices] - live telemetry per device (existing behavior)
 /// [totals] - period totals like solar_kwh_today, load_kwh_today (existing)
-/// [history] - optional Map of device key -> List of historical TelemetryPoint
-///             for the last 7 days. If provided, daily kWh summaries are added.
+/// [history] - optional Map of telemetry key -> List of historical TelemetryPoint
+///             for the last 7 days. Keys are raw telemetry keys like
+///             'power_dc', 'power_ac', 'power'. Daily kWh is computed by
+///             integrating power over time.
 String buildTelemetrySummaryWithHistory({
   required Map<String, Map<String, double>> devices,
   Map<String, double> totals = const {},
@@ -436,74 +448,76 @@ String buildTelemetrySummaryWithHistory({
   String emptyNote = 'No telemetry is available yet.',
 }) {
   final lines = <String>[];
-  
+
   // Live devices (concise)
   devices.forEach((name, values) {
     if (values.isEmpty) {
       lines.add('- $name: no reading');
       return;
     }
-    final importantKeys = <String>[];
-    if (name.contains('battery')) {
-      importantKeys.addAll(['soc', 'power', 'voltage']);
-    } else if (name.contains('pzem')) {
-      importantKeys.addAll(['power', 'voltage', 'current']);
-    } else if (name.contains('environment')) {
-      importantKeys.addAll(['temp', 'humidity', 'tds']);
-    } else if (name.contains('fish')) {
-      importantKeys.addAll(['ph', 'temp', 'turbidity']);
-    }
-    final shown = <String>[];
-    for (final k in importantKeys) {
-      if (values.containsKey(k)) {
-        shown.add('$k=${_round2(values[k]!)}');
-      }
-    }
-    if (shown.isEmpty && values.isNotEmpty) {
-      final keys = values.keys.toList()..sort();
-      shown.addAll(keys.take(3).map((k) => '$k=${_round2(values[k]!)}'));
-    }
+    final shown = _pickImportantKeys(name, values, fallbackLimit: 3);
     lines.add('- $name: ${shown.join(', ')}');
   });
-  
-  // Period totals
+
+  // Period totals (includes today's solar/load kWh)
   if (totals.isNotEmpty) {
     final keys = totals.keys.toList()..sort();
     lines.add(
-      '- totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
+      '- period totals: ${keys.map((k) => '$k=${_round2(totals[k]!)}').join(', ')}',
     );
   }
-  
-  // Historical daily summaries (last 7 days) - only solar/load kWh
+
+  // Historical daily summaries (last 7 days) - compute kWh from power history
   if (history.isNotEmpty) {
     lines.add('- daily kWh (last 7 days):');
     final now = DateTime.now();
+
+    // Power keys that represent energy flow we can integrate
+    // PV solar -> power_dc, AC load -> power_ac, Battery -> power
+    final powerKeys = {
+      'solar': ['power_dc'],
+      'load': ['power_ac'],
+      'battery': ['power'],
+    };
+
     for (int i = 0; i < 7; i++) {
       final day = now.subtract(Duration(days: i));
       final dayStart = DateTime(day.year, day.month, day.day);
       final dayEnd = dayStart.add(const Duration(days: 1));
       final dayStr = '${day.day}/${day.month}';
-      
+
       final dayLines = <String>[];
-      // Only show solar and load energy
-      for (final key in ['solar_kwh', 'load_kwh', 'energy', 'solar_energy']) {
-        final points = history[key];
-        if (points != null) {
-          final dayPoints = points.where((p) => 
-            p.timestamp.isAfter(dayStart) && p.timestamp.isBefore(dayEnd)).toList();
-          if (dayPoints.isNotEmpty) {
-            final values = dayPoints.map((p) => p.value).toList()..sort();
-            final sum = values.fold(0.0, (a, b) => a + b);
-            dayLines.add('$key=${_round2(sum)} kWh');
+
+      powerKeys.forEach((label, keys) {
+        for (final key in keys) {
+          final points = history[key];
+          if (points != null) {
+            final dayPoints = points.where((p) =>
+              p.timestamp.isAfter(dayStart) && p.timestamp.isBefore(dayEnd)).toList();
+            if (dayPoints.isNotEmpty) {
+              // Integrate power (W) over time to get energy (Wh), then /1000 = kWh
+              // Assume roughly constant power between samples; trapezoid rule
+              double wh = 0.0;
+              for (int j = 1; j < dayPoints.length; j++) {
+                final p1 = dayPoints[j - 1];
+                final p2 = dayPoints[j];
+                final dtHours = p2.timestamp.difference(p1.timestamp).inSeconds / 3600.0;
+                wh += (p1.value + p2.value) / 2.0 * dtHours;
+              }
+              if (wh > 0.001) { // Only show if meaningful
+                dayLines.add('$label=${_round2(wh / 1000.0)} kWh');
+              }
+            }
           }
         }
-      }
+      });
+
       if (dayLines.isNotEmpty) {
         lines.add('  $dayStr: ${dayLines.join(', ')}');
       }
     }
   }
-  
+
   if (lines.isEmpty) return emptyNote;
   return lines.join('\n');
 }
