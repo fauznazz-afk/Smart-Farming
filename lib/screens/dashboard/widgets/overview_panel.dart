@@ -38,8 +38,18 @@ import 'package:flutter/material.dart';
 import '../../../utils/battery_sign.dart';
 import '../../../utils/solar_irradiance.dart';
 import '../utils/design_tokens.dart';
-import 'dot_glyph.dart';
 import 'terminal_panel.dart';
+
+/// Returns a simple icon for the sky condition.
+Widget _skyIcon(SkyCondition condition, {double size = 24, Color? color}) {
+  final icon = switch (condition) {
+    SkyCondition.clear => Icons.wb_sunny_rounded,
+    SkyCondition.partlyCloudy => Icons.wb_cloudy_rounded,
+    SkyCondition.overcast => Icons.cloud_rounded,
+    SkyCondition.night => Icons.nightlight_round,
+  };
+  return Icon(icon, size: size, color: color ?? AppSurfaces.onSurfaceVariant);
+}
 
 /// The panel's inputs, resolved once by the screen.
 ///
@@ -77,6 +87,7 @@ class OverviewReadings {
     this.weekly = false,
     this.activeAlerts = 0,
     this.staleDevices = const [],
+    this.isLive = false,
   });
 
   /// The grower's name, for the header. Empty until the profile loads.
@@ -167,6 +178,10 @@ class OverviewReadings {
 
   /// Names of devices that stopped reporting.
   final List<String> staleDevices;
+
+  /// Whether the data source is live (realtime websocket connected).
+  /// Drives the subtle pulse on the hero figure.
+  final bool isLive;
 }
 
 /// The whole Overview readout.
@@ -223,6 +238,7 @@ class OverviewPanel extends StatelessWidget {
             ('Peak', slotNumber(r.pvPeak ?? r.pvPower ?? 0, decimals: 0)),
             ('Stale', r.pzemStale ? 'YES' : 'NO'),
           ],
+          isLive: r.isLive,
         ),
         const TerminalRule(),
 
@@ -257,8 +273,16 @@ class OverviewPanel extends StatelessWidget {
           // a continuous fill and became a flat contradiction the moment the bar
           // was segmented: 0% over eight lit blocks. The right caption had it
           // right all along, so the two now read from one expression.
-          leftCaption: 'BAT_SOC ${r.soc == null ? '--' : slotNumber(r.soc, decimals: 0)}%',
-          rightCaption: r.soc == null ? '--' : '${slotNumber(r.soc, decimals: 0)}%  100%',
+          leftCaption:
+              'BAT_SOC ${r.soc == null ? '--' : slotNumber(r.soc, decimals: 0)}%',
+          // **The right caption is the scale, not the value again.** It read
+          // `'58%  100%'` while the left one already said `BAT_SOC 58%`, so the
+          // same two characters were printed twice on one 8 dp line with nothing
+          // between them — the one place on the panel where the eye had to stop
+          // and work out which was the reading. The widget's own doc says the
+          // two ends of the bar are the caption's job; the value belongs on the
+          // left, next to its slot name, and the scale on the right.
+          rightCaption: '0%   100%',
           onTap: onOpenBattery,
         ),
         TerminalRow(
@@ -280,7 +304,13 @@ class OverviewPanel extends StatelessWidget {
           divider: false,
         ),
 
-        const TerminalRule(),
+        // **This one stays.** The hero is the only block on the panel that is
+        // not a list of labelled rows, so the full-width rule under it carries a
+        // distinction the other three do not — they only ever followed a row,
+        // and a row followed by a row is a table.
+        // **No full-width rule here any more.** The heading now runs into its own
+        // leader rule, so the old one drew a second line 12 dp above it and every
+        // section boundary acquired a pair of rules.
         _section('SKY'),
         TerminalRow(
           label: 'LUX',
@@ -309,9 +339,9 @@ class OverviewPanel extends StatelessWidget {
           // neighbours.
           trailing: r.lux == null
               ? null
-              : DotGlyph(
+              : _skyIcon(
                   skyConditionFor(r.lux!),
-                  size: 44,
+                  size: 28,
                   color: AppSurfaces.onSurfaceVariant,
                 ),
           divider: false,
@@ -324,7 +354,13 @@ class OverviewPanel extends StatelessWidget {
         // anything.
         const SizedBox(height: AppSpacing.xs),
 
-        const TerminalRule(),
+        // **No full-width rule here either.** This one was left in and it is the
+        // asymmetry the whole change is about: POWER, SKY and SYSTEM lost the
+        // rule because their heading draws one, and ENERGY — the only heading
+        // with a route on it, so the only one wrapped in a `Row` — kept it and
+        // ended up with the exact pair of lines 12 dp apart that the others were
+        // cleaned of.
+        //
         // **The heading carries the report's route.** `EnergySummaryCard`'s
         // `onOpenReport` was the only other caller of `_openEnergyReport`, so
         // dropping that card would have left the full report unreachable from
@@ -387,7 +423,9 @@ class OverviewPanel extends StatelessWidget {
             divider: false,
           ),
 
-        const TerminalRule(),
+        // **No full-width rule here any more.** The heading now runs into its own
+        // leader rule, so the old one drew a second line 12 dp above it and every
+        // section boundary acquired a pair of rules.
         _section('SYSTEM'),
         TerminalRow(
           label: 'ALARMS',
@@ -398,8 +436,25 @@ class OverviewPanel extends StatelessWidget {
         TerminalRow(
           label: 'METER_AGE',
           value: r.pzemAgeLabel ?? '--',
+          // **The small size, and it is the reason `valueStyle` exists.** Every
+          // other value on this panel is a figure, so `slotValue`'s 24 px was
+          // correct by default — and this one is a sentence. `Updated 3 minutes
+          // ago` at 24 px w700 was the longest run of text on the panel and it
+          // reached nearly to the slot name, so the row's eye stopped there
+          // instead of on `ALARMS` and `OFFLINE` directly above and below it.
+          // Freshness is metadata about the feed, and the meter caption above
+          // already reports the one number that matters.
+          valueStyle: AppType.slotValueSmall,
           alert: r.pzemStale,
-          divider: r.staleDevices.isEmpty,
+          // **Always false.** This was `divider: r.staleDevices.isEmpty`, which
+          // is the same condition as the closing rule below — so in the
+          // no-stale-device case `METER_AGE`'s own `Divider` and that rule were
+          // both drawn, one directly under the other with nothing between them.
+          // Two 1 px lines with zero gap between them read as one 2 px line.
+          // And in the stale case the rule was suppressed, leaving `OFFLINE`
+          // as the last thing in the card with nothing closing it.
+          // One closing rule, unconditional; no row draws one here.
+          divider: false,
         ),
         if (r.staleDevices.isNotEmpty)
           TerminalRow(
@@ -408,8 +463,7 @@ class OverviewPanel extends StatelessWidget {
             alert: true,
             divider: false,
           ),
-        if (r.staleDevices.isEmpty)
-          const TerminalRule(),
+        const TerminalRule(),
       ],
     );
   }
@@ -432,7 +486,24 @@ class OverviewPanel extends StatelessWidget {
   /// [OverviewReadings.pvPeak], which the dashboard computes from the history it
   /// already holds.
 
-  /// A section heading: a small monospace key above a group of rows.
+  /// A section heading: a small monospace key that introduces a group of rows.
+  ///
+  /// **The heading runs into a leader rule, and that is what gives it weight.**
+  /// At 10 px it was the smallest text on the panel, and nothing around it said
+  /// "this starts a group" — so `POWER` and `SKY` read as two more row labels
+  /// in a list of eighteen, and the panel was one long undifferentiated column
+  /// with four hairlines in it. The rule carries the heading to the right edge,
+  /// which turns a floating word into the head of a ruled block.
+  ///
+  /// **Its weight stays the token's `w500`.** `design_tokens_test.dart` states
+  /// the invariant as "the panel scale is exactly two weights, and the split is
+  /// keys vs values" — and that test reads the tokens, so a `copyWith` at a call
+  /// site drifts past it silently. A third weight would have been the third
+  /// thing standing in for structure, and the rule is structure.
+  ///
+  /// The rule is the theme's own `Divider` — the same one [TerminalRule] draws,
+  /// and un-tinted. A coloured rule here would be a drawn edge on the card,
+  /// which is the one thing this app's surface system exists to avoid.
   ///
   /// [onTap] makes the heading a route rather than a decoration — see the note
   /// at the ENERGY heading for why the route lives here.
@@ -442,35 +513,51 @@ class OverviewPanel extends StatelessWidget {
       style: AppType.slotMicro.copyWith(color: AppPalette.error),
     );
     return Padding(
-      // **Top `sm`, bottom `xs`.** `md`/`md` was 12 dp of air on both sides, so
-      // a heading floated in the middle of its own whitespace instead of sitting
-      // against the rows it introduces. A heading belongs to what is under it.
+      // **Top `md`, bottom `xs`.** The first of these was `sm`/`xs` on the
+      // argument that "a heading belongs to what is under it", which is true and
+      // was half the problem: with 8 dp of air above and only the rows' own 9 dp
+      // below, the heading sat in the middle of its own whitespace. Top 12
+      // against bottom 4 puts it against the rows and lets the rule above it
+      // supply the separation.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
-        AppSpacing.sm,
+        AppSpacing.md,
         AppSpacing.cardPadding,
         AppSpacing.xs,
       ),
       child: onTap == null
-          ? text
+          ? _ruled(text)
           : InkWell(
               onTap: onTap,
               // A heading is full-bleed to the panel's padding, so the ripple has
               // to be given the same shape or it draws a rounded blob inside a
               // square strip.
               borderRadius: AppRadius.all(AppRadius.badge),
-              child: Row(
-                children: [
-                  text,
-                  const SizedBox(width: AppSpacing.xs),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 12,
-                    color: AppSurfaces.onSurfaceVariant,
-                  ),
-                ],
-              ),
+              child: _ruled(text, chevron: true),
             ),
+    );
+  }
+
+  /// The heading text, an optional route chevron, then a hairline out to the
+  /// panel's right padding.
+  static Widget _ruled(Widget text, {bool chevron = false}) {
+    return Row(
+      children: [
+        text,
+        if (chevron) ...[
+          const SizedBox(width: AppSpacing.xs),
+          Icon(
+            Icons.chevron_right,
+            size: 12,
+            color: AppSurfaces.onSurfaceVariant,
+          ),
+        ],
+        const SizedBox(width: AppSpacing.sm),
+        // `CrossAxisAlignment.center` hands this loose vertical constraints, so
+        // `Divider`'s own 1 dp height holds and the rule sits on the text's
+        // optical centre rather than underlining it.
+        const Expanded(child: Divider()),
+      ],
     );
   }
 }
@@ -524,7 +611,17 @@ class _Header extends StatelessWidget {
           // `OFFLINE` in full; repeating them as chips at the top means the
           // reader sees the same fact twice in two different vocabularies.
           if (r.activeAlerts > 0)
-            TerminalTag(text: '${r.activeAlerts} alarm', alert: true)
+            // **Pluralised.** `TerminalTag` uppercases what it is given, so a bare
+            // `'alarm'` printed as `3 ALARM` — and it is a tag on a panel whose
+            // whole argument is that its labels are precise. One alarm and many
+            // alarms are also two different states of the system, not two ways
+            // of writing the same one.
+            TerminalTag(
+              text: r.activeAlerts == 1
+                  ? '1 alarm'
+                  : '${r.activeAlerts} alarms',
+              alert: true,
+            )
           else if (r.pzemStale || r.batteryStale)
             TerminalTag(text: 'Stale', alert: true),
         ],

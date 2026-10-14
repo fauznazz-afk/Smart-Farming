@@ -142,12 +142,10 @@ void main() {
     });
   });
   group('OverviewPanel carries the sky mark on SKY_STATE', () {
-    // **44 dp at the right edge, and both numbers were answers to a complaint.**
-    // 22 dp put each lamp at 0.84 dp, smaller than the gaps between them, and
-    // the mark read as texture - the user counted the lamps and said "11 px". A
-    // centred 72 dp block fixed the size and broke the layout: in a column of
-    // 43 dp rows it read as a section heading. So the size is 44 and the slot is
-    // `trailing`.
+    // **At the right edge, past the value, as the last thing in the row.** The
+    // mark was a 44 dp dot matrix on its own block, then moved onto the row as
+    // a `trailing`; the slot name keeps the left edge and the mark owns the
+    // right one.
     testWidgets('the mark is on the row, at the end of it', (tester) async {
       tester.view.physicalSize = const Size(381, 1400);
       tester.view.devicePixelRatio = 1.0;
@@ -168,33 +166,25 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final row = find.ancestor(
-        of: find.byType(DotGlyph),
-        matching: find.byType(TerminalRow),
-      );
+      // 16000 lx is `partlyCloudy`, so the mark is the cloud-behind-sun icon.
+      final mark = find.byIcon(Icons.wb_cloudy_rounded);
+      final row = find.ancestor(of: mark, matching: find.byType(TerminalRow));
       expect(row, findsOneWidget, reason: 'the mark belongs to the SKY row');
 
-      final size = tester.getSize(find.byType(DotGlyph)).width;
-      expect(size, greaterThanOrEqualTo(40), reason: 'still too small to read');
+      final size = tester.getSize(mark).width;
+      expect(size, greaterThanOrEqualTo(24), reason: 'still too small to read');
 
       // **At the right edge, past the value.** The slot name keeps the left
       // edge, and the mark is the last thing in the row.
-      final mark = tester.getRect(find.byType(DotGlyph));
-      final value = tester.getRect(find.text('Partly cloudy'));
       expect(
-        mark.left,
-        greaterThan(value.right),
+        tester.getRect(mark).left,
+        greaterThan(tester.getRect(find.text('Partly cloudy')).right),
         reason: 'the mark is not past the value, so it is not on the right',
-      );
-      expect(
-        value.right - mark.right,
-        lessThan(40),
-        reason: 'the mark is floating in the middle rather than on the edge',
       );
     });
 
-    // **No reading, no mark.** A dot matrix is a confident drawing of a
-    // condition, and `--` is not one.
+    // **No reading, no mark.** An icon is a confident drawing of a condition,
+    // and `--` is not one.
     testWidgets('an absent reading draws no mark', (tester) async {
       tester.view.physicalSize = const Size(381, 1400);
       tester.view.devicePixelRatio = 1.0;
@@ -213,7 +203,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(DotGlyph), findsNothing);
+      for (final icon in const [
+        Icons.wb_sunny_rounded,
+        Icons.wb_cloudy_rounded,
+        Icons.cloud_rounded,
+        Icons.nightlight_round,
+      ]) {
+        expect(find.byIcon(icon), findsNothing, reason: '$icon with no reading');
+      }
       expect(find.text('--'), findsWidgets);
     });
   });

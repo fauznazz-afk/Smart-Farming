@@ -89,11 +89,16 @@ class MetricGrid extends StatelessWidget {
       staleMinutes,
       specs,
     );
-    final breached = specs
-        .where((spec) => verdicts.isBreached(spec))
-        .length;
+    final breached = specs.where((spec) => verdicts.isBreached(spec)).length;
 
     return TerminalPanel(
+      // **Its own title, not `TerminalPanel`'s `'Overview'` default.**
+      // `MetricGrid` draws the Environment and Water Quality panels as well as
+      // anything else, and the default was still in force at this call site —
+      // so every one of them was announced to a screen reader as "Overview".
+      // The parameter was made a parameter precisely so this could stop
+      // happening, and then nobody passed it.
+      semanticLabel: title,
       header: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.cardPadding,
@@ -231,7 +236,11 @@ class _SpecRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.cardPadding,
-              0,
+              // `kTerminalGapAbove`, not 0 — this caption stands exactly where
+              // `TerminalMeter`'s own caption stands, so it has to be given the
+              // same top gap or the cell shifts 4 dp depending on whether the
+              // spec happened to have a bar.
+              kTerminalGapAbove,
               AppSpacing.cardPadding,
               AppSpacing.md,
             ),

@@ -47,7 +47,7 @@ class DeviceTelemetry {
 
   DeviceTelemetry({required this.latestValues, this.lastUpdate});
 
-/// Parse response dari endpoint /values/timeseries (latest only)
+  /// Parse response dari endpoint /values/timeseries (latest only)
   /// Format: { "power": [{"ts":..., "value":"12.5"}], "soc": [{"ts":..., "value":"97"}] }
   ///
   /// **A key whose payload is not a readable number is left out of the map
@@ -151,8 +151,15 @@ class DeviceTelemetry {
     if (lastUpdate == null) return 'No data yet';
     final age = DateTime.now().difference(lastUpdate!);
     if (age.inMinutes < 1) return 'Just now';
+    // **Singular at 1.** `inMinutes` counts whole minutes, so a reading that is
+    // 61 s old prints "1 minutes ago" — and this string is drawn next to a
+    // value on the Overview panel, where a grammar slip reads as a bug in the
+    // number rather than a typo in the label.
+    if (age.inMinutes == 1) return 'Updated 1 minute ago';
     if (age.inHours < 1) return 'Updated ${age.inMinutes} minutes ago';
+    if (age.inHours == 1) return 'Updated 1 hour ago';
     if (age.inDays < 1) return 'Updated ${age.inHours} hours ago';
+    if (age.inDays == 1) return 'Updated 1 day ago';
     return 'Updated ${age.inDays} days ago';
   }
 }

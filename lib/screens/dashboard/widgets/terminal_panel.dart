@@ -175,9 +175,9 @@ class TerminalRow extends StatelessWidget {
 
   /// Makes the whole row a target.
   ///
-  /// **A row is 43 dp tall, which clears the 48 dp minimum on its own** — unlike
-  /// the meter's 6 dp bar, which is why that one needed its captions inside the
-  /// hit region and this one does not.
+  /// **The row is ~47 dp tall, which is the 48 dp minimum to within a dp** —
+  /// unlike the meter's 6 dp bar, which is why that one needed its captions
+  /// inside the hit region and this one does not.
   final VoidCallback? onTap;
 
   @override
@@ -186,9 +186,11 @@ class TerminalRow extends StatelessWidget {
     final body = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.cardPadding,
-        // 7, not 9. This panel should read as a packed readout; the extra 2 dp
-        // per row is air on a page whose whole claim is density.
-        vertical: 7,
+        // 9, not 7. The row was 43 dp tall while the doc below claimed that
+        // "clears the 48 dp minimum" — it did not, by 5 dp. A reading you are
+        // meant to act on is the one row here that navigates, so it is the one
+        // that has to be reachable with a thumb. 9 lands it at 47-48.
+        vertical: 9,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -251,10 +253,7 @@ class TerminalRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          if (glyph != null) ...[
-            glyph!,
-            const SizedBox(width: AppSpacing.xs),
-          ],
+          if (glyph != null) ...[glyph!, const SizedBox(width: AppSpacing.xs)],
           // **The value is the one thing that must never be shortened**, so it is
           // outside the `FittedBox` and the *unit* is the one that yields when
           // the row is tight. `kW` becoming `k` would be wrong; `W` becoming
@@ -392,13 +391,19 @@ class _Dot extends StatelessWidget {
 /// because the tracking on the display scale is tuned for a short headline and a
 /// live figure with changing digit count needs the tighter, tabular setting — a
 /// value that changes width on every poll makes the whole panel twitch.
-class TerminalHero extends StatelessWidget {
+///
+/// **Lively:** while the array is producing and the feed is live, the glow
+/// pulses gently. Over a zero, or over a stale reading, it rests — a calm zero
+/// is honest, and a breathing glow over one would be the panel claiming activity
+/// it cannot back up.
+class TerminalHero extends StatefulWidget {
   const TerminalHero({
     super.key,
     required this.figure,
     required this.unit,
     required this.slot,
     this.secondary = const [],
+    this.isLive = false,
   });
 
   /// The main number, as the sensor reported it.
@@ -421,6 +426,69 @@ class TerminalHero extends StatelessWidget {
   /// Right-hand stats, as `(key, value)` pairs.
   final List<(String, String)> secondary;
 
+  /// Whether the data source is live (realtime). Drives the subtle pulse.
+  final bool isLive;
+
+  @override
+  State<TerminalHero> createState() => _TerminalHeroState();
+}
+
+class _TerminalHeroState extends State<TerminalHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  /// The glow at rest. **0.34, down from 0.55.**
+  ///
+  /// An 88 px figure carrying a *constant* halo is no longer a reading, it is a
+  /// light source — the eye is pulled to the halo's edge rather than to the
+  /// number inside it, and the row values below it, which are what the page is
+  /// actually for, all read as secondary to a lamp. Dimmed to the point where
+  /// you notice it only if you look for it.
+  static const double _restStrength = 0.34;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1800),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 0.26, end: 0.42).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _updatePulse();
+  }
+
+  @override
+  void didUpdateWidget(TerminalHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updatePulse();
+  }
+
+  void _updatePulse() {
+    final hasPower =
+        widget.figure != '--' &&
+        double.tryParse(widget.figure.replaceAll(',', '')) != null &&
+        double.parse(widget.figure.replaceAll(',', '')) > 0;
+    // **Pulse only while the array is producing and the feed is live.** A glow
+    // that breathes over a zero, or over a stale reading, would be the panel
+    // claiming activity it cannot back up.
+    final shouldPulse = hasPower && widget.isLive;
+    if (shouldPulse && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!shouldPulse && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -433,22 +501,18 @@ class TerminalHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // **One header row: slot on the left, legend on the right.** The stats
-          // were briefly below the figure, which put a second line of small text
-          // under a 72 dp glyph and made the block read as a caption and a
-          // footnote rather than as a number with a legend.
           Row(
             children: [
               Text(
-                slot,
+                widget.slot,
                 style: AppType.slotKey.copyWith(color: AppPalette.error),
               ),
               const Spacer(),
-              if (secondary.isNotEmpty)
+              if (widget.secondary.isNotEmpty)
                 Wrap(
                   spacing: AppSpacing.md,
                   children: [
-                    for (final (key, value) in secondary)
+                    for (final (key, value) in widget.secondary)
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -471,33 +535,59 @@ class TerminalHero extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                figure,
-                // **The glow is the whole "menyala" claim, and it is the only
-                // lever there is.** The accent cannot get more saturated:
-                // `color_helpers_test.dart` holds it to 4.5:1 on `surfaceMuted`
-                // and the search for a more saturated red that still clears it
-                // comes back empty, because the luminance floor that contrast
-                // implies pins the value at about `#FF6B6B`. So brightness comes
-                // from the shadow around it rather than from the fill.
-                style: AppType.heroFigure.copyWith(
-                  color: AppPalette.error,
-                  shadows: AppShadows.glow(AppPalette.error, strength: 0.55),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                unit,
-                style: AppType.heroUnit.copyWith(
-                  color: AppSurfaces.onSurfaceVariant,
-                ),
-              ),
-            ],
+          // 8, from 4. The slot name and the secondary stats sit directly above an
+          // 88 dp figure, and at 4 dp the cap-height of the figure touched the
+          // descenders of the row it is labelled by.
+          const SizedBox(height: AppSpacing.sm),
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              final strength = _pulseController.isAnimating
+                  ? _pulseAnimation.value
+                  : _restStrength;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  // **`Flexible` + `FittedBox`, for the same reason every other
+                  // figure on this panel carries it — and here the overflow is
+                  // on the largest element in the app.** At 1.0 scale an 88 px
+                  // monospace digit is ~53 dp, so `10000` is ~265 dp against
+                  // ~379 dp of card and fits. At the 2.0 system font scale it is
+                  // ~424 dp and the row is over by ~45: a hard `RenderFlex`
+                  // overflow, drawn as a yellow-and-black stripe across the
+                  // hero, on a phone with large text enabled. The figure shrinks
+                  // before the unit does, which is the right order — `W` is three
+                  // characters and `10000` is five.
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.figure,
+                        maxLines: 1,
+                        style: AppType.heroFigure.copyWith(
+                          color: AppPalette.error,
+                          shadows: AppShadows.glow(
+                            AppPalette.error,
+                            strength: strength,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    widget.unit,
+                    maxLines: 1,
+                    style: AppType.heroUnit.copyWith(
+                      color: AppSurfaces.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -565,10 +655,13 @@ class TerminalTag extends StatelessWidget {
 /// make the blocks read as blocks. The glow stays, per block: this is the one
 /// surface on the panel where the accent is meant to emit.
 ///
+/// **Lively:** the fill animates smoothly when the fraction changes, using
+/// [AppMotion.state] (200ms ease-out) to reflect real-time updates.
+///
 /// The block height is explicit and `stretch` is load-bearing — a `Row` passes
 /// loose vertical constraints, and a childless `DecoratedBox` under loose
 /// constraints collapses to zero. That is the exact bar that shipped in 1.9.1.
-class TerminalMeter extends StatelessWidget {
+class TerminalMeter extends StatefulWidget {
   const TerminalMeter({
     super.key,
     required this.fraction,
@@ -601,127 +694,200 @@ class TerminalMeter extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<TerminalMeter> createState() => _TerminalMeterState();
+}
+
+class _TerminalMeterState extends State<TerminalMeter>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+  double _prevFraction = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: AppMotion.state, vsync: this);
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _prevFraction = widget.fraction;
+    _controller.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(TerminalMeter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.fraction != oldWidget.fraction) {
+      _prevFraction = oldWidget.fraction.clamp(0.0, 1.0);
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final clamped = fraction.isNaN ? 0.0 : fraction.clamp(0.0, 1.0);
     // **The fill is the panel's red accent whether or not this meter is
     // alerting.** `alert` no longer changes the colour, because red is already
     // the accent — a second shade of it would say "worse" in a way the panel
     // cannot back up, and the row's own value already carries severity.
-    final fill = color ?? AppPalette.error;
-    // **The proportion is quantised to whole blocks, and that is the bar.** 20
-    // blocks on a ~349 dp track is a ~15 dp block and a 2 dp gap, which reads as a
-    // segmented gauge at phone width and still resolves 5% steps — finer than the
-    // caption's `NN%`, so the bar never claims more precision than the label.
-    final lit = (clamped * _segmentCount).round().clamp(0, _segmentCount);
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // **The block row is a `Positioned.fill` on the track, not a sibling.** A
-        // non-positioned child lets the `Stack` size to it and hand it loose
-        // constraints, which is how the 1.9.1 meter drew an empty track at 95%.
-        SizedBox(
-          height: 6,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(color: AppSurfaces.track),
-                ),
+    final fill = widget.color ?? AppPalette.error;
+    final clamped = widget.fraction.isNaN
+        ? 0.0
+        : widget.fraction.clamp(0.0, 1.0);
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        // Interpolate between previous and current fraction
+        final t = _animation.value;
+        final interpolatedFraction =
+            _prevFraction + (clamped - _prevFraction) * t;
+        // **The proportion is quantised to whole blocks, and that is the bar.** 20
+        // blocks on a ~349 dp track is a ~15 dp block and a 2 dp gap, which reads
+        // as a segmented gauge at phone width and still resolves 5% steps —
+        // finer than the caption's `NN%`, so the bar never claims more precision
+        // than the label.
+        final lit = (interpolatedFraction * _segmentCount).round().clamp(
+          0,
+          _segmentCount,
+        );
+
+        final body = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // **The block row is a `Positioned.fill` on the track, not a sibling.**
+            // A non-positioned child lets the `Stack` size to it and hand it loose
+            // constraints, which is how the 1.9.1 meter drew an empty track at 95%.
+            SizedBox(
+              // **8 dp, up from 6.** The bar is the only element on the panel
+              // that answers "how full", and at 6 dp on a 47 dp row it read as a
+              // rule that happened to be red on one end. 8 keeps it flat-ended
+              // and square — the two things `terminal_panel_test.dart` pins —
+              // and only gives it enough body to look like a gauge.
+              height: 8,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: AppSurfaces.track),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < _segmentCount; i++) ...[
+                          if (i > 0) const SizedBox(width: _segmentGap),
+                          Expanded(
+                            child: i < lit
+                                ? DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: fill,
+                                      boxShadow: AppShadows.glow(fill),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Positioned.fill(
-                // **`crossAxisAlignment: stretch` is load-bearing, and it is the
-                // same trap as the `Align` that this replaced.** A `Row` hands its
-                // children *loose* vertical constraints, and a `DecoratedBox` with
-                // no child under loose constraints collapses to
-                // `constraints.smallest` — every block would be 0 dp tall with the
-                // right width, exactly the bar that shipped in 1.9.1. `stretch`
-                // makes each block take the 6 dp the row already has.
+            ),
+            if (widget.leftCaption != null || widget.rightCaption != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (var i = 0; i < _segmentCount; i++) ...[
-                      if (i > 0) const SizedBox(width: _segmentGap),
-                      Expanded(
-                        child: i < lit
-                            ? DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: fill,
-                                  // **The glow stays, per block.** The meter is the
-                                  // panel's one "this accent emits" surface.
-                                  boxShadow: AppShadows.glow(fill),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+                    Text(
+                      widget.leftCaption ?? '',
+                      style: AppType.slotMicro.copyWith(
+                        color: AppSurfaces.onSurfaceVariant,
                       ),
-                    ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      widget.rightCaption ?? '',
+                      style: AppType.slotMicro.copyWith(
+                        color: AppSurfaces.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-        if (leftCaption != null || rightCaption != null)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            child: Row(
-              children: [
-                Text(
-                  leftCaption ?? '',
-                  style: AppType.slotMicro.copyWith(
-                    color: AppSurfaces.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  rightCaption ?? '',
-                  style: AppType.slotMicro.copyWith(
-                    color: AppSurfaces.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          ],
+        );
+
+        if (widget.onTap == null) {
+          return Padding(padding: _inset, child: body);
+        }
+        return Padding(
+          padding: _inset,
+          child: Semantics(
+            button: true,
+            // **And what it opens.** `button: true` on its own announces the
+            // word "button" and nothing else — the caller has to say which
+            // reading it is, because that is the one thing a sighted reader gets
+            // from the figure and a screen-reader listener does not. Built from
+            // the captions rather than from a separate argument, so it cannot
+            // drift from what the meter actually prints.
+            label: widget.leftCaption == null
+                ? 'Open the battery readings'
+                : 'Battery state of charge. ${widget.leftCaption}',
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: AppRadius.all(AppRadius.sm),
+              child: body,
             ),
           ),
-      ],
-    );
-
-    if (onTap == null) {
-      return Padding(padding: _inset, child: body);
-    }
-    return Padding(
-      padding: _inset,
-      child: Semantics(
-        button: true,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.all(AppRadius.sm),
-          child: body,
-        ),
-      ),
+        );
+      },
     );
   }
-
-  /// Blocks across the whole track.
-  static const int _segmentCount = 20;
-
-  /// The gap between two blocks. Thin, because a wide gap makes the bar read as
-  /// a row of buttons rather than as one meter at a level.
-  static const double _segmentGap = 2;
-
-  /// The meter's own inset, kept in one place.
-  ///
-  /// **Two call sites needed it and one of them was wrong.** The untappable
-  /// branch padded unconditionally; the tappable branch has to pad *outside* the
-  /// `InkWell` so the ripple is clipped to the meter's box rather than running
-  /// under the panel's edge. Having the padding as a field is what stops the
-  /// two from being written separately and disagreeing.
-  static const EdgeInsets _inset = EdgeInsets.fromLTRB(
-    AppSpacing.cardPadding,
-    0,
-    AppSpacing.cardPadding,
-    AppSpacing.md,
-  );
 }
+
+/// Blocks across the whole track.
+const int _segmentCount = 20;
+
+/// The gap between two blocks. Thin, because a wide gap makes the bar read as
+/// a row of buttons rather than as one meter at a level.
+const double _segmentGap = 2;
+
+/// The air between a `TerminalRow` and the non-row content directly under it.
+///
+/// **Two call sites, and they disagreed.** The meter pads itself by this;
+/// `MetricGrid`'s caption-only fallback — the row it draws when a spec has a
+/// limit but no meter fraction — wrote its own `Padding` with a top of `0`. So
+/// one cell's caption sat 4 dp higher than the rest of the column, and which
+/// cell it was depended on whether the bar happened to exist for that spec.
+const double kTerminalGapAbove = AppSpacing.xs;
+
+/// The meter's own inset, kept in one place.
+///
+/// **Two call sites needed it and one of them was wrong.** The untappable
+/// branch padded unconditionally; the tappable branch has to pad *outside* the
+/// `InkWell` so the ripple is clipped to the meter's box rather than running
+/// under the panel's edge. Having the padding as a field is what stops the
+/// two from being written separately and disagreeing.
+const EdgeInsets _inset = EdgeInsets.fromLTRB(
+  AppSpacing.cardPadding,
+  // **`kTerminalGapAbove`, from 0.** The bar is the only element on the panel
+  // that is not a `TerminalRow`, so it has no row padding of its own to inherit
+  // and was landing flush against the value above it — `BAT_FLOW`'s figure sat
+  // one hairline away from a red gauge that belongs to the row *below* it. On a
+  // panel that draws its depth from hairlines, touching is the same as joined.
+  kTerminalGapAbove,
+  AppSpacing.cardPadding,
+  AppSpacing.md,
+);
 
 /// A full-width hairline inside the panel.
 ///

@@ -117,7 +117,12 @@ void main() {
       );
       expect(
         historySelectionKey(rangeStart: start),
-        isNot(historySelectionKey(rangeStart: start, rangeEnd: DateTime(2026, 3, 2))),
+        isNot(
+          historySelectionKey(
+            rangeStart: start,
+            rangeEnd: DateTime(2026, 3, 2),
+          ),
+        ),
       );
     });
   });
@@ -212,10 +217,7 @@ void main() {
 
     test('describes today as the rolling 24 hour window', () {
       expect(
-        describeHistoryRange(
-          selectedDate: DateTime(2026, 3, 10, 9),
-          now: now,
-        ),
+        describeHistoryRange(selectedDate: DateTime(2026, 3, 10, 9), now: now),
         'Last 24 hours',
       );
     });
@@ -364,6 +366,59 @@ void main() {
         describeCacheAge(DateTime.now().subtract(const Duration(days: 2))),
         '2 days ago',
       );
+    });
+
+    // **The singular is the whole point of this second case.** Both formatters
+    // printed "1 minutes ago" and both were fixed separately; only one of them
+    // has a test, so the other one silently regressed.
+    test('is singular at exactly one', () {
+      expect(
+        describeCacheAge(DateTime.now().subtract(const Duration(minutes: 1))),
+        '1 minute ago',
+      );
+      expect(
+        describeCacheAge(DateTime.now().subtract(const Duration(hours: 1))),
+        '1 hour ago',
+      );
+      expect(
+        describeCacheAge(DateTime.now().subtract(const Duration(days: 1))),
+        '1 day ago',
+      );
+    });
+  });
+
+  group('pvPeakWatts', () {
+    final at = DateTime(2026, 10, 14);
+    List<TelemetryPoint> pts(List<double> values) => [
+      for (final v in values) TelemetryPoint(timestamp: at, value: v),
+    ];
+
+    test('is the max of the window', () {
+      expect(pvPeakWatts(pts([10, 286, 120])), 286);
+    });
+
+    // **The live reading is in the window, because the hero beside it is.**
+    // The panel printed `PEAK 286` under a hero reading `291`, which is a peak
+    // below the present value — a contradiction on the row whose whole claim is
+    // "the best this period has managed".
+    test('includes the live reading, which history alone can trail', () {
+      expect(pvPeakWatts(pts([10, 286]), livePower: 291), 291);
+      expect(pvPeakWatts(pts([10, 400]), livePower: 291), 400);
+    });
+
+    // **Nothing known is null, not zero** — a zero here would claim the array
+    // produced nothing, which is a different and wrong claim.
+    test('no data is null rather than zero', () {
+      expect(pvPeakWatts(const []), isNull);
+      expect(pvPeakWatts(const [], livePower: null), isNull);
+      expect(pvPeakWatts(pts([double.nan, -3])), isNull);
+    });
+
+    // **A negative sample must not lower the peak.** A sensor reporting -1 V
+    // during a reboot is a dropout, not a production of negative watts.
+    test('skips NaN and negative samples without discarding the rest', () {
+      expect(pvPeakWatts(pts([-1, 5, double.nan, 9, -2])), 9);
+      expect(pvPeakWatts(pts([-1, -2]), livePower: -5), isNull);
     });
   });
 

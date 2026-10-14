@@ -361,6 +361,48 @@ void main() {
     });
   });
 
+  group('the hero never overflows', () {
+    // **The one figure in the app with no `Flexible` on it, at the one font
+    // scale that breaks it.** An 88 px monospace digit is ~53 dp, so the largest
+    // value the panel can draw — `10000` W, a 10 kW array at noon — is ~265 dp
+    // against ~379 dp of card and fits at 1.0. At 2.0 it is ~424 dp and the row
+    // is over by ~45, which paints a hard `RenderFlex` overflow stripe across
+    // the page's largest element. `takeException` is the whole assertion: an
+    // overflow is thrown as an exception, not drawn as a warning.
+    for (final figure in ['0', '286', '10000']) {
+      testWidgets('$figure survives a 2.0 system font', (tester) async {
+        tester.view.physicalSize = const Size(381, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(size: Size(381, 900))
+                  .copyWith(textScaler: const TextScaler.linear(2.0)),
+              child: Scaffold(
+                body: SingleChildScrollView(
+                  child: TerminalPanel(
+                    children: [
+                      TerminalHero(figure: figure, unit: 'W', slot: 'PV_OUT'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'the hero overflowed its row',
+        );
+      });
+    }
+  });
+
   group('rows never clip their own text', () {
     // **The vocabulary has no short words.** `Discharging` and
     // `Heavily overcast` are values this panel actually renders, and on the

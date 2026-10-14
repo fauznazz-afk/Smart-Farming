@@ -1479,18 +1479,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// this screen's state, and the whole point of the layering rule in AGENTS.md
   /// is that a widget receives its data instead of reaching into a screen.
   String _aiTelemetrySummary() => buildTelemetrySummaryWithHistory(
-        devices: {
-          'battery': _battery?.latestValues ?? const {},
-          'pzem meter': _pzem?.latestValues ?? const {},
-          'environment sensor': _sensor?.latestValues ?? const {},
-          'fish tank sensor': _fish?.latestValues ?? const {},
-        },
-        totals: {
-          'solar_kwh_today': _solarKwh,
-          'load_kwh_today': _loadKwh,
-        },
-        history: _history,
-      );
+    devices: {
+      'battery': _battery?.latestValues ?? const {},
+      'pzem meter': _pzem?.latestValues ?? const {},
+      'environment sensor': _sensor?.latestValues ?? const {},
+      'fish tank sensor': _fish?.latestValues ?? const {},
+    },
+    totals: {'solar_kwh_today': _solarKwh, 'load_kwh_today': _loadKwh},
+    history: _history,
+  );
 
   void _openAiAssistant() {
     Navigator.push(
@@ -2073,7 +2070,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         // mid-switchover can report a small negative the same way the BMS
         // reports `-0.01 A`, and a peak that is the *highest* reading is not
         // the *least negative* one.
-        pvPeak: _pvPeakForWindow(),
+        pvPeak: _pvPeakForWindow(pzem?.latestValues['power_dc']),
         acPower: pzem?.latestValues['power_ac'],
         // Read from the BMS's own `power` key, never multiplied out from
         // voltage and current. The device reports all three, and deriving it
@@ -2124,6 +2121,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         weekly: _weeklyEnergySummary,
         activeAlerts: _activeAlertIds.length,
         staleDevices: _staleDeviceNames(),
+        isLive: _realtimeConnected,
       ),
       // **Both routes the panel replaced a card for.** `SystemStatusStrip` and
       // `EnergySummaryCard` were the only callers of these two; removing those
@@ -2163,28 +2161,20 @@ class _DashboardScreenState extends State<DashboardScreen>
   // which is the gap this fills.
 
   /// The highest PV output in the selected window, or null when there is none.
-///
-/// **Read from the history the chart already holds**, rather than tracked in the
-/// panel as values arrive. A running max in a widget is a max since the app
-/// launched: it resets on every cold start and on every process death, which for
-/// something labelled "Peak" is a claim that silently stops being true. The
-/// series is the one `chart_groups.dart` points the PV chart at, so the number
-/// here and the plot cannot describe different periods.
-double? _pvPeakForWindow() {
-  var peak = double.negativeInfinity;
-  var seen = false;
-  for (final key in chartKeysForPrefix('pv')) {
-    for (final point in _history[key] ?? const <TelemetryPoint>[]) {
-      final value = point.value;
-      if (value.isNaN || value < 0) continue;
-      seen = true;
-      if (value > peak) peak = value;
-    }
-  }
-  return seen ? peak : null;
-}
+  ///
+  /// **Read from the history the chart already holds**, rather than tracked in the
+  /// panel as values arrive. A running max in a widget is a max since the app
+  /// launched: it resets on every cold start and on every process death, which for
+  /// something labelled "Peak" is a claim that silently stops being true. The
+  /// arithmetic and the two reasons it is only over `power_dc` live in
+  /// [pvPeakWatts]; the only thing decided here is which window, which is what
+  /// makes this number and the plot describe the same period.
+  double? _pvPeakForWindow(double? livePower) => pvPeakWatts(
+    _history['power_dc'] ?? const <TelemetryPoint>[],
+    livePower: livePower,
+  );
 
-/// Whether the selected day or range is anything other than today.
+  /// Whether the selected day or range is anything other than today.
   ///
   /// Compares calendar days, not instants. The strip's chips are days and
   /// `_selectedDate` arrives from `DateTime.now()` when nothing has been picked,
