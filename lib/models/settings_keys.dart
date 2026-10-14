@@ -19,6 +19,14 @@ abstract final class SettingsKeys {
   static const offlineTelemetryMinutes = 'offline_telemetry_minutes';
   static const dailyProductionTargetKwh = 'daily_production_target_kwh';
 
+  /// Rupiah per kWh. Blank means unset, and an unset tariff yields no money
+  /// figure at all rather than a row of zeros.
+  static const electricityTariffPerKwh = 'electricity_tariff_per_kwh';
+
+  /// The array's nameplate in watts. Blank means the user has not said, and
+  /// every performance ratio the app could derive from it stays hidden.
+  static const pvInstalledWp = 'pv_installed_wp';
+
   // Environment alert limits
   static const environmentTempMin = 'environment_temp_min';
   static const environmentTempMax = 'environment_temp_max';

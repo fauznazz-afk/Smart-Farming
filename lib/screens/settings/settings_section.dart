@@ -5,6 +5,7 @@ import 'sections/ai_section.dart';
 import 'sections/alerts_section.dart';
 import 'sections/appearance_section.dart';
 import 'sections/background_status_section.dart';
+import 'sections/installation_section.dart';
 import 'sections/monitoring_section.dart';
 import 'settings_controller.dart';
 
@@ -60,6 +61,12 @@ List<SettingsSection> buildSettingsSections({
         subtitle: 'Set fish tank limits. Blank limits are not monitored.',
         icon: Icons.water_drop_outlined,
         builder: (_, settings) => FishAlertsSection(settings: settings),
+      ),
+      SettingsSection(
+        title: 'Installation',
+        subtitle: 'Your electricity tariff and array size. Both optional.',
+        icon: Icons.solar_power_outlined,
+        builder: (_, settings) => InstallationSection(settings: settings),
       ),
       SettingsSection(
         title: 'CCTV source',

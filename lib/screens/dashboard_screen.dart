@@ -39,6 +39,7 @@ import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
 import 'dashboard/widgets/update_banner.dart';
 import 'dashboard/widgets/chart_carousel.dart';
+import 'dashboard/widgets/cost_summary_panel.dart';
 import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
 import 'dashboard/widgets/date_strip.dart';
@@ -238,6 +239,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _loadKwh = 0;
   double _previousLoadKwh = 0;
   double? _dailyProductionTargetKwh;
+
+  /// Rupiah per kWh, and the array's nameplate in watts. Both null until the
+  /// user supplies them — see `_loadPreferences`.
+  double? _electricityTariffPerKwh;
+  double? _pvInstalledWp;
   static const _energyForecastService = EnergyForecastService();
 
   // ── Refresh & preferences ────────────────────────────────────────────────────
@@ -475,6 +481,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         preferences,
         SettingsKeys.dailyProductionTargetKwh,
       );
+      // The same two optional numbers the Settings screen writes. Null until
+      // the user supplies them, which is what hides the cost and performance
+      // card rather than filling it with zeros.
+      _electricityTariffPerKwh = _readDouble(
+        preferences,
+        SettingsKeys.electricityTariffPerKwh,
+      );
+      _pvInstalledWp = _readDouble(preferences, SettingsKeys.pvInstalledWp);
       _cctvUrl = cctvUrl;
       _cctvUrlFish = fishCctvUrl;
     });
@@ -2006,6 +2020,23 @@ class _DashboardScreenState extends State<DashboardScreen>
       () => _dateStrip(),
       () => const SizedBox(height: 8),
       () => _bindRevision(_liveRevision, () => _overviewPanel()),
+      // **Cost and array performance, below the panel that reports the kWh it
+      // is derived from.**
+      //
+      // `_energyRevision`, not `_liveRevision` or `_chartRevision`: `_solarKwh`
+      // and `_loadKwh` are memoised by `_updateMemoizedEnergy`, which only the
+      // energy-history fetch and the 24h/7d toggle write, and both bump this
+      // counter. Binding it to the ten-second poll would rebuild a panel whose
+      // numbers cannot change ten times a second.
+      //
+      // The period label comes from the same switch the ENERGY section uses, so
+      // the two blocks cannot disagree about which window they are describing.
+      () => _bindRevision(_energyRevision, () {
+        final panel = _costSummaryPanel();
+        return panel == null
+            ? const SizedBox.shrink()
+            : Column(children: [const SizedBox(height: 8), panel]);
+      }),
       // **The period summary, bound to `_chartRevision` and not `_liveRevision`.**
       //
       // It reads `_history`, which only the history fetch writes, and it reads
@@ -2134,6 +2165,40 @@ class _DashboardScreenState extends State<DashboardScreen>
       // of buttons is a lot of chrome for a panel this dense.
       onToggleEnergyPeriod: () =>
           _setWeeklyEnergySummary(!_weeklyEnergySummary),
+    );
+  }
+
+  /// The cost and performance card, or null when the user has supplied neither
+  /// a tariff nor a nameplate.
+  ///
+  /// **It reads `_solarKwh` and `_loadKwh`, the same two numbers the ENERGY
+  /// section above prints.** It could compute its own from `_energyHistory`, and
+  /// that is the version that would be wrong: `_energyComparison` is anchored on
+  /// `DateTime.now()` and ignores the selected date, so a card bound to the date
+  /// strip and integrals of its own would show last-today's window while the row
+  /// above it showed something else.
+  Widget? _costSummaryPanel() {
+    if (_electricityTariffPerKwh == null && _pvInstalledWp == null) return null;
+    return CostSummaryPanel(
+      solarKwh: _solarKwh,
+      loadKwh: _loadKwh,
+      periodLabel: _weeklyEnergySummary ? 'Last 7 days' : 'Last 24 hours',
+      // **The window's real length, not a flat 24.** `_energyComparison` ends
+      // at "now" and starts at midnight, so at 09:00 the window is nine hours.
+      // Dividing by 24 there would report the array as a quarter of as
+      // productive as it is, every morning, until noon.
+      hours: _weeklyEnergySummary
+          ? 7 * 24
+          : DateTime.now()
+                    .difference(DateTime(
+                      DateTime.now().year,
+                      DateTime.now().month,
+                      DateTime.now().day,
+                    ))
+                    .inMinutes /
+                60,
+      tariffPerKwh: _electricityTariffPerKwh,
+      installedWp: _pvInstalledWp,
     );
   }
 

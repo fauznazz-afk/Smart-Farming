@@ -21,6 +21,21 @@ class SettingsController extends ChangeNotifier {
   final fishCctvUrl = TextEditingController(text: defaultAllowedFishCctvUrl);
   final dailyTarget = TextEditingController();
 
+  /// Rupiah per kWh. **Blank by default, like [dailyTarget].**
+  ///
+  /// A shipped default here would be a guess about someone's electricity bill
+  /// presented in a settings field as though they had entered it, and every
+  /// money figure in the app would then be wrong in a way that looks right.
+  final electricityTariff = TextEditingController();
+
+  /// The array's nameplate in watts. **Blank, same reasoning.**
+  ///
+  /// This one is a measurement rather than a preference, and it is the only
+  /// number in the app the app cannot check for itself: performance ratios are
+  /// a division by it, so a wrong value here produces plausible-looking but
+  /// meaningless output rather than an obvious error.
+  final pvInstalledWp = TextEditingController();
+
   /// Environment alert limits, in display order.
   final List<EnvRangeSetting> envRanges = [
     EnvRangeSetting(
@@ -152,6 +167,9 @@ class SettingsController extends ChangeNotifier {
     staleMinutes = thresholds.staleMinutes;
     offlineMinutes = thresholds.offlineMinutes;
     dailyTarget.text = p.getString(SettingsKeys.dailyProductionTargetKwh) ?? '';
+    electricityTariff.text =
+        p.getString(SettingsKeys.electricityTariffPerKwh) ?? '';
+    pvInstalledWp.text = p.getString(SettingsKeys.pvInstalledWp) ?? '';
     cctvUrl.text = savedCctvUrl;
     fishCctvUrl.text = savedFishCctvUrl;
     // Every environment range has both keys today, but the fish list proved
@@ -213,6 +231,10 @@ class SettingsController extends ChangeNotifier {
     }
     final targetError = validateDailyTargetError(dailyTarget.text);
     if (targetError != null) return targetError;
+    final tariffError = validateTariffError(electricityTariff.text);
+    if (tariffError != null) return tariffError;
+    final capacityError = validateInstalledWpError(pvInstalledWp.text);
+    if (capacityError != null) return capacityError;
     final alertsError = validateEnvironmentAlertsEnabled(
       enabled: envAlerts,
       ranges: envRanges,
@@ -260,6 +282,12 @@ class SettingsController extends ChangeNotifier {
       await p.setInt(SettingsKeys.staleTelemetryMinutes, staleMinutes);
       await p.setInt(SettingsKeys.offlineTelemetryMinutes, offlineMinutes);
       await _saveDailyTarget(p);
+      await _saveIfNotEmpty(
+        p,
+        SettingsKeys.electricityTariffPerKwh,
+        electricityTariff.text,
+      );
+      await _saveIfNotEmpty(p, SettingsKeys.pvInstalledWp, pvInstalledWp.text);
       // A range may be missing a key on one side (turbidity is upper bound
       // only), so that side is skipped. `range.minKey!` used to throw right
       // here: after the environment values were written, before the CCTV URLs,
@@ -350,6 +378,8 @@ class SettingsController extends ChangeNotifier {
     cctvUrl.dispose();
     fishCctvUrl.dispose();
     dailyTarget.dispose();
+    electricityTariff.dispose();
+    pvInstalledWp.dispose();
     for (final range in envRanges) {
       range.dispose();
     }

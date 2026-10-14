@@ -135,6 +135,56 @@ String? validateEnvRange(
   return null;
 }
 
+/// The ceiling for a plausible rupiah-per-kWh tariff.
+///
+/// **Not a claim about what electricity costs.** It exists so a fat-fingered
+/// `1500000` cannot silently become a lifetime figure; any value above it is a
+/// miskeyed one.
+const double kMaxTariffPerKwh = 100000;
+
+/// Error message for an invalid electricity tariff, or null when valid.
+///
+/// **Blank is valid and means "not set".** The money rows are hidden entirely
+/// rather than drawn as `Rp 0`, because "you saved nothing today" and "we do
+/// not know what a kWh costs you" are different facts and only one of them is
+/// true.
+String? validateTariffError(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) return null;
+  final value = double.tryParse(text);
+  if (value == null || value <= 0) {
+    return 'The electricity tariff must be a number greater than 0.';
+  }
+  if (value > kMaxTariffPerKwh) {
+    return 'The electricity tariff cannot be above ${kMaxTariffPerKwh.toStringAsFixed(0)}.';
+  }
+  return null;
+}
+
+/// Error message for an invalid array nameplate, or null when valid.
+///
+/// **Blank is valid and means "not set".** Every performance ratio is a
+/// division by this number, so with no nameplate there is no specific yield, no
+/// full-load hours and no capacity factor — the whole card goes rather than
+/// showing a fraction of a guess.
+///
+/// **The floor is 50 W and the ceiling is 10 MW.** 50 is below any real panel
+/// and above a typo; 10 MW is above any array this app would ever meter. A
+/// zero-width floor would let `0` through and produce an infinite capacity
+/// factor, which is the one input that makes this widget divide by zero.
+String? validateInstalledWpError(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) return null;
+  final value = double.tryParse(text);
+  if (value == null || value < 50) {
+    return 'The installed capacity must be a number of watts, at least 50.';
+  }
+  if (value > 10000000) {
+    return 'The installed capacity cannot be above 10000000 W.';
+  }
+  return null;
+}
+
 /// Error message for an invalid daily production target, or null when valid.
 ///
 /// An empty field is valid and means "no target configured".
