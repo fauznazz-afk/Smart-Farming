@@ -336,6 +336,48 @@ void main() {
       expect(leftCaptions, greaterThan(0));
     });
 
+    // **One cell printed two different numbers for one reading.** The row above
+    // the bar formats at `spec.decimals`; the bar's right caption used
+    // `slotNumber`'s default of 1 and ignored the spec entirely, so a spec that
+    // declares fewer digits — `turbidity_ntu` declares 0, the sensor is good to
+    // a few percent — drew `2396` directly above `2396.5`.
+    testWidgets('the value and the meter caption agree on precision', (
+      tester,
+    ) async {
+      // A two-sided limit the default thresholds actually carry — TDS keeps no
+      // upper bound, so it draws no meter at all — declared at fewer digits
+      // than `slotNumber` defaults to.
+      const coarse = [
+        MetricSpec(
+          'temp_dht',
+          'AMBIENT_T',
+          '°C',
+          Icons.thermostat,
+          metric: 'temp_dht',
+          decimals: 0,
+        ),
+      ];
+      await tester.pumpWidget(
+        wrap(
+          MetricGrid(
+            title: 'Environment',
+            specs: coarse,
+            values: const {'temp_dht': 25.4},
+            thresholds: thresholds,
+            lastUpdate: DateTime.now(),
+          ),
+        ),
+      );
+
+      final rendered = tester
+          .widgetList<TerminalMeter>(find.byType(TerminalMeter))
+          .map((m) => m.rightCaption)
+          .whereType<String>();
+      expect(rendered, contains('25'));
+      // The un-decimalised reading must not survive anywhere in the cell.
+      expect(find.text('25.4'), findsNothing);
+    });
+
     testWidgets('draws no meter for an unwatched spec', (tester) async {
       await tester.pumpWidget(
         wrap(

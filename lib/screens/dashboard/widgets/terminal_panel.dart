@@ -447,6 +447,12 @@ class _TerminalHeroState extends State<TerminalHero>
   /// you notice it only if you look for it.
   static const double _restStrength = 0.34;
 
+  /// How many breaths the hero takes before it settles, per producing episode.
+  static const int _pulseCycles = 6;
+
+  /// Whether this episode has already used its cycles.
+  bool _pulseExhausted = false;
+
   @override
   void initState() {
     super.initState();
@@ -457,7 +463,18 @@ class _TerminalHeroState extends State<TerminalHero>
     _pulseAnimation = Tween<double>(begin: 0.26, end: 0.42).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _pulseController.addStatusListener(_onPulseStatus);
     _updatePulse();
+  }
+
+  /// Records that this producing episode has spent its cycles.
+  ///
+  /// **Needed because `didUpdateWidget` runs on every poll.** Without it, the
+  /// controller finishing its last cycle looks identical to "has not started",
+  /// and the next ten-second poll restarts the whole thing — an unbounded
+  /// animation wearing a `count`.
+  void _onPulseStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) _pulseExhausted = true;
   }
 
   @override
@@ -475,16 +492,33 @@ class _TerminalHeroState extends State<TerminalHero>
     // that breathes over a zero, or over a stale reading, would be the panel
     // claiming activity it cannot back up.
     final shouldPulse = hasPower && widget.isLive;
-    if (shouldPulse && !_pulseController.isAnimating) {
-      _pulseController.repeat(reverse: true);
-    } else if (!shouldPulse && _pulseController.isAnimating) {
-      _pulseController.stop();
+    // **A pulse that runs a set number of cycles and then rests.**
+    //
+    // `repeat()` with no count never completes, and that has two costs that are
+    // not visible in a screenshot. It repaints an 88 px shadowed glyph every
+    // single frame for as long as the Overview is open — on a page whose whole
+    // architecture is a `ValueNotifier` revision counter precisely so that
+    // *nothing* rebuilds when nothing changed. And any future test that pumps
+    // `OverviewReadings(isLive: true, pvPower: >0)` hits `pumpAndSettle()`, which
+    // waits for frames to stop and would time out.
+    //
+    // The glow ends at [_restStrength], so what is left when it settles is the
+    // same calm halo a non-animating panel would have drawn.
+    if (shouldPulse && !_pulseController.isAnimating && !_pulseExhausted) {
+      _pulseController.repeat(reverse: true, count: _pulseCycles);
+    } else if (!shouldPulse) {
+      // **The episode ends, so the next one is allowed its cycles again** — a
+      // device that recovers and stops again should re-announce that it is
+      // producing, not stay frozen at the resting glow for the rest of the day.
+      _pulseExhausted = false;
+      if (_pulseController.isAnimating) _pulseController.stop();
       _pulseController.reset();
     }
   }
 
   @override
   void dispose() {
+    _pulseController.removeStatusListener(_onPulseStatus);
     _pulseController.dispose();
     super.dispose();
   }
@@ -703,6 +737,14 @@ class _TerminalMeterState extends State<TerminalMeter>
   late final Animation<double> _animation;
   double _prevFraction = 0.0;
 
+  /// The fraction the last frame actually drew.
+  ///
+  /// **Kept separate from [_prevFraction] because the two answer different
+  /// questions.** `_prevFraction` is where the next animation starts; this is
+  /// where the bar visibly is. They are the same only when nothing is in
+  /// flight.
+  double _paintedFraction = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -712,6 +754,13 @@ class _TerminalMeterState extends State<TerminalMeter>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _prevFraction = widget.fraction;
+    // NaN- and range-safe, because a caller is allowed to pass an out-of-range
+    // fraction and `TerminalMeter` clamps only at paint time. Seeding the
+    // painted value with the raw one would carry NaN into the next
+    // interpolation and the bar would go blank instead of clamping.
+    _paintedFraction = widget.fraction.isNaN
+        ? 0.0
+        : widget.fraction.clamp(0.0, 1.0);
     _controller.value = 1.0;
   }
 
@@ -719,7 +768,9 @@ class _TerminalMeterState extends State<TerminalMeter>
   void didUpdateWidget(TerminalMeter oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.fraction != oldWidget.fraction) {
-      _prevFraction = oldWidget.fraction.clamp(0.0, 1.0);
+      // Seed from the value that was last painted, not from `oldWidget.fraction`
+      // — the two differ whenever an animation is still running.
+      _prevFraction = _paintedFraction;
       _controller.forward(from: 0.0);
     }
   }
@@ -748,6 +799,15 @@ class _TerminalMeterState extends State<TerminalMeter>
         final t = _animation.value;
         final interpolatedFraction =
             _prevFraction + (clamped - _prevFraction) * t;
+        // **Record what is actually on screen, not what it is heading for.**
+        // `_prevFraction` used to be seeded from `oldWidget.fraction`, which is
+        // the *target* of any animation still in flight rather than the value
+        // being painted. The dashboard polls every 10 s against a 200 ms
+        // animation, so that case is rare — but the one time it happens the
+        // block count jumped backwards to a value the bar had already passed
+        // and then animated forward again, and on a charging pack a 2-block
+        // drop reads as a real change in state of charge.
+        _paintedFraction = interpolatedFraction.clamp(0.0, 1.0);
         // **The proportion is quantised to whole blocks, and that is the bar.** 20
         // blocks on a ~349 dp track is a ~15 dp block and a 2 dp gap, which reads
         // as a segmented gauge at phone width and still resolves 5% steps —

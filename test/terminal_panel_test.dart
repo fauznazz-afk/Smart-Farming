@@ -403,6 +403,63 @@ void main() {
     }
   });
 
+  group('the hero pulse settles', () {
+    // **An unbounded `repeat()` never completes, and `pumpAndSettle` waits for
+    // frames to stop.** Nothing hit this before because `isLive` defaults to
+    // false and no test pumps `DashboardScreen`; the first test that pumps an
+    // Overview with live data would time out rather than fail.
+    testWidgets('a producing live hero reaches a settled frame', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(381, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: TerminalHero(
+              figure: '286',
+              unit: 'W',
+              slot: 'PV_OUT',
+              isLive: true,
+            ),
+          ),
+        ),
+      );
+      // Long enough for six 1800 ms cycles in either direction.
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TerminalHero), findsOneWidget);
+    });
+
+    // **A zero must not pulse at all** — the original rule, and the one this
+    // rewrite had to keep.
+    testWidgets('a zero hero never starts the animation', (tester) async {
+      tester.view.physicalSize = const Size(381, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: TerminalHero(
+              figure: '0',
+              unit: 'W',
+              slot: 'PV_OUT',
+              isLive: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TerminalHero), findsOneWidget);
+    });
+  });
+
   group('rows never clip their own text', () {
     // **The vocabulary has no short words.** `Discharging` and
     // `Heavily overcast` are values this panel actually renders, and on the

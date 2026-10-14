@@ -228,7 +228,17 @@ class _SpecRow extends StatelessWidget {
             fraction: meterFraction!,
             alert: alert,
             leftCaption: limit,
-            rightCaption: value == null ? null : slotNumber(value),
+            rightCaption: value == null
+                // **`spec.decimals`, not the `slotNumber` default of 1.** The
+                // cell above already formats the same reading at the spec's own
+                // precision, so a spec that declares fewer digits printed two
+                // different numbers for one value inside one cell — `TURBIDITY`
+                // declares 0 because the sensor is good to a few percent, and
+                // drew `2396` above a caption reading `2396.5`. The spec is the
+                // one place that decides how precise a quantity is shown;
+                // reading the default here quietly made a second one.
+                ? null
+                : slotNumber(value, decimals: spec.decimals),
           )
         else if (limit != null)
           // One-sided limit: the caption is the range, and it stays muted rather
