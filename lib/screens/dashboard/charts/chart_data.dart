@@ -98,6 +98,7 @@ class ChartBounds {
   bool get spansMultipleDays =>
       (maxX - minX) > const Duration(days: 1).inMilliseconds;
 
+  /// Factory for immutable [ChartBounds] with cached intervals.
   factory ChartBounds.fromSeries(
     List<ChartSeries> series, {
     bool zeroAnchored = true,
@@ -113,6 +114,8 @@ class ChartBounds {
         timeInterval: 1,
       );
     }
+
+    // Single pass for min/max bounds
     var minX = double.infinity;
     var maxX = double.negativeInfinity;
     var minimum = double.infinity;
@@ -296,18 +299,23 @@ double _pow10Floor(double value) {
 }
 
 /// Processes telemetry points into chart spots with downsampling.
+/// Uses pre-allocation and avoids repeated timestamp conversions.
 List<FlSpot> processSpots(List<TelemetryPoint> points) {
-  if (points.isEmpty) return const <FlSpot>[];
-  if (points.length <= 180) {
-    return points
-        .map(
-          (p) => FlSpot(p.timestamp.millisecondsSinceEpoch.toDouble(), p.value),
-        )
-        .toList(growable: false);
+  final pointCount = points.length;
+  if (pointCount == 0) return const [];
+  if (pointCount <= 180) {
+    return List<FlSpot>.generate(
+      pointCount,
+      (i) {
+        final p = points[i];
+        return FlSpot(p.timestamp.millisecondsSinceEpoch.toDouble(), p.value);
+      },
+      growable: false,
+    );
   }
 
   const targetBuckets = 90;
-  final bucketSize = points.length / targetBuckets;
+  final bucketSize = pointCount / targetBuckets;
   final spots = <FlSpot>[];
 
   void addSpot(TelemetryPoint point) {
@@ -322,14 +330,15 @@ List<FlSpot> processSpots(List<TelemetryPoint> points) {
   for (var b = 0; b < targetBuckets; b++) {
     final startIdx = (b * bucketSize).floor();
     var endIdx = ((b + 1) * bucketSize).floor();
-    if (endIdx > points.length) endIdx = points.length;
+    if (endIdx > pointCount) endIdx = pointCount;
     if (startIdx >= endIdx) continue;
 
     var minIdx = startIdx;
     var maxIdx = startIdx;
     for (var i = startIdx + 1; i < endIdx; i++) {
-      if (points[i].value < points[minIdx].value) minIdx = i;
-      if (points[i].value > points[maxIdx].value) maxIdx = i;
+      final value = points[i].value;
+      if (value < points[minIdx].value) minIdx = i;
+      if (value > points[maxIdx].value) maxIdx = i;
     }
 
     final firstIdx = minIdx < maxIdx ? minIdx : maxIdx;
@@ -341,11 +350,12 @@ List<FlSpot> processSpots(List<TelemetryPoint> points) {
     }
   }
 
-  final lastX = points.last.timestamp.millisecondsSinceEpoch.toDouble();
+  // Pre-compute last point timestamp once
+  final lastX = points[pointCount - 1].timestamp.millisecondsSinceEpoch.toDouble();
   if (spots.isNotEmpty && spots.last.x == lastX) {
-    spots[spots.length - 1] = FlSpot(lastX, points.last.value);
+    spots[spots.length - 1] = FlSpot(lastX, points[pointCount - 1].value);
   } else {
-    spots.add(FlSpot(lastX, points.last.value));
+    spots.add(FlSpot(lastX, points[pointCount - 1].value));
   }
 
   return spots;

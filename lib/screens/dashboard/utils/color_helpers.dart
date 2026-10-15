@@ -155,18 +155,6 @@ List<Color> get kChartSeriesOrder => [
   AppPalette.chartCyan,
 ];
 
-/// The colour one series of a chart group is drawn in.
-///
-/// [index] is the series' position in the group and [count] the group's length.
-/// With one series the category hue is used; with more than one, the fixed
-/// order above.
-Color chartSeriesColor(int index, {required int count, String? key}) {
-  if (count <= 1) {
-    return categoryColorForKey(key ?? '') ?? AppPalette.error;
-  }
-  return kChartSeriesOrder[index % kChartSeriesOrder.length];
-}
-
 /// The category of a telemetry key, resolved once.
 ///
 /// Convenience for the very common `categoryColor(MetricCategory.forKey(key)!)`

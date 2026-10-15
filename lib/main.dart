@@ -261,7 +261,7 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
 /// `MaterialApp`'s two slots. There is one appearance now, so the only decision
 /// left in this file is whether the palette is hand-built or derived, and the
 /// answer is above.
-ThemeData _appThemeData() => ThemeData(
+ThemeData appThemeData() => ThemeData(
   useMaterial3: true,
   brightness: AppTheme.brightness,
   colorScheme: _appColorScheme(),
@@ -432,8 +432,8 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
       // is built. Two slots rather than one rebuilt `theme:` because
       // `MaterialApp` re-derives `Theme.of(context)` from the slot it picks, and
       // only the slot mechanism animates and re-inherits that correctly.
-      theme: _appThemeData(),
-      darkTheme: _appThemeData(),
+      theme: appThemeData(),
+      darkTheme: appThemeData(),
       themeMode: _mode,
       builder: (context, child) {
         // The system navigation bar is opaque and sits over the app's bottom

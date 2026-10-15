@@ -17,9 +17,12 @@ bool sameStrings(List<String> first, List<String> second) {
 /// Returns true when [second] carries no value that differs from [first].
 bool sameTelemetry(DeviceTelemetry? first, DeviceTelemetry second) {
   if (first == null) return false;
-  if (first.latestValues.length != second.latestValues.length) return false;
-  for (final entry in second.latestValues.entries) {
-    if (first.latestValues[entry.key] != entry.value) return false;
+  final firstValues = first.latestValues;
+  final secondValues = second.latestValues;
+  if (firstValues.length != secondValues.length) return false;
+  // Use direct lookup instead of iteration when sizes match
+  for (final entry in secondValues.entries) {
+    if (firstValues[entry.key] != entry.value) return false;
   }
   return true;
 }

@@ -54,6 +54,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/main.dart';
 import 'package:plts_monitoring/models/telemetry_model.dart';
 import 'package:plts_monitoring/screens/dashboard/charts/chart_data.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
@@ -354,7 +355,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: _auditTheme(),
+          theme: appThemeData(),
           home: const RepaintBoundary(
             child: Center(
               child: Text(
@@ -418,7 +419,7 @@ Future<void> _audit(
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: _auditTheme(),
+      theme: appThemeData(),
       home: RepaintBoundary(
         key: boundaryKey,
         child: AppBackground(
@@ -487,128 +488,6 @@ Future<void> _audit(
   await expectLater(
     find.byKey(boundaryKey),
     matchesGoldenFile(_goldenKey(name)),
-  );
-}
-
-/// The one `ThemeData`.
-///
-/// **A copy of `main.dart`'s `_appThemeData`, because that is private.** It
-/// exists here so a `FilledButton`, a `SwitchListTile` and a `SegmentedButton`
-/// render in the app's own colours rather than in Material's defaults — a
-/// golden of the CCTV play button drawn in `secondaryContainer` would look like
-/// a design defect that is not one. Everything measurable in it comes from
-/// `design_tokens.dart`; nothing here picks a colour.
-ThemeData _auditTheme() {
-  TextStyle ink(TextStyle style) =>
-      style.copyWith(color: AppSurfaces.onSurface);
-  TextStyle muted(TextStyle style) =>
-      style.copyWith(color: AppSurfaces.onSurfaceVariant);
-
-  return ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: ColorScheme.dark(
-      primary: AppPalette.primary,
-      onPrimary: AppPalette.onHue,
-      primaryContainer: AppPalette.primary,
-      onPrimaryContainer: AppPalette.onHue,
-      secondary: AppPalette.secondary,
-      onSecondary: AppPalette.onHue,
-      secondaryContainer: AppPalette.secondary,
-      onSecondaryContainer: AppPalette.onHue,
-      tertiary: AppPalette.accent,
-      onTertiary: AppPalette.onHue,
-      surface: AppSurfaces.surface,
-      onSurface: AppSurfaces.onSurface,
-      onSurfaceVariant: AppSurfaces.onSurfaceVariant,
-      error: AppPalette.error,
-      onError: AppPalette.onHue,
-      outline: AppSurfaces.border,
-      outlineVariant: AppSurfaces.border,
-    ),
-    textTheme: TextTheme(
-      displayLarge: ink(AppType.displayLg),
-      displayMedium: ink(AppType.displayMd),
-      displaySmall: ink(AppType.numeralLg),
-      headlineLarge: ink(AppType.numeralLg),
-      headlineMedium: ink(AppType.headlineMd),
-      headlineSmall: ink(AppType.headlineMd),
-      titleLarge: ink(AppType.headlineMd),
-      titleMedium: ink(AppType.headlineMd),
-      titleSmall: muted(AppType.labelUppercase),
-      bodyLarge: ink(AppType.bodyMd),
-      bodyMedium: muted(AppType.bodyMd),
-      bodySmall: muted(AppType.bodySm),
-      labelLarge: ink(AppType.labelUppercase),
-      labelMedium: ink(AppType.labelUppercase),
-      labelSmall: muted(AppType.labelMicro),
-    ),
-    scaffoldBackgroundColor: AppSurfaces.page,
-    filledButtonTheme: FilledButtonThemeData(
-      style: ButtonStyle(
-        backgroundColor: WidgetStatePropertyAll(AppPalette.primary),
-        foregroundColor: WidgetStatePropertyAll(AppPalette.onHue),
-        elevation: const WidgetStatePropertyAll(0),
-        minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-        ),
-        textStyle: const WidgetStatePropertyAll(AppType.labelUppercase),
-      ),
-    ),
-    segmentedButtonTheme: SegmentedButtonThemeData(
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppPalette.secondary
-              : AppSurfaces.surface,
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppPalette.onHue
-              : AppSurfaces.onSurfaceVariant,
-        ),
-        side: WidgetStatePropertyAll(AppBorders.hairline),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-        ),
-        textStyle: const WidgetStatePropertyAll(AppType.labelUppercase),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: AppSurfaces.input,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-        borderSide: AppBorders.hairline,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-        borderSide: AppBorders.hairline,
-      ),
-    ),
-    cardTheme: CardThemeData(
-      color: AppSurfaces.surface,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        side: AppBorders.hairline,
-      ),
-    ),
-    dividerTheme: DividerThemeData(
-      color: AppSurfaces.border,
-      space: 1,
-      thickness: 1,
-    ),
   );
 }
 
