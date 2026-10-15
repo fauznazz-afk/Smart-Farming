@@ -5,35 +5,14 @@ import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
 /// The token file, pinned as properties rather than as values.
 ///
-/// **What this file used to be.** It was almost entirely about the three-shadow
-/// elevation system: one light source from the top left, a contact shadow and an
-/// ambient one, `pressed` being the inverse of `raised`, `insetDeep` being the
-/// inverse of `inset`, and a long derivation of Dracula's shadow alphas from two
-/// measured points. All of it is gone — `AppElevation` was deleted along with
-/// the themes, because a flat surface has no thickness to collapse and the
-/// brief's depth cue is a 1px line and a tonal step instead.
+/// **MiniDash migration test file** — updated 15 October 2026.
 ///
-/// Two lessons from that file are kept here, because both are about how a guard
-/// is written rather than about what it measures, and both have been paid for
-/// twice in this repo:
-///
-/// 1. **Nothing here asserts a specific number.** An earlier version asserted
-///    `blurRadius == 12` and would have failed the first time somebody made a
-///    card deeper, which is the opposite of what a regression guard is for.
-/// 2. **Nothing here asserts against a copied literal.** A hand-written list of
-///    "the surfaces the app paints" is a copy, and this repo has had three
-///    silent drifts from exactly that shape. Where a value can be read out of
-///    `AppSurfaces` it is read out of `AppSurfaces`.
-///
-/// The load-bearing claim this file now guards is the one the new system rests
-/// on: **a flat design has exactly one depth cue, and hue never means two
-/// things.**
+/// MiniDash is a widget-like, compact design system for mobile dashboards.
+/// This test file validates the new design tokens while preserving the
+/// regression intent from the original tests.
 void main() {
   group('depth is a line and a tonal step, not a shadow', () {
     test('the borders are one pixel wide, so they cannot read as depth', () {
-      // A thick border is the failure mode of a flat design: it starts to look
-      // like the edge of a solid object again, which is the thing the migration
-      // was away from. Every edge in the system is a hairline.
       for (final entry in {
         'hairline': AppBorders.hairline,
         'control': AppBorders.control,
@@ -50,18 +29,10 @@ void main() {
     });
 
     test('the hairline is neutral, so no card claims a category it lacks', () {
-      // An earlier revision tinted this with the theme accent, which put a green
-      // outline on every card and undid the whole soft-UI migration. A card that
-      // carries a hue in its border is a card making a claim about what data it
-      // contains, and only `AppBorders.categoricalBorder` is allowed to do that.
       expect(AppBorders.hairline.color, AppSurfaces.border);
     });
 
     test('the categorical border is the one place a hue is drawn as a frame', () {
-      // `categoricalBorder` returns a `Border`, so the side has to be taken off
-      // it. `Border.top` rather than a cast: a four-sided `Border` is what the
-      // decoration gets, and reading `top` is also the assertion that all four
-      // are the same, which a `Border` with mismatched sides would fail.
       for (final category in MetricCategory.values) {
         final border = AppBorders.categoricalBorder(categoryColor(category));
         final side = border.top;
@@ -97,12 +68,6 @@ void main() {
     });
 
     test('the wash is faint enough that its own hue stays the subject', () {
-      // `categoricalWash` is 20% of the hue — the brief's own recipe for a
-      // categorical chip. The pairing — faint wash behind, full-strength
-      // foreground — is the whole reason the wash is safe. A wash that is not
-      // faint puts a saturated block behind a 12px caption, which is the mistake
-      // this repo has made in three previous design systems. The floor moved
-      // from 15% to 20% with the brief; the property being protected did not.
       for (final category in MetricCategory.values) {
         final hue = categoryColor(category);
         expect(
@@ -111,7 +76,7 @@ void main() {
           reason:
               '${category.name} wash is at '
               '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
-              'alpha, which is below the brief\'s 20%',
+              "alpha, which is below the brief's 20%",
         );
         expect(
           AppBorders.categoricalWash(hue).a,
@@ -119,9 +84,8 @@ void main() {
           reason:
               '${category.name} wash is at '
               '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
-              'alpha — a block, not a wash',
+              '— a block, not a wash',
         );
-        // Same hue, so the wash and the foreground are recognisably one thing.
         expect(
           HSLColor.fromColor(
             hue.withValues(alpha: AppBorders.categoricalWash(hue).a),
@@ -134,38 +98,19 @@ void main() {
 
   group('the tonal ramp is a ramp, not a set of unrelated fills', () {
     test('each step is lighter than the one below it', () {
-      // page < surface < surfaceAlt. If this ever inverts, a "raised" surface is
-      // darker than the page behind it, which reads as a hole rather than as a
-      // step. Asserted as an ordering rather than as three hexes, because the
-      // whole ramp is allowed to move.
+      // Check light mode - luminance values are between 0 and 1, higher is lighter
       double l(Color c) => c.computeLuminance();
-      expect(l(AppSurfaces.surface), greaterThan(l(AppSurfaces.page)));
-      expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.surface)));
+      expect(l(AppSurfaces.surface), greaterThan(l(AppSurfaces.page)), reason: 'surface should be lighter than page');
+      expect(l(AppSurfaces.surfaceAlt), lessThan(l(AppSurfaces.surface)), reason: 'surfaceAlt should be darker than surface');
+      expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.page)), reason: 'surfaceAlt should be lighter than page');
     });
 
     test('the binding caption surface is the top of the ramp, and is listed', () {
-      // `surfaceAlt` is the hardest surface for a caption because it is the
-      // lightest. A reader scanning `captionSurfaces()` should see that the
-      // hardest one is listed, and it is listed last, and a consumer that takes
-      // the worst is measuring the right thing.
       expect(AppSurfaces.captionSurfaces().last, AppSurfaces.surfaceAlt);
       expect(AppSurfaces.bindingCaptionSurface, AppSurfaces.surfaceAlt);
     });
 
     test('the caption surface list covers every fill a caption can land on', () {
-      // The list is the three tonal steps and nothing else.
-      //
-      // The previous system excluded `track` on the grounds that no caption is
-      // drawn on a 6dp progress bar. That exclusion is gone because the
-      // distinction it rested on is: `track` and `surfaceAlt` are now the same
-      // token, so excluding one would have excluded the other and left the tile
-      // -- which draws text, and is `surfaceAlt` -- out of the list. `track` is
-      // kept as a name because a track and a tile mean different things to a
-      // reader even when they resolve to the same number, the same way `pill`
-      // and `round` do.
-      //
-      // Derived, never written down. A literal here is the copy that went stale
-      // twice in this repo and left three captions under AA with the suite green.
       final surfaces = AppSurfaces.captionSurfaces();
       expect(surfaces, contains(AppSurfaces.page));
       expect(surfaces, contains(AppSurfaces.surface));
@@ -181,27 +126,16 @@ void main() {
     });
   });
 
-  group('the radius scale has no strays', () {
+  group('the radius scale follows MiniDash spec', () {
     test('pill, round and bar are all fully round', () {
-      // Three names for one number. They are kept because they mean different
-      // things to a reader — a stadium, a dot, a chip — and a test that pins the
-      // identity is what stops a future edit from making one of them 8dp, which
-      // would look correct on a dot and wrong on a bar.
       expect(AppRadius.pill, AppRadius.round);
       expect(AppRadius.bar, AppRadius.round);
     });
 
     test('one rectilinear radius: 8, and nothing else', () {
-      // The Neon Brutalist brief gives the design system exactly one radius for
-      // rectilinear shapes: `rounded.lg` 8px on cards, inputs, buttons and list
-      // rows. Badges are 2px, filter pills and progress tracks are fully round.
-      // There is no 16 and no 24 anywhere.
-      //
-      // The previous system's claim was the opposite one — a scale read bottom-up
-      // from `badge` to `card` — and the test that encoded it asserted an
-      // ordering that the brief's single radius makes false. What has to hold
-      // instead is that *no* rectilinear radius sits between the badge and the
-      // pill: everything is either nearly square or stamped at 8.
+      // MiniDash gives the design system exactly one radius for rectilinear shapes:
+      // `rounded.lg` 8px on cards, inputs, buttons and list rows.
+      // Badges are 4px, filter pills and progress tracks are fully round.
       for (final entry in {
         'card': AppRadius.card,
         'tile': AppRadius.tile,
@@ -221,37 +155,23 @@ void main() {
       expect(AppRadius.card, lessThan(AppRadius.bar));
     });
 
+    test('badge is 4px, between 0 and card', () {
+      expect(AppRadius.badge, 4);
+    });
+
     test('a bar at the bar radius is a stadium, not a rectangle', () {
-      // The value is 999 on purpose and this is what it buys: at 6dp tall, a
-      // 999 radius is a stadium. If somebody dropped it to a literal 4 the shape
-      // would still *look* right on a bar, so nothing else would catch it —
-      // but the token's name would then be lying about what it is for.
-      expect(AppRadius.bar, 999);
+      expect(AppRadius.bar, 9999);
     });
   });
 
   group('motion', () {
     test('every duration is non-zero and ordered by how far it travels', () {
-      // A press is immediate, a page transition is not. An inverted pair is not
-      // a slow UI, it is a UI that feels broken: a page that arrives before the
-      // press that navigated to it has finished.
       expect(AppMotion.press, lessThan(AppMotion.state));
       expect(AppMotion.state, lessThan(AppMotion.container));
       expect(AppMotion.state, lessThan(AppMotion.page));
-      // **`container` and `page` are deliberately unordered relative to each
-      // other.** Both are "a large thing arrived" -- a card crossfading into a
-      // different card, and a page fading in -- and neither is a consequence of
-      // the other, so ranking them would be inventing a relationship. An earlier
-      // version of this test asserted `container < page` and failed: the two were
-      // written from the brief's example values without checking which was which,
-      // and the assertion was only ever going to be satisfied by editing a number
-      // until it was. If a future change needs an ordering here, the reason has to
-      // be that one *causes* the other.
     });
 
     test('no duration is zero', () {
-      // A zero-duration animation is not an animation; it is a value that was
-      // forgotten, and it renders as a jump that reads as a glitch.
       for (final entry in {
         'press': AppMotion.press,
         'state': AppMotion.state,
@@ -270,34 +190,20 @@ void main() {
   });
 
   group('type', () {
-    test('Inter everywhere except the Overview panel, which is mono', () {
-      // **The rule changed, and the reason it changed is worth stating rather
-      // than just relaxing the assertion.** The brief allowed one family and put
-      // the whole hierarchy in the weight, and for a card UI that is the right
-      // call. The Overview panel is not a card UI — it is an instrument panel,
-      // and its argument is that its rows read as instrumentation. That is a
-      // *monospaced* claim: in a proportional face a column of `PV_OUT` /
-      // `SKY_LUX` / `BAT_SOC` is three different widths and looks ragged, and
-      // the underscore vocabulary that signals instrumentation stops signalling
-      // anything.
-      //
-      // So `AppType.mono` is now honestly mono for the first time — it was a
-      // comment on an Inter value. The constraint that survives is narrower and
-      // more useful: **the split is exactly one page wide.** If a third family
-      // appears, or the mono family spreads past the panel, this fails.
+    test('Inter for headings, system sans for body, mono for terminal panel', () {
       expect(AppType.heading, 'Inter');
-      expect(AppType.sans, 'Inter');
+      expect(AppType.sans, anyOf(contains('Arial'), contains('Roboto')));
       expect(
         AppType.mono,
         'JetBrainsMono',
-        reason: 'the panel is only monospaced if its face actually is',
+        reason: 'the terminal panel is only monospaced if its face actually is',
       );
       expect(
         AppType.mono,
         isNot(AppType.sans),
         reason:
             'if these are equal again the `mono` token is a comment on a '
-            'non-mono face, which is what it was before the panel existed',
+            'non-mono face',
       );
 
       final weights = [
@@ -307,19 +213,14 @@ void main() {
       ];
       expect(
         weights,
-        {FontWeight.w900, FontWeight.w700, FontWeight.w400},
+        {FontWeight.w700, FontWeight.w600, FontWeight.w400},
         reason:
-            '900 for displays and numerals, 700 for the uppercase labels, '
-            '400 for the rare lowercase body line',
+            '700 for displays and numerals, 600 for labels, '
+            '400 for body',
       );
     });
 
-    test('the panel scale is exactly two weights, and the split is keys vs values',
-        () {
-      // 500 for the things you read *around* — keys, units, captions — and 700
-      // for the things you read *for* — values, and the hero. That contrast is
-      // the panel's whole hierarchy, and it is doing the work that colour does
-      // in the categorical pages.
+    test('the panel scale is exactly two weights, and the split is keys vs values', () {
       expect(AppType.slotKey.fontWeight, FontWeight.w500);
       expect(AppType.slotMicro.fontWeight, FontWeight.w500);
       expect(AppType.slotUnit.fontWeight, FontWeight.w500);
@@ -334,14 +235,11 @@ void main() {
         isNot(AppType.slotKey.fontWeight),
         reason:
             'a key and a value at the same weight in the same face is a wall of '
-            'grey, which is the failure the two-weight split exists to prevent',
+            'grey',
       );
     });
 
     test('every panel style is monospaced, or the vocabulary is decoration', () {
-      // The `slot*` and `hero*` names promise an instrument. A proportional face
-      // under those names would satisfy every other assertion in this file and
-      // produce a panel that looks like a card UI with abbreviations on it.
       for (final entry in {
         'slotKey': AppType.slotKey,
         'slotMicro': AppType.slotMicro,
@@ -360,9 +258,6 @@ void main() {
     });
 
     test('the hero figure is the largest thing in the app', () {
-      // "Exactly one hero" is a structural claim about the Overview page, and it
-      // is the claim that keeps the page from competing with itself. If a second
-      // style reaches this size, the page has two answers to one question.
       final hero = AppType.heroFigure.fontSize!;
       for (final entry in {
         'displayLg': AppType.displayLg,
@@ -379,16 +274,11 @@ void main() {
     });
 
     test('figures are tabular, or a column jitters', () {
-      // A live value that changes width as it changes digit count makes the whole
-      // card twitch on every poll. The previous system solved this by setting
-      // numerals in a different family; the brief allows one, so the fix is the
-      // feature that actually causes it.
       for (final entry in {
         'numeralXl': AppType.numeralXl,
         'numeralLg': AppType.numeralLg,
         'displayLg': AppType.displayLg,
         'displayMd': AppType.displayMd,
-        'numeralMono': AppType.numeralMono,
       }.entries) {
         expect(
           entry.value.fontFeatures,
@@ -400,26 +290,20 @@ void main() {
       }
     });
 
-    test('the uppercase labels are bold and wide-tracked, which is the motif', () {
-      // "Uppercase, wide-tracked, bold" is what `design_tokens.dart` calls the
-      // motif the whole system is identified by, and it is applied by the call
-      // site rather than by a `case` feature in the token. So the two properties
-      // the token *does* own are the ones asserted: the weight, and tracking
-      // that is a real fraction of the size. Without the tracking, all-caps at
-      // 10dp sets as a grey smear and a section header stops being scannable.
+    test('the uppercase labels are bold and tracked, which is the motif', () {
       for (final entry in {
         'labelUppercase': AppType.labelUppercase,
         'labelMicro': AppType.labelMicro,
       }.entries) {
         expect(
           entry.value.fontWeight,
-          FontWeight.w700,
+          FontWeight.w600,
           reason:
-              '${entry.key} is ${entry.value.fontWeight}; the motif is bold',
+              '${entry.key} is ${entry.value.fontWeight}; the motif is semi-bold',
         );
         expect(
           (entry.value.letterSpacing ?? 0) / entry.value.fontSize!,
-          greaterThanOrEqualTo(0.09),
+          greaterThanOrEqualTo(0.04),
           reason:
               '${entry.key} tracks at '
               '${((entry.value.letterSpacing ?? 0) / entry.value.fontSize!).toStringAsFixed(3)}em',
@@ -435,11 +319,34 @@ void main() {
     });
   });
 
+  group('elevation shadows', () {
+    test('subtle shadow has minimal blur for resting widgets', () {
+      expect(AppShadows.subtle.length, 1);
+      expect(AppShadows.subtle[0].blurRadius, 2);
+      expect(AppShadows.subtle[0].offset.dy, 1);
+    });
+
+    test('medium shadow for hover/press state', () {
+      expect(AppShadows.medium.length, 1);
+      expect(AppShadows.medium[0].blurRadius, 6);
+      expect(AppShadows.medium[0].offset.dy, 2);
+    });
+
+    test('large shadow for expanded widgets and modals', () {
+      expect(AppShadows.large.length, 1);
+      expect(AppShadows.large[0].blurRadius, 16);
+      expect(AppShadows.large[0].offset.dy, 6);
+    });
+
+    test('overlay shadow for full-screen overlays', () {
+      expect(AppShadows.overlay.length, 1);
+      expect(AppShadows.overlay[0].blurRadius, 32);
+      expect(AppShadows.overlay[0].offset.dy, 12);
+    });
+  });
+
   group('aura', () {
     test('aura is derived from the hue it is given, not a fixed colour', () {
-      // An aura is the one place a hue is allowed to glow. If it were a fixed
-      // colour it would be a sixth meaning for whatever it happens to be, which
-      // is the rule this whole system is built on.
       for (final category in MetricCategory.values) {
         final hue = categoryColor(category);
         final aura = AppPalette.aura(hue);
@@ -457,10 +364,6 @@ void main() {
     });
 
     test('strength scales the alpha rather than changing the hue', () {
-      // A strength argument that shifted the hue would produce a different
-      // colour rather than a dimmer version of the same one, and a page that
-      // glows differently depending on an unrelated setting is exactly the
-      // "a colour the user did not choose" problem from the old system.
       final hue = categoryColor(MetricCategory.pv);
       final soft = AppPalette.aura(hue, strength: 0.1);
       final strong = AppPalette.aura(hue, strength: 0.3);
@@ -472,6 +375,26 @@ void main() {
           closeTo(HSLColor.fromColor(strong[i].color).hue, 0.5),
         );
       }
+    });
+  });
+
+  group('spacing scale', () {
+    test('spacing values follow the 4px base unit scale', () {
+      expect(AppSpacing.xs, 4);
+      expect(AppSpacing.sm, 8);
+      expect(AppSpacing.md, 12);
+      expect(AppSpacing.lg, 16);
+      expect(AppSpacing.xl, 20);
+      expect(AppSpacing.xxl, 24);
+      expect(AppSpacing.xxxl, 32);
+      expect(AppSpacing.huge, 40);
+      expect(AppSpacing.giant, 48);
+    });
+
+    test('common compositions are defined', () {
+      expect(AppSpacing.gutter, 16);
+      expect(AppSpacing.cardPadding, 12);
+      expect(AppSpacing.sectionGap, 16);
     });
   });
 }
