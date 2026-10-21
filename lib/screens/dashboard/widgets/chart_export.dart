@@ -144,7 +144,12 @@ Future<ByteData?> composeChartImage(
       // The token's own style, unmodified: the caption stands in for the section
       // header, and stretching its line height to make room would make the
       // exported file differ from the screen it came from.
-      style: AppType.numeralLg.copyWith(color: AppSurfaces.onSurface),
+      //
+      // **Page ink, because the caption sits on the page-coloured margin.** The
+      // canvas is painted `AppSurfaces.page` and `AppSurfaces.onSurface` is
+      // *card* ink — navy in both ramps since the cards went near-white — which
+      // measured **1.22:1** on that canvas in the dark ramp.
+      style: AppType.numeralLg.copyWith(color: AppGlass.pageInkStrong),
     ),
     textDirection: textDirection,
     textScaler: textScaler,
@@ -154,7 +159,10 @@ Future<ByteData?> composeChartImage(
   final subtitlePainter = TextPainter(
     text: TextSpan(
       text: subtitle,
-      style: AppType.labelMicro.copyWith(color: AppSurfaces.onSurfaceVariant),
+      // The soft page ink, because the subtitle is a caption and the soft ink is
+      // the caption weight: **7.32:1** on the dark sweep's top stop and
+      // **8.28:1** on the flat dark page, **8.02:1** on the light page.
+      style: AppType.labelMicro.copyWith(color: AppGlass.pageInkSoft),
     ),
     textDirection: textDirection,
     textScaler: textScaler,

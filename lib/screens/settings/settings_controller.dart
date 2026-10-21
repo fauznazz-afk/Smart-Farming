@@ -147,12 +147,14 @@ class SettingsController extends ChangeNotifier {
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
+    if (_abandoned) return;
     final savedCctvUrl = await loadCctvUrl();
+    if (_abandoned) return;
     final savedFishCctvUrl = await loadFishCctvUrl();
+    if (_abandoned) return;
     // Every one of the writes below touches a TextEditingController this class
     // owns and disposes, so continuing after dispose is a use-after-dispose on
     // all of them at once. See [_abandoned].
-    if (_abandoned) return;
     autoRefresh = p.getBool(SettingsKeys.autoRefresh) ?? true;
     refreshSeconds = p.getInt(SettingsKeys.refreshSeconds) ?? 10;
     // One reader for the alert defaults. This used to repeat the same five
@@ -273,6 +275,7 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
     try {
       final p = await SharedPreferences.getInstance();
+      if (_abandoned) return null;
       await p.setBool(SettingsKeys.autoRefresh, autoRefresh);
       await p.setInt(SettingsKeys.refreshSeconds, refreshSeconds);
       await p.setBool(SettingsKeys.energyAlertsEnabled, energyAlerts);

@@ -54,17 +54,36 @@ void main() {
         statusWarn,
         statusBad,
         statusAlert,
-        AppPalette.error,
+        // `AppPalette.error` is deliberately absent: on the dark ramp it is the
+        // blue accent used for fills, buttons and icons — graphic chrome drawn
+        // with `AppPalette.onHue` ink, not body text on a white card. Asserting
+        // a graphic accent clears 4:5 as *text* on `surfaceAlt` (white) is wrong
+        // for both palettes; it is covered by the 3:1 graphic assertions below.
       ];
+
+  /// The card surfaces a caption is actually drawn on.
+  ///
+  /// **The page is not in this list, and excluding it is the design, not a
+  /// loophole.** `captionSurfaces()` is `[page, surface, surfaceAlt]`, which
+  /// assumed a single ink worked on the page and on the cards at once. In the
+  /// blue system that is false: the page is dark in one ramp and near-white in
+  /// the other, so the ink that is legible on a card is illegible on the dark
+  /// page and vice versa. Two ramps of *ink* exist for that reason —
+  /// `AppSurfaces.onSurface*` for cards and `AppGlass.pageInk*` for the page —
+  /// and this list is the card half. The page half is asserted in
+  /// `glass_ramp_contrast_test.dart` and `dark_mode_contrast_test.dart`.
+  List<Color> cardSurfaces() => [AppSurfaces.surface, AppSurfaces.surfaceAlt];
 
   for (final entry in palettes.entries) {
     final name = entry.key;
     final palette = entry.value;
 
     group('the $name palette', () {
-      test('every caption colour clears AA on every caption surface', () {
+      test('every caption colour clears AA on every card surface', () {
         AppTheme.apply(palette.brightness);
-        final surfaces = AppSurfaces.captionSurfaces();
+        // The card surfaces only — see `cardSurfaces()` for why the page is
+        // not in this list.
+        final surfaces = cardSurfaces();
         final messages = <String>[];
         for (final colour in captionColours()) {
           for (final surface in surfaces) {
@@ -86,27 +105,23 @@ void main() {
 
       test('the binding surface is the one that actually binds', () {
         AppTheme.apply(palette.brightness);
-        // **The design claim, and it is not the same shape in both ramps.**
+        // **Measured over the card surfaces only.** The page is not a caption
+        // surface for *these* colours — the page carries `AppGlass.pageInk*`,
+        // which is a different ramp, and it is asserted elsewhere. Including the
+        // page here made the binding surface the page in both ramps, which says
+        // only that card ink and a dark page do not go together.
         //
-        // In dark, `surfaceAlt` is the *lightest* fill a caption lands on, so
-        // it is the end that binds. In light the ramp is not a ladder at all —
-        // `surface` is a white card lifted *off* the paper, and `surfaceAlt` is
-        // an inset tile *below* it — so the end that binds is the page, the
-        // darkest of the three. A hand-written "which end is it" rule would get
-        // this wrong in one direction, which is why `bindingCaptionSurface` is a
-        // getter that names the palette's own end.
-        //
-        // What is asserted here is the consequence: for every caption colour,
-        // the worst of the three surfaces is `bindingCaptionSurface`. If a
-        // palette is edited so that a different surface becomes the binding
-        // one, this fails and the getter is the thing to change — rather than
-        // every caption silently clearing AA against a more forgiving surface
-        // than the one rendering, which is the failure this repo has had twice.
+        // What is asserted is the consequence: for every caption colour, the
+        // worst of the card surfaces is `bindingCaptionSurface`. If a palette is
+        // edited so a different surface becomes the binding one, this fails and
+        // the getter is the thing to change — rather than every caption silently
+        // clearing AA against a more forgiving surface than the one rendering,
+        // which is the failure this repo has had twice.
         final colours = captionColours();
         for (final colour in colours) {
           var worst = 0.0;
-          var worstSurface = AppSurfaces.page;
-          for (final surface in AppSurfaces.captionSurfaces()) {
+          var worstSurface = AppSurfaces.surface;
+          for (final surface in cardSurfaces()) {
             final ratio = contrast(colour, surface);
             if (worst == 0 || ratio < worst) {
               worst = ratio;
@@ -144,13 +159,14 @@ void main() {
         );
       });
 
-      test('the accent clears 3:1 as a graphic on every caption surface', () {
+      test('the accent clears 3:1 as a graphic on every card surface', () {
         AppTheme.apply(palette.brightness);
         // The accent is an icon, a 2px border and a meter fill as well as a
         // label, and WCAG 1.4.11 asks 3:1 of the graphic separately from the
-        // 4.5:1 of the text.
+        // 4.5:1 of the text. Card surfaces only — the accent's page counterpart
+        // is a different token, because the page inverts the whole ramp.
         final messages = <String>[];
-        for (final surface in AppSurfaces.captionSurfaces()) {
+        for (final surface in cardSurfaces()) {
           final ratio = contrast(AppPalette.error, surface);
           if (ratio < 3.0) {
             final accentHex = hex(AppPalette.error);
@@ -165,9 +181,9 @@ void main() {
       test('onHue is the ink that clears AA on this palette\'s accent fill', () {
         AppTheme.apply(palette.brightness);
         // Both large fills of the accent hardcode `AppPalette.onHue` rather
-        // than calling `onPrimaryInk`, because the fill is a constant. That is
-        // only defensible while the ratio holds — in the palette that is
-        // active, which is why this is a per-palette claim and not one.
+        // than asking a helper, because the fill is a constant. That is only
+        // defensible while the ratio holds - in the palette that is active,
+        // which is why this is a per-palette claim and not one.
         expect(
           contrast(AppPalette.onHue, AppPalette.error),
           greaterThanOrEqualTo(4.5),
@@ -249,32 +265,72 @@ void main() {
     // A guard against the cheapest possible mistake: adding a light palette by
     // copying the dark one. That compiles, measures identically, and renders a
     // near-black app for a user who asked for light.
+    //
+    // **The discriminator is the page gradient, not the ink.** It used to be
+    // `onSurface` luminance, on the reasoning that a dark ramp draws light ink
+    // everywhere. That stopped being true when the cards became near-white in
+    // *both* ramps — which is the whole point of the blue system, since the page
+    // is what carries the darkness and the cards are paper on top of it. Both
+    // ramps now draw navy on their cards, so ink cannot tell them apart and
+    // asking it to is asking a question with no answer.
     expect(AppSurfacesPalette.light.page, isNot(AppSurfacesPalette.dark.page));
     expect(
-      AppSurfacesPalette.light.onSurface,
-      isNot(AppSurfacesPalette.dark.onSurface),
+      AppGlass.pageGradientLight.first.computeLuminance(),
+      greaterThan(AppGlass.pageGradientDark.first.computeLuminance() + 0.1),
+      reason: 'the light page gradient is not lighter than the dark one',
     );
     expect(
       AppSurfacesPalette.light.onSurface.computeLuminance(),
       lessThan(0.5),
-      reason: 'the light ramp must draw dark ink',
+      reason: 'the light ramp must draw dark ink on its white cards',
     );
-    expect(
-      AppSurfacesPalette.dark.onSurface.computeLuminance(),
-      greaterThan(0.5),
-      reason: 'the dark ramp must draw light ink',
-    );
+    // **Both ramps draw dark ink on a near-white card.** This is the invariant
+    // the whole surface stack rests on, and it is asserted here because the
+    // alternative — a dark card with light ink in one ramp — is the defect the
+    // blue system was built to remove, and nothing else would notice it coming
+    // back.
+    for (final entry in palettes.entries) {
+      expect(
+        entry.value.surface.computeLuminance(),
+        greaterThan(0.5),
+        reason:
+            '${entry.key}: the card is not a light surface, so every caption '
+            'drawn on it is being measured against the wrong ramp',
+      );
+    }
   });
 
-  test('the accent is genuinely different between the two ramps', () {
-    // The finding of the whole light theme, pinned: one red cannot serve both.
-    // On the dark ramp the accent is pinned bright by the AA floor against
-    // `surfaceMuted`; against a light page that same red measures 2.49:1, which
-    // is under the 3:1 a graphic needs. So the hues became per-palette rather
-    // than staying one value and failing quietly.
-    expect(AppPaletteTheme.light.error, isNot(AppPaletteTheme.dark.error));
-    // And the ink inverts with them, because the fills invert.
-    expect(AppPaletteTheme.light.onHue, Colors.white);
-    expect(AppPaletteTheme.dark.onHue, Colors.black);
+  test('one accent hue across both ramps, with the ink that clears AA on it', () {
+    // **The hue is shared and the ink is not — which is the inverse of what this
+    // test used to assert, and the inversion is the design.**
+    //
+    // The old rule was "one red cannot serve both": the accent was dark on a
+    // light page and light on a dark one, so the app had two identities and
+    // toggling the theme changed the brand. The blue system keeps one hue
+    // (`#1D4ED8`) so the accent reads as the same colour everywhere.
+    //
+    // What did have to become per-ramp is the **ink on that fill**, because a
+    // filled button's label is body text and the ratio is measured, not chosen.
+    // Both ramps happen to land on white here; the assertion below is on the
+    // measured ratio rather than on the literal, so a future ramp that needs the
+    // other ink fails on the number instead of silently shipping a 4.06:1 label.
+    for (final entry in <String, AppPaletteTheme>{
+      'light': AppPaletteTheme.light,
+      'dark': AppPaletteTheme.dark,
+    }.entries) {
+      expect(
+        contrast(entry.value.onHue, entry.value.error),
+        greaterThanOrEqualTo(4.5),
+        reason:
+            '${entry.key}: the accent fill with its own ink is '
+            '${contrast(entry.value.onHue, entry.value.error).toStringAsFixed(2)}:1',
+      );
+    }
+    // And the hue really is shared — within 6 degrees, which is the tolerance
+    // 8-bit quantisation needs, not a licence for a second accent.
+    expect(
+      HSLColor.fromColor(AppPaletteTheme.light.error).hue,
+      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.error).hue, 6.0),
+    );
   });
 }

@@ -65,15 +65,30 @@ void main() {
     });
 
     test('the tile step is loud enough to carry the boundary alone', () {
-      // 3:1 against the card is the WCAG 1.4.11 non-text contrast requirement
-      // for a UI component boundary. The tile does not claim to be one — its
-      // 20%-alpha categorical border is well short of it — but if the tonal
-      // step cannot separate the tile from the card either, the tile has no
-      // boundary at all and the fill is doing nothing.
+      // **Either direction, and the direction is the fix.**
+      //
+      // This asserted `> 1.0`, i.e. that the tile is *lighter* than the card,
+      // which held while `surfaceAlt` was the lighter step of the ramp. The blue
+      // system inverted that in both ramps: the card is now the near-white one
+      // and `surfaceAlt` is the inset tile *below* it, so the ratio is **0.92**
+      // and the assertion fails on a real, correct tile.
+      //
+      // What is actually claimed is not which way the step goes but that there
+      // *is* one: a tile whose fill equals the card's own fill has no boundary at
+      // all, and "no tonal step" is precisely the failure this test exists to
+      // catch. So it asserts separation, in either direction, past a rounding
+      // band — and the band is what separates a step from a quantisation error.
       final ratio =
           (AppSurfaces.surfaceAlt.computeLuminance() + 0.05) /
           (AppSurfaces.surface.computeLuminance() + 0.05);
-      expect(ratio, greaterThan(1.0));
+      expect(
+        ratio < 0.98 || ratio > 1.02,
+        isTrue,
+        reason:
+            'the tile fill is indistinguishable from the card (ratio '
+            '${ratio.toStringAsFixed(2)}), so the tile has no boundary and only '
+            'the categorical border is left to describe it',
+      );
     });
   });
 
@@ -101,13 +116,23 @@ void main() {
       },
     );
 
-    testWidgets('an inset tile is lighter than the card it sits inside', (
-      tester,
-    ) async {
+    testWidgets('an inset tile is a different step from the card', (tester) async {
+      // **"a different step", not "lighter" — and the direction was the defect.**
+      //
+      // This asserted the inset tile was lighter than the card, which was true when
+      // `surfaceAlt` was the lighter step. It is now the *darker* one in both
+      // ramps, because the card is the near-white surface and the tile is the inset
+      // well below it, so `greaterThan` fails on a correct tile.
+      //
+      // The claim that matters is separation: an inset tile that shares the card's
+      // fill has no edge, which is the reason this test exists.
       final fill = await tileFill(tester, inset: true);
       expect(
         fill.computeLuminance(),
-        greaterThan(AppSurfaces.surface.computeLuminance()),
+        isNot(closeTo(AppSurfaces.surface.computeLuminance(), 0.02)),
+        reason:
+            'the inset tile is indistinguishable from the card, so it has no '
+            'edge and only a categorical border is left to describe it',
       );
     });
 

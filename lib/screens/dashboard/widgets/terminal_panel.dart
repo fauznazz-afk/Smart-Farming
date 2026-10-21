@@ -22,12 +22,21 @@
 /// categorical hue sitting in every row would flatten exactly the structure the
 /// panel is building.
 ///
-/// The panel is a black instrument with a single red accent: the hero figure,
-/// the section headings and the meter fills are [AppPalette.error], and the
-/// rows are white on black. **Red is the instrument's own colour, not a claim
-/// that something is wrong** — that is a deliberate change from the earlier
-/// monochrome rule, which reserved red for an out-of-bounds value. The category
-/// tabs keep their hues; this is one page, not a new app.
+/// **The panel is paper on the blue page.** It is [AppSurfaces.surface] —
+/// near-white in *both* ramps — with an [AppBorders.hairlineBorder] around it
+/// and a soft [AppShadows.subtle] lifting it off the page, so the darkness in
+/// this design system belongs to the page and the panel is the thing that lifts
+/// off it. It was a black instrument once; there is no black surface left in the
+/// system to be one.
+///
+/// Its single accent is [AppPalette.primary], and it is spent on the hero
+/// figure, the slot name above it and the meter's fill: the places that say
+/// *this is the reading*, as opposed to *this is a field name*. **Red no longer
+/// appears as an accent here at all** — under this palette `AppPalette.error` is
+/// the same blue as the accent, which made it a colour that could not be named,
+/// so it was replaced by the token that means "the accent". Red is
+/// [AppPalette.statusBad] and is used for exactly one thing: a reading that is
+/// out of bounds ([TerminalRow.alert] and [TerminalTag.alert]).
 ///
 /// ## The label vocabulary
 ///
@@ -46,12 +55,12 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../../widgets/liquid_glass.dart';
+import '../utils/app_motion.dart';
 import '../utils/design_tokens.dart';
 
 /// The single frame every row in the panel is drawn inside.
 ///
-/// **One [AppCard] for the whole page rather than five.** The previous layout
+/// **One surface for the whole page rather than five.** The previous layout
 /// drew a border around each section and a gap between them, so the page read as
 /// a stack of separate widgets rather than as one readout. A single frame with
 /// hairline rules inside it is the difference between a list of cards and an
@@ -81,15 +90,35 @@ class TerminalPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      semanticLabel: semanticLabel,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (header != null) ...[header!, const Divider()],
-          ...children,
-        ],
+    // **Built from tokens rather than `AppCard`, because `AppCard` carries the
+    // hard `AppShadows.stamped` rectangle from the dead design system.** This
+    // panel lifts off the page with the card's hairline and a soft shadow
+    // instead. The transparent `Material` sits between the decoration and the
+    // content so the rows' `InkWell` ripples are not painted over by the fill.
+    return Semantics(
+      label: semanticLabel,
+      container: true,
+      excludeSemantics: true,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppSurfaces.surface,
+          borderRadius: AppRadius.all(AppRadius.card),
+          border: AppBorders.hairlineBorder,
+          boxShadow: AppShadows.subtle,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (header != null) ...[
+                header!,
+                Divider(color: AppSurfaces.border, height: 1),
+              ],
+              ...children,
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -153,12 +182,12 @@ class TerminalRow extends StatelessWidget {
   /// The unit, set smaller and muted immediately after [value].
   final String? unit;
 
-  /// Draw the value in [AppPalette.error].
+  /// Draw the value in [AppPalette.statusBad].
   ///
-  /// **The only colour this panel has**, and it means "out of bounds" — never
-  /// "battery" or "environment" or any other category. A panel that colours by
-  /// category cannot also colour by severity, because then red means two things
-  /// on one screen.
+  /// **The only colour on this panel that means anything, and it means "out of
+  /// bounds"** — never "battery" or "environment" or any other category. A panel
+  /// that colours by category cannot also colour by severity, because then red
+  /// means two things on one screen.
   final bool alert;
 
   /// Draw a hairline under this row.
@@ -182,7 +211,7 @@ class TerminalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final valueColor = alert ? AppPalette.error : AppSurfaces.onSurface;
+    final valueColor = alert ? AppPalette.statusBad : AppSurfaces.onSurface;
     final body = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.cardPadding,
@@ -277,11 +306,20 @@ class TerminalRow extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
-              child: Text(
-                value,
-                maxLines: 1,
-                style: (valueStyle ?? AppType.slotValue).copyWith(
-                  color: valueColor,
+              // **The figure counts to its new value instead of jumping to it.**
+              // A reading that changes every ten seconds is a flicker when it
+              // snaps and motion when it counts. Only a figure that prints a
+              // number is animated: `--`, `Discharging` and a `min / avg / max`
+              // triple have nothing to count between, and are drawn as they
+              // arrive.
+              child: TweenedFigure(
+                text: value,
+                builder: (context, text) => Text(
+                  text,
+                  maxLines: 1,
+                  style: (valueStyle ?? AppType.slotValue).copyWith(
+                    color: valueColor,
+                  ),
                 ),
               ),
             ),
@@ -354,7 +392,11 @@ class TerminalRow extends StatelessWidget {
             borderRadius: AppRadius.all(AppRadius.sm),
             child: body,
           ),
-        if (divider) const Divider(),
+        // **[TerminalRule], not a bare `Divider`.** A rule that runs edge to edge
+        // reads as a border between two regions; the inset one reads as a row
+        // separator, which is what a rule under a row is. This one was full-bleed
+        // while [TerminalRule] was inset, so the same panel drew both kinds.
+        if (divider) const TerminalRule(),
       ],
     );
   }
@@ -382,10 +424,12 @@ class _Dot extends StatelessWidget {
 /// and this is the one number that answers "what is happening" without a
 /// calculation.
 ///
-/// **It is drawn in [AppPalette.error] because red is the panel's accent, not
+/// **It is drawn in [AppPalette.primary] because that is the panel's accent, not
 /// because the reading is a breach.** The figure is the number the page is
-/// about, and an 88 dp glyph in the same red as every other accent on the panel
-/// is what makes this read as one instrument rather than as five widgets.
+/// about, and an 88 dp glyph in the same blue as the slot name above it and the
+/// meter below it is what makes this read as one instrument rather than as five
+/// widgets. Red is [AppPalette.statusBad] on this panel and says only that a
+/// value is out of bounds.
 ///
 /// It is drawn at [AppType.heroFigure] rather than reusing [AppType.displayLg]
 /// because the tracking on the display scale is tuned for a short headline and a
@@ -395,7 +439,8 @@ class _Dot extends StatelessWidget {
 /// **Lively:** while the array is producing and the feed is live, the glow
 /// pulses gently. Over a zero, or over a stale reading, it rests — a calm zero
 /// is honest, and a breathing glow over one would be the panel claiming activity
-/// it cannot back up.
+/// it cannot back up. The glow is the accent at low alpha rather than a new
+/// value: [AppShadows.glow] already takes the hue.
 class TerminalHero extends StatefulWidget {
   const TerminalHero({
     super.key,
@@ -539,7 +584,7 @@ class _TerminalHeroState extends State<TerminalHero>
             children: [
               Text(
                 widget.slot,
-                style: AppType.slotKey.copyWith(color: AppPalette.error),
+                style: AppType.slotKey.copyWith(color: AppPalette.primary),
               ),
               const Spacer(),
               if (widget.secondary.isNotEmpty)
@@ -598,14 +643,22 @@ class _TerminalHeroState extends State<TerminalHero>
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.figure,
-                        maxLines: 1,
-                        style: AppType.heroFigure.copyWith(
-                          color: AppPalette.error,
-                          shadows: AppShadows.glow(
-                            AppPalette.error,
-                            strength: strength,
+                      // **The hero counts too.** It is the largest figure in the
+                      // app, so it is the one a jump is most visible on — and
+                      // the same rule as every other row: a figure that prints
+                      // a number counts to its new value, and one that does not
+                      // is drawn as it arrives.
+                      child: TweenedFigure(
+                        text: widget.figure,
+                        builder: (context, text) => Text(
+                          text,
+                          maxLines: 1,
+                          style: AppType.heroFigure.copyWith(
+                            color: AppPalette.primary,
+                            shadows: AppShadows.glow(
+                              AppPalette.primary,
+                              strength: strength,
+                            ),
                           ),
                         ),
                       ),
@@ -635,6 +688,11 @@ class _TerminalHeroState extends State<TerminalHero>
 /// spends its colour budget on severity alone; a fill here would make a routine
 /// status louder than a real alarm. The outline says "this is a label" at the
 /// same volume as everything else, and the text carries the meaning.
+///
+/// A resting tag is a quiet chip on a white card:
+/// [AppSurfaces.onSurfaceVariant] at 35% for the outline and solid for the
+/// text, at [AppRadius.badge] — the system's smallest radius, because a tag is
+/// a label and not a pill.
 class TerminalTag extends StatelessWidget {
   const TerminalTag({
     super.key,
@@ -645,14 +703,14 @@ class TerminalTag extends StatelessWidget {
 
   final String text;
 
-  /// Red outline and red text — a breach, or an active alarm.
+  /// [AppPalette.statusBad] outline and text — a breach, or an active alarm.
   final bool alert;
 
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = alert ? AppPalette.error : AppSurfaces.onSurfaceVariant;
+    final color = alert ? AppPalette.statusBad : AppSurfaces.onSurfaceVariant;
     final tag = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -711,8 +769,8 @@ class TerminalMeter extends StatefulWidget {
 
   final bool alert;
 
-  /// The fill colour. Defaults to the panel's red accent; a caller that needs
-  /// another accent can pass one rather than the widget carrying a second rule.
+  /// The fill colour. Defaults to the panel's accent; a caller that needs another
+  /// accent can pass one rather than the widget carrying a second rule.
   final Color? color;
   final String? leftCaption;
   final String? rightCaption;
@@ -783,11 +841,14 @@ class _TerminalMeterState extends State<TerminalMeter>
 
   @override
   Widget build(BuildContext context) {
-    // **The fill is the panel's red accent whether or not this meter is
-    // alerting.** `alert` no longer changes the colour, because red is already
-    // the accent — a second shade of it would say "worse" in a way the panel
-    // cannot back up, and the row's own value already carries severity.
-    final fill = widget.color ?? AppPalette.error;
+    // **The fill is the panel's accent whether or not this meter is
+    // alerting.** `alert` no longer changes the colour, because the accent is
+    // already the accent — a second shade of it would say "worse" in a way the
+    // panel cannot back up, and the row's own value already carries severity.
+    // The unfilled track is [AppSurfaces.track], which in this ramp is a step of
+    // the page, so an empty bar reads as an inset well on the white card rather
+    // than as a hole in it.
+    final fill = widget.color ?? AppPalette.primary;
     final clamped = widget.fraction.isNaN
         ? 0.0
         : widget.fraction.clamp(0.0, 1.0);
@@ -828,7 +889,7 @@ class _TerminalMeterState extends State<TerminalMeter>
             SizedBox(
               // **8 dp, up from 6.** The bar is the only element on the panel
               // that answers "how full", and at 6 dp on a 47 dp row it read as a
-              // rule that happened to be red on one end. 8 keeps it flat-ended
+              // rule that happened to be tinted on one end. 8 keeps it flat-ended
               // and square — the two things `terminal_panel_test.dart` pins —
               // and only gives it enough body to look like a gauge.
               height: 8,
@@ -942,7 +1003,7 @@ const EdgeInsets _inset = EdgeInsets.fromLTRB(
   // **`kTerminalGapAbove`, from 0.** The bar is the only element on the panel
   // that is not a `TerminalRow`, so it has no row padding of its own to inherit
   // and was landing flush against the value above it — `BAT_FLOW`'s figure sat
-  // one hairline away from a red gauge that belongs to the row *below* it. On a
+  // one hairline away from a lit gauge that belongs to the row *below* it. On a
   // panel that draws its depth from hairlines, touching is the same as joined.
   kTerminalGapAbove,
   AppSpacing.cardPadding,
@@ -956,14 +1017,20 @@ const EdgeInsets _inset = EdgeInsets.fromLTRB(
 /// regions; the same rule inset to the panel's content padding reads as a
 /// *row separator*, which is what it is. Three call sites copying
 /// `Divider(indent: 16)` is how they drift apart.
+///
+/// [TerminalRow]'s own trailing rule is this widget, so a row that draws one and
+/// a caller that inserts one get the same 1 px line at the same insets.
 class TerminalRule extends StatelessWidget {
   const TerminalRule({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding),
-      child: Divider(),
+    // The card's own hairline value, not the Material scheme's default divider —
+    // a themed `Divider` is whatever the scheme happens to say, and this rule
+    // has to match the card's border exactly.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.cardPadding),
+      child: Divider(color: AppSurfaces.border, height: 1),
     );
   }
 }

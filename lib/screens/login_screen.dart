@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/alarm_notification_service.dart';
 import '../services/thingsboard_api.dart';
+import 'dashboard/utils/app_motion.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'dashboard_screen.dart';
@@ -63,32 +64,14 @@ class _LoginScreenState extends State<LoginScreen> {
         // alarms would only start working after the next app launch, which is
         // exactly the case a user who just signed in would notice.
         unawaited(AlarmNotificationService.sync(api: _api));
+        // **The app's one transition, not a second one.** This screen had its
+        // own `PageRouteBuilder` and every other push in the app was a
+        // `MaterialPageRoute`, so the app had two different answers to "what
+        // happens when I press this" — and the sign-in, the one transition the
+        // user sees first, was the one that belonged to nobody else.
         Navigator.pushReplacement<void, void>(
           context,
-          PageRouteBuilder<void>(
-            transitionDuration: const Duration(milliseconds: 420),
-            reverseTransitionDuration: const Duration(milliseconds: 260),
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                DashboardScreen(api: _api),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  final curved = CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity: curved,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.035),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
-                    ),
-                  );
-                },
-          ),
+          appPageRoute<void>(page: DashboardScreen(api: _api)),
         );
       } else {
         setState(() => _errorMsg = 'Wrong username or password');
@@ -125,7 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Align(
+                        // Not `const`: the ink is a brightness-aware getter.
+                        //
+                        // **Card ink, explicitly — and this was page ink.** It was
+                        // `AppGlass.pageInkStrong`, which was correct when the fix
+                        // for the pale *page* went in and is wrong here: this word
+                        // is inside the `AppCard`, and `surface` is near-white in
+                        // **both** ramps. White on `#F8FAFC` is **1.05:1**, so the
+                        // app's name was invisible on the login card in dark mode
+                        // and visible in light. Card ink is navy in both ramps,
+                        // which is the one value that works on this fill twice.
+                        Align(
                           alignment: Alignment.center,
                           child: Text(
                             'EnerGrow',
@@ -134,7 +127,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             // slot at 24/900. It was `headline-md`, which is the
                             // *sub*-headline — and this is the screen's defining
                             // line.
-                            style: AppType.headlineLg,
+                            style: AppType.headlineLg.copyWith(
+                              color: AppSurfaces.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xs),

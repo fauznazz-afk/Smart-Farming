@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../utils/battery_sign.dart';
 import '../utils/csv_export.dart';
+import '../utils/solar_irradiance.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
@@ -29,11 +31,13 @@ import '../utils/app_update.dart';
 import '../utils/ai_provider.dart';
 import '../utils/date_summary_stats.dart';
 import '../utils/poll_interval.dart';
+import '../utils/production_buckets.dart';
 import '../widgets/liquid_glass.dart';
 import 'ai_chat_screen.dart';
 import 'alarm_history_screen.dart';
 import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
+import 'dashboard/utils/app_motion.dart';
 import 'dashboard/utils/bound.dart';
 import 'dashboard/utils/chart_gesture_lock.dart';
 import 'dashboard/utils/color_helpers.dart';
@@ -52,10 +56,12 @@ import 'dashboard/widgets/date_summary_panel.dart';
 import 'dashboard/widgets/power_sub_tabs.dart';
 import 'dashboard/widgets/metric_grid.dart';
 import 'dashboard/widgets/metric_specs.dart';
-import 'dashboard/widgets/greeting_header.dart';
 import 'dashboard/widgets/nav_bar.dart';
-import 'dashboard/widgets/overview_panel.dart';
+import 'dashboard/widgets/terminal_panel.dart';
+import 'dashboard/utils/date_helpers.dart';
 import 'dashboard/widgets/telemetry_card.dart';
+import 'dashboard/widgets/glass_hero_card.dart';
+import 'dashboard/widgets/glass_sheet.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -158,6 +164,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   final ValueNotifier<double> _appBarBlurProgress = ValueNotifier(0);
   int _selectedIndex = 0;
 
+  /// The page the user asked for, while the slide is running.
+  ///
+  /// **A slide crosses the pages in between, and the framework reports each
+  /// one.** A jump from Overview to Fish passes the Power tab and the
+  /// Hydroponics tab, and `onPageChanged` fires for both on the way. The
+  /// bubble is on the page the user asked for, so those two are dropped
+  /// rather than acted on — see [_onPageChanged].
+  int? _targetPage;
+
   /// Which of PV / AC / Battery the Power tab is showing.
   ///
   /// A notifier rather than plain state so that selecting a sub-view rebuilds only
@@ -237,12 +252,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// fifteen minutes old with nothing saying so.
   Completer<void>? _energyInFlight;
   String? _energyError;
+
+  /// The 24h / 7d window the cost panel reports on.
+  ///
+  /// **Its toggle moved to the cost panel's own period label.** The control used
+  /// to be the instrument panel's energy rows, which came off the Overview page
+  /// when the glass cards replaced it — so the affordance followed the card that
+  /// still has a window to change rather than being dropped.
   bool _weeklyEnergySummary = false;
   DateTime? _energyUpdatedAt;
   double _solarKwh = 0;
-  double _previousSolarKwh = 0;
   double _loadKwh = 0;
-  double _previousLoadKwh = 0;
   double? _dailyProductionTargetKwh;
 
   /// Rupiah per kWh, and the array's nameplate in watts. Both null until the
@@ -397,7 +417,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final alarmId = await AlarmBridge.instance.launchAlarmId();
     if (alarmId != null && mounted) {
       Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()));
+          .push(appPageRoute<void>(page: const AlarmHistoryScreen()));
     }
   }
 
@@ -1099,20 +1119,21 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _updateMemoizedEnergy() {
-    final solar = energyComparison(
+    // **Only `current` is kept.** The instrument panel's `PREV_SOLAR` /
+    // `PREV_LOAD` rows were the only readers of the previous period, and they
+    // went with it — the 7-day sheet reports a week of days rather than one
+    // week-versus-last-week delta, which is the same comparison expressed as
+    // seven readable rows instead of two.
+    _solarKwh = energyComparison(
       history: _energyHistory,
       key: 'power_dc',
       weekly: _weeklyEnergySummary,
-    );
-    final load = energyComparison(
+    ).current;
+    _loadKwh = energyComparison(
       history: _energyHistory,
       key: 'power_ac',
       weekly: _weeklyEnergySummary,
-    );
-    _solarKwh = solar.current;
-    _previousSolarKwh = solar.previous;
-    _loadKwh = load.current;
-    _previousLoadKwh = load.previous;
+    ).current;
   }
 
   // ── Per-page history ─────────────────────────────────────────────────────────
@@ -1318,9 +1339,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   };
 
   /// The status strip's battery cell is a shortcut to the battery readings, which
-  /// are now a view inside the Power tab rather than a tab. Both halves have to
+  /// The status strip's battery cell is a shortcut to the battery readings, which
+  /// are a view inside the Power tab rather than a tab. Both halves have to
   /// happen, and the order matters: selecting the sub-view first means the page
   /// builds with the right content already in place instead of flashing PV.
+  ///
+  /// **Its caller is now the hero's SOC cell** rather than a row in the
+  /// instrument panel that came off this page. "How full is the pack" is the
+  /// question that cell answers, so the affordance is the thing being asked about
+  /// — the same reason it was the right target when the panel owned it.
   void _openBatteryFromStrip() {
     final batteryIndex = kPowerSubTabs.indexWhere(
       (tab) => tab.prefix == 'battery',
@@ -1329,27 +1356,54 @@ class _DashboardScreenState extends State<DashboardScreen>
       _powerSubNotifier.value = batteryIndex;
     }
     if (_selectedIndex != 1) {
-      _pageController.animateToPage(
-        1,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeInOutCubic,
-      );
+      unawaited(_showPage(1));
     }
-    // Fetched by prefix rather than through _reloadHistoryForCurrentPage, which
-    // reads _selectedIndex — and that is only updated by onPageChanged once the
-    // animation above has finished. Relying on it here would fetch whatever page
-    // the user was on, not the one they were sent to.
+    // Fetched by prefix, and the prefix is the battery sub-view. The switch
+    // above applies the selection before it moves the page, so
+    // `_reloadHistoryForCurrentPage` would resolve to the same prefix — but
+    // naming it keeps the request tied to the sub-view the user was sent to
+    // rather than to the tab they were on.
     _historyLoaded.remove('battery');
     unawaited(_fetchHistoryFor('battery'));
   }
 
+  /// Moves the dashboard to a page, and the nav bar's bubble with it.
+  ///
+  /// **The selection is applied before the page moves, and that is what makes
+  /// the two arrive together.** The bubble is drawn from `_selectedIndex`, and
+  /// `_onPageChanged` only fires once the new page is halfway across — so the
+  /// bubble used to start moving halfway through the content's own animation,
+  /// and the two landed apart. Applying the selection first starts both on the
+  /// same frame.
+  ///
+  /// **One clock for both, and it is [AppMotionTab].** The bubble was already
+  /// on it; the page slide is the half that moved. Two halves of one gesture
+  /// that run on two clocks read as two gestures.
+  ///
+  /// **A swipe still moves the bubble late, and that is the framework's
+  /// order, not this one's.** `onPageChanged` fires when the new page becomes
+  /// the current one, which is halfway through the drag; the bubble follows
+  /// the finger's release from there. A tap — the gesture the clock is for —
+  /// moves both at once.
+  Future<void> _showPage(int index) async {
+    _selectedIndex = index;
+    _selectedPage.value = index;
+    _targetPage = index;
+    await _pageController.animateToPage(
+      index,
+      duration: AppMotionTab.duration,
+      curve: AppMotionTab.curve,
+    );
+    // **Only clear the target if it is still this one.** A second tap starts a
+    // second slide, and the first slide's future completes the moment it is
+    // cancelled — which would clear the second one's target and let the pages
+    // it passes take the bubble with them.
+    if (_targetPage == index) _targetPage = null;
+  }
+
   void _selectPage(int index) {
     if (_selectedPage.value == index) return;
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeInOutCubic,
-    );
+    unawaited(_showPage(index));
   }
 
   void _setChartPointerActive(bool active) {
@@ -1454,7 +1508,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _goToLogin() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      appPageRoute<void>(page: const LoginScreen()),
       (_) => false,
     );
   }
@@ -1475,7 +1529,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _openSettings() async {
     final changed = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => SettingsScreen(onLogout: _logout)),
+      appPageRoute<bool>(page: SettingsScreen(onLogout: _logout)),
     );
     if (changed == true) {
       _loadPreferences();
@@ -1485,14 +1539,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _openAlarmHistory() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AlarmHistoryScreen()),
+      appPageRoute<void>(page: const AlarmHistoryScreen()),
     );
   }
 
   void _openEnergyReport() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EnergyReportScreen(api: widget.api)),
+      appPageRoute<void>(page: EnergyReportScreen(api: widget.api)),
     );
   }
 
@@ -1501,23 +1555,153 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Built here rather than inside the chat screen because the live values are
   /// this screen's state, and the whole point of the layering rule in AGENTS.md
   /// is that a widget receives its data instead of reaching into a screen.
-  String _aiTelemetrySummary() => buildTelemetrySummaryWithHistory(
-    devices: {
-      'battery': _battery?.latestValues ?? const {},
-      'pzem meter': _pzem?.latestValues ?? const {},
-      'environment sensor': _sensor?.latestValues ?? const {},
-      'fish tank sensor': _fish?.latestValues ?? const {},
-    },
-    totals: {'solar_kwh_today': _solarKwh, 'load_kwh_today': _loadKwh},
-    history: _history,
-  );
+  ///
+  /// **This is a method, not a field, because the snapshot has to be current.**
+  /// It used to be evaluated once and handed to `AiChatScreen` as a `String`, so
+  /// the assistant answered from whatever the readings were when the screen was
+  /// opened — a question asked ten minutes later reasoned about ten-minute-old
+  /// numbers. `AiChatScreen.telemetrySummary` takes a builder now and calls it per
+  /// request.
+  ///
+  /// **Everything the app knows goes in, not the four devices it used to send.**
+  /// The slice was live values for four devices, two totals and seven days of
+  /// three power keys; the assistant therefore could not answer anything about
+  /// alarms, thresholds, the tariff, the array's size, how fresh a reading was, or
+  /// any key outside a hardcoded whitelist. All of those are here now, and the
+  /// formatting is `ai_provider.dart`'s job.
+  String _aiTelemetrySummary() {
+    final now = DateTime.now();
+    return buildTelemetrySummaryWithHistory(
+      devices: {
+        'battery': _battery?.latestValues ?? const {},
+        'pzem meter': _pzem?.latestValues ?? const {},
+        'environment sensor': _sensor?.latestValues ?? const {},
+        'fish tank sensor': _fish?.latestValues ?? const {},
+      },
+      totals: {'solar_kwh_today': _solarKwh, 'load_kwh_today': _loadKwh},
+      history: _history,
+      deviceNotes: {
+        if (_battery != null) 'battery': _freshness(_battery!.lastUpdate, now),
+        if (_pzem != null) 'pzem meter': _freshness(_pzem!.lastUpdate, now),
+        if (_sensor != null)
+          'environment sensor': _freshness(_sensor!.lastUpdate, now),
+        if (_fish != null)
+          'fish tank sensor': _freshness(_fish!.lastUpdate, now),
+      },
+      // The same evaluator the banner and the background module use, so the
+      // assistant cannot describe a condition the app is not showing.
+      activeAlarms: _alertMessages.value,
+      thresholds: _aiThresholds(),
+      installation: _aiInstallation(),
+      derived: _aiDerived(),
+    );
+  }
+
+  /// "3 min ago", for a device's last reading.
+  ///
+  /// `--` when the device has never reported: "0 min ago" would be a claim about
+  /// a reading that does not exist.
+  String _freshness(DateTime? lastUpdate, DateTime now) {
+    if (lastUpdate == null) return 'no reading yet';
+    final minutes = now.difference(lastUpdate).inMinutes;
+    if (minutes < 1) return 'updated just now';
+    if (minutes < 60) return 'updated $minutes min ago';
+    final hours = minutes ~/ 60;
+    return 'updated $hours h ago';
+  }
+
+  /// The user's alarm thresholds, as `label -> "value unit"`.
+  ///
+  /// Only the ones that are actually set: a null limit is not a threshold, and
+  /// printing it as one would tell the assistant a rule exists that does not.
+  Map<String, String> _aiThresholds() {
+    final t = _thresholds;
+    String c(double? value, String unit) =>
+        value == null ? '' : '${slotNumber(value, decimals: 1)} $unit';
+    return {
+      if (t.tempMin != null || t.tempMax != null)
+        'air temperature': '${c(t.tempMin, '')} to ${c(t.tempMax, '°C')}'
+            .trim(),
+      if (t.humidityMin != null || t.humidityMax != null)
+        'humidity': '${c(t.humidityMin, '')} to ${c(t.humidityMax, '%')}'
+            .trim(),
+      if (t.tdsMin != null) 'tds minimum': c(t.tdsMin, 'ppm'),
+      if (t.tdsMax != null) 'tds maximum': c(t.tdsMax, 'ppm'),
+      'battery low': '${slotNumber(t.lowSoc, decimals: 0)} %',
+      if (t.fishPhMin != null || t.fishPhMax != null)
+        'fish pH': '${c(t.fishPhMin, '')} to ${c(t.fishPhMax, '')}'.trim(),
+      if (t.fishTempMin != null || t.fishTempMax != null)
+        'fish temperature':
+            '${c(t.fishTempMin, '')} to ${c(t.fishTempMax, '°C')}'.trim(),
+      if (t.fishTurbidityMax != null)
+        'turbidity max': c(t.fishTurbidityMax, 'NTU'),
+      'silent device warning': '${t.staleMinutes} min',
+      'device offline': '${t.offlineMinutes} min',
+    };
+  }
+
+  /// The installation's own numbers — the two the user typed into Settings.
+  ///
+  /// Neither is an alarm threshold and neither raises a notification, which is why
+  /// they are separate from [_aiThresholds]: an assistant told the tariff is a
+  /// threshold would answer "your tariff is breached".
+  Map<String, String> _aiInstallation() {
+    final target = _dailyProductionTargetKwh;
+    return {
+      if (_pvInstalledWp != null)
+        'array nameplate': '${slotNumber(_pvInstalledWp, decimals: 0)} Wp',
+      if (_electricityTariffPerKwh != null)
+        'electricity tariff':
+            '${slotNumber(_electricityTariffPerKwh, decimals: 0)} per kWh',
+      if (target != null && target > 0)
+        'daily production target': '${slotNumber(target, decimals: 1)} kWh',
+    };
+  }
+
+  /// Figures the assistant would otherwise have to be told how to compute.
+  ///
+  /// Each one is a number the page is already deriving somewhere, so the answer
+  /// and the screen cannot disagree about it. Kept short deliberately: anything
+  /// the model can read straight off `devices` does not belong here.
+  Map<String, String> _aiDerived() {
+    final peak = _pvPeakForWindow(_pzem?.latestValues['power_dc']);
+    // The cost panel's own function, so the assistant cannot price a period the
+    // app would refuse to price — an unset tariff is "the user has not told us",
+    // not zero.
+    final money = moneyForPeriod(
+      solarKwh: _solarKwh,
+      loadKwh: _loadKwh,
+      tariffPerKwh: _electricityTariffPerKwh,
+    );
+    return {
+      if (peak != null) 'peak PV today': '${slotNumber(peak, decimals: 0)} W',
+      'net energy today (solar minus load)':
+          '${slotNumber(_solarKwh - _loadKwh, decimals: 2)} kWh',
+      if (_pvInstalledWp != null && _pvInstalledWp! > 0)
+        'specific yield today':
+            '${(_solarKwh * 1000 / _pvInstalledWp!).toStringAsFixed(2)} kWh/kWp',
+      // A zero denominator is omitted rather than printed as infinity: no load
+      // today is a fact worth leaving out, not a percentage worth inventing.
+      if (_loadKwh > 0)
+        'self-sufficiency today':
+            '${((_solarKwh / _loadKwh) * 100).clamp(0, 999).toStringAsFixed(0)} %',
+      if (money != null)
+        'load cost today': '${slotNumber(money.loadCost, decimals: 0)} rupiah',
+      if (money != null)
+        'solar value today':
+            '${slotNumber(money.solarValue, decimals: 0)} rupiah',
+      if (money != null)
+        'balance today (solar value minus load cost)':
+            '${slotNumber(money.balance, decimals: 0)} rupiah',
+    };
+  }
 
   void _openAiAssistant() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AiChatScreen(
-          telemetrySummary: _aiTelemetrySummary(),
+      appPageRoute<void>(
+        page: AiChatScreen(
+          telemetrySummary: _aiTelemetrySummary,
           openSettings: _openSettings,
         ),
       ),
@@ -1622,8 +1806,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           if (progress == 0) return const SizedBox.expand();
           // The scrim has to match the page it fades in over, or the app bar
           // shows as a slightly different shade of the same colour once you
-          // scroll. These were the old scaffold hexes; the page moved.
-          final baseColor = AppSurfaces.page;
+          // scroll. **The sweep's first stop, not the flat page.** The bar is
+          // transparent over the body, so what is behind it is the *top* of the
+          // gradient — `#223C6B` in the dark ramp — and the flat page
+          // (`#1B3260`) sits **1.15:1** away from it, which is a visible band
+          // of a slightly different blue under the bar.
+          final baseColor = AppGlass.pageGradient.first;
           return DecoratedBox(
             decoration: BoxDecoration(
               // Opaque, and that is a fix. This was `0.86 * progress`, so 14% of
@@ -1648,53 +1836,18 @@ class _DashboardScreenState extends State<DashboardScreen>
           );
         },
       ),
-      leading: IconButton(
-        tooltip: 'Reload data',
-        icon: const Icon(Icons.refresh_rounded),
-        onPressed: _loading ? null : _fetchAll,
-      ),
-      title: const Text(
-        'EnerGrow',
-        style: TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
-        ),
-      ),
-      actions: [
-        // No date-range button here, and that is the user's call.
-        //
-        // It was added in this release to fix a real gap -- the range picker had
-        // become unreachable -- and the reasoning was that the app bar is the one
-        // place on screen on all four tabs. It sat between the "EnerGrow" wordmark
-        // and the history icon, and the user read it as clutter next to the logo.
-        //
-        // The gap is therefore back, and honestly: `DateStrip` on Overview is the
-        // only route to a custom range again, so on Power, Hydroponics and Fish
-        // the date cannot be changed without going back to Overview. That was the
-        // state before this release and it is a worse experience than a slightly
-        // crowded app bar.
-        //
-        // Recording it rather than quietly reverting, because the reasoning for
-        // putting it here was sound and the reason for taking it out is that it
-        // looked wrong in the one place the user looks at first. If the range
-        // control is wanted back, the app bar is still the only chrome shared by
-        // all four tabs -- but it should be a single control that also carries the
-        // current date, not an icon that duplicates what the date strip says.
-        // Ahead of Alarm History, because it is the one an ordinary user is more
-        // likely to reach for. See the `Scaffold` comment for why this is in
-        // the app bar and not a floating button.
-        IconButton(
-          tooltip: 'Alarm History',
-          icon: const Icon(Icons.history_outlined),
-          onPressed: _openAlarmHistory,
-        ),
-        IconButton(
-          tooltip: 'Settings',
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: _openSettings,
-        ),
-      ],
+      // Wordmark only. Every button that used to live here has a home that is
+      // either on the page itself or in the hero card: reload is the page's own
+      // pull-to-refresh, alarm history is the hero's bell, settings is the
+      // hero's menu, CSV export is the hero's download. Four duplicates of
+      // things the user can already see, on the one surface present on all tabs.
+      //
+      // **The token, and the ink comes from the bar.** The literal style had no
+      // colour, so the title took the bar's foreground — navy in both ramps
+      // since the cards went near-white, which on the dark page is invisible.
+      // The colour is `AppGlass.pageInkStrong`, from the theme's `AppBarTheme`.
+      title: const Text('EnerGrow', style: AppType.appBarTitle),
+      actions: const <Widget>[],
     );
   }
 
@@ -1720,6 +1873,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _onPageChanged(int index) {
+    // **A page the slide passed is not a page the user is on.**
+    //
+    // The framework reports the page the scroll position has rounded to, so
+    // a jump from Overview to Fish reports the Power tab and then the
+    // Hydroponics tab on the way past. The bubble is already on the page the
+    // user asked for, and the history for a page nobody is going to look at is
+    // a request nobody needs — so a page change that is not the target is
+    // dropped rather than acted on.
+    if (_targetPage != null && index != _targetPage) return;
     _selectedIndex = index;
     _selectedPage.value = index;
     final prefix = _prefixForPage(index);
@@ -2024,17 +2186,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Overview page ────────────────────────────────────────────────────────────
   List<Widget Function()> _overviewPage() {
     return [
-      () => GreetingHeader(displayName: _displayName),
-      () => const SizedBox(height: 8),
-      () => _dateStrip(),
-      () => const SizedBox(height: 8),
-      // **Under the date strip, not in the app bar.** The strip is what chooses
-      // the range this exports, and the app bar is shared by all four tabs — the
-      // user already had a control removed from there for reading as clutter
-      // next to the wordmark. A text action belongs beside the control it acts
-      // on, and a CSV is not something to reach for on every visit.
-      () => _exportCsvAction(),
-      () => _bindRevision(_liveRevision, () => _overviewPanel()),
+      () => _bindRevision(_liveRevision, () => _glassHero()),
+      // **The date strip used to be its own block here.** It is inside the hero
+      // card now (`GlassHeroCard.footer`), with its range trigger among the
+      // card's actions, so the two rows are one surface instead of two unrelated
+      // ones with an empty header strip above the chips.
+      //
+      // **The CSV export row is gone from this page**, and the capability moved
+      // to the app bar rather than disappearing with it. It was a line of text
+      // right under the date strip, which is the most valuable real estate on the
+      // screen for the app's least-used feature.
+      () => const SizedBox(height: 18),
+      () => _bindRevision(_energyRevision, () => _forecastSheet()),
       // **Cost and array performance, below the panel that reports the kWh it
       // is derived from.**
       //
@@ -2067,119 +2230,234 @@ class _DashboardScreenState extends State<DashboardScreen>
             ? const SizedBox.shrink()
             : Column(children: [const SizedBox(height: 8), panel]);
       }),
-      // **One panel, and it replaced four widgets.**
+      // **The old instrument panel is gone from this page, and that is the
+      // compaction.**
       //
-      // The page used to be the live-power hero card, the sky card, the energy
-      // summary card and the status strip, each in its own rounded box with its
-      // own padding and its own 8dp gap. That composition says "four different
-      // widgets", and what it means is "one readout, and these are its fields".
+      // `OverviewPanel` was a 25-row terminal readout — PV_OUT, POWER, SKY,
+      // ENERGY, SYSTEM, each with its own heading and rule — stacked *underneath*
+      // the glass hero and the 7-day sheet. Every headline figure
+      // on it was already on the page above: the hero carries PV output, peak,
+      // AC load, battery state and SOC; the sheet carries the 7-day totals. What
+      // it added was a second, taller way of reading the same numbers, which is
+      // why the Overview needed two scrolls to reach the nav bar.
       //
-      // Nothing was lost. Both routes those cards carried — the Battery view and
-      // the full energy report — are now entry points inside the panel, and the
-      // sky reading is the `LUX` row rather than a whole fifth card. See
-      // `_overviewPanel`.
+      // Nothing became unreachable. AC load, battery flow and both voltages are
+      // rows on the Power tab's own panel; lux, temperature and humidity are rows
+      // on Hydroponics and Fish. The nav bar reaches each in one tap, so the
+      // removed shortcut cost one tap on a route that still exists.
     ];
   }
 
-  /// The Overview instrument panel, fed from the devices the screen owns.
+  /// The navy glass hero: the site's name, today's date, the sun glyph, the
+  /// array's live output, and the three figures that qualify it.
   ///
-  /// **This is where the panel's inputs are resolved, and that boundary is why
-  /// the widget is testable at all.** Everything below `OverviewPanel` is a
-  /// plain `double?` and a `String?`; the ThingsBoard device objects, the stale
-  /// arithmetic and the alert set all stop here. A widget test can pump the
-  /// panel from a record and never construct a server client.
-  Widget _overviewPanel() {
-    final battery = _battery;
+  /// **The hero is PV output, and that is the same call `OverviewPanel` makes**,
+  /// with the same trade-off recorded there: at midnight it reads zero, and the
+  /// array's own status is on the panel below. What changed is the presentation —
+  /// this is the reference's hero card with telemetry in it, so the biggest
+  /// number on the page is the one the panels exist to produce.
+  ///
+  /// The stat row is AC load, battery flow and state of charge: the three numbers
+  /// that answer "where is the power going", which is the question the hero's own
+  /// figure cannot.
+  Widget _glassHero() {
     final pzem = _pzem;
-    // **Computed once, here.** `calculate` integrates the day's telemetry and
-    // sorts a list of samples; calling it twice for two rows would double that
-    // work on every ten-second poll for no reason, and — worse — two calls a few
-    // microseconds apart can straddle a poll and produce two rows disagreeing
-    // about the same day.
+    final battery = _battery;
+    final lux = _sensor?.latestValues['lux'];
+    final pvPower = pzem?.latestValues['power_dc'];
+    final acPower = pzem?.latestValues['power_ac'];
+    final batteryPower = battery?.latestValues['power'];
+    final soc = battery?.latestValues['soc'];
+    final peak = _pvPeakForWindow(pvPower);
+
+    // A device that has never reported prints `--`, never `0`. `slotNumber` owns
+    // that decision and every figure below goes through it, so the page cannot
+    // claim the panels produced nothing.
+    return GlassHeroCard(
+      title: _displayName.trim().isEmpty ? 'EnerGrow' : _displayName.trim(),
+      subtitle: _heroSubtitle(),
+      icon: _heroSkyIcon(lux),
+      figure: slotNumber(pvPower, decimals: 0),
+      unit: 'W',
+      conditionLabel: lux == null
+          ? 'No sky sensor'
+          : skyConditionFor(lux).label,
+      highLabel: 'Peak',
+      highValue: peak == null ? '--' : '${slotNumber(peak, decimals: 0)} W',
+      lowLabel: 'Load',
+      lowValue: '${slotNumber(acPower, decimals: 0)} W',
+      stats: [
+        // **Battery power in watts, not AC load.**
+        //
+        // AC load is the hero's `Load` pill directly above; printing it a second
+        // time in the stat row spent a third of that row on a number already on
+        // screen. What the row cannot answer is where the power is *going*, and
+        // the battery is the only device that both stores and returns it — so
+        // this is the signed figure straight from the BMS, the one
+        // `batteryChargeState` reads. See `lib/utils/battery_sign.dart`: a
+        // negative reading while the SOC falls means discharging, and the sign is
+        // never flipped at the call site, so this cell and the Battery page agree.
+        GlassHeroStat(
+          label: 'Battery Power',
+          value: '${slotNumber(batteryPower, decimals: 0)} W',
+          onTap: _openBatteryFromStrip,
+        ),
+        GlassHeroStat(
+          label: 'Battery',
+          value: batteryPower == null
+              ? '--'
+              : batteryChargeState(batteryPower).label,
+        ),
+        GlassHeroStat(
+          label: 'SOC',
+          value: '${slotNumber(soc, decimals: 0)}%',
+          onTap: _openBatteryFromStrip,
+        ),
+      ],
+      trailingActions: [
+        // First, because it is the only action that changes what the whole page
+        // below is describing.
+        GlassCircleButton(
+          icon: Icons.calendar_month_rounded,
+          tooltip: dateSelectionLabel(
+            selectedDate: _selectedDate,
+            rangeStart: _selectedRangeStart,
+            rangeEnd: _selectedRangeEnd,
+          ),
+          onPressed: _pickDateFromCalendar,
+        ),
+        GlassCircleButton(
+          icon: Icons.notifications_none_rounded,
+          badge: _activeAlertIds.isNotEmpty,
+          tooltip: 'Alarm history',
+          onPressed: _openAlarmHistory,
+        ),
+        GlassCircleButton(
+          icon: Icons.download_outlined,
+          tooltip: 'Export CSV',
+          onPressed: _exportingCsv ? null : _exportCsv,
+        ),
+        GlassCircleButton(
+          icon: Icons.menu_rounded,
+          tooltip: 'Settings',
+          onPressed: _openSettings,
+        ),
+      ],
+      // **The dates are the weather card's footer.** They describe the same
+      // "now" the card's own reading does, and as a separate block they needed a
+      // header row of their own that held nothing but their trigger.
+      footer: _dateStrip(),
+    );
+  }
+
+  /// "Senin, 15 Oktober 2026" — the reference's "Monday, June 23" line.
+  String _heroSubtitle() {
+    final now = DateTime.now();
+    return '${dayNameFull(now.weekday)}, ${now.day} ${monthName(now.month)} '
+        '${now.year}';
+  }
+
+  /// The sun glyph beside the hero figure.
+  ///
+  /// **Driven by lux, so the icon is a measurement rather than decoration** — the
+  /// reference's icon is a picture of the weather and this one is the sky the
+  /// greenhouse is actually under. Below the threshold it drops to a moon, which
+  /// is the one case where a solar dashboard genuinely has nothing to show.
+  IconData _heroSkyIcon(double? lux) {
+    if (lux == null) return Icons.cloud_queue_rounded;
+    return switch (skyConditionFor(lux)) {
+      SkyCondition.clear => Icons.wb_sunny_rounded,
+      SkyCondition.partlyCloudy => Icons.wb_cloudy_rounded,
+      SkyCondition.overcast => Icons.cloud_rounded,
+      SkyCondition.night => Icons.nightlight_round,
+    };
+  }
+
+  /// The white sheet: today's own row first, then the six previous days, oldest
+  /// first — today is deliberately not repeated inside the day loop.
+  ///
+  /// **Yesterday-to-today rather than today-forward.** The reference is a weather
+  /// forecast, so its rows are days that have not happened. This app has no
+  /// forecast — `EnergyForecastService` extrapolates the current day's power
+  /// curve, which is a projection of *today*, not of seven days. Showing a row
+  /// per upcoming day would mean printing a number the app cannot know, so the
+  /// sheet reports the seven days it actually has samples for.
+  Widget _forecastSheet() {
+    final totals = dailyTotals(
+      _energyHistory['power_dc'] ?? const <TelemetryPoint>[],
+      DateTime.now(),
+    );
+    final today = startOfLocalDay(DateTime.now());
+    // **The target and the runtime come from the service, and they are here
+    // because the instrument panel used to carry them.**
+    //
+    // `_dailyProductionTargetKwh` is a number the user types into Settings, so
+    // dropping the panel without carrying the target forward would have
+    // silently retired a setting they can still configure. `observedProduction`
+    // is the *measured* production today rather than the service's 24-hour
+    // extrapolation, which is why it is the one on screen.
     final forecast = _energyForecastService.calculate(
       history: _energyHistory,
-      latest: {...?battery?.latestValues, ...?pzem?.latestValues},
+      latest: {...?_battery?.latestValues, ...?_pzem?.latestValues},
       dailyProductionTargetKwh: _dailyProductionTargetKwh,
       referenceDate: DateTime.now(),
     );
-    return OverviewPanel(
-      readings: OverviewReadings(
-        displayName: _displayName,
-        pvPower: pzem?.latestValues['power_dc'],
-        // **The highest PV output in the window on screen, not the current
-        // one.** This used to be absent and the panel derived "Peak" from
-        // `pvPower`, so the hero's secondary figure repeated the hero. The PV
-        // history is already fetched for the chart carousel, so this costs
-        // nothing extra — it is the same series, read a different way.
-        //
-        // Negative samples are skipped rather than clamped: an inverter
-        // mid-switchover can report a small negative the same way the BMS
-        // reports `-0.01 A`, and a peak that is the *highest* reading is not
-        // the *least negative* one.
-        pvPeak: _pvPeakForWindow(pzem?.latestValues['power_dc']),
-        acPower: pzem?.latestValues['power_ac'],
-        // Read from the BMS's own `power` key, never multiplied out from
-        // voltage and current. The device reports all three, and deriving it
-        // produced two separate wrong answers: the product collapses to 0
-        // whenever current reads `0.00 A`, which this BMS does report while
-        // idle, and it drifts from the reported figure whenever the pack is not
-        // at its nominal voltage.
-        //
-        // Passed through raw, sign and all, so the figure matches the Battery
-        // page one tab away. Which sign means which direction is decided by the
-        // observed state-of-charge trend, not by this comment, and it has been
-        // opposite twice on two BMSes — `batteryChargeState` owns it and is
-        // pinned by a test; see `lib/utils/battery_sign.dart`.
-        batteryPower: battery?.latestValues['power'],
-        soc: battery?.latestValues['soc'],
-        batteryVoltage: battery?.latestValues['voltage'],
-        acVoltage: pzem?.latestValues['voltage_ac'],
-        lux: _sensor?.latestValues['lux'],
-        pzemAgeLabel: pzem?.ageLabel,
-        pzemStale: pzem?.isStale(minutes: _staleTelemetryMinutes) ?? true,
-        batteryStale: battery?.isStale(minutes: _staleTelemetryMinutes) ?? true,
-        // Already aggregated by `_updateMemoizedEnergy`; the panel reads the
-        // result rather than recomputing it, so there is one rule for "today vs
-        // this week" in the app rather than two.
-        solarKwh: _solarKwh,
-        loadKwh: _loadKwh,
-        previousSolarKwh: _previousSolarKwh,
-        previousLoadKwh: _previousLoadKwh,
-        energyLoading: _energyLoading,
-        energyError: _energyError,
-        // **The forecast moves here rather than dying with `EnergySummaryCard`.**
-        // `_dailyProductionTargetKwh` is still read from Settings and the service
-        // still has 13 tests; dropping the call site would have silently retired
-        // a feature the user can still configure a target for. Two rows is what
-        // it costs.
-        forecastTargetProgress: forecast.targetProgress,
-        // **Measured, not extrapolated.** `forecast.targetProgress` divides a
-        // 24-hour *projection* of the day's production by the daily target, so
-        // at midday it reads past 100% on a good day — a forecast of a forecast
-        // on a row labelled `TARGET`, which the reader takes as progress made.
-        // This is the production actually recorded today over the same target.
-        productionProgress:
-            _dailyProductionTargetKwh != null && _dailyProductionTargetKwh! > 0
-            ? (forecast.observedProductionKwh / _dailyProductionTargetKwh!)
-                  .clamp(0.0, double.infinity)
-            : null,
-        forecastBatteryHours: forecast.batteryDepletionHours,
-        weekly: _weeklyEnergySummary,
-        activeAlerts: _activeAlertIds.length,
-        staleDevices: _staleDeviceNames(),
-        isLive: _realtimeConnected,
-      ),
-      // **Both routes the panel replaced a card for.** `SystemStatusStrip` and
-      // `EnergySummaryCard` were the only callers of these two; removing those
-      // cards without carrying their entry points forward would have left the
-      // Battery view and the full energy report unreachable from anywhere.
-      onOpenBattery: _openBatteryFromStrip,
-      onOpenEnergyReport: _openEnergyReport,
-      // The 24H / 7D toggle moved onto the energy rows. Same screen state, same
-      // aggregation rule — only the affordance changed, because a segmented pair
-      // of buttons is a lot of chrome for a panel this dense.
-      onToggleEnergyPeriod: () =>
-          _setWeeklyEnergySummary(!_weeklyEnergySummary),
+    final target = _dailyProductionTargetKwh;
+    return GlassSheet(
+      title: '7-Day Production',
+      onTitleTap: _openEnergyReport,
+      // **No page dots.** The reference carries three of them and they implied a
+      // swipeable pager; this sheet has no second page, so they were a promise
+      // the widget could not keep. A dead affordance is worse than no affordance.
+      trailing: const SizedBox.shrink(),
+      children: [
+        // **The unit is the trailing slot, never the number a second time.**
+        // These rows printed `1.37` and then `produksi 1.37 kWh` — the same figure
+        // twice with a word attached, which is what made the row too narrow for
+        // either half of it and the sentence ellipsised. The label already says
+        // which quantity it is; the trailing slot only needs to say the unit.
+        GlassSheetRow(
+          label: 'Today',
+          icon: Icons.bolt_rounded,
+          value: _energyLoading ? '...' : slotNumber(_solarKwh, decimals: 2),
+          // The unit and nothing else — see the note on the day rows.
+          trailing: _energyLoading ? 'Loading' : 'kWh',
+          highlight: true,
+        ),
+        if (target != null && target > 0)
+          GlassSheetRow(
+            label: 'Target',
+            icon: Icons.flag_rounded,
+            value: slotNumber(target, decimals: 1),
+            trailing:
+                '${((forecast.targetProgress ?? 0) * 100).clamp(0, 999).toStringAsFixed(0)}% tercapai',
+          ),
+        if (forecast.batteryDepletionHours != null)
+          GlassSheetRow(
+            label: 'Runtime',
+            icon: Icons.battery_charging_full_rounded,
+            value: slotNumber(forecast.batteryDepletionHours, decimals: 1),
+            trailing: 'h battery',
+          ),
+        if (_energyError != null)
+          GlassSheetRow(
+            label: 'Error',
+            icon: Icons.error_outline_rounded,
+            value: '--',
+            trailing: 'Riwayat daya gagal dimuat',
+          ),
+        for (final day in totals)
+          // Today is already the highlighted 'Today' row above; the loop lists
+          // only the six previous days.
+          if (day.date != today)
+            GlassSheetRow(
+              label: dayNameShort(day.date.weekday),
+              icon: Icons.wb_sunny_rounded,
+              value: day.isEmpty ? '--' : slotNumber(day.kwh, decimals: 2),
+              // The unit, never the figure again — see the note on `Hari ini`.
+              trailing: day.isEmpty ? 'No data' : 'kWh',
+            ),
+      ],
     );
   }
 
@@ -2193,29 +2471,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// strip and integrals of its own would show last-today's window while the row
   /// above it showed something else.
   // ── CSV export ───────────────────────────────────────────────────────────────
-  Widget _exportCsvAction() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: _exportingCsv ? null : _exportCsv,
-        icon: _exportingCsv
-            ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.download_outlined, size: 16),
-        label: Text(
-          _exportingCsv ? 'Preparing CSV…' : 'Export CSV for this period',
-        ),
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          foregroundColor: AppSurfaces.onSurfaceVariant,
-          textStyle: AppType.slotMicro,
-        ),
-      ),
-    );
-  }
 
   /// Fetches every telemetry key for the selected window and shares a CSV.
   ///
@@ -2296,9 +2551,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   };
 
   void _showExportNote(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget? _costSummaryPanel() {
@@ -2307,6 +2561,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       solarKwh: _solarKwh,
       loadKwh: _loadKwh,
       periodLabel: _weeklyEnergySummary ? 'Last 7 days' : 'Last 24 hours',
+      onTogglePeriod: () => _setWeeklyEnergySummary(!_weeklyEnergySummary),
       // **The window's real length, not a flat 24.** `_energyComparison` ends
       // at "now" and starts at midnight, so at 09:00 the window is nine hours.
       // Dividing by 24 there would report the array as a quarter of as
@@ -2314,11 +2569,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       hours: _weeklyEnergySummary
           ? 7 * 24
           : DateTime.now()
-                    .difference(DateTime(
-                      DateTime.now().year,
-                      DateTime.now().month,
-                      DateTime.now().day,
-                    ))
+                    .difference(
+                      DateTime(
+                        DateTime.now().year,
+                        DateTime.now().month,
+                        DateTime.now().day,
+                      ),
+                    )
                     .inMinutes /
                 60,
       tariffPerKwh: _electricityTariffPerKwh,
@@ -2333,7 +2590,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       rangeStart: _selectedRangeStart,
       rangeEnd: _selectedRangeEnd,
       onSelectDate: _selectDate,
-      onPickRange: _pickDateFromCalendar,
     );
   }
 

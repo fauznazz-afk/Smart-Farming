@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/widgets/formatted_markdown_text.dart';
 
 void main() {
@@ -22,7 +23,9 @@ void main() {
 
       bool foundBold = false;
       textSpan.visitChildren((span) {
-        if (span is TextSpan && span.text == '1250 W' && span.style?.fontWeight == FontWeight.w800) {
+        if (span is TextSpan &&
+            span.text == '1250 W' &&
+            span.style?.fontWeight == AppType.strong.fontWeight) {
           foundBold = true;
           return false;
         }

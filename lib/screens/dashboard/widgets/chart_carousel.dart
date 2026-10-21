@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 
 /// One chart per page, swiped horizontally.
+///
+/// **The pager row is page chrome on the page gradient, not on a card** — every
+/// call site puts this straight into the page's column. The bleed below is
+/// `inset` past the page margin on each side so a chart reaches the screen edge
+/// and the next one shows a sliver as the swipe affordance; `inset` is
+/// `kDashboardPageMargin` and `test/chart_carousel_bleed_test.dart` pins the
+/// painted geometry, so the `OverflowBox` is not a styling choice.
 class ChartCarousel extends StatefulWidget {
   const ChartCarousel({
     super.key,
@@ -38,18 +44,18 @@ class _ChartCarouselState extends State<ChartCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final faint = faintColor;
-    // **The accent, and the dot was lime.** Two generations of "not amber" here,
-    // both arguing against the *status* ramp and both settling on a categorical
-    // hue. The dot is not a status and it is not a data series either: it is
-    // page chrome, and chrome has one colour. Which is `AppPalette.error`.
+    // **The dots are page ink, and they were the accent.** Two generations of
+    // "not amber" here, both settling on a categorical hue, and the hue had the
+    // same problem the chart header's live dot had: `AppPalette.error` is
+    // `#1D4ED8` in both ramps and measures **1.09:1** on the dark ramp's own page
+    // stop. `AppGlass.active` (`#2F6FED`) is not the answer either — it is the
+    // selected *sheet row* outline, chosen to clear 3:1 on white, and it lands
+    // at 1.61:1 on that same stop.
     //
-    // It is also fine that red does not mean "warning" here — `terminal_panel.dart`
-    // settles that, at length, for the panel that established the rule: red is
-    // the instrument's own colour, and a meaning it carries only when a *word*
-    // says so.
-    final accent = AppPalette.error;
-
+    // So the pager is drawn in the page ink ramp, like every other piece of
+    // chrome that sits on the page gradient: the current page at
+    // [AppGlass.pageInkStrong] and the rest at [AppGlass.pageInkSoft]. Width
+    // carries "which one" and colour only carries weight.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -117,27 +123,31 @@ class _ChartCarouselState extends State<ChartCarousel> {
             );
           },
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var i = 0; i < widget.itemCount; i++)
               AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
+                duration: AppMotion.state,
+                curve: AppMotion.enter,
+                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 width: i == _index ? 16 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _index ? accent : faint.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(3),
+                  color: i == _index
+                      ? AppGlass.pageInkStrong
+                      : AppGlass.pageInkSoft,
+                  // `AppRadius.bar` — a 6dp pill, not a 3dp radius. The dot is
+                  // fully round at either number and the token says so.
+                  borderRadius: BorderRadius.circular(AppRadius.bar),
                 ),
               ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm),
             Text(
               '${widget.labelBuilder(_index)}  ·  ${_index + 1} of '
               '${widget.itemCount}',
-              style: AppType.labelMicro.copyWith(color: faint),
+              style: AppType.labelMicro.copyWith(color: AppGlass.pageInkSoft),
             ),
           ],
         ),

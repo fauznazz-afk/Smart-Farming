@@ -39,16 +39,27 @@ class TelemetryErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // [statusBad] as ink, on the rule [_statusBannerEdge] documents: a
-            // condition is a glyph and a word, never a block of colour. It was
-            // inheriting the ambient default, which is not a colour the app
-            // chose.
-            Icon(Icons.cloud_off, size: 42, color: statusBad),
+            // **[statusBadOnPage], and this is the page twin rather than the card
+            // value.** The rule [_statusBannerEdge] documents still holds — a
+            // condition is a glyph and a word, never a block of colour — but
+            // `TelemetryErrorView` is the `Scaffold` body, so this glyph is drawn
+            // straight onto the page gradient with no card behind it, and the card
+            // value is `#D01E1E`: measured **2.02:1** against the dark ramp's top
+            // stop and 2.32:1 against its bottom one, which is a 42px glyph
+            // disappearing into the sweep. `statusBadOnPage` is the same red at
+            // the lightness the dark page needs (**5.74:1** at the top stop,
+            // **6.62:1** at the bottom) and resolves to `#B91C1C` in light mode,
+            // where the page is pale and the card value is what would have been
+            // correct.
+            Icon(Icons.cloud_off, size: 42, color: statusBadOnPage),
             const SizedBox(height: 12),
             Text(
               'Failed to fetch telemetry from ThingsBoard.',
               textAlign: TextAlign.center,
-              style: AppType.headlineLg.copyWith(color: appPrimaryText),
+              // Directly on the page, not on a card: the `pageInk` ramp inverts
+              // with the ramp, which card ink (`AppSurfaces.onSurface`, navy in
+              // both palettes) cannot do because it is white in neither.
+              style: AppType.headlineLg.copyWith(color: AppGlass.pageInkStrong),
             ),
             const SizedBox(height: 8),
             // The one lowercase line on the screen, and the brief's `body-sm`
@@ -56,11 +67,11 @@ class TelemetryErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppType.bodySm.copyWith(color: faintColor),
+              style: AppType.bodySm.copyWith(color: AppGlass.pageInkSoft),
             ),
             const SizedBox(height: 16),
             // **The brief's `button-primary`, and the only large accent fill
-            // allowed anywhere in the app.** Red fill, white ink,
+            // allowed anywhere in the app.** Blue fill, white ink,
             // `button-label` type, 8px radius, 56dp tall, with the tinted
             // displacement `4px 4px 0` at 20% in the same hue in place of the
             // black one.
@@ -69,13 +80,10 @@ class TelemetryErrorView extends StatelessWidget {
             // conversion is fixing: a saturated brand fill on a *retry* button
             // is chrome, and chrome has one colour.
             //
-            // **The ink is black, and that was measured rather than assumed.** The
-            // obvious thing on a red fill is white, and white on `#FF6B6B` is
-            // **2.78:1** — it fails AA for body text by a factor of 1.6 and is
-            // barely legible. Black is **7.57:1**. `AppPalette.onHue` is
-            // therefore not a lime-era leftover here; it is the correct token,
-            // and `color_helpers.dart`'s `onPrimaryInk` independently reaches the
-            // same answer from the fill's luminance rather than from its hue.
+            // **The ink is white, and that was measured rather than assumed.**
+            // On this blue fill (`#1D4ED8`) black is **3.13:1** — under AA for
+            // body text — and white is **6.70:1**. `AppPalette.onHue` is white
+            // in both ramps, so it is the ink every saturated fill takes.
             //
             // The shadow sits on a wrapping `DecoratedBox` rather than on the
             // button's own style, because a `BoxShadow` in a `BoxDecoration`
@@ -102,7 +110,14 @@ class TelemetryErrorView extends StatelessWidget {
                   backgroundColor: AppPalette.error,
                   foregroundColor: AppPalette.onHue,
                   disabledBackgroundColor: AppSurfaces.surfaceAlt,
-                  disabledForegroundColor: faintColor,
+                  // **Card ink, not page ink.** The disabled fill is
+                  // `AppSurfaces.surfaceAlt`, which is near-white in *both*
+                  // ramps, so the ink on it has to be the ink that binds to a
+                  // white card. `AppGlass.pageInkSoft` is white in dark mode, and
+                  // white at 78% over a near-white fill measured **1.00:1** — a
+                  // "Try again" button with no label. `onSurfaceVariant` clears
+                  // at 7.08:1 in dark and 6.92:1 in light.
+                  disabledForegroundColor: AppSurfaces.onSurfaceVariant,
                   minimumSize: const Size.fromHeight(56),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   shape: RoundedRectangleBorder(

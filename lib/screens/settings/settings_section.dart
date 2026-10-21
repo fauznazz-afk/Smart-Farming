@@ -76,7 +76,7 @@ List<SettingsSection> buildSettingsSections({
       ),
       SettingsSection(
         title: 'AI assistant',
-        subtitle: 'Ask questions about your telemetry. Uses your own API key.',
+        subtitle: 'Ask questions about your telemetry using your API key.',
         icon: Icons.auto_awesome_outlined,
         builder: (_, settings) => const AiSection(),
       ),

@@ -244,9 +244,8 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
           Expanded(
             child: Text(
               value,
-              style: AppType.bodyMd.copyWith(
+              style: (ok ? AppType.strong : AppType.bodyMd).copyWith(
                 color: plain ? null : color,
-                fontWeight: ok ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ),

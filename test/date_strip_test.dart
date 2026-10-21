@@ -81,7 +81,6 @@ void main() {
                 rangeStart: null,
                 rangeEnd: null,
                 onSelectDate: (_) {},
-                onPickRange: () {},
               ),
             ),
           ),
@@ -247,28 +246,29 @@ void main() {
     }
   });
 
-  testWidgets('the legend and the chip row share both edges', (tester) async {
-    // **The asymmetry, stated as geometry so it cannot come back.**
+  testWidgets('the chip row is the whole strip, both edges', (tester) async {
+    // **The asymmetry that used to be here, stated as geometry so it cannot come
+    // back.**
     //
-    // The header used to be `Padding(horizontal: 2)` + a 48dp button + a 4dp gap
-    // + `Expanded` legend, which put the legend text's left edge at 54dp and the
-    // header's right edge at maxWidth - 2, against a chip row running 0 to
-    // maxWidth. Every number involved is small; that is the point. Nothing in the
-    // strip was misaligned by enough to name, and the eye reads the total.
+    // The header was once `Padding(horizontal: 2)` + a 48dp button + a 4dp gap
+    // + an `Expanded` legend, which put the legend text's left edge at 54dp and
+    // the header's right edge at maxWidth - 2, against a chip row running 0 to
+    // maxWidth. Every number involved was small; that is the point. Nothing in
+    // the strip was misaligned by enough to name, and the eye reads the total.
     //
-    // Asserted on the *rendered* rects, because the defect is a rect problem and
-    // checking the source would only re-state the intent.
+    // There is no header at all now, so the claim collapses to the strongest
+    // form of the original: the row *is* the strip. Asserted on the *rendered*
+    // rects, because the defect was a rect problem and checking the source would
+    // only re-state the intent.
     //
     // **411 dp, not 381, and the difference is load-bearing.** Under the test
     // font every glyph is a full em square, so at 381 the seven chips measure
     // 390.2dp and the strip falls back to a horizontal `SingleChildScrollView`
     // -- correctly, and the "widest day is the widest chip" test above relies on
     // that fallback. A scrolled row's last chip has a rect that legitimately
-    // extends past the viewport, so comparing it to the header's edge compares a
-    // scrolling row against a fixed one and fails for a reason that has nothing
-    // to do with alignment. 411 is a width where all seven fit, which is the only
-    // case where both edges are meaningful at once. The scrolled case gets its
-    // own assertion on the left edge below.
+    // extends past the viewport, so both ends only coincide at a width where
+    // nothing is scrolled. 411 is such a width. The scrolled case gets its own
+    // assertion on the left edge below.
     await pumpStrip(tester, width: 411, scale: 1.0);
 
     expect(
@@ -278,42 +278,33 @@ void main() {
       ),
       findsNothing,
       reason:
-          'this test compares the last chip against the header edge, which '
+          'this test compares the last chip against the strip edge, which '
           'is only meaningful when all seven chips are on screen together',
     );
 
-    double leftOf(Finder f) => tester.getTopLeft(f).dx;
-    double rightOf(Finder f) => tester.getBottomRight(f).dx;
-
-    // The legend is found structurally rather than by its text. `_rangeLabel`
-    // compares `selectedDate` against `DateTime.now()`, so the label is 'Today'
-    // only on the day the test happens to run: at any other date it is
-    // 'Saturday, 2 October 2026' and a `find.text('Today')` finds nothing. A
-    // geometry assertion should not depend on the calendar.
+    // **The strip is only the chips now, and this is what says so.**
     //
-    // `Wrap` is unique to the legend -- the chip row is a `Row`, and the chip
-    // internals are a `Column` -- so its first `Text` is the range label.
-    final legend = find
-        .descendant(of: find.byType(Wrap), matching: find.byType(Text))
-        .first;
-    final firstChip = find.byType(DateStripChip).first;
+    // It used to hold a header row with a `Spacer` and a calendar button. The
+    // button was removed from the strip (it is a hero-card action now), and with
+    // it the header — which after the weather glyph went had held nothing but
+    // that button and read as an empty strip above the chips. So the remaining
+    // geometric claim is the strong one: the chip row *is* the strip, both edges.
+    final strip = tester.getRect(find.byType(DateStrip));
+    final firstChip = tester.getRect(find.byType(DateStripChip).first);
+    final lastChip = tester.getRect(find.byType(DateStripChip).last);
     expect(
-      leftOf(legend),
-      moreOrLessEquals(leftOf(firstChip), epsilon: 0.01),
+      firstChip.left,
+      moreOrLessEquals(strip.left, epsilon: 0.01),
       reason:
-          'the legend starts ${leftOf(legend) - leftOf(firstChip)}dp '
-          'right of the first chip, so the header reads as indented',
+          'the first chip starts ${firstChip.left - strip.left}dp inside the '
+          'strip, so the row reads as inset on the left',
     );
-
-    // The last chip's right edge, and the calendar button's touch target.
-    final lastChip = find.byType(DateStripChip).last;
-    final button = find.byTooltip('Pick a date range');
     expect(
-      rightOf(button),
-      moreOrLessEquals(rightOf(lastChip), epsilon: 0.01),
+      lastChip.right,
+      moreOrLessEquals(strip.right, epsilon: 0.01),
       reason:
-          'the calendar button ends ${rightOf(lastChip) - rightOf(button)}dp '
-          'short of the last chip, so the header reads as inset on the right',
+          'the last chip ends ${strip.right - lastChip.right}dp short of the '
+          'strip, so the row reads as inset on the right',
     );
 
     // And all seven chips are the same width, which is the rest of "a grid".
@@ -330,30 +321,26 @@ void main() {
     );
   });
 
-  testWidgets('the legend still starts where the chips do when the row scrolls', (
+  testWidgets('the row still starts on the strip edge when it scrolls', (
     tester,
   ) async {
     // **The scrolled case, asserted separately because it is the reported one.**
     //
     // On the Xiaomi (381 dp) at a 2x system font the seven chips are wider than
-    // the viewport and the strip scrolls. That is when the indent is most
-    // obvious -- a header whose legend sits 54dp in, directly above chips that
-    // start at the very edge, with a scrollbar between them.
-    //
-    // Only the left edge is checked. The right edge has no meaning here: the last
-    // chip is genuinely off-screen, which is the whole point of the fallback.
+    // the viewport and the strip scrolls. What is claimed here is that the row
+    // still begins on the strip's left edge rather than being pushed in by
+    // something above it — which is what a header would have done while the row
+    // beneath it moved.
     await pumpStrip(tester, width: 381, scale: 2.0);
 
-    final legend = find
-        .descendant(of: find.byType(Wrap), matching: find.byType(Text))
-        .first;
-    final firstChip = find.byType(DateStripChip).first;
+    final strip = tester.getRect(find.byType(DateStrip));
+    final firstChip = tester.getRect(find.byType(DateStripChip).first);
     expect(
-      tester.getTopLeft(legend).dx,
-      moreOrLessEquals(tester.getTopLeft(firstChip).dx, epsilon: 0.01),
+      firstChip.left,
+      moreOrLessEquals(strip.left, epsilon: 0.01),
       reason:
-          'the legend is indented from the chips while the strip scrolls, '
-          'which is the case this defect was reported in',
+          'the first chip has been pulled in from the strip\'s left edge while '
+          'the row scrolls, so something above it is holding it back',
     );
   });
 

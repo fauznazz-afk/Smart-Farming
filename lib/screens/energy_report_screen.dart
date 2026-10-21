@@ -96,11 +96,11 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
   Future<void> _load() async {
     if (_requestInFlight) return;
     _requestInFlight = true;
-    setState(() {
-      _loading = _data == null;
-      _error = null;
-    });
     try {
+      setState(() {
+        _loading = _data == null;
+        _error = null;
+      });
       final data = await _service.load(referenceDate: _selectedDate);
       if (!mounted) return;
       _touchedBucketNotifier.value = null;
@@ -183,6 +183,19 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
     );
 
     return Scaffold(
+      // **The sweep's first stop, so the app bar's strip is the same colour as
+      // the body immediately below it.** The body paints `AppBackground`, whose
+      // top stop is the sweep's first colour, and the app bar sits above the
+      // body rather than behind it - so the strip above the bar showed the flat
+      // page while the body started the sweep, and the two are **1.15:1** apart.
+      // A full-width horizontal step of two blues is exactly the kind of seam
+      // this ramp exists to remove.
+      //
+      // The dashboard and the alarm history solve it by extending the body
+      // behind the bar (`extendBodyBehindAppBar`), which moves the body's own
+      // content under the bar and is a layout change. This is the same seam
+      // without that: the bar's strip carries the colour the sweep starts with.
+      backgroundColor: AppGlass.pageGradient.first,
       appBar: AppBar(
         // English, like the rest of the app. It said "Energi Analytics", which
         // was a half-translation left in from 1.3.1 -- the screen around it reads

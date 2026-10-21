@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
 
 /// The panel's primitives, and the claims that are invisible in the source.
@@ -285,13 +286,17 @@ void main() {
         final unit = tester.getRect(find.text('W'));
         final label = tester.getRect(find.text('AC_LOAD'));
 
-        // **Within a pixel or two of the card's own edge.** The panel's padding
-        // is 16 dp and the row's border is 1 px at the panel's outer edge, so
-        // the figure's right edge should sit 16-17 dp inside the panel. A
-        // tolerance of 2 dp is the renderer's own rounding, not a design slack.
+        // **Exactly the row's own horizontal inset from the panel's edge.** The
+        // claim is that the figure is pushed out to the content edge and not
+        // stranded mid-row, so it is asserted against [AppSpacing.cardPadding]
+        // rather than a literal. The blue system moved that token from 16 to 12,
+        // and the old range was a measurement of a number that had stopped being
+        // the design — a copy of the padding, not a check on the alignment. The
+        // tolerance is 1 dp, which is the renderer's own rounding; this is
+        // *tighter* than the 15-18 it replaces, not looser.
         expect(
           panel.right - unit.right,
-          inInclusiveRange(15.0, 18.0),
+          closeTo(AppSpacing.cardPadding, 1.0),
           reason:
               'the figure ends ${panel.right - unit.right} dp from the panel\'s '
               'right edge - it is not on the edge it was measured to be off',
@@ -345,10 +350,12 @@ void main() {
       final label = tester.getRect(find.text('AMBIENT_T'));
       final value = tester.getRect(find.text('40.1 / 71.6 / 94.9'));
 
-      // The caption is the right-most ink in the row.
+      // The caption is the right-most ink in the row, and it sits on the same
+      // content edge the figure does — asserted against the token, for the same
+      // reason and with the same 1 dp tolerance as above.
       expect(
         panel.right - caption.right,
-        inInclusiveRange(15.0, 18.0),
+        closeTo(AppSpacing.cardPadding, 1.0),
         reason: 'the caption is not on the right edge',
       );
 

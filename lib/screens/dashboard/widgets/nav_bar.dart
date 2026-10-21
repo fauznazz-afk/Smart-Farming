@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../utils/app_motion.dart';
 import '../utils/design_tokens.dart';
 import '../utils/pressable.dart';
 
@@ -167,20 +168,22 @@ double glassNavBarReservedHeightFor(double systemBottomInset) {
 /// the bar's height in `padding.bottom` — so calling this from inside the body
 /// would measure the reservation against itself and return roughly double. The
 /// call site in `dashboard_screen.dart` is in the screen's `State`, whose context
-/// is above the `Scaffold`, which is the same MediaQuery the bar's own `SafeArea`
-/// reads. That the two agree is not an accident of the current tree shape: the
+/// is above the `Scaffold`, which is the same MediaQuery the bar itself reads.
+/// That the two agree is not an accident of the current tree shape: the
 /// `Scaffold` passes `removeBottomPadding: false` for the `bottomNavigationBar`
-/// slot precisely so the bar is handed the unmodified system inset.
+/// slot precisely so the bar is handed the unmodified system inset — the same
+/// number `GlassNavBar` reads for the glass it paints down into that strip.
 double glassNavBarReservedHeight(BuildContext context) {
   return glassNavBarReservedHeightFor(MediaQuery.paddingOf(context).bottom);
 }
 
 /// Flat bottom navigation bar.
 ///
-/// The brief's tab bar: a flat dark bar with a hairline border, active item =
-/// `AppPalette.error` (red) with no pill background and no underline, inactive =
-/// muted. No shadow pair, no gradient, no glass. No captions either — the bar is
-/// four icons, and each one's name lives in its `Semantics` label.
+/// The brief's tab bar: a flat bar with a hairline border, painted as glass
+/// over the page gradient, active item = `AppPalette.error` on a pill bubble
+/// with no underline, inactive = muted glass ink. No shadow pair, no gradient
+/// of its own. No captions either — the bar is four icons, and each one's name
+/// lives in its `Semantics` label.
 class GlassNavBar extends StatelessWidget {
   const GlassNavBar({
     super.key,
@@ -193,194 +196,245 @@ class GlassNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      // **No side margin, and that is the whole of the docked change.** The
-      // bar was inset 24 dp left and right and 10 dp below, which is what
-      // made it a floating capsule: page visible on three sides, a stadium
-      // silhouette, and a shadow of an object that was never resting on
-      // anything. Docked, it is the full width of the page and its hairline
-      // is the only thing separating it from the content above.
-      minimum: const EdgeInsets.only(bottom: kGlassNavBarBottomGap),
-      child: RepaintBoundary(
-        child: SizedBox(
-          width: double.infinity,
-          height: kGlassNavBarHeight,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // **One slot width, shared by the row and the bubble.**
-                //
-                // The row used `Expanded` across the bar's full width, which put
-                // the four icons a quarter of a 360 dp screen apart — 90 dp
-                // between centres for a 22 dp glyph, which reads as four things
-                // that belong to four different bars rather than one navigation.
-                // The bar's own width is not the destinations' width; it is the
-                // *floor*, used only when the screen is too narrow to hold the
-                // preferred pitch, which is the same clamp-and-centre rule the
-                // `min` below is for.
-                final slot = math.min(
-                  _kNavSlotWidth,
-                  constraints.maxWidth / kNavDestinations.length,
-                );
-                final rowWidth = slot * kNavDestinations.length;
-                final rowLeft = (constraints.maxWidth - rowWidth) / 2;
+    // **The bottom inset, read here and painted over.**
+    //
+    // `Scaffold` hands the `bottomNavigationBar` slot an unmodified MediaQuery
+    // (`removeBottomPadding: false` for that slot), so this is the real system
+    // strip — the same number `glassNavBarReservedHeight` reads above the
+    // Scaffold, which is why the two agree. `viewPaddingOf` would *not*: the
+    // fixtures in `nav_bar_clearance_test` and `nav_bar_icon_size_test` inject
+    // `MediaQueryData(padding: ...)` with a zero `viewPadding`, so it reads 0
+    // there and the bar would silently lose the strip the tests measure for.
+    //
+    // It was a `SafeArea` above a 54 dp `SizedBox`, which put the inset *outside*
+    // the decoration: the gesture-handle strip showed the Scaffold's own
+    // background instead of glass, and against a page gradient that is a hard
+    // horizontal seam across the bottom of the screen — the reported defect.
+    // The inset is now padding *inside* the decorated box, so the glass reaches
+    // the bottom edge. Total height is unchanged at
+    // `kGlassNavBarHeight + inset`, so `glassNavBarReservedHeightFor` and
+    // `nav_bar_clearance_test`'s measured-height claim still hold.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final totalHeight =
+        kGlassNavBarHeight + math.max(bottomInset, kGlassNavBarBottomGap);
 
-                return AnimatedContainer(
-                  duration: AppMotion.container,
-                  curve: AppMotion.both,
-                  alignment: Alignment.centerLeft,
-                  // **Always the full width.** It used to shrink to
-                  // `kGlassNavBarHeight` when collapsed, which is a pill
-                  // floating at the bottom-left corner — a shape that only
-                  // exists while floating.
-                  width: constraints.maxWidth,
-                  height: kGlassNavBarHeight,
-                  decoration: BoxDecoration(
-                    // **The page colour, not the card colour.** The brief's
-                    // `tab-bar` is `backgroundColor: {colors.background}` — the
-                    // bar is flat over the page and is separated from it by the
-                    // hairline alone, which is what "Flat: top app bar, tab bar,
-                    // badges, chips — no shadow" means. It used to be
-                    // `AppSurfaces.surface`, a step *above* the page, which made
-                    // the bottom of every screen read as a raised strip with
-                    // nothing raising it. No `boxShadow` here: the bar is on the
-                    // flat tier, and [AppShadows.stamped] would make it the only
-                    // stamped thing at the bottom of the screen.
-                    color: AppSurfaces.page,
-                    // **A stadium, not an 8px rectangle.** This was
-                    // `AppRadius.card`, and the user's read on it was "masih
-                    // kotak" — still square. That is a measurement, not a
-                    // preference: 8 px on a bar 76 dp tall is a corner radius
-                    // of 10% of the height, which at a phone's physical
-                    // density is about two millimetres. It reads as a
-                    // slightly chamfered rectangle, which is what it is.
-                    //
-                    // A tab bar is the one component in the app that is
-                    // *floating* — it is `extendBody: true`, painted over the
-                    // page, with a gap under it and page visible on both
-                    // sides. A floating object with near-square corners does
-                    // not read as floating; it reads as a strip that happens
-                    // to be inset. `AppRadius.pill` is the token that already
-                    // means "fully round" and it is what the pressed
-                    // `InkWell` in `_NavItem` uses, so the ripple and the
-                    // silhouette finally agree — the ripple was a capsule
-                    // over a chamfered rectangle.
-                    //
-                    // The bar's own clip below carries the same value, and the
-                    // test asserts the two are the same number, because that
-                    // disagreement is invisible in the source and visible on
-                    // the device.
-                    // **Square, not a stadium, because the bar is docked.**
-                    // The capsule was correct for a floating object and is
-                    // wrong for this one: a bar with rounded corners sitting
-                    // flush to the bottom edge shows page-coloured notches in
-                    // the two bottom corners, which reads as a rendering fault
-                    // rather than as a shape. A docked bar's bottom corners
-                    // are off-screen, so the radius has nothing to describe.
-                    borderRadius: BorderRadius.zero,
-                    // **A top hairline only.** A docked bar's left, right and
-                    // bottom edges are the page's own edges — a border there
-                    // is a line drawn along the screen.
-                    border: Border(top: AppBorders.hairline),
+    return RepaintBoundary(
+      child: SizedBox(
+        width: double.infinity,
+        height: totalHeight,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // **One slot width, shared by the row and the bubble.**
+              //
+              // The row used `Expanded` across the bar's full width, which put
+              // the four icons a quarter of a 360 dp screen apart — 90 dp
+              // between centres for a 22 dp glyph, which reads as four things
+              // that belong to four different bars rather than one navigation.
+              // The bar's own width is not the destinations' width; it is the
+              // *floor*, used only when the screen is too narrow to hold the
+              // preferred pitch, which is the same clamp-and-centre rule the
+              // `min` below is for.
+              final slot = math.min(
+                _kNavSlotWidth,
+                constraints.maxWidth / kNavDestinations.length,
+              );
+              final rowWidth = slot * kNavDestinations.length;
+              final rowLeft = (constraints.maxWidth - rowWidth) / 2;
+
+              return AnimatedContainer(
+                duration: AppMotion.container,
+                curve: AppMotion.both,
+                alignment: Alignment.centerLeft,
+                // **Always the full width.** It used to shrink to
+                // `kGlassNavBarHeight` when collapsed, which is a pill
+                // floating at the bottom-left corner — a shape that only
+                // exists while floating.
+                width: constraints.maxWidth,
+                height: totalHeight,
+                // **The inset is padding on the *inside*.** This is the fix:
+                // `Container` paints its decoration across the whole box and
+                // only then insets the child, so the glass covers the gesture
+                // strip and the row never moves down into it.
+                padding: EdgeInsets.only(
+                  bottom: totalHeight - kGlassNavBarHeight,
+                ),
+                decoration: BoxDecoration(
+                  // **Glass over the page gradient, not a flat fill of it.**
+                  //
+                  // The bar used to paint `AppSurfaces.page` outright, which
+                  // was right while the page was one flat colour: bar and page
+                  // were the same value and only the hairline separated them.
+                  // The page is now a vertical sweep, so painting its mid-tone
+                  // here lays a rectangle of a slightly different blue across
+                  // the bottom of the screen with a visible seam at the join —
+                  // the one place on a phone the user's thumb rests, and so the
+                  // one place a seam is most legible.
+                  //
+                  // Translucent white over the gradient lets the sweep continue
+                  // through the bar, which is the reason the rest of the screen
+                  // is built this way at all.
+                  color: AppGlass.fillStrong,
+                  // **A stadium, not an 8px rectangle.** This was
+                  // `AppRadius.card`, and the user's read on it was "masih
+                  // kotak" — still square. That is a measurement, not a
+                  // preference: 8 px on a bar 76 dp tall is a corner radius
+                  // of 10% of the height, which at a phone's physical
+                  // density is about two millimetres. It reads as a
+                  // slightly chamfered rectangle, which is what it is.
+                  //
+                  // A tab bar is the one component in the app that is
+                  // *floating* — it is `extendBody: true`, painted over the
+                  // page, with a gap under it and page visible on both
+                  // sides. A floating object with near-square corners does
+                  // not read as floating; it reads as a strip that happens
+                  // to be inset. `AppRadius.pill` is the token that already
+                  // means "fully round" and it is what the pressed
+                  // `InkWell` in `_NavItem` uses, so the ripple and the
+                  // silhouette finally agree — the ripple was a capsule
+                  // over a chamfered rectangle.
+                  //
+                  // The bar's own clip below carries the same value, and the
+                  // test asserts the two are the same number, because that
+                  // disagreement is invisible in the source and visible on
+                  // the device.
+                  // **Rounded at the top, flush at the bottom.**
+                  //
+                  // It used to be `BorderRadius.zero` on the argument that a
+                  // docked bar's corners are off-screen, so the radius has
+                  // nothing to describe. That is only true of the *bottom* two.
+                  // The bar is `extendBody: true` and 54dp tall, so its top
+                  // corners sit in the middle of the page with the blue sweep
+                  // visible on either side of them — and square, which is what
+                  // read as "too square at the bottom" rather than as a bar.
+                  // The bottom two stay flush: rounding them would cut the
+                  // gesture-bar inset out of the shape.
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.sheet),
                   ),
-                  // **The clip matches the decoration, and still has to be stated.**
-                  // In Flutter 3.47 `ClipRRect.borderRadius` defaults to
-                  // `BorderRadius.zero`, so this used to clip the contents to
-                  // a plain rectangle while the decoration painted rounded
-                  // corners around it — invisible in the source, clean under
-                  // `flutter analyze`, and wrong on the device because the
-                  // clip is painted after the fill and wins.
-                  child: ClipRect(
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // **The accent bubble, and it travels.** It is a single
-                          // widget positioned by its index rather than one bubble
-                          // per slot with a crossfade, because a crossfade draws
-                          // two bubbles fading through each other while the user
-                          // is swiping — the icon they are dragging toward appears
-                          // twice, and neither copy is where their finger is. One
-                          // widget moving is the animation they asked for.
-                          //
-                          // **`AnimatedPositioned`, not `AnimatedAlign`, and the
-                          // difference is 16.5 dp.** `Align` places its child by
-                          // `(W - childW) * ((alignment.x + 1) / 2)` — the child's
-                          // *leading edge* lands on that fraction of the parent,
-                          // not its centre. Solving for a centre put the first
-                          // bubble at 116.5 in an 800-wide bar whose first icon is
-                          // at 100, and it looked like a layout that was nearly
-                          // right. Positioning the bubble over the whole slot and
-                          // centring the disc inside it is exact by construction:
-                          // the slot and the row's `SizedBox` are the same number.
-                          //
-                          // **`Curves.easeInOutCubic`, not [AppMotion.both], and
-                          // that is the smoothness.** `both` is `easeInCubic` — it
-                          // leaves the origin at walking pace and arrives at full
-                          // speed before stopping, which is the right feel for
-                          // something appearing and the wrong feel for something
-                          // travelling. A 192 dp slide read as a lurch. Symmetric
-                          // ease-in-out is a glide.
-                          AnimatedPositioned(
-                            key: const ValueKey('nav-accent-bubble'),
-                            duration: AppMotion.container,
-                            curve: Curves.easeInOutCubic,
-                            left: rowLeft + slot * selectedIndex,
-                            top: 0,
-                            width: slot,
-                            height: kGlassNavBarHeight,
-                            child: const _NavBubble(),
-                          ),
-                          // **No collapse state, and this is the deletion rather
-                          // than an omission.** There used to be a vertical-scroll
-                          // collapse that crossfaded all four icons out and one
-                          // enlarged icon in, at the bottom-left. It is gone: the
-                          // bar keeps all four icons at all times, so the collapse
-                          // had nothing to do and its notifier, its `_downScrollDistance`
-                          // accumulator and its ~54-line `_CollapsedNavItem` all
-                          // went with it. A bar that hides its own destinations on
-                          // scroll is a bar you cannot tap your way back out of.
-                          // **The row is `rowWidth` wide and centred, not
-                          // `Expanded` across the bar.** Two numbers describe the
-                          // same slots — `slot` here and `slot` in the bubble —
-                          // and they are the same variable, so the bubble cannot
-                          // drift off its icon the way a second, independently
-                          // written slot width would.
-                          Center(
-                            child: SizedBox(
-                              width: rowWidth,
-                              child: Row(
-                                children: [
-                                  for (
-                                    var i = 0;
-                                    i < kNavDestinations.length;
-                                    i++
-                                  )
-                                    Expanded(
-                                      child: _NavItem(
-                                        index: i,
-                                        destination: kNavDestinations[i],
-                                        selectedIndex: selectedIndex,
-                                        onTap: () => onSelect(i),
-                                      ),
+                  // **A top hairline only.** A docked bar's left, right and
+                  // bottom edges are the page's own edges — a border there
+                  // is a line drawn along the screen.
+                  // A white hairline, not the neutral one: over the blue bar a
+                  // slate border is a grey line on a blue field and reads as
+                  // dirt, where a translucent white reads as an edge.
+                  border: Border(
+                    top: BorderSide(color: AppGlass.divider, width: 1),
+                  ),
+                ),
+                // **The clip matches the decoration, and still has to be stated.**
+                // In Flutter 3.47 `ClipRRect.borderRadius` defaults to
+                // `BorderRadius.zero`, so this used to clip the contents to
+                // a plain rectangle while the decoration painted rounded
+                // corners around it — invisible in the source, clean under
+                // `flutter analyze`, and wrong on the device because the
+                // clip is painted after the fill and wins.
+                // The radius below is the same value as the decoration's, and
+                // `nav_bar_clearance_test` asserts the two agree.
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.sheet),
+                  ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // **The accent bubble, and it travels.** It is a single
+                        // widget positioned by its index rather than one bubble
+                        // per slot with a crossfade, because a crossfade draws
+                        // two bubbles fading through each other while the user
+                        // is swiping — the icon they are dragging toward appears
+                        // twice, and neither copy is where their finger is. One
+                        // widget moving is the animation they asked for.
+                        //
+                        // **`AnimatedPositioned`, not `AnimatedAlign`, and the
+                        // difference is 16.5 dp.** `Align` places its child by
+                        // `(W - childW) * ((alignment.x + 1) / 2)` — the child's
+                        // *leading edge* lands on that fraction of the parent,
+                        // not its centre. Solving for a centre put the first
+                        // bubble at 116.5 in an 800-wide bar whose first icon is
+                        // at 100, and it looked like a layout that was nearly
+                        // right. Positioning the bubble over the whole slot and
+                        // centring the disc inside it is exact by construction:
+                        // the slot and the row's `SizedBox` are the same number.
+                        //
+                        // **`Curves.easeInOutCubic`, not [AppMotion.both], and
+                        // that is the smoothness.** `both` is `easeInCubic` — it
+                        // leaves the origin at walking pace and arrives at full
+                        // speed before stopping, which is the right feel for
+                        // something appearing and the wrong feel for something
+                        // travelling. A 192 dp slide read as a lurch. Symmetric
+                        // ease-in-out is a glide.
+                        //
+                        // **[AppMotionTab], and the bubble is not on a clock of
+                        // its own.** The dashboard's page slide runs on the same
+                        // duration and the same curve, so the bubble and the
+                        // content it points at leave together and arrive
+                        // together. The bubble was already on this clock; the
+                        // page slide was the half that was 40 ms short and
+                        // that started halfway through its own animation,
+                        // because the selection was applied on the page
+                        // change rather than on the tap — so the tab read as
+                        // two events, the content arriving and then the
+                        // bubble catching up.
+                        AnimatedPositioned(
+                          key: const ValueKey('nav-accent-bubble'),
+                          duration: AppMotionTab.duration,
+                          curve: AppMotionTab.curve,
+                          left: rowLeft + slot * selectedIndex,
+                          top: 0,
+                          width: slot,
+                          height: kGlassNavBarHeight,
+                          child: const _NavBubble(),
+                        ),
+                        // **No collapse state, and this is the deletion rather
+                        // than an omission.** There used to be a vertical-scroll
+                        // collapse that crossfaded all four icons out and one
+                        // enlarged icon in, at the bottom-left. It is gone: the
+                        // bar keeps all four icons at all times, so the collapse
+                        // had nothing to do and its notifier, its `_downScrollDistance`
+                        // accumulator and its ~54-line `_CollapsedNavItem` all
+                        // went with it. A bar that hides its own destinations on
+                        // scroll is a bar you cannot tap your way back out of.
+                        // **The row is `rowWidth` wide and centred, not
+                        // `Expanded` across the bar.** Two numbers describe the
+                        // same slots — `slot` here and `slot` in the bubble —
+                        // and they are the same variable, so the bubble cannot
+                        // drift off its icon the way a second, independently
+                        // written slot width would.
+                        Center(
+                          child: SizedBox(
+                            width: rowWidth,
+                            child: Row(
+                              children: [
+                                for (
+                                  var i = 0;
+                                  i < kNavDestinations.length;
+                                  i++
+                                )
+                                  Expanded(
+                                    child: _NavItem(
+                                      index: i,
+                                      destination: kNavDestinations[i],
+                                      selectedIndex: selectedIndex,
+                                      onTap: () => onSelect(i),
                                     ),
-                                ],
-                              ),
+                                  ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
-      ),
+    ),
     );
   }
 }
@@ -458,16 +512,20 @@ class _NavItem extends StatelessWidget {
 /// preserved below, because the guard against their return is the thing that
 /// matters now.
 ///
-/// **The active item is ink on the accent bubble, not a red glyph.** Selection
-/// used to be "the icon turns red", and there was no fill behind it. The bar now
-/// paints [_NavBubble] behind the selected slot, so the selected glyph has to be
-/// [AppPalette.onHue] — the same token the bubble's ink was measured with, and
-/// it is per-palette, which is why this is not `Colors.white`: black on the
-/// dark palette's `#FF6B6B` is 7.6:1, while the light palette's bubble is
-/// `#B3261E` and white on it is 5.9:1. A hard-coded white is 2.8:1 on the first
-/// of those and this bar is drawn in both palettes.
+/// **The active item is ink on the accent bubble, not a coloured glyph.**
+/// Selection used to be "the icon turns red", and there was no fill behind it.
+/// The bar now paints [_NavBubble] behind the selected slot, so the selected
+/// glyph has to be [AppPalette.onHue] — the same token the bubble's ink was
+/// measured with. The bubble is `#1D4ED8` in both ramps: white on it measures
+/// **6.70:1** and black **3.13:1**, so the ink follows the fill rather than
+/// being picked, and the token is what keeps the two in step. The bubble
+/// itself clears 1.4.11's 3:1 against the bar it sits on — **3.56:1** on the
+/// dark ramp's 68% white wash over `#1B3260` and **6.21:1** on the light
+/// ramp's over `#D4E5FA`.
 ///
-/// The inactive glyph is `AppSurfaces.onSurfaceVariant`, which is unchanged.
+/// The inactive glyph is `AppGlass.navInkSoft`, because the bar is a glass
+/// surface and the ink on glass is the token that does not invert with the
+/// ramp.
 class _NavDestination extends StatelessWidget {
   const _NavDestination({
     required this.selected,
@@ -481,23 +539,27 @@ class _NavDestination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **`onHue`, not `error`.** The bubble is behind this glyph, so red ink on a
-    // red fill is red-on-red. See the class doc for why it is not a literal
-    // white: the two palettes have bubbles of opposite lightness.
-    final color = selected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
+    // **`onHue`, not `error`.** The bubble is behind this glyph, so accent ink
+    // on an accent fill is accent-on-accent. See the class doc for the measured
+    // numbers.
+    // The inactive glyph is glass ink, not `AppGlass.inkSoft`: `inkSoft` is white
+    // at 70% and is the hero's ink, and the bar is a glass surface over the
+    // page, where white is invisible in the light ramp's pale-blue wash.
+    final color = selected ? AppPalette.onHue : AppGlass.navInkSoft;
     return Pressable(
       pressedScale: 0.90,
       builder: (pressed) => AnimatedContainer(
         // **The bubble's own duration and curve, and this is what makes the
         // travel read as one movement.** The colour was on `AppMotion.press`
-        // (150 ms, `easeOutCubic`) while the bubble takes `AppMotion.container`
-        // (320 ms, `easeInOutCubic`), so the glyph turned to its ink 170 ms
-        // before the disc arrived — a white glyph on a white page for most of
-        // the slide, then the red disc catching up with an icon that was
-        // already the right colour. Two halves of one gesture have to be on the
-        // same clock, and this is that clock.
-        duration: AppMotion.container,
-        curve: Curves.easeInOutCubic,
+        // (150 ms, `easeOutCubic`) while the bubble takes the tab clock
+        // (`AppMotionTab`), so the glyph turned to its ink long before the disc
+        // arrived — a white glyph on a white page for most of the slide, then
+        // the red disc catching up with an icon that was already the right
+        // colour. Two halves of one gesture have to be on the same clock, and
+        // this is that clock: the glyph, the disc and the page behind them all
+        // run on [AppMotionTab].
+        duration: AppMotionTab.duration,
+        curve: AppMotionTab.curve,
         width: _kNavItemWidth,
         // **The icon is NOT inside a `FittedBox`, and that is the fix for
         // "the Hydroponics icon looks small".** The whole icon-plus-label column

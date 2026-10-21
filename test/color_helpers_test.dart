@@ -19,7 +19,41 @@ import 'package:plts_monitoring/widgets/liquid_glass.dart';
 /// It was once a pair — a light list and a dark list — because there were two
 /// brightnesses to cover. There is one now, so there is one list, read straight
 /// out of `AppSurfaces.captionSurfaces()`.
-final List<Color> _surfaces = AppSurfaces.captionSurfaces();
+/// The **card** surfaces a caption is drawn on.
+///
+/// **The page is deliberately not in this list**, and that exclusion is the blue
+/// system rather than a convenience. It used to be
+/// `AppSurfaces.captionSurfaces()` — `[page, surface, surfaceAlt]` — on the
+/// reasoning that one ink worked on the page and on the cards at once. It does
+/// not: the page is near-white in the light ramp and dark in the dark one, while
+/// the cards are near-white in **both**, so the colour that is legible on a card
+/// is illegible on the dark page and the other way round. That is why the status
+/// ramp now has page twins (`statusOkOnPage` and friends).
+///
+/// So the two halves are asserted separately: this list is the cards, and
+/// [`_pageSurfaces`] is the page — its flat colour and every stop of the
+/// sweep, read in whichever ramp is live. A status colour failing here is a
+/// real card defect; a status colour failing against the page is not, because
+/// nothing draws that pair together.
+final List<Color> _surfaces = [
+  AppSurfaces.surface,
+  AppSurfaces.surfaceAlt,
+];
+
+/// The surfaces content on the page gradient is drawn on.
+///
+/// **A function, not a `final` list.** As a top-level `final` it captured
+/// whichever page colour was live when the library loaded, so the page-twin
+/// guard measured one ramp's twins against one ramp's page and said nothing
+/// about the other — the same capture that the card list above still has.
+///
+/// **The page is a sweep, not a flat colour**, so the list is the ramp's flat
+/// page *and* every stop of the ramp's sweep: the twins are drawn on the
+/// gradient, and the worst stop is the one that decides.
+List<Color> _pageSurfaces() => [
+      AppSurfaces.page,
+      ...AppGlass.pageGradient,
+    ];
 
 /// The five colours every caption and status reading in the app is drawn in.
 ///
@@ -68,24 +102,33 @@ Future<BoxDecoration> _tileDecoration(WidgetTester tester) async {
       .decoration! as BoxDecoration;
 }
 
-/// The progress track (`AppSurfaces.track`) is the **same value** as
-/// [AppSurfaces.surfaceAlt], and that is deliberate rather than an accident of
-/// the ramp: a track is a 6 to 8dp bar, but nothing else in the app needs a
-/// fourth step, so the two share one. `design_tokens_test.dart` asserts the
-/// identity (`contains(AppSurfaces.track)`), and the tile that draws text is
-/// `surfaceAlt` — which is why `surfaceAlt` is the last entry of
-/// [AppSurfaces.captionSurfaces], and why the tile is measured against it.
+/// The progress track (`AppSurfaces.track`) is the **page colour** in both ramps
+/// — the same value as [AppSurfaces.page] — and that is deliberate rather than
+/// an accident of the ramp: an un-lit meter segment is a hole in the surface it
+/// sits on, so the track is the page showing through rather than a fourth
+/// tonal step of its own. `design_tokens_test.dart` asserts that the track is
+/// among the caption surfaces (`contains(AppSurfaces.track)`), and the tile
+/// that draws text is `surfaceAlt` — which is why `surfaceAlt` is the last entry
+/// of [AppSurfaces.captionSurfaces], and why the tile is measured against it.
 ///
 /// A test used to live here asserting the tile fill was *not* the track. It was
 /// written for the previous system, in which the track was a lighter step than
 /// the tile and no text sat on it, and its numbers (captions at 4.31:1 to
-/// 4.39:1 on it) describe that value, not this one. Under the current tokens the
-/// assertion could only be satisfied by putting the tile in the card's own fill,
-/// which is what it was "fixed" to do — and which made every metric tile in the
-/// app invisible against the card behind it, with the suite green. That is the
-/// third guard in this repo that encoded a relationship which was itself the
-/// thing that had gone stale, so it is recorded here rather than deleted
-/// quietly.
+/// 4.39:1 on it) describe that value, not this one: the captions this file
+/// measures now read 4.62:1 to 6.37:1 on the fill the tile actually paints
+/// (`#F1F6FD`).
+///
+/// Under the tokens of that system `AppSurfaces.track` *was*
+/// [AppSurfaces.surfaceAlt] and the tile was meant to be `surfaceAlt` too, so
+/// the only way to satisfy the assertion was to put the tile in the card's own
+/// fill — which is what it was "fixed" to do, and which made every metric tile
+/// in the app invisible against the card behind it, with the suite green. The
+/// track is the page colour now, so the assertion would hold again; it stays
+/// deleted because there is no identity left for it to contradict.
+///
+/// That is the third guard in this repo that encoded a relationship which was
+/// itself the thing that had gone stale, so it is recorded here rather than
+/// deleted quietly.
 void main() {
   /// `HSLColor.hue` is already in degrees, not 0..1, which is worth stating
   /// because getting that wrong scales every tolerance here by 360 and makes a
@@ -278,6 +321,51 @@ void main() {
       expectClearsAa('statusAlert', statusAlert, _surfaces);
     });
 
+    test('every page-twin clears AA on the page it is drawn on', () {
+      // The other half of the split `_surfaces` documents. These are the values
+      // the CCTV status pill and the page-level banners use, and the page is the
+      // only thing behind them.
+      //
+      // **Both ramps, and every stop of the sweep.** The page is a gradient, so
+      // the worst stop is what decides — and the twins come from live palette
+      // getters, so the ramp has to be applied for them to be read at all.
+      for (final ramp in Brightness.values) {
+        AppTheme.apply(ramp);
+        for (final entry in <String, Color>{
+          'statusOkOnPage': statusOkOnPage,
+          'statusWarnOnPage': statusWarnOnPage,
+          'statusBadOnPage': statusBadOnPage,
+        }.entries) {
+          expectClearsAa('${entry.key} in the ${ramp.name} ramp', entry.value,
+              _pageSurfaces());
+        }
+      }
+      // The card surfaces this file measures against are the light ramp's, so
+      // the ramp goes back where the rest of the file expects it.
+      AppTheme.apply(Brightness.light);
+    });
+
+    test('the card and page status values differ where the ramp inverts', () {
+      // A single value serving both surfaces is the failure this split exists to
+      // prevent, and it is invisible from either side alone: each half passes on
+      // its own surface while the pair is ~2.5:1 apart.
+      //
+      // **Dark only, and that is the point.** The dark ramp has a dark page and a
+      // near-white card, so the two must be different values. The light ramp has a
+      // pale page *and* a near-white card, so one value serves both and asserting
+      // a difference there would be asserting a needless second number.
+      AppTheme.apply(Brightness.dark);
+      expect(statusOk, isNot(statusOkOnPage));
+      expect(statusWarn, isNot(statusWarnOnPage));
+      expect(statusBad, isNot(statusBadOnPage));
+      AppTheme.apply(Brightness.light);
+      // The light ramp's twins are a step *deeper* rather than a different hue —
+      // the page there is pale, so the same hue reads once the card step is gone.
+      // Asserting equality would be asserting that `#B45309` is legible on the
+      // light page, and it measures 4.09:1.
+      expect(statusWarn, isNot(statusWarnOnPage));
+    });
+
     test('every caption colour clears AA on every caption surface', () {
       // The five individual assertions above are the ones that print a readable
       // name on failure. This one is the loop that cannot be forgotten when a
@@ -346,13 +434,14 @@ void main() {
 
     // A test used to sit here: "the tile fill is not the progress-bar track".
     // It was a leftover from the previous system, where the track was a lighter
-    // step than the tile and carried no text. Under these tokens
-    // `AppSurfaces.track` *is* [AppSurfaces.surfaceAlt] and the tile is meant to
-    // be `surfaceAlt` too, so the only way to satisfy it was to draw the tile in
-    // the card's own fill -- which is how every metric tile in the app ended up
-    // invisible against the card behind it, on a build where this file's other
-    // tests were green. `design_tokens_test.dart` asserts the identity it
-    // contradicted. See the header of this file.
+    // step than the tile and carried no text. Under the tokens of that system
+    // `AppSurfaces.track` *was* [AppSurfaces.surfaceAlt] and the tile was meant
+    // to be `surfaceAlt` too, so the only way to satisfy it was to draw the
+    // tile in the card's own fill -- which is how every metric tile in the app
+    // ended up invisible against the card behind it, on a build where this
+    // file's other tests were green. `design_tokens_test.dart` asserts the
+    // identity it contradicted, and the track is the page colour today, so the
+    // assertion would hold again. See the header of this file.
 
     test('the surfaces this file measures against are the ones the app paints',
         () {
@@ -362,16 +451,24 @@ void main() {
       // list wrong: the binding surface is the deepest tonal step, because that
       // is the hardest one, and a caption has to clear AA on all of them.
       expect(
-        AppSurfaces.captionSurfaces().last,
-        AppSurfaces.bindingCaptionSurface,
-        reason: 'the deepest step is the binding one and it has to be in the '
-            'list, or the tests above quietly stop testing it',
-      );
-      expect(
         _surfaces,
-        [AppSurfaces.page, AppSurfaces.surface, AppSurfaces.surfaceAlt],
+        [AppSurfaces.surface, AppSurfaces.surfaceAlt],
         reason: 'a copy of this list in the test would drift again; read it '
             'out of AppSurfaces instead',
+      );
+      // And the page half is a list too, so a surface can be added to one
+      // surface family and not the other without anything noticing.
+      expect(_pageSurfaces(), [
+        AppSurfaces.page,
+        ...AppGlass.pageGradient,
+      ]);
+      // The binding surface has to be one of the two this file measures, or the
+      // hardest card is being skipped by every test above.
+      expect(
+        _surfaces,
+        contains(AppSurfaces.bindingCaptionSurface),
+        reason: 'the binding surface is not in the list the caption tests '
+            'measure against, so the hardest card is never tested',
       );
     });
 
@@ -419,10 +516,10 @@ void main() {
         // stays a description of where *text* goes, and this is a statement
         // about a specific colour's job.
         //
-        // The margin at the bottom is 0.05:1. Red measures 6.27 / 5.73 / 5.17
-        // / 4.55 on page / surface / surfaceAlt / surfaceMuted, so any future
-        // change to a surface is a change to this colour's legibility, exactly
-        // as the header of this file says.
+        // The margin at the bottom is 0.11:1. The accent measures 5.45 / 6.70 /
+        // 6.17 / 4.61 on page / surface / surfaceAlt / surfaceMuted, so any
+        // future change to a surface is a change to this colour's legibility,
+        // exactly as the header of this file says.
         expectClearsAa('AppPalette.error', AppPalette.error, [
           ..._surfaces,
           AppSurfaces.track,
@@ -451,41 +548,36 @@ void main() {
       test('the ink on an accent fill is the one the app actually uses', () {
         // Both large fills of the accent — the primary button in `banners.dart`
         // and the selected date chip in `liquid_glass.dart` — hardcode
-        // `AppPalette.onHue` rather than calling `onPrimaryInk`, because the
-        // fill is a constant rather than a caller-supplied hue. That is only
-        // defensible while the ratio holds.
+        // `AppPalette.onHue`, because the fill is a constant rather than a
+        // caller-supplied hue. That is only defensible while the ratio holds.
         //
-        // **Pinned as `onHue` rather than as "not white" on purpose.** The
-        // assumption this test exists to kill is the natural one: white ink on a
-        // red fill. It measures 2.78:1, below AA for body text by a factor of
-        // 1.6, and every instinct about "ink on a coloured chip is white" points
-        // at it. Black is 7.57:1. Neither number is obvious and both were
-        // measured, which is why the assertion is on the value.
+        // **Pinned as `onHue` rather than as "not black" on purpose.** The
+        // assumption this test exists to kill is the natural one: black ink on a
+        // saturated fill. On this blue (`#1D4ED8`) black measures **3.13:1**,
+        // under AA for body text, and white measures **6.70:1**. Neither number
+        // is obvious and both were measured, which is why the assertion is on
+        // the value.
         expectClearsAa('AppPalette.onHue on the accent', AppPalette.onHue,
             [AppPalette.error]);
       });
 
-      test('a wash in the accent is legible as a graphic but NOT as text', () {
-        // `AppBorders.categoricalWash` at 20%, which is the shape `AppBadge`
-        // draws. Composited over every caption surface rather than only over
-        // `page`, because the category loop above only ever composited over the
-        // page and the accent is now the hue behind most badges.
+      test('a wash in the accent is legible as a graphic and as text', () {
+        // `AppBorders.categoricalWash`, which is the shape `AppBadge` draws.
+        // Composited over every caption surface rather than only over `page`,
+        // because the category loop above only ever composited over the page
+        // and the accent is now the hue behind most badges.
         //
-        // **The number is 4.20:1 over a card and it is below AA, and that is a
-        // finding rather than a rounding error.** A 20% wash of the accent over
-        // `AppSurfaces.surface` lands on `#4E3131`, and the accent on that is
-        // 4.20:1 — over `page` and `surfaceAlt` it clears, and the card is the
-        // one that does not.
+        // **This used to fail AA, and the wash is why it does not any more.**
+        // The wash was 20% and the accent was the old red, so a 20% wash of it
+        // over a card landed on `#4E3131` and the accent on that measured
+        // 4.20:1 - under AA for the 11-15dp caption `AppBadge` draws in it.
+        // The wash is now 12% and the accent is this blue, so the accent on its
+        // own wash over a card measures **5.32:1** and clears AA with room.
         //
-        // So the guarantee is split, and the split is the useful part:
-        //
-        //  * **3:1, which passes.** This is what `GlassPageHeader` does — a 20%
-        //    wash with an 18px `Icon` of the same hue on it. That is 1.4.11's
-        //    graphical-object rule, and it clears with 1.2:1 to spare.
-        //  * **4.5:1, which fails.** Nobody draws accent-coloured *text* on an
-        //    accent wash today: `AppBadge`'s three call sites are the status ramp
-        //    and the CCTV overlay's own text colour. So this is a tripwire for
-        //    the next badge, not a description of the screen.
+        // The 3:1 half is 1.4.11's graphical-object rule, which is what
+        // `GlassPageHeader` relies on: a wash with an 18px `Icon` of the same
+        // hue on it. Both halves now pass, and the 4.5 one is the one that
+        // matters - it is what lets the next badge draw accent-coloured text.
         for (final surface in _surfaces) {
           final wash = Color.alphaBlend(
             AppBorders.categoricalWash(AppPalette.error),
@@ -506,10 +598,11 @@ void main() {
         );
         expect(
           _contrast(AppPalette.error, overCard),
-          lessThan(4.5),
-          reason: 'the accent now clears 4.5:1 on a 20% wash over a card, so '
-              'this assertion — and the comment above explaining why a badge '
-              'must stay an icon — should both be revisited',
+          greaterThanOrEqualTo(4.5),
+          reason: 'the accent on its own wash over a card is '
+              '${_contrast(AppPalette.error, overCard).toStringAsFixed(2)}:1, '
+              'which is under the 4.5 a caption on that wash needs; the wash '
+              'alpha is the thing to raise back, not this assertion',
         );
       });
 

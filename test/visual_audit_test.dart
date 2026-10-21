@@ -10,15 +10,52 @@
 /// build and every test in this repo.
 ///
 /// This file renders the key screens at a phone width (411 dp) inside the app's
-/// real `AppBackground` and writes each one to `test/visual_audit/<name>.png`,
-/// so a human can **look** at the new design without a device. It is a
-/// review harness, not a mutation guard: when a widget changes shape the image
-/// changes and that is the point.
+/// real `AppBackground` and writes each one to
+/// `test/visual_audit/<name>_<light|dark>.png`, so a human can **look** at the
+/// design without a device. It is a review harness, not a mutation guard: when
+/// a widget changes shape the image changes and that is the point.
+///
+/// **Every screen is rendered in both ramps, and the file name says which.**
+///
+/// The ramp is not a parameter any widget can see: `AppTheme.apply` swaps the
+/// `AppSurfaces` and `AppPalette` statics, so light and dark are two *global
+/// states* rather than two arguments. That has two consequences this harness
+/// has to respect, and both of them were found by looking at the images rather
+/// than by reading the code.
+///
+///  * **The ramp has to be applied before the theme is built.**
+///    `appThemeData()` reads `AppTheme.brightness` and the two statics, and
+///    every widget reads the statics while it builds. Applying the ramp after
+///    the pump would repaint nothing that was already on screen.
+///  * **The ramp leaks between cases**, so `tearDown` puts it back to dark
+///    after every test. A case that left the light palette behind would tint
+///    the next case's chrome, and the image would look wrong for a reason that
+///    has nothing to do with the widget under review.
+///
+/// A screen that was only ever looked at in one ramp is a screen nobody has
+/// reviewed in the other, so both are written every time.
 ///
 /// ## Regenerating the images
 ///
 /// ```
 /// flutter test test/visual_audit_test.dart --update-goldens
+/// ```
+///
+/// **On the 7 GB machine this repo is developed on, run it one case at a
+/// time.** The whole-file command renders eleven screens in two ramps each,
+/// and the process is killed part-way through with the isolate's
+/// "did not complete" — the same symptom `run_tests_per_file.ps1` exists to
+/// work around, and the same one this file's own header has always warned
+/// about. A case on its own is a fresh process with the whole machine's RAM
+/// behind it, and it is reliable:
+///
+/// ```powershell
+/// foreach ($c in 'glass_nav_bar_expanded','live_power_card','telemetry_card',
+///                'energy_summary_card','date_strip','telemetry_chart_card',
+///                'settings_row','dashboard_screen','settings_screen',
+///                'energy_report','ai_chat') {
+///   flutter test test/visual_audit_test.dart --update-goldens --plain-name $c
+/// }
 /// ```
 ///
 /// On a clean checkout the PNGs do not exist, and a bare
@@ -33,15 +70,37 @@
 ///
 /// 1. **Custom fonts do not load automatically.** Flutter's own documentation
 ///    states that the test font set falls back to **Ahem**, which draws a
-///    square per glyph. `setUpAll` below loads the three bundled Inter faces
-///    through `FontLoader` explicitly, and `inter_is_actually_loaded` measures
-///    the width of `Solar` at 10px to prove it worked: Inter is ~22 px where
-///    Ahem is exactly 50 px (one glyph advance per font size). **If that test
-///    ever fails, every PNG in here is unreadable blocky rectangles** and the
-///    goldens are worthless — read the failure before touching anything else.
+///    square per glyph. `setUpAll` below loads the app's three families
+///    through `FontLoader` explicitly — **Inter** for the prose, **JetBrains
+///    Mono** for the instrument panel's slot labels, and **MaterialIcons** for
+///    the icons — and two tests measure the width of `Solar` at 10px to prove
+///    the first two worked: Inter is ~26 px and JetBrains Mono ~30 px, where
+///    Ahem is exactly 50 px (one glyph advance per font size). **If either
+///    test ever fails, every PNG in here is unreadable blocky rectangles** and
+///    the goldens are worthless — read the failure before touching anything
+///    else.
 /// 2. **Text rasterisation is platform- and Flutter-version specific.** Flutter
 ///    says so itself. A golden generated on Windows will not match one
 ///    generated on Linux. Do not chase that across machines.
+///
+/// ## Two ramps, and why the file name carries them
+///
+/// Every case is rendered twice — once with `AppTheme.apply(Brightness.light)`
+/// and once with `AppTheme.apply(Brightness.dark)` — and the golden is named
+/// `<case>_light.png` / `<case>_dark.png`.
+///
+/// The ramp is **global mutable state**: `AppTheme.apply` swaps the
+/// `AppSurfaces` and `AppPalette` statics that every widget reads while it
+/// builds, and `AppTheme.brightness` is what `AppGlass` reads to pick the page
+/// gradient. It is applied *before* `appThemeData()` is called, because that
+/// call is what reads the statics to build the `ThemeData` and the
+/// `ColorScheme`; a ramp applied afterwards would leave the chrome in the
+/// previous ramp while the widgets below it repainted in the new one.
+///
+/// And it is reset in `tearDown`, because the statics outlive the test that
+/// set them: a case that left the light palette behind would tint the next
+/// case's chrome, and the resulting image would be wrong for a reason that has
+/// nothing to do with the widget under review.
 ///
 /// ## Constraints this file keeps
 ///
@@ -62,43 +121,103 @@ import 'package:plts_monitoring/screens/dashboard/widgets/chart_card.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/chart_groups.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/date_strip.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/live_power_card.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/metric_grid.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/metric_specs.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/nav_bar.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/overview_panel.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/telemetry_card.dart';
+import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
+import 'package:plts_monitoring/screens/energy_report/utils/period_buckets.dart';
+import 'package:plts_monitoring/screens/energy_report/widgets/period_selector.dart';
+import 'package:plts_monitoring/screens/energy_report/widgets/totals_card.dart';
 import 'package:plts_monitoring/screens/settings/widgets/settings_fields.dart';
+import 'package:plts_monitoring/services/energy_report_service.dart';
+import 'package:plts_monitoring/utils/alarm_rules.dart';
 import 'package:plts_monitoring/widgets/energy_summary_card.dart';
+import 'package:plts_monitoring/widgets/formatted_markdown_text.dart';
 import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
 /// The phone width the brief is designed against: 411 dp is the smallest
 /// common Android viewport, and every card in this app is measured at it.
 const double kPhoneWidth = 411;
 
-/// The three bundled static Inter faces, in pubspec order.
+/// The padding between the phone frame and the case body.
 ///
-/// **Static instances, and the weight in the filename is why.** A variable font
-/// would let a single asset serve 400/700/900, but on older Android the `wght`
-/// axis is not applied reliably, so a variable file declared once renders every
-/// weight at its default. These three are what `pubspec.yaml` declares.
-const List<(String, int)> _interFaces = [
-  ('assets/fonts/Inter-Regular-400.ttf', 400),
-  ('assets/fonts/Inter-Bold-700.ttf', 700),
-  ('assets/fonts/Inter-Black-900.ttf', 900),
+/// **Named, and it is not cosmetic.** The dashboard case has to size a scroll
+/// view to the space this leaves, and a second literal for the same number
+/// would be a silent mismatch the first time either one changed.
+const EdgeInsets _framePadding = EdgeInsets.symmetric(
+  horizontal: AppSpacing.gutter,
+  vertical: AppSpacing.sm,
+);
+
+/// The bundled Inter faces, in pubspec order.
+///
+/// **The weight is in the file name, and the list is the whole of it.** A
+/// variable font would let a single asset serve 400/500/600/700/900, but on
+/// older Android the `wght` axis is not applied reliably, so a variable file
+/// declared once renders every weight at its default. These are the five
+/// `pubspec.yaml` declares.
+const List<String> _interFaces = [
+  'assets/fonts/Inter-Regular-400.ttf',
+  'assets/fonts/Inter-Medium-500.ttf',
+  'assets/fonts/Inter-SemiBold-600.ttf',
+  'assets/fonts/Inter-Bold-700.ttf',
+  'assets/fonts/Inter-Black-900.ttf',
 ];
+
+/// The bundled JetBrains Mono faces, in pubspec order.
+///
+/// **A second family, and it is the app's terminal face.** `AppType.mono` is
+/// `JetBrainsMono`, and the Overview panel, the metric grid and every slot
+/// label are drawn in it. An unregistered family falls back to Ahem, which
+/// draws a solid box per glyph — so a harness that loaded only Inter produced
+/// images where the entire instrument panel was a wall of navy rectangles and
+/// the "readable screenshot" was a picture of Ahem.
+const List<String> _monoFaces = [
+  'assets/fonts/JetBrainsMono-Medium.ttf',
+  'assets/fonts/JetBrainsMono-Bold.ttf',
+];
+
+/// The Material icon font, which the framework puts in the asset bundle.
+///
+/// **Without it every `Icon` in every PNG is an empty box.** An unregistered
+/// family falls back to Ahem, and Ahem has no glyph for the icon codepoints,
+/// so the harness was drawing tofu where the design puts an icon. The font is
+/// 1.6 MB, which is the price of the images being pictures of the design.
+const String _iconFont = 'fonts/MaterialIcons-Regular.otf';
+
+/// The ramps every case is rendered in, in the order they are captured.
+///
+/// **A fixed list, not `Brightness.values`.** The order decides which capture
+/// is written first, and spelling the list out means a ramp added later cannot
+/// silently reorder the files that already exist.
+const List<Brightness> kRamps = <Brightness>[Brightness.light, Brightness.dark];
+
+/// The suffix a ramp contributes to a golden's file name.
+String _rampSuffix(Brightness brightness) =>
+    brightness == Brightness.light ? 'light' : 'dark';
 
 void main() {
   // **Opt-in, and the reason is a hang rather than a preference.**
   //
-  // This file renders ten screens to PNG. On the 7 GB machine this repo is
-  // developed on, `captureImage` under `flutter test` takes the whole isolate
-  // down: the cases run green one at a time and the file "does not complete"
-  // when it runs, which is the same symptom `run_tests_per_file.ps1` exists to
-  // work around. A review tool that breaks the suite is worse than no tool, so
-  // the goldens are only registered when the comparator is actually updating
-  // them — `flutter test --update-goldens` — and a plain run reports one skipped
-  // test that says so.
+  // This file renders eleven screens to PNG, in two ramps each. On the 7 GB
+  // machine this repo is developed on, `captureImage` under `flutter test` takes
+  // the whole isolate down: the cases run green one at a time and the file
+  // "does not complete" when it runs, which is the same symptom
+  // `run_tests_per_file.ps1` exists to work around. A review tool that breaks
+  // the suite is worse than no tool, so the goldens are only registered when
+  // the comparator is actually updating them — `flutter test --update-goldens`
+  // — and a plain run reports one skipped test that says so.
   //
   // Regenerate with:
   //
   //     flutter test test/visual_audit_test.dart --update-goldens
+  //
+  // …or one case at a time on a machine with 7 GB of RAM, which is the only
+  // way that reliably completes there:
+  //
+  //     flutter test test/visual_audit_test.dart --update-goldens --plain-name <case>
   final updating = autoUpdateGoldenFiles;
   if (!updating) {
     // A passing test rather than a skipped one, and that is deliberate: the
@@ -112,7 +231,7 @@ void main() {
         autoUpdateGoldenFiles,
         isFalse,
         reason:
-            'This file renders ten screens to PNG and needs '
+            'This file renders eleven screens to PNG and needs '
             '`--update-goldens`. A plain run registers this one test and '
             'skips the images.',
       );
@@ -123,15 +242,26 @@ void main() {
   // The one thing the golden harness cannot do for itself: without this the
   // entire app renders in Ahem squares and every image below is decoration
   // rather than documentation.
+  //
+  // **All three families.** The app draws its prose in Inter, its instrument
+  // panel in JetBrains Mono and its icons in MaterialIcons, so loading only
+  // Inter left half of every screen as Ahem boxes.
   setUpAll(() async {
-    final loader = FontLoader('Inter');
-    for (final (asset, _) in _interFaces) {
-      loader.addFont(rootBundle.load(asset));
-    }
-    await loader.load();
+    await _loadFont('Inter', _interFaces);
+    await _loadFont('JetBrainsMono', _monoFaces);
+    await _loadFont('MaterialIcons', const [_iconFont]);
   });
 
   group('visual audit goldens', () {
+    // **The ramp is global state, so it is put back after every case.**
+    //
+    // `AppTheme.apply` swaps the `AppSurfaces` and `AppPalette` statics, and
+    // those outlive the test that set them. A case that left the light palette
+    // behind would tint the next case's chrome, and the resulting image would
+    // be wrong for a reason that has nothing to do with the widget under
+    // review.
+    tearDown(() => AppTheme.apply(Brightness.dark));
+
     // **One nav-bar golden, and it used to be two.** There was a
     // `glass_nav_bar_collapsed` variant for the vertical-scroll state that
     // crossfaded four icons out and one enlarged icon in. That state is gone —
@@ -141,7 +271,7 @@ void main() {
     // that has to be re-approved every time the bar changes, for a picture no
     // user can reach.
     testWidgets('glass_nav_bar_expanded', (tester) async {
-      await _audit(
+      await _auditBoth(
         tester,
         'glass_nav_bar_expanded',
         GlassNavBar(selectedIndex: 0, onSelect: (_) {}),
@@ -151,7 +281,7 @@ void main() {
     });
 
     testWidgets('live_power_card', (tester) async {
-      await _audit(
+      await _auditBoth(
         tester,
         'live_power_card',
         const LivePowerCard(
@@ -167,7 +297,7 @@ void main() {
     });
 
     testWidgets('telemetry_card', (tester) async {
-      await _audit(
+      await _auditBoth(
         tester,
         'telemetry_card',
         TelemetryCard(
@@ -216,15 +346,20 @@ void main() {
       );
     });
 
-    // **No metric-grid golden, and it is a considered omission.** The grid is
-    // the one case that does not finish rendering on the 7 GB machine this repo
-    // is developed on: it hangs the isolate, and the PNG left behind is a
-    // partial frame with a lime bar in it that is not in the render tree at all
-    // (measured: no decorator and no paragraph in that region). A golden of a
-    // partial frame is worse than no golden, because it looks like a defect.
-    // `metric_grid_test.dart` covers the widget, ten tests, and it passes.
+    // **No standalone metric-grid golden, and it is a considered omission.**
+    // There used to be one, and it was dropped because it did not finish
+    // rendering on the 7 GB machine this repo is developed on: it hung the
+    // isolate, and the PNG left behind was a partial frame with a lime bar in
+    // it that is not in the render tree at all (measured: no decorator and no
+    // paragraph in that region). A golden of a partial frame is worse than no
+    // golden, because it looks like a defect.
+    //
+    // **The grid is not missing from the audit, though** — it is inside the
+    // `dashboard_screen` case below, rendered in its real place on the page,
+    // and it is fine there. `metric_grid_test.dart` covers the widget itself,
+    // ten tests, and it passes.
     testWidgets('energy_summary_card', (tester) async {
-      await _audit(
+      await _auditBoth(
         tester,
         'energy_summary_card',
         const EnergySummaryCard(
@@ -245,7 +380,7 @@ void main() {
 
     testWidgets('date_strip', (tester) async {
       final today = DateTime.now();
-      await _audit(
+      await _auditBoth(
         tester,
         'date_strip',
         DateStrip(
@@ -257,7 +392,6 @@ void main() {
           rangeStart: null,
           rangeEnd: null,
           onSelectDate: (_) {},
-          onPickRange: () {},
         ),
         height: 210,
       );
@@ -286,7 +420,7 @@ void main() {
           ],
       };
 
-      await _audit(
+      await _auditBoth(
         tester,
         'telemetry_chart_card',
         TelemetryChartCard(
@@ -324,7 +458,7 @@ void main() {
     // remaining cases rather than just its own. The real CCTV screen needs the
     // device; this file is the dashboard and the report.
     testWidgets('settings_row', (tester) async {
-      await _audit(
+      await _auditBoth(
         tester,
         'settings_row',
         SectionCard(
@@ -341,9 +475,327 @@ void main() {
         height: 380,
       );
     });
+
+    // **The whole dashboard, in one scroll view.**
+    //
+    // The other cases are single widgets in isolation, which is what a golden
+    // is good at. This one is the page: the cards in the order the screen
+    // stacks them, so the *relationships* between them — the gap rhythm, the
+    // shared page fill, the panel typography against the card typography — are
+    // visible in one image. A page that is wrong in a way no single card is
+    // wrong cannot be caught by a card golden.
+    //
+    // **The dates on screen are pinned.** A `DateTime.now()` in the day strip
+    // or the Overview header would make the image change every day, and a
+    // golden that changes by itself is a golden nobody re-approves. The one
+    // `DateTime.now()` left in the tree is the metric grid's freshness probe,
+    // and what it draws — a fresh reading, or the stale tag — does not change
+    // from one day to the next.
+    testWidgets('dashboard_screen', (tester) async {
+      const thresholds = AlarmThresholds.defaults;
+      final day = DateTime(2026, 10, 5);
+
+      await _auditBoth(
+        tester,
+        'dashboard_screen',
+        ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const LivePowerCard(
+              pvPower: 1834,
+              acPower: 720,
+              batteryPower: -42,
+              soc: 68,
+              pzemStale: false,
+              pzemAgeLabel: '12s ago',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TelemetryCard(
+              data: DeviceTelemetry(
+                latestValues: const {
+                  'voltage': 25.4,
+                  'current': -1.24,
+                  'power': -31,
+                  'soc': 78,
+                },
+                lastUpdate: null,
+              ),
+              metrics: const [
+                MetricDef('voltage', 'Voltage', 'V', Icons.bolt_outlined,
+                    decimals: 1),
+                MetricDef('current', 'Current', 'A',
+                    Icons.electrical_services_outlined, decimals: 2),
+                MetricDef('power', 'Power', 'W', Icons.wb_sunny_outlined,
+                    decimals: 0),
+                MetricDef('soc', 'State of Charge', '%',
+                    Icons.battery_std_rounded, decimals: 0),
+              ],
+              staleMinutes: 10,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const EnergySummaryCard(
+              weekly: false,
+              loading: false,
+              hasData: true,
+              errorMessage: null,
+              solarKwh: 12.41,
+              previousSolarKwh: 10.0,
+              loadKwh: 8.72,
+              previousLoadKwh: 9.1,
+              onRangeChanged: _noopBool,
+              onOpenReport: _noopVoid,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            DateStrip(
+              days: [
+                for (var i = -3; i <= 3; i++)
+                  DateTime(day.year, day.month, day.day + i),
+              ],
+              selectedDate: day,
+              rangeStart: null,
+              rangeEnd: null,
+              onSelectDate: (_) {},
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const OverviewPanel(
+              readings: OverviewReadings(
+                displayName: 'Rumah Apik',
+                pvPower: 1834,
+                pvPeak: 2140,
+                acPower: 720,
+                batteryPower: -42,
+                soc: 68,
+                batteryVoltage: 25.4,
+                acVoltage: 231.2,
+                lux: 18400,
+                pzemAgeLabel: '12s ago',
+                solarKwh: 12.41,
+                loadKwh: 8.72,
+                previousSolarKwh: 10.0,
+                previousLoadKwh: 9.1,
+                productionProgress: 0.83,
+                forecastBatteryHours: 6.5,
+                isLive: false,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            MetricGrid(
+              title: 'Environment',
+              specs: kEnvironmentSpecs,
+              values: const {
+                'temp_dht': 27.4,
+                'humidity_dht': 68.0,
+                'temp_ds18b20': 31.2,
+                'lux': 18400,
+                'tds_ppm': 980,
+              },
+              thresholds: thresholds,
+              limitLabelFor: (spec) => environmentLimitLabel(spec, thresholds),
+              // `DateTime.now()` and not a pinned date: this field is *about*
+              // freshness, and a pinned date three weeks in the past would draw
+              // the stale tag every time, which is a different design to review.
+              lastUpdate: DateTime.now(),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const TerminalPanel(
+              semanticLabel: 'Status',
+              children: [
+                TerminalRow(label: 'GATEWAY', value: 'ONLINE', unit: null),
+                TerminalRule(),
+                TerminalRow(label: 'UPLINK', value: '4G', unit: null),
+              ],
+            ),
+          ],
+        ),
+        height: 1400,
+      );
+    });
+
+    // **Two settings cards, and the point is that they are two different
+    // controls.** A switch and a text field do not share a row shape, and a
+    // golden of one of them says nothing about the other.
+    testWidgets('settings_screen', (tester) async {
+      final controller = TextEditingController(text: '32');
+      addTearDown(controller.dispose);
+
+      await _auditBoth(
+        tester,
+        'settings_screen',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionCard(
+              title: 'Monitoring',
+              subtitle: 'Set how often live telemetry updates.',
+              icon: Icons.monitor_heart_outlined,
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Auto refresh telemetry'),
+                value: true,
+                onChanged: (_) {},
+              ),
+            ),
+            SectionCard(
+              title: 'Greenhouse',
+              subtitle: 'Alerts for the environment sensors.',
+              icon: Icons.thermostat_outlined,
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Max temperature (C)',
+                ),
+              ),
+            ),
+          ],
+        ),
+        height: 600,
+      );
+    });
+
+    // **The energy report's two headline pieces.** The period selector and
+    // the totals card, which is the whole top of that screen.
+    testWidgets('energy_report', (tester) async {
+      final day = DateTime(2026, 10, 5);
+      final buckets = <EnergyBucket>[
+        for (var h = 6; h <= 18; h++)
+          EnergyBucket(
+            hour: DateTime(day.year, day.month, day.day, h),
+            pvKwh: 1.2,
+            acKwh: 0.6,
+            sampleCount: 12,
+          ),
+      ];
+
+      await _auditBoth(
+        tester,
+        'energy_report',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PeriodSelector(
+              monthly: false,
+              selectedDate: day,
+              onMonthlyChanged: _noopBool,
+              onPickPeriod: _noopVoid,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TotalsCard(
+              monthly: false,
+              selectedDate: day,
+              pvKwh: 15.6,
+              acKwh: 7.8,
+              buckets: buckets,
+              previousTotals: const PeriodTotals(pvKwh: 12.1, acKwh: 8.4),
+            ),
+          ],
+        ),
+        height: 500,
+      );
+    });
+
+    // **The AI chat, without the screen.**
+    //
+    // `AiChatScreen` reads its API key from `flutter_secure_storage` and its
+    // bubbles are a private `_Bubble`, so the screen cannot be pumped here
+    // without a service and a private type. What the design *is* — the answer
+    // bubble's typography and the composer row — is the public
+    // `FormattedMarkdownText` and a `TextField` in a row, so that is what this
+    // golden is.
+    testWidgets('ai_chat', (tester) async {
+      await _auditBoth(
+        tester,
+        'ai_chat',
+        AppCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const FormattedMarkdownText(
+                text: '### Ringkasan hari ini\n'
+                    '\n'
+                    '- Produksi **12.41 kWh**, naik 24% dari kemarin.\n'
+                    '- Beban rumah 8.72 kWh, turun 4%.\n'
+                    '- Baterai 68%, sisa 6.5 jam.',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  const Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Tanya tentang data tanaman',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.send_rounded),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        height: 500,
+      );
+    });
   });
 
-  group('inter is really loaded', () {
+  group('fonts are really loaded', () {
+    testWidgets('jetbrains_mono_is_actually_loaded', (tester) async {
+      // The same measurement as the Inter check below, on the app's other
+      // family. Ahem gives every glyph an advance of exactly one font size,
+      // so five glyphs at 10 px is 50.0; JetBrains Mono's advance is 0.6 em,
+      // so the same string is about 30.
+      tester.view.physicalSize = const Size(kPhoneWidth, 160);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: appThemeData(),
+          home: const RepaintBoundary(
+            child: Center(
+              child: Text(
+                'Solar',
+                style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final width = tester.getSize(find.text('Solar')).width;
+      // ignore: avoid_print
+      print(
+        'visual_audit: JetBrainsMono "Solar" at 10px measured $width px '
+        '(JetBrains Mono ~30, Ahem 50.0).',
+      );
+
+      expect(
+        width,
+        lessThan(40.0),
+        reason:
+            'JetBrainsMono did not load: "Solar" measured $width px, which is '
+            'the Ahem fallback (50.0) rather than JetBrains Mono (~30). Every '
+            'slot label and every row of the instrument panels in '
+            'test/visual_audit/ is a blocky rectangle until setUpAll\'s '
+            'FontLoader succeeds.',
+      );
+      expect(
+        width,
+        greaterThan(15.0),
+        reason:
+            '"Solar" measured $width px — narrower than JetBrains Mono should '
+            'be, so the text is not laying out at the size it was asked for.',
+      );
+    });
+
     testWidgets('inter_is_actually_loaded', (tester) async {
       // Inter 'Solar' at 10px is about 22 px wide. The flutter_test fallback,
       // Ahem, gives every glyph an advance of exactly one font size, so the
@@ -380,7 +832,7 @@ void main() {
         lessThan(40.0),
         reason:
             'Inter did not load: "Solar" measured $width px, which is the '
-            'Ahem fallback (50.0) rather than Inter (~22). Every PNG in '
+            'Ahem fallback (50.0) rather than Inter (~26). Every PNG in '
             'test/visual_audit/ is blocky rectangles until '
             'setUpAll\'s FontLoader succeeds.',
       );
@@ -396,7 +848,38 @@ void main() {
 }
 
 /// Where this file writes its goldens, relative to the test file.
-String _goldenKey(String name) => 'visual_audit/$name.png';
+///
+/// **The ramp is in the name.** Light and dark are two images of the same
+/// case, and a name that did not say which was which would leave a reviewer
+/// comparing the wrong two files.
+String _goldenKey(String name, Brightness brightness) =>
+    'visual_audit/${name}_${_rampSuffix(brightness)}.png';
+
+/// Renders one case in every ramp, in [kRamps] order.
+///
+/// The same widget instance is pumped once per ramp. That is safe because the
+/// cases are stateless trees, and the root [MaterialApp] carries a per-ramp
+/// key so each pump rebuilds the whole tree from scratch — the ramp lives in
+/// statics, and a tree that survived from the previous ramp would keep the
+/// widgets it had already built.
+Future<void> _auditBoth(
+  WidgetTester tester,
+  String name,
+  Widget child, {
+  required double height,
+  MainAxisAlignment mainAxisAlignment = MainAxisAlignment.start,
+}) async {
+  for (final ramp in kRamps) {
+    await _audit(
+      tester,
+      name,
+      child,
+      height: height,
+      mainAxisAlignment: mainAxisAlignment,
+      brightness: ramp,
+    );
+  }
+}
 
 /// Pumps one case at a phone width inside the app's real [AppBackground] and
 /// compares it against its golden.
@@ -410,14 +893,29 @@ Future<void> _audit(
   Widget child, {
   required double height,
   MainAxisAlignment mainAxisAlignment = MainAxisAlignment.start,
+  Brightness brightness = Brightness.dark,
 }) async {
   tester.view.physicalSize = Size(kPhoneWidth, height);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
-  final boundaryKey = ValueKey('audit-$name');
+  // **The ramp goes on before the theme is built.**
+  //
+  // `appThemeData()` reads `AppTheme.brightness` and the two statics, and
+  // every widget reads the statics while it builds. Applying the ramp after
+  // the pump would leave the chrome in the previous ramp while the widgets
+  // below it repainted in the new one.
+  AppTheme.apply(brightness);
+
+  final rampSuffix = _rampSuffix(brightness);
+  final boundaryKey = ValueKey('audit-$name-$rampSuffix');
   await tester.pumpWidget(
     MaterialApp(
+      // **A per-ramp key on the root.** The ramp is global mutable state, so
+      // the tree has to be built again from scratch for it; a tree that
+      // survived from the previous ramp would keep the widgets it had already
+      // built, with the old ramp's values baked into them.
+      key: ValueKey('audit-root-$name-$rampSuffix'),
       debugShowCheckedModeBanner: false,
       theme: appThemeData(),
       home: RepaintBoundary(
@@ -427,22 +925,31 @@ Future<void> _audit(
             width: kPhoneWidth,
             height: height,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.gutter,
-                vertical: AppSpacing.sm,
-              ),
+              padding: _framePadding,
               child: Column(
                 mainAxisAlignment: mainAxisAlignment,
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Adds Inter's family — and nothing else — to the ambient
-                  // style, so the several widgets that render a raw
-                  // `TextStyle(fontSize:)` still come out in Inter rather than
-                  // in Ahem squares.
-                  DefaultTextStyle.merge(
-                    style: const TextStyle(fontFamily: 'Inter'),
-                    child: child,
+                  // **Loose, so the child keeps its own height.**
+                  //
+                  // A `Column` hands its children an *unbounded* main-axis
+                  // constraint, which a `ListView` cannot live with — it throws
+                  // "Vertical viewport was given unbounded height". `Flexible`
+                  // gives the child a bounded maximum instead, and `loose` lets
+                  // a child that is smaller than that maximum keep its own
+                  // size, which is what the nav bar's `mainAxisAlignment: end`
+                  // relies on.
+                  Flexible(
+                    fit: FlexFit.loose,
+                    // Adds Inter's family — and nothing else — to the ambient
+                    // style, so the several widgets that render a raw
+                    // `TextStyle(fontSize:)` still come out in Inter rather than
+                    // in Ahem squares.
+                    child: DefaultTextStyle.merge(
+                      style: const TextStyle(fontFamily: 'Inter'),
+                      child: child,
+                    ),
                   ),
                 ],
               ),
@@ -487,10 +994,19 @@ Future<void> _audit(
   // `flutter test --update-goldens` — which is what the header says.
   await expectLater(
     find.byKey(boundaryKey),
-    matchesGoldenFile(_goldenKey(name)),
+    matchesGoldenFile(_goldenKey(name, brightness)),
   );
 }
 
 void _noopBool(bool _) {}
 
 void _noopVoid() {}
+
+/// Loads one bundled family into the test's font collection.
+Future<void> _loadFont(String family, List<String> assets) async {
+  final loader = FontLoader(family);
+  for (final asset in assets) {
+    loader.addFont(rootBundle.load(asset));
+  }
+  await loader.load();
+}

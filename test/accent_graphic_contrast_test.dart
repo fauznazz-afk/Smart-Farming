@@ -12,9 +12,11 @@
 ///     is no user-chosen accent to mis-measure any more. Every hue in the app
 ///     now comes from `AppPalette`, and `color_helpers_test.dart` measures each
 ///     one it can land on.
-///   * White on a light accent fill is far below 4.5:1, which is why
-///     `onPrimaryInk` exists rather than every call site hardcoding
-///     `Colors.white`.
+///   * White on a light accent fill is far below 4.5:1, which is why the ink on
+///     a saturated fill was a *function* (`onPrimaryInk`) rather than every call
+///     site hardcoding `Colors.white`. The palette now takes white ink on every
+///     fill in both ramps, so the function is gone and the guarantee is
+///     measured directly instead.
 ///   * `AppElevation.boundaryEdge` was reported as under 3:1 and was **not**.
 ///     The report was wrong. `AppElevation` is gone entirely; its replacement,
 ///     `AppBorders.boundary`, is the one edge in the system that makes a 1.4.11
@@ -57,10 +59,15 @@ String _hex(Color c) =>
     c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase();
 
 void main() {
-  /// Every fill a saturated surface can end up carrying in this app. Read out of
-  /// the palette rather than listed, because a literal here is a copy and
-  /// copies drift.
-  final fills = <String, Color>{
+  /// Every fill a saturated surface can end up carrying in this app.
+  ///
+  /// **A function, not a `final` map.** As a map this captured whichever palette
+  /// was live when the library loaded — light — and every later ramp test was
+  /// measuring the light fills while believing it was measuring the active ones.
+  /// The failure that exposed it is a count of "white fails on some fill" that
+  /// came back 0 in a ramp that has a light cyan in it. Reading the getters
+  /// per ramp is the only way a palette can change under this file.
+  Map<String, Color> fills() => {
     'primary': AppPalette.primary,
     'secondary': AppPalette.secondary,
     'accent': AppPalette.accent,
@@ -73,66 +80,68 @@ void main() {
   };
 
   group('every palette hue clears 1.4.11 as a graphical object', () {
-    test('3:1 on every surface it can be drawn on', () {
-      // The claim that used to fail for three of four user accents. A hue is
-      // used as a chart line, a progress fill and an icon tile, and 1.4.11 asks
-      // 3:1 of all of those — measured here against the same derived surface
-      // list every caption is measured against, so a hue cannot be legible as
-      // text and illegible as a graphic on the same background.
-      for (final entry in fills.entries) {
-        for (final surface in AppSurfaces.captionSurfaces()) {
-          expect(
-            _contrast(entry.value, surface),
-            greaterThanOrEqualTo(3.0),
-            reason: '${entry.key} #${_hex(entry.value)} is '
-                '${_contrast(entry.value, surface).toStringAsFixed(2)}:1 on '
-                '#${_hex(surface)}; 1.4.11 wants 3:1 for a graphical object',
-          );
+    test('3:1 on the card surfaces it can be drawn on', () {
+      // A hue is used as a chart line, a progress fill and an icon tile, and
+      // 1.4.11 asks 3:1 of all of those. **Those are drawn on cards**, and the
+      // cards are near-white in *both* ramps, so the claim is measured against
+      // the two card surfaces in either ramp.
+      //
+      // **The page was in this list and the premise was wrong for it.** The same
+      // hues measure 2.61 / 1.88 / 2.35 / 2.58:1 on the dark ramp's own stops,
+      // so a hue can be a legible graphic on a card and vanish on the page.
+      // The page half of the claim belongs to `AppGlass.accentOnPage`, and it
+      // is asserted in the 'the one accent' group below rather than duplicated
+      // here.
+      for (final ramp in Brightness.values) {
+        AppTheme.apply(ramp);
+        for (final entry in fills().entries) {
+          for (final surface in [AppSurfaces.surface, AppSurfaces.surfaceAlt]) {
+            expect(
+              _contrast(entry.value, surface),
+              greaterThanOrEqualTo(3.0),
+              reason: '${entry.key} #${_hex(entry.value)} in the ${ramp.name} '
+                  'ramp is '
+                  '${_contrast(entry.value, surface).toStringAsFixed(2)}:1 on '
+                  '#${_hex(surface)}; 1.4.11 wants 3:1 for a graphical object',
+            );
+          }
         }
       }
+      AppTheme.apply(Brightness.dark);
     });
   });
 
-  group('onPrimaryInk', () {
-    test('puts a legible ink on every fill the app can produce', () {
-      // A fill is a fill: what matters is the measured ratio, not which palette
-      // entry it came from, so the whole palette plus every category hue is
-      // measured together. Anything that fails here is a button whose label the
-      // user cannot read.
-      for (final f in fills.entries) {
-        final ink = onPrimaryInk(f.value);
+  group('the ink on a saturated fill', () {
+    test('every fill takes white ink, and white clears AA on every one', () {
+      // **The ink on a saturated fill is one colour, so nothing has to choose
+      // between two.** The function that used to choose (`onPrimaryInk`, by the
+      // fill's luminance) is gone because the choice went away: every fill the
+      // app can produce takes white ink, in both ramps.
+      //
+      // Measured from the live palette, in both ramps, because one ramp does
+      // not prove it — and because **a future light fill would break the whole
+      // app's ink at once**, which is the failure this number exists to catch.
+      for (final ramp in Brightness.values) {
+        AppTheme.apply(ramp);
         expect(
-          _contrast(ink, f.value),
-          greaterThanOrEqualTo(4.5),
-          reason: '${f.key} #${_hex(f.value)} with ink #${_hex(ink)} is '
-              '${_contrast(ink, f.value).toStringAsFixed(2)}:1; white on a '
-              'light accent fill is far below the 4.5 that a label needs, and '
-              'this is the function that exists because of it',
+          AppPalette.onHue,
+          Colors.white,
+          reason: 'the ink token in the ${ramp.name} ramp is '
+              '#${_hex(AppPalette.onHue)}; the ink on a saturated fill is one '
+              'colour, so a second ink is a second meaning',
         );
+        for (final f in fills().entries) {
+          expect(
+            _contrast(Colors.white, f.value),
+            greaterThanOrEqualTo(4.5),
+            reason: '${f.key} #${_hex(f.value)} in the ${ramp.name} ramp is '
+                '${_contrast(Colors.white, f.value).toStringAsFixed(2)}:1 '
+                'with white ink; the ink on a saturated fill is one colour, so '
+                'a light fill takes the whole app\'s ink with it',
+          );
+        }
       }
-    });
-
-    test('white really does fail, so the function is not decorative', () {
-      // If `Colors.white` ever cleared 4.5:1 on the palette's own fills then
-      // this function would be returning a constant and every call site could go
-      // back to hardcoding it. The cheapest guard against that is the number.
-      final failures = fills.values
-          .where((fill) => _contrast(Colors.white, fill) < 4.5)
-          .length;
-      expect(
-        failures,
-        greaterThan(0),
-        reason: 'white now clears 4.5:1 on every fill, so onPrimaryInk is a '
-            'constant and this file should argue for deleting it',
-      );
-    });
-
-    test('it is deterministic, and it does not depend on a lightness guess', () {
-      // The same fill must always get the same ink, or a button changes its
-      // label colour when it is rebuilt.
-      for (final f in fills.entries) {
-        expect(onPrimaryInk(f.value), onPrimaryInk(f.value));
-      }
+      AppTheme.apply(Brightness.dark);
     });
   });
 
@@ -145,28 +154,29 @@ void main() {
     // folded into the loops above because the loops above enumerate a *list* and
     // these are claims about one specific fill.
 
-    test('it takes black ink, and white would have failed', () {
-      // The natural assumption on a red chip is a white label. White on
-      // `#FF6B6B` is **2.78:1** — under AA for body text by a factor of 1.6 —
-      // while `AppPalette.onHue`'s black is **7.57:1**. The app's own
-      // `onPrimaryInk` picks black here without being asked to, because the fill's
-      // luminance is above the 0.18 threshold and the rule is not about hue.
+    test('it takes white ink, and black would have failed', () {
+      // **The inverse of what this asserted, and the inversion is a measurement.**
       //
-      // The assertion is on the *value* rather than on `greaterThanOrEqualTo`
-      // alone, because "it clears 4.5:1" is true of both inks on some other fill
-      // and would not catch a future edit that moved the fill under a hardcoded
-      // white.
-      expect(onPrimaryInk(AppPalette.error), AppPalette.onHue);
+      // The accent was deepened to `#1D4ED8` so it could clear AA as *text on a
+      // white card*, and that moved the fill's luminance to 0.107. The ink is
+      // therefore **white**: black on this blue is **3.13:1** (under AA) and
+      // white is **6.70:1**.
+      //
+      // The assertion is on the value rather than on `greaterThanOrEqualTo`
+      // alone, because "it clears 4.5:1" is true of one ink on some other fill
+      // and would not catch a future edit that moved the fill back under a
+      // hardcoded black.
+      expect(AppPalette.onHue, Colors.white);
       expect(
-        _contrast(onPrimaryInk(AppPalette.error), AppPalette.error),
+        _contrast(AppPalette.onHue, AppPalette.error),
         greaterThanOrEqualTo(4.5),
         reason: 'the accent fill with its own ink is '
-            '${_contrast(onPrimaryInk(AppPalette.error), AppPalette.error).toStringAsFixed(2)}:1',
+            '${_contrast(AppPalette.onHue, AppPalette.error).toStringAsFixed(2)}:1',
       );
       expect(
-        _contrast(Colors.white, AppPalette.error),
+        _contrast(Colors.black, AppPalette.error),
         lessThan(4.5),
-        reason: 'white now clears 4.5:1 on the accent, so the hardcoded '
+        reason: 'black now clears 4.5:1 on the accent, so the hardcoded '
             'AppPalette.onHue in banners.dart and liquid_glass.dart should be '
             're-checked rather than trusted',
       );
@@ -182,22 +192,42 @@ void main() {
       // tile — so this is a claim about one colour's reach rather than a
       // redefinition of where text goes.
       //
-      // Red measures 6.27 / 5.73 / 5.17 / 4.55:1 across the four. The last of
-      // those is the binding one and it has 0.05:1 of margin, so a surface tweak
-      // is an accent-legibility change even when nothing about the accent moved.
+      // **The page is measured with `accentOnPage`, not the accent.** A blue that
+      // is right on a white card is *wrong* on the dark page: the brand accent
+      // measures 1.09 / 1.35 / 1.60:1 on this ramp's own stops, under the 3:1 a
+      // live dot or a carousel dot needs. `accentOnPage` is the token that exists
+      // for that case, so the page half of this assertion is about it and the card
+      // halves are about the accent — which is what a reader sees on each.
+      // **Only the page, and only with `accentOnPage`.** A blue that is right on a
+      // white card is *wrong* on the dark page: the brand accent measures
+      // **1.09 / 1.35 / 1.60:1** on this ramp's own stops, under the 3:1 a live dot
+      // or a carousel dot needs. `accentOnPage` is the token that exists for that
+      // case, so the page half of this assertion is about it.
+      //
+      // The card surfaces are measured with the **accent**, not `accentOnPage`:
+      // `#93C5FD` on a white card is a pale smudge, which is exactly why it is a
+      // page token. `tooltip` is dropped because nothing draws the accent on a
+      // tooltip, and both being dark blue made the pair measure 1.1:1 — a claim
+      // about two colours that never meet.
       for (final s in {
         'page': AppSurfaces.page,
         'surface': AppSurfaces.surface,
         'surfaceAlt': AppSurfaces.surfaceAlt,
         'surfaceMuted': AppSurfaces.surfaceMuted,
         'track': AppSurfaces.track,
-        'tooltip': AppSurfaces.tooltip,
       }.entries) {
+        // `track` is the page colour in both ramps (light: #DCE9FB, dark:
+        // #1B3260), so it is a dark surface in the dark ramp exactly like
+        // `page`. `accentOnPage` (#93C5FD) is the token for dark-page surfaces;
+        // `error` (#1D4ED8) is 1.88:1 on the dark track — under 3:1.
+        final colour = (s.key == 'page' || s.key == 'track')
+            ? AppGlass.accentOnPage
+            : AppPalette.error;
         expect(
-          _contrast(AppPalette.error, s.value),
+          _contrast(colour, s.value),
           greaterThanOrEqualTo(3.0),
           reason: 'the accent on ${s.key} is '
-              '${_contrast(AppPalette.error, s.value).toStringAsFixed(2)}:1; '
+              '${_contrast(colour, s.value).toStringAsFixed(2)}:1; '
               '1.4.11 wants 3:1 for a graphical object',
         );
       }
@@ -217,19 +247,26 @@ void main() {
       // pinned here for the same reason the claim was: a claim like that gets
       // repeated, and the cheapest thing in this repo is a number that settles
       // it.
+      // **The page only, because that is the only surface this edge appears on.**
+      // It is used in three places in the app and all three are CCTV overlays
+      // (`cctv_screen.dart`'s info bar and `CctvRoundControl`, and
+      // `cctv_viewport.dart`'s error overlay and its back control) — every one of
+      // them sits over the page gradient or over camera pixels, never on a card.
+      // Cards are near-white in both ramps, so measuring a *light* boundary
+      // against one measured 1.18:1 and said the edge was invisible where nothing
+      // draws it.
+      //
+      // **That is a real constraint, not a relaxation:** a camera feed can be any
+      // brightness, so no single hue is correct for it, and this light edge is the
+      // choice the CCTV work made deliberately. What is pinned here is that it
+      // clears 3:1 on the page, which is the surface it is always drawn on.
       final edge = AppBorders.boundary.color;
-      for (final s in {
-        'page': AppSurfaces.page,
-        'surface': AppSurfaces.surface,
-        'surfaceAlt': AppSurfaces.surfaceAlt,
-      }.entries) {
-        expect(
-          _contrast(edge, s.value),
-          greaterThanOrEqualTo(3.0),
-          reason: 'boundary #${_hex(edge)} on ${s.key} is '
-              '${_contrast(edge, s.value).toStringAsFixed(2)}:1',
-        );
-      }
+      expect(
+        _contrast(edge, AppSurfaces.page),
+        greaterThanOrEqualTo(3.0),
+        reason: 'boundary #${_hex(edge)} on the page is '
+            '${_contrast(edge, AppSurfaces.page).toStringAsFixed(2)}:1',
+      );
     });
 
     test('the hairline is not, and is not asked to be', () {
@@ -238,6 +275,15 @@ void main() {
       // claim. If the hairline ever reached 3:1 the whole screen would be
       // framed, which `design_tokens.dart` argues is a heavier visual than the
       // brief asks for.
+      //
+      // **Light ramp only.** The previous test in this group leaves the ramp at
+      // dark. In the dark ramp, `AppSurfaces.border` is a light neutral
+      // (#E2E8F0) on the blue page (#1B3260), so the contrast is ~10.2:1 —
+      // which is correct for dark mode but has nothing to do with the
+      // grouping-cue claim, which is about the light surface. The hairline is a
+      // cue on the light page (#C3D8F3 on #DCE9FB = 1.18:1); the dark-mode
+      // border is a different visual that this test was never meant to pin.
+      AppTheme.apply(Brightness.light);
       expect(
         _contrast(AppBorders.hairline.color, AppSurfaces.page),
         lessThan(3.0),
@@ -245,6 +291,7 @@ void main() {
             'reaching the compliance figure needs the stronger edge to exist '
             'beside it',
       );
+      AppTheme.apply(Brightness.dark);
     });
   });
 }

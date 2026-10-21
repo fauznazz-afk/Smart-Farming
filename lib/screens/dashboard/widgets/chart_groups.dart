@@ -35,10 +35,16 @@ class ChartSeriesSpec {
   /// belongs to no category.
   ///
   /// `categoryColorForKey` rather than `categoryColor(category!)`, so there is
-  /// one path from key to hue in the app. Every series declared below already
-  /// resolves through it: the four PV keys are all `MetricCategory.pv`, the six
-  /// AC keys all `ac`, and so on, which is what "one hue per category" means
-  /// here.
+  /// one path from key to hue in the app.
+  ///
+  /// **Nothing draws a series through this any more, and it is not what colours
+  /// a chart.** `categoryColor` collapsed to one accent for all five categories,
+  /// so "its category's hue" has been the accent for some time — and a group
+  /// with more than one series has to take [kChartSeriesOrder] instead, because
+  /// three lightness steps of one hue are indistinguishable on a phone. It is
+  /// kept because it is the honest resolution of a single-series group's key, and
+  /// `chart_card.dart` is where the decision about which of the two applies is
+  /// made.
   Color color(Color fallbackAccent) =>
       categoryColorForKey(key) ?? fallbackAccent;
 }

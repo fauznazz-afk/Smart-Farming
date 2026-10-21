@@ -54,7 +54,11 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, size: 42),
+            Icon(
+              Icons.cloud_off_outlined,
+              size: 42,
+              color: AppGlass.pageInkSoft,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               error,
@@ -62,7 +66,14 @@ class ErrorView extends StatelessWidget {
               // The brief's body line. The bare `Text` this replaces inherited
               // whatever the ambient default was, which on this screen is the
               // muted body style — the same colour, now stated.
-              style: AppType.bodyMd.copyWith(color: AppSurfaces.onSurface),
+              //
+              // **Page ink, not card ink: `ErrorView` is the `Scaffold` body, so
+              // it is drawn straight onto the page gradient and is not inside a
+              // card like `EmptyPeriodView` above.** Card ink is navy in both
+              // ramps since the cards went near-white, and that measured
+              // **2.10:1** on the dark ramp's page stop — an error message the
+              // user cannot read is the worst place for it to happen.
+              style: AppType.bodyMd.copyWith(color: AppGlass.pageInk),
             ),
             const SizedBox(height: AppSpacing.md),
             // The brief's `button-primary`, standing on the page with its
@@ -97,7 +108,7 @@ class ErrorView extends StatelessWidget {
             Text(
               'Check that the PZEM device is sending telemetry and that the ThingsBoard account has access to its history.',
               textAlign: TextAlign.center,
-              style: AppType.bodySm.copyWith(color: faintColor),
+              style: AppType.bodySm.copyWith(color: AppGlass.pageInkSoft),
             ),
           ],
         ),

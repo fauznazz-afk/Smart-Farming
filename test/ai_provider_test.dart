@@ -21,7 +21,8 @@ void main() {
       // Built by interpolation rather than typed literally: the control bytes
       // below are invisible in an editor and one gets silently eaten by a paste
       // or a formatter, which turns this test into a tautology.
-      final raw = 'a${String.fromCharCode(0x07)}b'
+      final raw =
+          'a${String.fromCharCode(0x07)}b'
           '${String.fromCharCode(0x00)}c'
           '${String.fromCharCode(0x1B)}d'
           '\t${String.fromCharCode(0x0A)}e';
@@ -51,17 +52,18 @@ void main() {
 
   group('buildAiMessages', () {
     test(
-        'puts the telemetry summary in the system turn and the question last',
-        () {
-      final messages = buildAiMessages(
-        telemetrySummary: '- battery: soc=88',
-        history: const [],
-        question: 'how much power?',
-      );
-      expect(messages.first['role'], 'system');
-      expect(messages.first['content'], contains('- battery: soc=88'));
-      expect(messages.last, {'role': 'user', 'content': 'how much power?'});
-    });
+      'puts the telemetry summary in the system turn and the question last',
+      () {
+        final messages = buildAiMessages(
+          telemetrySummary: '- battery: soc=88',
+          history: const [],
+          question: 'how much power?',
+        );
+        expect(messages.first['role'], 'system');
+        expect(messages.first['content'], contains('- battery: soc=88'));
+        expect(messages.last, {'role': 'user', 'content': 'how much power?'});
+      },
+    );
 
     test('sanitises the question it sends', () {
       final messages = buildAiMessages(
@@ -128,10 +130,16 @@ void main() {
           history: const [],
           question: 'q',
         );
-        expect(body.containsKey('temperature'), isFalse,
-            reason: 'temperature is rejected by current OpenAI models');
-        expect(body.containsKey('max_tokens'), isFalse,
-            reason: 'max_tokens must be max_completion_tokens or omitted');
+        expect(
+          body.containsKey('temperature'),
+          isFalse,
+          reason: 'temperature is rejected by current OpenAI models',
+        );
+        expect(
+          body.containsKey('max_tokens'),
+          isFalse,
+          reason: 'max_tokens must be max_completion_tokens or omitted',
+        );
       }
     });
 
@@ -185,7 +193,9 @@ void main() {
     test('reads choices[0].message.content', () {
       final reply = parseAiReply(presetFor(AiProvider.openai), {
         'choices': [
-          {'message': {'content': '  12.4 W  '}}
+          {
+            'message': {'content': '  12.4 W  '},
+          },
         ],
       });
       expect(reply, '12.4 W');
@@ -194,46 +204,60 @@ void main() {
     test('reads content[0].text for Anthropic', () {
       final reply = parseAiReply(presetFor(AiProvider.anthropic), {
         'content': [
-          {'type': 'text', 'text': '12.4 W'}
+          {'type': 'text', 'text': '12.4 W'},
         ],
       });
       expect(reply, '12.4 W');
     });
 
-    test('returns null for an empty or unknown shape, never a blank bubble', () {
-      expect(
-        parseAiReply(presetFor(AiProvider.openai), {'choices': []}),
-        isNull,
-      );
-      expect(
-        parseAiReply(presetFor(AiProvider.openai), {
-          'choices': [
-            {'message': {'content': '   '}}
-          ]
-        }),
-        isNull,
-      );
-      expect(
-        parseAiReply(presetFor(AiProvider.openai), {'error': 'nope'}),
-        isNull,
-      );
-    });
+    test(
+      'returns null for an empty or unknown shape, never a blank bubble',
+      () {
+        expect(
+          parseAiReply(presetFor(AiProvider.openai), {'choices': []}),
+          isNull,
+        );
+        expect(
+          parseAiReply(presetFor(AiProvider.openai), {
+            'choices': [
+              {
+                'message': {'content': '   '},
+              },
+            ],
+          }),
+          isNull,
+        );
+        expect(
+          parseAiReply(presetFor(AiProvider.openai), {'error': 'nope'}),
+          isNull,
+        );
+      },
+    );
   });
 
   group('buildTelemetrySummary', () {
     test('emits one line per device, keys sorted', () {
-      final summary = buildTelemetrySummary(devices: {
-        'battery': {'soc': 88, 'voltage': 52.4},
-      });
-      expect(summary, '- battery: soc=88, voltage=52.40');
+      final summary = buildTelemetrySummary(
+        devices: {
+          'battery': {'soc': 88, 'voltage': 52.4},
+        },
+      );
+      expect(summary, contains('- battery:'));
+      expect(summary, contains('soc=88 %'));
+      expect(summary, contains('voltage=52.40 V'));
     });
 
     test('rounds to two decimals and drops the fraction on whole numbers', () {
-      final summary = buildTelemetrySummary(devices: {
-        'pzem': {'power': 12.456, 'energy': 100.0},
-      });
-      expect(summary, contains('power=12.46'));
-      expect(summary, contains('energy=100'));
+      final summary = buildTelemetrySummary(
+        devices: {
+          // `energy_dc`, not `energy`. No device publishes a bare `energy` key —
+          // the meter sends `energy_dc` and `energy_ac` — so a test written
+          // against `energy` asserted a unit the app could never produce.
+          'pzem': {'power': 12.456, 'energy_dc': 100.0},
+        },
+      );
+      expect(summary, contains('power=12.46 W'));
+      expect(summary, contains('energy_dc=100 kWh'));
     });
 
     test('says "no reading" instead of dropping an empty device', () {
@@ -245,14 +269,19 @@ void main() {
 
     test('includes period totals alongside devices', () {
       final summary = buildTelemetrySummary(
-        devices: {'battery': {'soc': 50}},
+        devices: {
+          'battery': {'soc': 50},
+        },
         totals: {'solar_kwh_today': 3.5},
       );
-      expect(summary, contains('- period totals: solar_kwh_today=3.50'));
+      expect(summary, contains('solar_kwh_today=3.50'));
     });
 
     test('falls back to a note when there is nothing at all', () {
-      expect(buildTelemetrySummary(devices: const {}), contains('No telemetry'));
+      expect(
+        buildTelemetrySummary(devices: const {}),
+        contains('No telemetry'),
+      );
     });
   });
 
@@ -282,7 +311,7 @@ void main() {
         },
       );
 
-      expect(summary, contains('daily kWh (last 7 days):'));
+      expect(summary, contains('daily energy (last 7 days):'));
       expect(summary, contains('solar=1 kWh'));
       expect(summary, contains('load=1 kWh'));
     });
@@ -303,6 +332,9 @@ void main() {
       );
 
       expect(summary, isNot(contains('solar=')));
+      // Also report no data for that day
+      final lines = summary.split('\n');
+      expect(lines.any((l) => l.contains('no data')), isTrue);
     });
   });
 
@@ -310,8 +342,11 @@ void main() {
     test('every preset is https and has a default model except custom', () {
       for (final preset in kAiProviderPresets) {
         if (preset.provider == AiProvider.custom) continue;
-        expect(preset.endpoint, startsWith('https://'),
-            reason: '${preset.label} must not be plaintext');
+        expect(
+          preset.endpoint,
+          startsWith('https://'),
+          reason: '${preset.label} must not be plaintext',
+        );
         expect(preset.defaultModel, isNotEmpty);
       }
     });
@@ -375,9 +410,13 @@ void main() {
         'deepseek-v4-flash-vision-exp',
       };
       for (final preset in kAiProviderPresets) {
-        expect(retired, isNot(contains(preset.defaultModel)),
-            reason: '${preset.label} defaults to a retired model. Check the '
-                "provider's own model list before changing this.");
+        expect(
+          retired,
+          isNot(contains(preset.defaultModel)),
+          reason:
+              '${preset.label} defaults to a retired model. Check the '
+              "provider's own model list before changing this.",
+        );
       }
     });
   });
@@ -402,7 +441,9 @@ void main() {
 
     test('real content passes through', () {
       expect(
-        parseOpenAiStreamChunk('data: {"choices":[{"delta":{"content":"12.4 W"}}]}'),
+        parseOpenAiStreamChunk(
+          'data: {"choices":[{"delta":{"content":"12.4 W"}}]}',
+        ),
         '12.4 W',
       );
     });

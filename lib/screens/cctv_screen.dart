@@ -9,6 +9,7 @@ import '../widgets/liquid_glass.dart';
 import '../services/secure_window.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
+import 'dashboard/utils/app_motion.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 
@@ -271,7 +272,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     final streamUri = parseAllowedCctvUrl(widget.streamUrl);
     if (streamUri == null) {
       setState(() {
-        _playing = true;
+        _playing = false;
         _loading = false;
         _failed = true;
         _controller = null;
@@ -333,9 +334,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     // Release the embedded player first; the full screen route opens its own.
     _stopStream();
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            CctvScreen(streamUrl: widget.streamUrl, fullScreen: true),
+      appPageRoute<void>(
+        page: CctvScreen(streamUrl: widget.streamUrl, fullScreen: true),
       ),
     );
   }
@@ -438,7 +438,17 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                       // `headline-md` is already weight 900; the `w800` on top
                       // of it was a third weight that is not in the brief's
                       // scale of three.
-                      style: AppType.headlineMd,
+                      //
+                      // **Page ink, and this header is on the page.** The whole
+                      // embedded column is a list item in the dashboard's own
+                      // page builder, above the video card — not inside one — so
+                      // card ink (navy in both ramps since the cards went
+                      // near-white) measured **2.10:1** on the dark ramp's page
+                      // stop. The white chip beside it is a chip and takes chip
+                      // ink; this line is page and takes page ink.
+                      style: AppType.headlineMd.copyWith(
+                        color: AppGlass.pageInkStrong,
+                      ),
                     ),
                   ),
                   CctvStatusPill(status: status),
@@ -448,7 +458,9 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                 padding: const EdgeInsets.only(left: 54, top: 4),
                 child: Text(
                   'Watch the area live',
-                  style: AppType.labelUppercase.copyWith(color: faintColor),
+                  style: AppType.labelUppercase.copyWith(
+                    color: AppGlass.pageInkSoft,
+                  ),
                 ),
               ),
             ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/telemetry_model.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
+import '../utils/app_motion.dart';
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 
@@ -31,24 +32,33 @@ class GlassPageHeader extends StatelessWidget {
         // card-frame habit this style replaced. A coloured border is a drawn
         // edge, and hue is spoken for — the hue belongs to the glyph inside.
         //
-        // The wash stays at [AppBorders.categoricalWash]'s 20% rather than the
-        // 10% the brief's list-row thumbnail uses, because 20% is the only wash
-        // the token file has and a hand-mixed alpha here is exactly the
-        // unmeasured-value problem `color_helpers_test.dart` exists to stop.
+        // **A white wash, not [AppBorders.categoricalWash], and this is the same
+        // correction `AppGlass.fillSoft` documents.** The wash used to be the
+        // accent at 20%, measured at 4.20:1 over a *card*. This header is not
+        // over a card — all five call sites in `dashboard_screen.dart` put it
+        // straight onto `AppBackground` — and over the dark ramp's own blue page
+        // the accent against that wash measured **1.09:1**: the glyph and the
+        // chip behind it were the same blue. A wash has to lift the chip clear of
+        // the page in *both* ramps, which is what a white wash does and what
+        // re-tinting a saturated one never can.
         //
-        // **The 20% wash of the accent over a card is `#4E3131`, and the accent
-        // on it is 4.20:1.** That clears the 3:1 an 18px `Icon` needs under
-        // WCAG 1.4.11 and does *not* clear the 4.5:1 that accent-coloured text
-        // would need. So this header may put an icon of the hue on the wash and
-        // nothing else — which is why the title below is `appPrimaryText` and
-        // not `accent`. `color_helpers_test.dart` pins both halves of that.
+        // The ink follows the wash, for the reason `AppGlass.pageGlassInk`
+        // exists: dark navy on a white wash in both ramps. `accent` is unread
+        // here now, which costs nothing — `categoryColor` resolves to one value
+        // for all five categories, so the chip never said which one this was.
+        //
+        // In the light ramp the chip is a near-invisible lift rather than the
+        // pale blue it was. That is the trade and it is recorded rather than
+        // hidden: the light ramp's page is `#F7FAFE`, so a 45% white wash over it
+        // is `#FBFCFE`. There is no token for a page-level chip that keeps its
+        // hue on both pages.
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppBorders.categoricalWash(accent),
+            color: AppGlass.fillSoft,
           ),
-          child: Icon(icon, size: 18, color: accent),
+          child: Icon(icon, size: 18, color: AppGlass.pageGlassInk),
         ),
         const SizedBox(width: 10),
         // `headlineLg`, not `numeralLg`: this is a title, and the brief's
@@ -56,7 +66,17 @@ class GlassPageHeader extends StatelessWidget {
         // 24sp/900 the numeral style uses. Reaching for the numeral style for a
         // word is what happens when there is only one 24sp Black in the file —
         // the two now exist separately and should be used for what they mean.
-        Text(title, style: AppType.headlineLg.copyWith(color: appPrimaryText)),
+        //
+        // **Page ink, not card ink, and the word "card" in the sentence above is
+        // the historical one.** This header is not inside a card: all five call
+        // sites put it directly on the page gradient. `AppSurfaces.onSurface` is
+        // navy in *both* ramps now, which is right for a card and wrong here —
+        // navy on the dark ramp's own blue page measured **2.10:1**. `AppGlass`'s
+        // page ramp is the only one that inverts.
+        Text(
+          title,
+          style: AppType.headlineLg.copyWith(color: AppGlass.pageInkStrong),
+        ),
       ],
     );
   }
@@ -171,11 +191,13 @@ class _MetricRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final unit = metric.unit;
     final decimals = metric.decimals;
-    final displayValue = value == null
+    final number = value?.toStringAsFixed(decimals);
+    // **The label and the figure are the same string.** The label is the
+    // reading the figure is heading for, so it is built from the same number
+    // rather than from a second formatting of the value.
+    final displayValue = number == null
         ? (unit.isEmpty ? '--' : '-- $unit')
-        : (unit.isEmpty
-              ? value!.toStringAsFixed(decimals)
-              : '${value!.toStringAsFixed(decimals)} $unit');
+        : (unit.isEmpty ? number : '$number $unit');
     return MergeSemantics(
       child: Semantics(
         label: '${metric.label}: $displayValue',
@@ -201,9 +223,19 @@ class _MetricRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  displayValue,
-                  style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                // **The figure counts to its new value instead of jumping to
+                // it.** A reading that moves from 1834 to 1841 every ten
+                // seconds is a flicker, and a flicker reads as an error; a
+                // figure that counts is motion. The tween lives inside the
+                // widget, so the poll's rebuild does not reach the page above
+                // it, and the figure starts at the value it was given — a card
+                // that opens shows the reading, not a count-up from zero.
+                TweenedFigure(
+                  text: number ?? '--',
+                  builder: (context, text) => Text(
+                    unit.isEmpty ? text : '$text $unit',
+                    style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                  ),
                 ),
               ],
             ),

@@ -46,47 +46,56 @@ extension CctvStatusDisplay on CctvStatus {
   /// WCAG 1.4.11 exempts it as part of a graphic that is not the sole carrier of
   /// the information. It keeps its status hue for exactly that reason.
   ///
-  /// **Offline now takes the measured ink, not the fill.** It used to take
+  /// **Offline now takes the measured ink, not a second red.** It used to take
   /// [statusBadFill], whose own doc names "a dot" as one of its purposes, so
-  /// this looks like a step backwards. It is not, for one measured reason:
-  /// `statusBad` (`#FF5C5C`) and `statusBadFill` (`#FF6B6B`) are **0.4° apart**
-  /// — `color_helpers.dart` records the number — so the pill was drawing two
-  /// reds that are the same red. On a 7dp dot beside a word, the second red
-  /// reads as a rendering fault rather than as a distinction, and dropping it
-  /// costs nothing: [statusBad] clears AA on every caption surface, which the
-  /// fill variant does not.
+  /// this looks like a step backwards. It is not, and the reason is stronger
+  /// now than it was: the ramp carries **one** red. `statusBad` and
+  /// `statusBadFill` both resolve to `AppPalette.statusBad` (`#D01E1E`), so the
+  /// pill would be drawing two reds that are the same red — the second would be
+  /// a duplicate rather than a distinction, and on a 7dp dot beside a word it
+  /// reads as a rendering fault. Dropping it costs nothing: [statusBad]
+  /// measures **5.40:1** on `#FFFFFF` and **4.98:1** on the light ramp's
+  /// `#F1F6FD` card.
   ///
   /// The two getters stay separate rather than collapsing into one, because
-  /// they describe different jobs and the day a dot needs to differ from its
-  /// label — a live-only dot that must not be read aloud, say — is the day this
-  /// split is the thing that makes it expressible.
+  /// they describe different jobs — a dot is a shape, a label is text — and the
+  /// day a dot needs to differ from its label, a live-only dot that must not be
+  /// read aloud, say, is the day this split is the thing that makes it
+  /// expressible.
+  ///
+  /// **The page twins, because this is the one place a status hue is drawn
+  /// straight onto the page gradient** with no card behind it. The card values
+  /// are dark — cards are near-white in both ramps — so drawing them here put a
+  /// dark green dot on a dark blue page. Measured on the dark page `#1B3260`:
+  /// 6.53 / 7.52 / 6.62:1.
   Color get color => switch (this) {
-    CctvStatus.live => statusOk,
-    CctvStatus.offline => statusBad,
-    CctvStatus.standby || CctvStatus.connecting => statusWarn,
+    CctvStatus.live => statusOkOnPage,
+    CctvStatus.offline => statusBadOnPage,
+    CctvStatus.standby || CctvStatus.connecting => statusWarnOnPage,
   };
 
   /// The status colour to draw the *label* in.
   ///
   /// This is separate from [color] because the pill used [color] for both, and
-  /// as 9dp text those values measured 1.66:1 (live) and 1.39:1 (standby) on
-  /// the light page — far below AA and, at that size, close to invisible. They
-  /// are fills tuned to be bright, not colours tuned to be read.
+  /// as 9dp text the then-current values measured 1.66:1 (live) and 1.39:1
+  /// (standby) on the light page — far below AA and, at that size, close to
+  /// invisible. They were fills tuned to be bright, not colours tuned to be
+  /// read.
   ///
-  /// So the text moves to the measured family the rest of the app asserts
-  /// against (`statusOk` / `statusWarn` / `statusBad`, pinned by
-  /// `test/color_helpers_test.dart`) and the dot keeps its own hue, which is the
-  /// cheapest possible fix and the one that preserves the dot/text pairing.
+  /// So the text takes the **page twins** — `statusOkOnPage` / `statusWarnOnPage`
+  /// / `statusBadOnPage` — which are the values the ramp pins for text drawn
+  /// straight on the page. On the light page they measure 6.25 / 5.21 / 5.27:1
+  /// and on the dark page 6.53 / 7.52 / 6.62:1, and on the badge's own 12% wash
+  /// they read 4.55 / 5.24 / 4.63:1 at the dark ramp's worst stop — AA
+  /// everywhere, which is what 10dp label text needs.
   ///
-  /// Note the `0xFFFFC857` above is byte-identical to the energy report's PV
-  /// series amber. A CCTV standby dot and a PV bar are already the same colour
-  /// on screen. That is reported rather than fixed here: inventing a fourth hue
-  /// to separate them would be the automatic hue variation AGENTS.md forbids,
-  /// and a deliberate alternative has to be a choice the lead makes.
+  /// The dot and the label resolve to the same value today, because the ramp
+  /// carries one page twin per severity. The split is kept because the two jobs
+  /// are different: a dot is a shape, a label is text.
   Color get textColor => switch (this) {
-    CctvStatus.live => statusOk,
-    CctvStatus.offline => statusBad,
-    CctvStatus.standby || CctvStatus.connecting => statusWarn,
+    CctvStatus.live => statusOkOnPage,
+    CctvStatus.offline => statusBadOnPage,
+    CctvStatus.standby || CctvStatus.connecting => statusWarnOnPage,
   };
 
   /// Whether the video surface should be mounted behind the overlays.

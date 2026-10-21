@@ -524,9 +524,16 @@ class SecondaryButton extends StatelessWidget {
       label: Text(label),
       style: OutlinedButton.styleFrom(
         backgroundColor: AppSurfaces.page,
-        foregroundColor: AppSurfaces.onSurface,
+        // **Page ink on a page-coloured fill**, for the same reason the energy
+        // report's period button gives up card ink: `AppSurfaces.page` is
+        // near-black on the dark ramp and pale on the light one, so the ink has
+        // to follow it. Card ink is navy in both ramps since the cards went
+        // near-white and measured **1.22:1** against this fill in dark mode —
+        // "Check now" and "Battery settings" were two black rectangles with no
+        // visible label.
+        foregroundColor: AppGlass.pageInkStrong,
         disabledBackgroundColor: AppSurfaces.page,
-        disabledForegroundColor: AppSurfaces.onSurfaceVariant,
+        disabledForegroundColor: AppGlass.pageInkSoft,
         side: AppBorders.hairline,
         textStyle: AppType.buttonLabel,
         minimumSize: const Size(0, 48),

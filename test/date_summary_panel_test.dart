@@ -4,7 +4,6 @@ import 'package:plts_monitoring/models/telemetry_model.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/date_summary_panel.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/terminal_panel.dart';
 import 'package:plts_monitoring/utils/date_summary_stats.dart';
-import 'package:plts_monitoring/widgets/liquid_glass.dart';
 
 TelemetryPoint _point(DateTime at, double value) =>
     TelemetryPoint(timestamp: at, value: value);
@@ -409,9 +408,14 @@ void main() {
       // `TerminalPanel` hardcoded 'Overview' before the parameter existed, which
       // announced this panel as the live overview — a factually wrong first
       // impression for a screen-reader user on a page about a past day.
+      //
+      // Scoped to the `TerminalPanel` itself, not to an `AppCard`: the panel is
+      // built from raw tokens rather than `AppCard` (its build comment explains
+      // why — the dead `stamped` shadow), so an `AppCard` finder here matched
+      // nothing and the assertion read as "no label anywhere".
       expect(
         find.descendant(
-          of: find.byType(AppCard),
+          of: find.byType(TerminalPanel),
           matching: find.bySemanticsLabel('Period summary'),
         ),
         findsOneWidget,

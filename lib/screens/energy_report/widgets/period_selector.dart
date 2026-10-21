@@ -47,6 +47,13 @@ class PeriodSelector extends StatelessWidget {
         // Its fill is [AppSurfaces.page], which the brief specifies for
         // `button-secondary`: deeper than the card, so the hairline is the only
         // thing defining it. No shadow — secondary is the flat tier.
+        //
+        // **And its ink is page ink, because its fill is the page colour.** That
+        // value is near-black on the dark ramp and pale on the light one, so the
+        // ink has to follow the ramp rather than the card. It was
+        // `AppSurfaces.onSurface`, which is navy in both ramps since the cards
+        // went near-white: navy on this fill measured **1.22:1** in dark mode.
+        // A date label the user cannot read is not a quieter date label.
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
@@ -59,7 +66,7 @@ class PeriodSelector extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               backgroundColor: AppSurfaces.page,
-              foregroundColor: AppSurfaces.onSurface,
+              foregroundColor: AppGlass.pageInkStrong,
               side: AppBorders.hairline,
               textStyle: AppType.buttonLabel,
               minimumSize: const Size(0, 56),

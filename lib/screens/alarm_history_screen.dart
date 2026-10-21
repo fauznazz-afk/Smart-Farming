@@ -118,6 +118,24 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
+        // **Page ink, because the bar is transparent and the body is the page
+        // gradient.** `extendBodyBehindAppBar` plus `Colors.transparent` puts
+        // the title on the sweep, and the scheme's default bar ink is card ink —
+        // navy in both ramps since the cards went near-white, which measured
+        // **2.10:1** on the dark ramp's own top stop. One parameter covers the
+        // title, the leading arrow and the action icons together.
+        //
+        // **`backgroundColor: Colors.transparent` is the load-bearing half.** The
+        // comment above said the bar was transparent but the parameter was never
+        // set, so the bar painted `colorScheme.surface` — near-white in both
+        // ramps — and the white page ink on it measured **1.00:1** in dark mode:
+        // an "Alarm History" title the user could not read. `ai_chat_screen.dart`
+        // has the same transparent-bar arrangement and sets all three parameters
+        // together; this one was missing the background.
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        foregroundColor: AppGlass.pageInkStrong,
         title: const Text('Alarm History'),
         centerTitle: true,
         actions: [
@@ -149,11 +167,18 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.notifications_off_outlined, size: 56, color: faintColor),
+          // On the page, not on a card — same correction as the app bar above.
+          Icon(
+            Icons.notifications_off_outlined,
+            size: 56,
+            color: AppGlass.pageInkSoft,
+          ),
           const SizedBox(height: AppSpacing.lg),
           Text(
             'No alarms recorded',
-            style: AppType.labelUppercase.copyWith(color: faintColor),
+            style: AppType.labelUppercase.copyWith(
+              color: AppGlass.pageInkSoft,
+            ),
           ),
         ],
       ),
@@ -166,7 +191,7 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       return Center(
         child: Text(
           'No alarms match this filter',
-          style: AppType.labelUppercase.copyWith(color: faintColor),
+          style: AppType.labelUppercase.copyWith(color: AppGlass.pageInkSoft),
         ),
       );
     }
@@ -276,12 +301,11 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
                           children: [
                             Text(
                               alarm.message,
-                              // 700, not 600. The brief has three weights and
-                              // 600 is not one of them; a row title takes the
-                              // bold end of the scale, which is also what the
-                              // brief's list-row HTML uses for `[Row title]`.
-                              style: AppType.bodyMd.copyWith(
-                                fontWeight: FontWeight.w700,
+                              // `AppType.strong`: a row's title, and 700 rather
+                              // than 600. A row title takes the bold end of the
+                              // scale, which is also what the brief's list-row
+                              // HTML uses for `[Row title]`.
+                              style: AppType.strong.copyWith(
                                 color: appPrimaryText,
                               ),
                             ),

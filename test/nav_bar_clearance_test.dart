@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 import 'package:plts_monitoring/screens/dashboard/widgets/nav_bar.dart';
 
 /// Covers the reservation the dashboard's scroll padding makes for the floating
@@ -121,21 +122,26 @@ void main() {
       expect(measured, glassNavBarReservedHeightFor(34));
     });
 
-    testWidgets('the bar is square, and the clip agrees with the decoration', (
+    testWidgets('the clip agrees with the decoration, which is round on top', (
       tester,
     ) async {
       // **A decoration's radius and its clipper's radius being allowed to
-      // disagree is a shape that cannot exist.** The claim here has not changed
-      // since the bar was a stadium — only the value has, because the bar is
-      // docked now.
+      // disagree is a shape that cannot exist**, and that claim has not changed
+      // since the bar was a stadium — only the value has.
       //
-      // It was `AppRadius.pill` on the grounds that a floating object needs
-      // round corners to read as floating. A docked bar has the opposite
-      // requirement: its bottom corners are the screen's own corners, so a
-      // radius there paints page-coloured notches in them, which read as a
-      // rendering fault rather than as a shape. `BorderRadius.zero` on both sides
-      // of the claim is the docked answer.
+      // It went square, and then back to round. `BorderRadius.zero` was right
+      // while the bar's only visible corners were the screen's own, but the bar
+      // is 54dp tall and floating over the page, so its *top* corners sit in the
+      // middle of the screen with the blue sweep on either side of them. Square
+      // there is what read as a hard edge across the bottom of the display.
+      //
+      // The bottom two stay flush, because rounding them cuts the gesture-bar
+      // inset out of the shape.
       await measureBar(tester, bottomInset: 0);
+
+      const expected = BorderRadius.vertical(
+        top: Radius.circular(AppRadius.sheet),
+      );
 
       final decoration = tester
           .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
@@ -145,23 +151,22 @@ void main() {
 
       expect(
         decoration.borderRadius,
-        BorderRadius.zero,
-        reason:
-            'a docked bar is square, and a radius here shows page-coloured '
-            'notches in the two screen corners',
+        expected,
+        reason: 'the bar is rounded at the top and flush at the bottom',
       );
 
-      // And the clip is `ClipRect` rather than a `ClipRRect` with a radius,
-      // because in Flutter 3.47 `ClipRRect.borderRadius` *defaults* to
-      // `BorderRadius.zero` rather than being required — which is how a rounded
-      // decoration ended up with a square clip painted over it, on a device,
-      // with the suite green.
+      // **A `ClipRRect` now, not a `ClipRect`.** In Flutter 3.47
+      // `ClipRRect.borderRadius` *defaults* to `BorderRadius.zero` rather than
+      // being required — which is how a rounded decoration once ended up with a
+      // square clip painted over it, on a device, with the suite green. Asserting
+      // the radius is what catches a silent fall back to `ClipRect`.
+      final clip = tester.widget<ClipRRect>(find.byType(ClipRRect));
       expect(
-        find.byType(ClipRect),
-        findsOneWidget,
+        clip.borderRadius,
+        expected,
         reason:
-            'the clip must still clip the contents to the same shape the '
-            'decoration paints',
+            'the clip must be the same shape the decoration paints, or the '
+            'corners are square on screen while the source says round',
       );
     });
   });

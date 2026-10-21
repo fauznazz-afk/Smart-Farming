@@ -104,6 +104,12 @@ flutter:
   # lowercase body line, 700 for the uppercase labels, 900 (Black) for displays,
   # numerals and button labels. The weight is in the filename.
   #
+  # 500 and 600 are declared because `design_tokens.dart` asks for them by
+  # weight. Flutter resolves a requested weight to the NEAREST declared cut, so
+  # with only 400/700/900 declared a `w600` style painted as Bold 700 and a
+  # `w500` style painted as Regular 400 — two declared weights silently became
+  # two others. Measured with a TextPainter probe over the real font files.
+  #
   # The OFL requires the licence to travel with the font, so it is committed
   # next to the instances.
   fonts:
@@ -111,6 +117,10 @@ flutter:
       fonts:
         - asset: assets/fonts/Inter-Regular-400.ttf
           weight: 400
+        - asset: assets/fonts/Inter-Medium-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold-600.ttf
+          weight: 600
         - asset: assets/fonts/Inter-Bold-700.ttf
           weight: 700
         - asset: assets/fonts/Inter-Black-900.ttf

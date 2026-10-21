@@ -46,9 +46,9 @@ void main() {
 /// paints, and leaving it at Material's derived value would put a desaturated
 /// near-invisible fill behind the alarm-history filter chips.
 ///
-/// `onHue` on every role it can sit on is not decoration. Black ink on
-/// `#FF6B6B` measures **7.57:1** and white measures **2.78:1**, so white fails
-/// AA for body text by a factor of 1.6 and black clears it by a wide margin.
+/// `onHue` on every role it can sit on is not decoration. On the accent
+/// `#1D4ED8` white ink measures **6.70:1** and black **3.13:1**, so black
+/// fails AA for body text and white clears it by a wide margin.
 ColorScheme _appColorScheme() => ColorScheme(
   brightness: AppTheme.brightness,
   primary: AppPalette.error,
@@ -78,6 +78,11 @@ ColorScheme _appColorScheme() => ColorScheme(
 /// tracking, the tabular figures — not on this function. Only the colour is
 /// added here, because [AppType] is about shape and colour belongs to the
 /// surface it lands on.
+///
+/// **No family is chosen here either.** Every slot is an `AppType` style, and
+/// `AppType` owns the app's two bundled families, so a face named in this
+/// function would be a second place choosing one — which is how `AppType.sans`
+/// stayed a dead CSS string through a green suite.
 TextTheme _appTextTheme() {
   TextStyle ink(TextStyle style) =>
       style.copyWith(color: AppSurfaces.onSurface);
@@ -117,10 +122,10 @@ TextTheme _appTextTheme() {
 /// buttons), 56dp tall. Label is `AppType.buttonLabel`: 13px at 900 with 0.1em
 /// tracking — buttons shout.
 ///
-/// **Black ink on the accent, and it is measured rather than preferred:** 7.57:1
-/// against 2.78:1 for white. `AppPalette.onHue` was written for a lime fill and
-/// its name is a leftover; what it has always meant is *dark ink on a bright
-/// fill*, and the accent is bright.
+/// **White ink on the accent, and it is measured rather than preferred:** 6.70:1
+/// against 3.13:1 for black. `AppPalette.onHue` was written for a lime fill and
+/// its name is a leftover; what it has always meant is *the ink that clears AA
+/// on this fill*, and on this blue that is white.
 ///
 /// The 56dp is `minimumSize` rather than `fixedSize`, so the button still grows
 /// with the user's font scale. `elevation: 0` keeps Material from adding a soft
@@ -151,10 +156,18 @@ FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
 /// all** — the brief reserves the stamped displacement for filled surfaces, so a
 /// secondary button reads as flat and a primary one as stamped. Text buttons
 /// are transparent with the accent ink at the label size.
+///
+/// **The ink is page ink, because the fill is the page.** The label was
+/// `AppSurfaces.onSurface`, which is navy in both ramps since the cards went
+/// near-white — **1.22:1** on the dark page, so the button was a rectangle with
+/// no visible label. The two call sites that override this (the settings
+/// section's secondary buttons and the report's period button) already use
+/// `AppGlass.pageInkStrong` for the same reason, so the default has to agree
+/// with them.
 OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
   style: ButtonStyle(
     backgroundColor: WidgetStatePropertyAll(AppSurfaces.page),
-    foregroundColor: WidgetStatePropertyAll(AppSurfaces.onSurface),
+    foregroundColor: WidgetStatePropertyAll(AppGlass.pageInkStrong),
     elevation: const WidgetStatePropertyAll(0),
     minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
     padding: const WidgetStatePropertyAll(
@@ -265,8 +278,40 @@ ThemeData appThemeData() => ThemeData(
   useMaterial3: true,
   brightness: AppTheme.brightness,
   colorScheme: _appColorScheme(),
+  // **One family, app-wide.** Without this, a widget that builds a raw
+  // `TextStyle(fontSize: ...)` inherits the platform default (Roboto) rather than
+  // the `AppType` family, so the app rendered in two fonts at once. `AppType`
+  // still wins wherever a style is used explicitly — this is the floor, not an
+  // override.
+  fontFamily: AppType.sans,
   textTheme: _appTextTheme(),
   scaffoldBackgroundColor: AppSurfaces.page,
+  // **Every `AppBar` is transparent, so the page gradient shows through.**
+  //
+  // There was no `appBarTheme` at all, so every `AppBar` painted
+  // `colorScheme.surface` — a near-white slab in **both** ramps, because cards
+  // are near-white in both now. On a page that is supposed to be a blue gradient
+  // that put a white rectangle across the top of the Settings, the energy
+  // report, alarm history and every other screen with a default `AppBar`, and it
+  // was invisible until the alarm history screen was measured at **1.00:1**
+  // for its own title.
+  //
+  // Transparent rather than page-coloured: the page is a *gradient*, and a flat
+  // colour cannot follow a gradient. What the bar needs is to be out of the way.
+  //
+  // **And the ink is page ink, because the bar is over the page.** The scheme's
+  // default bar ink is `onSurface`, which is navy in **both** ramps now that the
+  // cards are near-white — navy on the dark page measured **1.22:1**, so every
+  // title was invisible. `AppGlass.pageInkStrong` is white in the dark ramp and
+  // navy in the light one, and measures **10.90:1** on the sweep's top stop and
+  // **12.56:1** on the flat page.
+  appBarTheme: AppBarTheme(
+    backgroundColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    foregroundColor: AppGlass.pageInkStrong,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+  ),
   // Flat, and a step above the page. `CardTheme` cannot express a hairline
   // *and* a tonal step is still the wrong way round, so both are here: the
   // fill does the separation from the canvas and the hairline draws the edge.
@@ -298,13 +343,80 @@ ThemeData appThemeData() => ThemeData(
     circularTrackColor: AppSurfaces.surfaceMuted,
   ),
   // Material draws a `SnackBar` on `inverseSurface`, which on a dark scheme is
-  // a light box — a white panel on a black page. It is stated here rather than
+  // a light box - a white panel on a black page. It is stated here rather than
   // left to the default because the default also picks the action's ink, and the
-  // accent on a light surface measures 2.78:1.
+  // accent on a light surface measures 5.4:1.
   snackBarTheme: SnackBarThemeData(
     backgroundColor: AppSurfaces.surface,
     contentTextStyle: AppType.bodySm.copyWith(color: AppSurfaces.onSurface),
     actionTextColor: AppPalette.error,
+  ),
+  // The date pickers' chrome, which otherwise falls back to Material 3's own
+  // dark defaults (`#1C1B1F`-family surface containers) and shows up as a
+  // foreign grey dialog on both ramps. Every role here reads the same tokens a
+  // card does: near-white fill, navy ink, the one accent — so the picker reads
+  // as an app surface in dark mode instead of a system one. The header takes
+  // the accent with white ink, matching the hero card, and in-range days take
+  // the 12% accent wash from [AppBorders.categoricalWash] for the same
+  // contrast reason that value was chosen.
+  datePickerTheme: DatePickerThemeData(
+    backgroundColor: AppSurfaces.surface,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      side: AppBorders.hairline,
+    ),
+    rangePickerBackgroundColor: AppSurfaces.surface,
+    rangePickerSurfaceTintColor: Colors.transparent,
+    rangePickerShape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      side: AppBorders.hairline,
+    ),
+    headerBackgroundColor: AppPalette.error,
+    headerForegroundColor: AppPalette.onHue,
+    rangePickerHeaderBackgroundColor: AppPalette.error,
+    rangePickerHeaderForegroundColor: AppPalette.onHue,
+    headerHeadlineStyle: AppType.headlineMd,
+    rangePickerHeaderHeadlineStyle: AppType.headlineMd,
+    weekdayStyle: AppType.labelUppercase.copyWith(
+      color: AppSurfaces.onSurfaceVariant,
+    ),
+    dayBackgroundColor: WidgetStatePropertyAll(AppSurfaces.surface),
+    dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) return AppPalette.onHue;
+      if (states.contains(WidgetState.disabled)) {
+        return AppSurfaces.onSurfaceVariant;
+      }
+      return AppSurfaces.onSurface;
+    }),
+    dayShape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sheetRow)),
+    ),
+    dayOverlayColor: WidgetStatePropertyAll(
+      AppPalette.error.withValues(alpha: 0.12),
+    ),
+    todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) return AppPalette.onHue;
+      return AppPalette.error;
+    }),
+    todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) return AppPalette.error;
+      return AppSurfaces.surface;
+    }),
+    todayBorder: BorderSide(color: AppPalette.error),
+    yearBackgroundColor: WidgetStatePropertyAll(AppSurfaces.surface),
+    yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) return AppPalette.onHue;
+      if (states.contains(WidgetState.disabled)) {
+        return AppSurfaces.onSurfaceVariant;
+      }
+      return AppSurfaces.onSurface;
+    }),
+    rangeSelectionBackgroundColor: AppPalette.error.withValues(alpha: 0.12),
+    rangeSelectionOverlayColor: WidgetStatePropertyAll(
+      AppPalette.error.withValues(alpha: 0.12),
+    ),
   ),
 );
 
@@ -436,19 +548,28 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
       darkTheme: appThemeData(),
       themeMode: _mode,
       builder: (context, child) {
-        // The system navigation bar is opaque and sits over the app's bottom
-        // edge, so it has to match the page or there is a visible seam. The
-        // icons now follow the palette rather than being pinned light: a light
-        // page with light icons is the second half of the bug this used to be.
+        // **Transparent, because the glass bar now paints that strip itself.**
+        // These two used to be `AppSurfaces.page`, which was a flat navy strip
+        // under a translucent white bar: a hard horizontal seam across the
+        // bottom of the screen, right where the user's thumb is. `GlassNavBar`
+        // now reads the bottom inset itself and paints its glass down into the
+        // gesture-bar region, so the platform must add nothing of its own colour
+        // there. `contrastEnforced: false` is what stops Android painting a
+        // scrim over a transparent navigation bar on API 29+.
+        //
+        // **The handle's brightness still follows the palette.** A transparent
+        // strip shows whatever is behind it — the light glass bar — so a dark
+        // handle is the readable one there; this is not a value to be pinned
+        // once and forgotten.
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness:
                 light ? Brightness.dark : Brightness.light,
-            systemNavigationBarColor: AppSurfaces.page,
+            systemNavigationBarColor: Colors.transparent,
             systemNavigationBarIconBrightness:
                 light ? Brightness.dark : Brightness.light,
-            systemNavigationBarDividerColor: AppSurfaces.page,
+            systemNavigationBarDividerColor: Colors.transparent,
             systemNavigationBarContrastEnforced: false,
           ),
           child: ThemeModeScope(
@@ -508,16 +629,10 @@ class _SplashRouterState extends State<_SplashRouter> {
                 child: const BrandLogo(size: 92),
               ),
               const SizedBox(height: 10),
-              // `AppType.heading`, because this is the app's name set in its
-              // display face rather than in whichever family the framework
-              // default happens to be.
-              Text(
-                'EnerGrow',
-                style: AppType.numeralLg.copyWith(
-                  fontFamily: AppType.heading,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              // `AppType.wordmark`, because this is the app's name set as a brand
+              // lockup rather than in whichever family the framework default
+              // happens to be.
+              const Text('EnerGrow', style: AppType.wordmark),
             ],
           ),
         ),

@@ -81,10 +81,7 @@ class FormattedMarkdownText extends StatelessWidget {
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Text(
             content,
-            style: AppType.headlineMd.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
+            style: AppType.headlineMd,
           ),
         ));
         continue;
@@ -130,8 +127,7 @@ class FormattedMarkdownText extends StatelessWidget {
                 width: 18,
                 child: Text(
                   '${numMatch.group(1)}.',
-                  style: defaultStyle.copyWith(
-                    fontWeight: FontWeight.w700,
+                  style: AppType.strong.copyWith(
                     color: isUser ? AppSurfaces.onSurface : AppPalette.error,
                   ),
                 ),
@@ -170,16 +166,20 @@ class FormattedMarkdownText extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppSurfaces.page,
+        // **`surfaceMuted`, not `page`.** This block is drawn *inside* a chat
+        // bubble and `AppSurfaces.page` is a deep blue (`#1B3260`) on the dark
+        // ramp, so the navy code ink measured **1.22:1** against its own
+        // background — a code block rendered as an empty black hole.
+        // `surfaceMuted` is the step the inline-code chip two widgets up already
+        // uses, so the two read as one code vocabulary, and it is the same token
+        // that value documents as a fill rather than a track.
+        color: AppSurfaces.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: AppBorders.hairlineBorder,
       ),
       child: SelectableText(
         code,
-        style: AppType.bodySm.copyWith(
-          fontFamily: AppType.mono,
-          color: AppSurfaces.onSurface,
-        ),
+        style: AppType.code.copyWith(color: AppSurfaces.onSurface),
       ),
     );
   }
@@ -209,26 +209,52 @@ class FormattedMarkdownText extends StatelessWidget {
 
       if (blockMath != null) {
         // Block math - render as centered math widget
+        Widget math;
+        try {
+          math = Math.tex(
+            blockMath,
+            textStyle: base.copyWith(
+              fontSize: (base.fontSize ?? AppType.bodyMd.fontSize!) * 1.1,
+            ),
+          );
+        } catch (_) {
+          math = Text(
+            blockMath,
+            style: base.copyWith(
+              fontFamily: AppType.mono,
+              fontWeight: AppType.code.fontWeight,
+            ),
+          );
+        }
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Center(
-              child: Math.tex(
-                blockMath,
-                textStyle: base.copyWith(fontSize: (base.fontSize ?? 13) * 1.1),
-              ),
-            ),
+            child: Center(child: math),
           ),
         ));
       } else if (inlineMath != null) {
         // Inline math - render inline
+        Widget math;
+        try {
+          math = Math.tex(
+            inlineMath,
+            textStyle: base.copyWith(
+              fontSize: (base.fontSize ?? AppType.bodyMd.fontSize!) * 0.95,
+            ),
+          );
+        } catch (_) {
+          math = Text(
+            inlineMath,
+            style: base.copyWith(
+              fontFamily: AppType.mono,
+              fontWeight: AppType.code.fontWeight,
+            ),
+          );
+        }
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
-          child: Math.tex(
-            inlineMath,
-            textStyle: base.copyWith(fontSize: (base.fontSize ?? 13) * 0.95),
-          ),
+          child: math,
         ));
       } else if (code != null) {
         spans.add(WidgetSpan(
@@ -244,7 +270,17 @@ class FormattedMarkdownText extends StatelessWidget {
               code,
               style: AppType.bodySm.copyWith(
                 fontFamily: AppType.mono,
-                fontSize: (base.fontSize ?? 13) * 0.9,
+                fontWeight: AppType.code.fontWeight,
+                fontSize:
+                    (base.fontSize ?? AppType.bodyMd.fontSize!) * 0.9,
+                // **Explicit, and this is a correction rather than a
+                // restatement.** With no colour the `Text` inherited the
+                // ambient default, which is `bodyMedium` — the *muted* ink — and
+                // `onSurfaceVariant` on `surfaceMuted` measures **4.15:1** in the
+                // light ramp. This chip is 11 px, the size with the least room,
+                // and it is a code fragment rather than prose. Full card ink
+                // clears at 10.6:1 and 12.5:1.
+                color: AppSurfaces.onSurface,
               ),
             ),
           ),
@@ -252,9 +288,12 @@ class FormattedMarkdownText extends StatelessWidget {
       } else if (bold != null) {
         spans.add(TextSpan(
           text: bold,
-          style: base.copyWith(
-            fontWeight: FontWeight.w800,
-            color: isUser ? AppSurfaces.onSurface : null,
+          // **`AppType.strong`, and the base's own ink.** A markdown bold run is
+          // a bold run inside 13sp body text — the role the token exists for —
+          // and the ink is the caller's, because the body line it sits in is
+          // the caller's too.
+          style: AppType.strong.copyWith(
+            color: isUser ? AppSurfaces.onSurface : base.color,
           ),
         ));
       } else if (italic != null) {

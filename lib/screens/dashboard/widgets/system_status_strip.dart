@@ -222,12 +222,9 @@ class _Verdict extends StatelessWidget {
                 // brief's `numeral-lg` 24sp because three of these share one row
                 // and the `FittedBox` above already scales them down at large
                 // text scales — the size is this strip's own layout decision,
-                // the weight is the system's.
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
+                // the weight is the system's. `AppType.statusWord` is that
+                // decision, declared once.
+                style: AppType.statusWord.copyWith(color: color),
               ),
             ),
           ),

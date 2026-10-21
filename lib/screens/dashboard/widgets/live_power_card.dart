@@ -545,7 +545,7 @@ class _SocLine extends StatelessWidget {
 /// The three terms all share one height so a wrapped label cannot push its figure
 /// below the other two.
 TextStyle _termLabelStyle(BuildContext context) =>
-    DefaultTextStyle.of(context).style.copyWith(fontSize: 11);
+    DefaultTextStyle.of(context).style.copyWith(fontSize: AppType.caption.fontSize);
 
 /// The label style, resolved once and threaded through the whole measurement.
 ///
@@ -578,15 +578,11 @@ double _naturalWidth(BuildContext context, String text, TextStyle style) {
   return width;
 }
 
-TextStyle _termFigureStyle({required Color color}) => TextStyle(
-  fontSize: 24,
-  fontWeight: FontWeight.w800,
-  height: 1.0,
-  color: color,
-);
+TextStyle _termFigureStyle({required Color color}) =>
+    AppType.figureTerm.copyWith(color: color);
 
 TextStyle _termUnitStyle({required Color color}) =>
-    TextStyle(fontSize: 11, color: color);
+    TextStyle(fontSize: AppType.caption.fontSize, color: color);
 
 String? _figureText(double? watts) =>
     watts == null ? '--' : watts.toStringAsFixed(0);
@@ -944,7 +940,7 @@ class _Term extends StatelessWidget {
                   child: Text(
                     _figureText(watts)!,
                     style: _termFigureStyle(color: watts == null ? faint : color)
-                        .copyWith(fontSize: 24 * figureScale),
+                        .copyWith(fontSize: AppType.figureTerm.fontSize! * figureScale),
                   ),
                 ),
               ),
@@ -957,7 +953,7 @@ class _Term extends StatelessWidget {
                   child: Text(
                     'W',
                     style: _termUnitStyle(color: faint)
-                        .copyWith(fontSize: 11 * figureScale),
+                        .copyWith(fontSize: AppType.caption.fontSize! * figureScale),
                   ),
                 ),
               ),
@@ -1015,11 +1011,7 @@ class _Header extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: Text(
                       ageLabel!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: pzemStale
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                      style: AppType.caption.copyWith(
                         color: pzemStale ? statusWarn : faintColor,
                       ),
                     ),

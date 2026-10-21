@@ -21,11 +21,16 @@ import '../screens/dashboard/utils/design_tokens.dart';
 
 /// The page backdrop.
 ///
-/// The previous version painted three large radial-gradient orbs over the page
-/// colour. They existed to give the translucent card fills something to reveal,
-/// and the fills went opaque when the neumorphic system arrived, so the orbs were
-/// already dead weight: about ten megapixels of shaded fill per repaint that
-/// nothing could see. A flat system wants a flat page.
+/// **A vertical sweep, not a flat fill, and not the old orb field.** The blue
+/// system is built on the page being *blue*, and a flat page with translucent
+/// white cards on it reads as grey rather than as glass — the transparency only
+/// means something if there is a gradient behind it for the white to lift off.
+/// Three radial orbs were tried and reverted: they put a visible circular edge
+/// in the middle of the scroll area, which is a texture nobody asked for.
+///
+/// [AppSurfaces.page] stays the fallback colour underneath, which is what shows
+/// during the one frame between the paint and the gradient's first resolve, and
+/// what any overscroll bounce exposes at the top and bottom edges.
 class AppBackground extends StatelessWidget {
   const AppBackground({super.key, required this.child});
 
@@ -33,8 +38,14 @@ class AppBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppSurfaces.page,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        // The gradient's own flat fallback, not `AppSurfaces.page`: the sweep's
+        // mid-tone is what shows at an overscroll edge, and a different value
+        // there draws a seam exactly where the user's thumb is.
+        color: AppGlass.pageFallback,
+        gradient: AppGlass.pageSweep,
+      ),
       child: RepaintBoundary(child: child),
     );
   }
@@ -206,14 +217,17 @@ class AppCard extends StatelessWidget {
         color: fill,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: edge,
-        // **The stamped shadow, and it is the brief's signature move.**
-        // `4px 4px 0` with no blur and no spread — a solid displaced rectangle,
-        // not a soft Material halo. It only reads as a displacement because the
-        // card is lighter than the page; on a fill identical to the page the
-        // same shadow reads as a second border. The pressed state drops it,
+        // **The card's own lift, and it replaced a 4%-black smudge.**
+        //
+        // This used to be `AppShadows.stamped` — the alias for a single
+        // `0x0A000000` at 6px blur, left over from a design system whose cards
+        // were separated by a solid displaced rectangle. Four percent of black
+        // over this page is not a shadow, so the card had a hairline and nothing
+        // else and the whole interface read as flat. `subtle` is the two-shadow
+        // pair the rest of the system uses. The pressed state still drops it,
         // which is what makes a press read as the card being pushed *into* the
         // page rather than lifted off it.
-        boxShadow: pressed ? null : AppShadows.stamped,
+        boxShadow: pressed ? null : AppShadows.subtle,
       ),
       padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
       child: Material(type: MaterialType.transparency, child: child),
@@ -412,15 +426,17 @@ class DateStripChip extends StatelessWidget {
     // carry the accent fill. That is why the selected day label is the one the
     // brief asks to lean: italic at 900 weight.
     //
-    // **The ink is `AppPalette.onHue` — black — and white would have failed.**
-    // `onHue` was written for lime, where black and white are 14:1 and 1.9:1, so
-    // the name reads like it belongs to the old brand hue rather than to the
-    // role. It does not: on this red fill black measures **7.57:1** and white
-    // measures **2.78:1**, which is below AA for body text by a factor of 1.6.
-    // `color_helpers.dart`'s `onPrimaryInk` reaches the same answer from the
-    // fill's luminance rather than from its hue, and the day number here is the
-    // largest text on the page, so it is the one that would have been read.
+    // **The ink is `AppPalette.onHue` — white — because black fails here.**
+    // `onHue` was written for lime, where black and white were 14:1 and 1.9:1,
+    // so the name reads like it belongs to the old brand hue rather than to the
+    // role. It does not: on this blue fill black measures **3.13:1**, under AA
+    // for body text, and white **6.70:1**. The day number here is the largest
+    // text on the page, so it is the one that would have been read.
     final fill = isSelected ? AppPalette.error : AppSurfaces.surface;
+    // **Card ink, not page ink.** The unselected chip carries its own white fill
+    // (`AppSurfaces.surface`) in both ramps, so it is a card and not a bare
+    // patch of page — and a white fill takes navy ink in either ramp, which is
+    // exactly what `AppSurfaces.onSurface*` now resolves to.
     final ink = isSelected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
     final numberInk = isSelected ? AppPalette.onHue : AppSurfaces.onSurface;
 
@@ -448,7 +464,7 @@ class DateStripChip extends StatelessWidget {
           // 6 still clears the day number (14 sp, ~9 dp wide) by a wide margin,
           // and it is `AppSpacing.xs` + 2 rather than a new token because
           // nothing else in the app pairs with a 6 dp chip inset.
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
           decoration: BoxDecoration(
             color: fill,
             // A day cell is the brief's `rounded.sm`, not the card radius: the

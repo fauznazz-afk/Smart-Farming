@@ -16,9 +16,9 @@ class DataNote extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // `headline-md`, the brief's uppercase card title at 20/900. It was a
-          // bare `fontWeight: w800` at the framework's default body size, which
-          // is neither the brief's headline slot nor a weight in its scale of
+          // `headline-md`, the brief's card title. It was a bare
+          // `fontWeight: w800` at the framework's default body size, which is
+          // neither the brief's headline slot nor a weight in its scale of
           // three.
           Text('Source & calculation', style: AppType.headlineMd),
           const SizedBox(height: AppSpacing.sm),

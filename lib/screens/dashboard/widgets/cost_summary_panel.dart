@@ -41,6 +41,7 @@ class CostSummaryPanel extends StatelessWidget {
     required this.hours,
     this.tariffPerKwh,
     this.installedWp,
+    this.onTogglePeriod,
   });
 
   /// Energy produced over the window, kWh.
@@ -51,6 +52,9 @@ class CostSummaryPanel extends StatelessWidget {
 
   /// What this window is, in the app's own words — `Last 24 hours`, `Last 7 days`.
   final String periodLabel;
+
+  /// Toggles the window [periodLabel] names. See `_Header`.
+  final VoidCallback? onTogglePeriod;
 
   /// How many hours the window actually covers.
   ///
@@ -83,7 +87,7 @@ class CostSummaryPanel extends StatelessWidget {
 
     return TerminalPanel(
       semanticLabel: 'Cost and performance',
-      header: _Header(periodLabel: periodLabel),
+      header: _Header(periodLabel: periodLabel, onTogglePeriod: onTogglePeriod),
       children: [
         if (money != null) ...[
           const _Section('VALUE'),
@@ -142,12 +146,28 @@ class CostSummaryPanel extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.periodLabel});
+  const _Header({required this.periodLabel, this.onTogglePeriod});
 
   final String periodLabel;
 
+  /// Toggles the 24h / 7d window this card reports on.
+  ///
+  /// **The period label is the toggle.** It lived on the instrument panel's
+  /// energy rows, which came off the Overview page when the glass cards
+  /// replaced it — so the control moved here rather than disappearing, and the
+  /// label is the honest target for it because it is the only thing in the card
+  /// that names the window being reported.
+  final VoidCallback? onTogglePeriod;
+
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      periodLabel.toUpperCase(),
+      style: AppType.slotKey.copyWith(
+        color: AppSurfaces.onSurface,
+        fontWeight: FontWeight.w700,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.cardPadding,
@@ -159,13 +179,31 @@ class _Header extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            periodLabel.toUpperCase(),
-            style: AppType.slotKey.copyWith(
-              color: AppSurfaces.onSurface,
-              fontWeight: FontWeight.w700,
+          if (onTogglePeriod == null)
+            label
+          else
+            Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                onTap: onTogglePeriod,
+                borderRadius: AppRadius.all(AppRadius.badge),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      label,
+                      const SizedBox(width: AppSpacing.xs),
+                      Icon(
+                        Icons.swap_vert_rounded,
+                        size: 14,
+                        color: AppSurfaces.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
           Text(
             'COST & PERFORMANCE',
             style: AppType.slotMicro.copyWith(color: AppPalette.error),

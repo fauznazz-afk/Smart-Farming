@@ -41,14 +41,20 @@ class ChartSectionHeader extends StatelessWidget {
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
     );
-    // The accent, not a category hue. This used to be
-    // `categoryColorForKey('power_dc')`, which is the PV lime — a *chart
-    // series* colour being used to draw a live/polling dot and a spinner. Two
-    // separate jobs: the dot says "this connection is up", which is a condition
-    // about the app rather than a fact about solar, and it is chrome by any
-    // reading. Reading it from a telemetry key also meant the indicator's colour
-    // was a silent function of a constant string three files away.
-    final accent = AppPalette.error;
+    // **Page ink, because this row is not inside the card.** Every call site is
+    // `dashboard_screen.dart`'s `_chartSectionThunks`, which puts this row
+    // straight onto `AppBackground` with the chart card *below* it. Card ink
+    // (`AppSurfaces.onSurface*`) is navy in both ramps since the cards went
+    // near-white, which is right on a card and measured **2.10:1** on the dark
+    // ramp's own page stop — this header was unreadable in dark mode.
+    //
+    // **The live indicator is a glass chip, and that is the whole change.** It
+    // was `AppPalette.error` behind a local `AppGlass.isDark` branch, because
+    // the accent measured **1.09:1** on the dark ramp's own page stop: a blue dot
+    // on a blue page, needing a fifth value to be visible. `GlassPageHeader`
+    // already answered the same question the system way — a white wash lifts the
+    // chip clear of the page in *both* ramps and the ink follows the wash. See
+    // [_LivePill].
     return Row(
       children: [
         Expanded(
@@ -58,15 +64,23 @@ class ChartSectionHeader extends StatelessWidget {
                 child: Text(
                   title,
                   overflow: TextOverflow.ellipsis,
-                  style: AppType.labelUppercase.copyWith(color: appPrimaryText),
+                  // `headlineMd`, not the 11sp uppercase label: this is a section
+                  // heading on the page gradient, and the brief's `headline-md` is
+                  // what a card title in a list row wears. The uppercase micro
+                  // label is the *metric grid*'s register.
+                  style: AppType.headlineMd.copyWith(
+                    color: AppGlass.pageInkStrong,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Flexible(
                 child: Text(
                   rangeLabel,
                   overflow: TextOverflow.ellipsis,
-                  style: AppType.labelMicro.copyWith(color: faintColor),
+                  style: AppType.labelMicro.copyWith(
+                    color: AppGlass.pageInkSoft,
+                  ),
                 ),
               ),
             ],
@@ -76,27 +90,66 @@ class ChartSectionHeader extends StatelessWidget {
           SizedBox(
             width: 10,
             height: 10,
-            child: CircularProgressIndicator(strokeWidth: 1.6, color: accent),
+            child: CircularProgressIndicator(
+              strokeWidth: 1.6,
+              color: AppGlass.pageInkSoft,
+            ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             'Updating',
-            style: AppType.labelMicro.copyWith(color: faintColor),
+            style: AppType.labelMicro.copyWith(color: AppGlass.pageInkSoft),
           ),
         ],
-        Icon(
-          realtimeConnected ? Icons.wifi : Icons.wifi_off,
-          size: 13,
-          color: realtimeConnected ? accent : faintColor,
-        ),
-        const SizedBox(width: 3),
-        Text(
-          realtimeConnected ? 'Live' : 'Polling',
-          style: AppType.labelMicro.copyWith(
-            color: realtimeConnected ? accent : faintColor,
-          ),
-        ),
+        const SizedBox(width: AppSpacing.sm),
+        _LivePill(connected: realtimeConnected),
       ],
+    );
+  }
+}
+
+/// The live/polling indicator: a wifi glyph and a word on a white wash.
+///
+/// **One axis of state, in the fill, and nothing else.** This was the accent in
+/// one ramp and white in the other behind a local `AppGlass.isDark` branch, which
+/// existed because the blue accent measures **1.09:1** on the dark ramp's own page
+/// stop — no token carries a saturated hue there, and the branch was a fifth
+/// value living in a widget. A wash is the system's own answer to a chip on the
+/// page: it lifts the surface clear in both ramps, and the ink follows the wash
+/// ([AppGlass.pageGlassInk]), exactly as `GlassPageHeader` and the hour pills
+/// already do.
+///
+/// Live is [AppGlass.fillStrong] and polling [AppGlass.fillSoft] — the same
+/// resting/selected pair as the hour strip, so the glyph and the word do not
+/// have to change too.
+class _LivePill extends StatelessWidget {
+  const _LivePill({required this.connected});
+
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: connected ? AppGlass.fillStrong : AppGlass.fillSoft,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            connected ? Icons.wifi : Icons.wifi_off,
+            size: 13,
+            color: AppGlass.pageGlassInk,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            connected ? 'Live' : 'Polling',
+            style: AppType.labelMicro.copyWith(color: AppGlass.pageGlassInk),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -253,12 +306,21 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
       key: _exportKey,
       child: AppCard(
         height: (loading || !hasData) ? 170 : (group.height ?? 400),
-        padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
         semanticLabel:
             '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
             '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',
         child: loading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: AppSurfaces.onSurfaceVariant,
+                ),
+              )
             : !hasData
             ? Center(
                 child: Text(
@@ -376,6 +438,15 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
         // `AppSurfaces.border` at 24% — enough to separate the fill from the
         // card behind it without drawing a second outline.
         //
+        // **The ink is white, and it was navy.** `AppSurfaces.tooltip` is a dark
+        // navy in *both* ramps (`#0B2545` light, `#0F172A` dark) and
+        // `appPrimaryText` is `AppSurfaces.onSurface` — the same `#0B2545` — so
+        // the tooltip text measured **1.00:1** in light and **1.16:1** in dark.
+        // A tooltip nobody can read is the one widget on this card that must be
+        // legible, so the ink is the ink-on-a-saturated-fill token. There is no
+        // "ink on `AppSurfaces.tooltip`" token; `AppPalette.onHue` is the same
+        // white under a name that fits.
+        //
         // `fitInsideHorizontally` and `fitInsideVertically` are load-bearing and
         // not padding: they are what stop a tooltip at the far right of the plot
         // from being painted off the edge of the card.
@@ -404,10 +475,7 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
             ];
             final tooltip = LineTooltipItem(
               '$time\n${values.join('  \u00b7  ')}',
-              AppType.bodyMd.copyWith(
-                color: appPrimaryText,
-                fontWeight: FontWeight.w700,
-              ),
+              AppType.strong.copyWith(color: AppPalette.onHue),
             );
             return List<LineTooltipItem?>.generate(
               touchedSpots.length,
@@ -605,6 +673,12 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
 }
 
 /// The statistics of a card that charts exactly one series, on one line.
+///
+/// **Caption ink on the card, stated rather than inherited.** These rows were
+/// `const TextStyle(fontSize: 11)` with no colour at all, so they took whatever
+/// the ambient `DefaultTextStyle` happened to be; `AppType.caption` in
+/// `AppSurfaces.onSurfaceVariant` is the same size and says which surface it is
+/// on. The series label keeps its own hue — that is the data mark, not chrome.
 class _SingleSeriesStatistics extends StatelessWidget {
   const _SingleSeriesStatistics(this.scaled);
 
@@ -645,7 +719,9 @@ class _SingleSeriesStatistics extends StatelessWidget {
             child: Text(
               text,
               maxLines: 1,
-              style: const TextStyle(fontSize: 11),
+              style: AppType.caption.copyWith(
+                color: AppSurfaces.onSurfaceVariant,
+              ),
             ),
           ),
         ),
@@ -685,21 +761,27 @@ class _SeriesStatistics extends StatelessWidget {
             'Last ${formatAxisNumber(stats.latest)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11),
+            style: AppType.caption.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             'min ${formatAxisNumber(stats.minimum)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11),
+            style: AppType.caption.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             'max ${formatAxisNumber(stats.maximum)} ${series.unit}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11),
+            style: AppType.caption.copyWith(
+              color: AppSurfaces.onSurfaceVariant,
+            ),
           ),
         ],
       ),

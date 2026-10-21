@@ -5,6 +5,18 @@ import '../../../widgets/liquid_glass.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../utils/cctv_status.dart';
 
+/// The opaque scrim both video overlays paint.
+///
+/// **Public, and shared by the two overlays, because it is the surface their
+/// ink has to be measured against.** The loading scrim was `0xCC` of it and the
+/// error scrim opaque; they differ only in that one alpha and a test cannot
+/// assert a contrast claim against a value it has to copy out of a widget tree.
+///
+/// It is a very dark neutral on purpose and it never inverts with the theme:
+/// the overlays cover camera pixels, and their whole job is to be independent
+/// of what is behind them.
+const Color cctvOverlayScrim = Color(0xFF0B100E);
+
 /// Small status badge shown next to the CCTV header and in full screen.
 class CctvStatusPill extends StatelessWidget {
   const CctvStatusPill({super.key, required this.status});
@@ -186,6 +198,9 @@ class CctvLoadingOverlay extends StatelessWidget {
         // translucent dim over a bright frame leaves the spinner competing with
         // whatever is behind it, and this is the state where the user is waiting
         // and looking for the only sign that anything is happening.
+        //
+        // **80% of [cctvOverlayScrim], the one place the two overlays differ.**
+        // The white spinner is the same in both.
         color: Color(0xCC0B100E),
         child: Center(child: CircularProgressIndicator(color: Colors.white)),
       ),
@@ -211,14 +226,20 @@ class CctvErrorOverlay extends StatelessWidget {
       // failure message and two buttons — and a translucent scrim over video
       // means the text's contrast depends on the frame underneath it, which is
       // the one backdrop nobody can measure against.
-      color: const Color(0xFF0B100E),
+      color: cctvOverlayScrim,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.videocam_off_rounded,
-              color: AppSurfaces.onSurface,
+              // **White, and this was `AppSurfaces.onSurface`.** The scrim is a
+              // very dark neutral in both ramps and card ink is navy in *both*
+              // ramps, so the glyph and the failure message were invisible in
+              // dark *and* light mode — 1.25:1 either way. `AppGlass.ink` is the
+              // app's only ink that does not follow the ramp, and that is
+              // exactly right on a ground this dark: **19.2:1** here.
+              color: AppGlass.ink,
               size: 34,
             ),
             const SizedBox(height: 10),
@@ -228,7 +249,7 @@ class CctvErrorOverlay extends StatelessWidget {
               // The bare `TextStyle(color: white)` it replaces inherited the
               // framework's 14px body default, which is a label size for what
               // is the whole point of this state.
-              style: AppType.headlineMd.copyWith(color: AppSurfaces.onSurface),
+              style: AppType.headlineMd.copyWith(color: AppGlass.ink),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -243,8 +264,10 @@ class CctvErrorOverlay extends StatelessWidget {
                   icon: const Icon(Icons.refresh_rounded, size: 20),
                   label: const Text('Retry'),
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: AppSurfaces.page,
-                    foregroundColor: AppSurfaces.onSurface,
+                    backgroundColor: cctvOverlayScrim,
+                    // The same correction as the glyph: card ink on this fill is
+                    // 1.25:1, so "Retry" was an outline around nothing.
+                    foregroundColor: AppGlass.ink,
                     side: AppBorders.hairline,
                     textStyle: AppType.buttonLabel,
                     minimumSize: const Size(0, 56),
@@ -264,7 +287,13 @@ class CctvErrorOverlay extends StatelessWidget {
                 TextButton(
                   onPressed: onBack,
                   style: TextButton.styleFrom(
-                    foregroundColor: AppPalette.error,
+                    // **White, not the accent.** `AppPalette.error` is `#1D4ED8`
+                    // in both ramps and this scrim is a near-black neutral, so
+                    // "Back" measured **2.86:1** — a text button nobody could
+                    // see. A saturated hue on a dark ground needs a light step of
+                    // itself, and the step this system already owns is the hero's
+                    // white ink.
+                    foregroundColor: AppGlass.ink,
                     textStyle: AppType.labelMicro,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xs,
@@ -308,12 +337,14 @@ class CctvRoundControl extends StatelessWidget {
           shape: BoxShape.circle,
           // A scrim, not a shadow: this control floats over arbitrary camera
           // pixels, so the gradient is there to give the white glyph a floor to
-          // sit on regardless of what is behind it.
+          // sit on regardless of what is behind it. The centre stop is a *white*
+          // lift at 12% and was `AppSurfaces.onSurface` at the same alpha —
+          // navy at 12% over black is a colour with no name and no effect.
           gradient: RadialGradient(
             center: const Alignment(-0.3, -0.3),
             radius: 0.7,
             colors: [
-              AppSurfaces.onSurface.withValues(alpha: 0.12),
+              AppGlass.inkStrong.withValues(alpha: 0.12),
               Colors.black.withValues(alpha: 0.55),
             ],
           ),
@@ -334,7 +365,12 @@ class CctvRoundControl extends StatelessWidget {
           child: IconButton(
             tooltip: tooltip,
             onPressed: onPressed,
-            color: AppSurfaces.onSurface,
+            // **White, and this was `AppSurfaces.onSurface`** — navy in both
+            // ramps, on a control whose own floor is a black radial gradient.
+            // The full-screen and stop glyphs were navy on black at **1.25:1**.
+            // The claim this control exists to make is WCAG 1.4.11's 3:1 over
+            // arbitrary video, which only the boundary edge was carrying.
+            color: AppGlass.inkStrong,
             icon: Icon(icon),
           ),
         ),

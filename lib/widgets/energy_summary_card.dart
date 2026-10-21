@@ -101,7 +101,7 @@ class EnergySummaryCard extends StatelessWidget {
               children: [
                 ExcludeSemantics(child: Icon(icon, color: color, size: 18)),
                 const SizedBox(height: 6),
-                Text(title, style: const TextStyle(fontSize: 11)),
+                Text(title, style: AppType.caption),
                 const SizedBox(height: 2),
                 // **`FittedBox(scaleDown)`, and this is not the `DateStripChip`
                 // mistake.** That widget put its label inside a `SizedBox` of
@@ -158,7 +158,7 @@ class EnergySummaryCard extends StatelessWidget {
                   // user cannot finish reading is a correctness one.
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10, color: faintColor),
+                  style: AppType.captionSmall.copyWith(color: faintColor),
                 ),
               ],
             ),
@@ -282,7 +282,7 @@ class EnergySummaryCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             'Estimated from average telemetry power',
-            style: TextStyle(fontSize: 11, color: faintColor),
+            style: AppType.caption.copyWith(color: faintColor),
           ),
           const SizedBox(height: 8),
           if (loading)
@@ -353,11 +353,7 @@ class EnergySummaryCard extends StatelessWidget {
         children: [
           Text(
             'Forecast',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: faintColor,
-            ),
+            style: AppType.sectionTitle.copyWith(color: faintColor),
           ),
           const SizedBox(height: 8),
           Row(
@@ -414,14 +410,14 @@ class EnergySummaryCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             '$targetLabel · $runway',
-            style: TextStyle(fontSize: 10, color: faintColor),
+            style: AppType.captionSmall.copyWith(color: faintColor),
           ),
           if (result.hasProduction)
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Actual today: ${result.observedProductionKwh.toStringAsFixed(2)} kWh',
-                style: TextStyle(fontSize: 10, color: faintColor),
+                style: AppType.captionSmall.copyWith(color: faintColor),
               ),
             ),
         ],
@@ -443,7 +439,7 @@ class EnergySummaryCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 10)),
+              Text(label, style: AppType.captionSmall),
               Text(
                 value,
                 maxLines: 1,

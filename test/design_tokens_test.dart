@@ -72,11 +72,13 @@ void main() {
         final hue = categoryColor(category);
         expect(
           AppBorders.categoricalWash(hue).a,
-          greaterThanOrEqualTo(0.15),
+          greaterThanOrEqualTo(0.12),
           reason:
               '${category.name} wash is at '
               '${(AppBorders.categoricalWash(hue).a * 100).toStringAsFixed(0)}% '
-              "alpha, which is below the brief's 20%",
+              "alpha, which is below the 12% the accent's own contrast on it "
+              'requires — a 20% wash left the hue at 4.07:1, under AA for the '
+              '11-15dp caption a badge draws in it',
         );
         expect(
           AppBorders.categoricalWash(hue).a,
@@ -126,16 +128,16 @@ void main() {
     });
   });
 
-  group('the radius scale follows MiniDash spec', () {
+  group('the radius scale', () {
     test('pill, round and bar are all fully round', () {
       expect(AppRadius.pill, AppRadius.round);
       expect(AppRadius.bar, AppRadius.round);
     });
 
-    test('one rectilinear radius: 8, and nothing else', () {
-      // MiniDash gives the design system exactly one radius for rectilinear shapes:
-      // `rounded.lg` 8px on cards, inputs, buttons and list rows.
-      // Badges are 4px, filter pills and progress tracks are fully round.
+    test('one rectilinear radius for cards, and the blue scale above it', () {
+      // Cards are 16 (`AppRadius.xl`). The blue system adds four larger
+      // component radii — hero 28, sheet 24, stat 16, pills 14, sheet rows 12 —
+      // which are named per component rather than being a second step scale.
       for (final entry in {
         'card': AppRadius.card,
         'tile': AppRadius.tile,
@@ -144,11 +146,17 @@ void main() {
         expect(
           entry.value,
           AppRadius.card,
-          reason: '${entry.key} is ${entry.value} — the brief has one '
-              'rectilinear radius and this is a second one',
+          reason: '${entry.key} is ${entry.value} — there is one card radius '
+              'and this is a second one',
         );
       }
-      expect(AppRadius.card, 8);
+      expect(AppRadius.card, 16);
+      // The blue radii are ordered by how large the component is.
+      expect(AppRadius.hero, greaterThan(AppRadius.sheet));
+      expect(AppRadius.sheet, greaterThan(AppRadius.stat));
+      expect(AppRadius.stat, greaterThan(AppRadius.tilePill));
+      expect(AppRadius.tilePill, greaterThan(AppRadius.sheetRow));
+      expect(AppRadius.sheetRow, greaterThan(AppRadius.badge));
       expect(AppRadius.badge, lessThan(AppRadius.card),
           reason: 'a badge is nearly square');
       expect(AppRadius.badge, greaterThan(0));
@@ -190,9 +198,18 @@ void main() {
   });
 
   group('type', () {
-    test('Inter for headings, system sans for body, mono for terminal panel', () {
+    test('one body face, one display face, mono for terminal panel', () {
       expect(AppType.heading, 'Inter');
-      expect(AppType.sans, anyOf(contains('Arial'), contains('Roboto')));
+      expect(
+        AppType.sans,
+        'Inter',
+        reason:
+            '`sans` was a CSS font stack, and Flutter reads a comma-separated '
+            'list as one literal family name it does not have — so every body '
+            'style silently fell back to Roboto while every heading style used '
+            'the bundled Inter, which is two families on one screen. If this '
+            'fails the app is not uniform again.',
+      );
       expect(
         AppType.mono,
         'JetBrainsMono',
@@ -264,6 +281,7 @@ void main() {
         'displayMd': AppType.displayMd,
         'numeralXl': AppType.numeralXl,
         'numeralLg': AppType.numeralLg,
+        'figureHero': AppType.figureHero,
       }.entries) {
         expect(
           hero,
@@ -279,6 +297,8 @@ void main() {
         'numeralLg': AppType.numeralLg,
         'displayLg': AppType.displayLg,
         'displayMd': AppType.displayMd,
+        'figureHero': AppType.figureHero,
+        'figureTerm': AppType.figureTerm,
       }.entries) {
         expect(
           entry.value.fontFeatures,
@@ -320,10 +340,39 @@ void main() {
   });
 
   group('elevation shadows', () {
-    test('subtle shadow has minimal blur for resting widgets', () {
-      expect(AppShadows.subtle.length, 1);
-      expect(AppShadows.subtle[0].blurRadius, 2);
-      expect(AppShadows.subtle[0].offset.dy, 1);
+    test('subtle is a raised pair, not a smudge', () {
+      // **Two shadows, and that is the assertion.** This used to pin one shadow
+      // at a 1px offset and a 2px blur, which it did *faithfully*: the value was
+      // four percent of neutral black, invisible on this page, and the test kept
+      // it that way while every card in the app rendered flat. A single shadow
+      // wide enough to see reads as a float — a halo with nothing joining the
+      // shape to the page — so the shape is the claim: a tight contact shadow at
+      // a small offset, then a wide ambient one at a large offset, both navy.
+      expect(AppShadows.subtle.length, 2);
+      expect(
+        AppShadows.subtle.first.blurRadius,
+        lessThan(AppShadows.subtle.last.blurRadius),
+      );
+      expect(
+        AppShadows.subtle.first.offset.dy,
+        lessThan(AppShadows.subtle.last.offset.dy),
+      );
+      // The defect was an alpha of four percent, so the floor is what is pinned
+      // rather than a value.
+      for (final shadow in AppShadows.subtle) {
+        expect(
+          shadow.color.a,
+          greaterThan(0.05),
+          reason: 'a shadow at ${shadow.color.a} reads as nothing on this page',
+        );
+        // A neutral black over a blue page desaturates it and reads as grey
+        // dirt; both halves carry the page's own navy.
+        expect(
+          shadow.color.b,
+          greaterThan(shadow.color.r),
+          reason: 'the shadow must be the page\'s navy, not a neutral grey',
+        );
+      }
     });
 
     test('medium shadow for hover/press state', () {

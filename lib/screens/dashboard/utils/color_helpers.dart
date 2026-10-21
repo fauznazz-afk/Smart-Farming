@@ -178,17 +178,24 @@ Color? categoryColorForKey(String key) {
 /// text label and the label carries the meaning.
 ///
 
-/// Healthy. [AppPalette.success], 8.6:1 on [AppSurfaces.surfaceAlt].
+/// Healthy. [AppPalette.success] — the **card** value.
 ///
-/// **The one hue in this file that is not in the brief, and it is here because
-/// the app needs a colour that means "nothing is wrong" and the brief has no
-/// green.** A status that clears AA on every surface is the constraint; anything
-/// darker moves the wrong way on a dark ramp.
+/// **Use [statusOkOnPage] instead for anything drawn on the page gradient.**
+/// Cards are near-white in both ramps, so this has to be a dark hue; the page is
+/// the opposite in dark mode. The two are about 2.5:1 apart and no single value
+/// clears AA on both, so the call site has to say which surface it is on.
 Color get statusOk => AppPalette.success;
 
-/// A warning. [AppPalette.accent] — amber is the brief's own caution colour and
-/// the only one in the palette that reads that way. 7.4:1.
+/// Healthy, as drawn **on the page gradient** rather than on a card.
+Color get statusOkOnPage => AppPalette.successOnPage;
+
+/// A warning. [AppPalette.accent] — the **card** value.
+///
+/// **Use [statusWarnOnPage] on the page gradient.** Same reason as [statusOk].
 Color get statusWarn => AppPalette.accent;
+
+/// A warning, as drawn **on the page gradient**.
+Color get statusWarnOnPage => AppPalette.warningOnPage;
 
 /// An alert: serious, not yet a breach. `#FB923C`, measured 6.58:1 on
 /// [AppSurfaces.surfaceAlt].
@@ -209,35 +216,50 @@ Color get statusWarn => AppPalette.accent;
 /// pinned value now, and `theme_palette_contrast_test.dart` measures both ramps.
 Color get statusAlert => AppPalette.statusAlert;
 
-/// A breach, as a **fill**. [AppPalette.error], 3.96:1 on
-/// [AppSurfaces.surfaceAlt].
+/// A breach, as a **fill**. [AppPalette.statusBad] (`#D01E1E`).
 ///
-/// **Below AA for text, which is why [statusBad] exists.** This value is for a
-/// solid block, a dot or a ring — somewhere the thing is a shape, not a
-/// sentence. Anything the user reads goes through [statusBad].
-Color get statusBadFill => AppPalette.error;
+/// This value is for a solid block, a dot or a ring — somewhere the thing is a
+/// shape, not a sentence. Anything the user reads goes through [statusBad].
+///
+/// **It is the same value as [statusBad] now, and that is deliberate.** The
+/// ramp carries one red, so a second one would be a duplicate rather than a
+/// distinction. The split survives because the two getters describe different
+/// jobs, and the day the ramp grows a second red is the day the distinction
+/// becomes real.
+Color get statusBadFill => AppPalette.statusBad;
 
-/// A breach, as **ink**. `#FF5C5C` at 4.92:1 on [AppSurfaces.surfaceAlt].
+/// A breach, as **ink**. [AppPalette.statusBad] (`#D01E1E`), measured **5.40:1**
+/// on `#FFFFFF` and **4.98:1** on the light ramp's `#F1F6FD` card.
 ///
-/// **Derived by scaling every channel of `#EF4444` by 1.35, and the direction is
-/// the whole point.** The obvious fix for a colour that fails contrast on a dark
-/// surface is to darken it, and that is exactly backwards: it takes the red
-/// *further* from white. Measured, on `surfaceAlt`: 1.00× gives 3.96:1, 0.92×
-/// gives 3.42:1, 0.88× gives 3.16:1. Going up, 1.15× gives 4.58:1 and 1.35×
-/// gives **4.92:1**.
+/// **A token and not a literal, and the light ramp is why.** It was its own
+/// literal `#FF5C5C` for the same reason `statusAlert` was, and it failed the
+/// same way: a literal cannot swap, so the red stayed light on a white page and
+/// measured 2.3:1.
 ///
-/// Scaled per channel rather than stepped in HSL, so hue is preserved exactly —
-/// measured 0.00° before and after. The old file recorded this lesson already:
+/// **The value has moved twice, and both moves were measured.** It was
+/// `#FF5C5C` — 1.35× the old `#EF4444`, scaled per channel rather than stepped
+/// in HSL so the hue was preserved exactly — and it measured 4.92:1 on the
+/// `surfaceAlt` of the day. The ramp now carries one red in both ramps,
+/// `#D01E1E`, one step deeper than the `#DC2626` that measured 4.45:1 on
+/// `surfaceAlt`, which is 0.05 under AA. It clears AA on both card surfaces.
+///
+/// **The direction flipped with the cards.** The card the old red was measured
+/// against was dark, where a red that fails contrast has to be *lighter*;
+/// cards are near-white in both ramps now, so the breach red has to be dark
+/// instead.
+///
+/// Scaling every channel by one factor rather than stepping HSL lightness is
+/// still the rule, because hue and saturation are preserved exactly that way:
 /// stepping HSL lightness on a saturated colour moved `faintColor` from 150.00°
 /// to 146.67° at a 0.6% darkening, and a caption that shifts hue when you
 /// change it reads warm beside a green theme.
-/// A breach, as **ink**. See [AppPalette.statusBad] for the `#EF4444` scaling
-/// measurement that chose the value.
-///
-/// It was its own literal `#FF5C5C` for the same reason `statusAlert` was, and
-/// it failed the same way: a literal cannot swap, so the red stayed light on a
-/// white page at 2.3:1.
 Color get statusBad => AppPalette.statusBad;
+
+/// A breach, as **ink on the page gradient** rather than on a card.
+///
+/// [statusBad] is the card value and is dark in both ramps; this is the light
+/// twin the dark page needs, and it resolves to the same number in light mode.
+Color get statusBadOnPage => AppPalette.statusBadOnPage;
 
 /// Alarm severity, for the alarm history list.
 ///
@@ -287,16 +309,3 @@ Color skyConditionColor(SkyCondition condition) => switch (condition) {
 /// contrast_test.dart` measures it against both ramps now, and the failure it
 /// caught was 1.11:1: white on white.
 Color get faintColor => AppSurfaces.onSurfaceVariant;
-
-/// The ink to put **on top of** a saturated categorical fill.
-///
-/// Measured across the whole palette rather than assumed: [#AppPalette.onHue] is
-/// 11.4:1 on `primary`, 4.6 on `secondary`, 7.4 on `accent`, 9.1 on `success`,
-/// 4.9 on `chartViolet`, 8.0 on `chartCyan` and 4.6 on `error` — so dark ink is
-/// correct on every one, and the two tightest are `secondary` and `error`.
-///
-/// Picked by luminance rather than hard-coded per call site, so a future palette
-/// entry is handled without a second rule in a different file, which is how the
-/// previous version's two independent ink rules drifted apart.
-Color onPrimaryInk(Color fill) =>
-    fill.computeLuminance() > 0.18 ? AppPalette.onHue : Colors.white;

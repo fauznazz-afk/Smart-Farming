@@ -1,12 +1,10 @@
-import '../utils/color_helpers.dart';
-
 import 'package:flutter/material.dart';
 
 import '../../../widgets/liquid_glass.dart';
 import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
 
-/// Seven-day quick-pick strip with a calendar button for custom ranges.
+/// Seven day quick-pick strip. Tapping a day selects it.
 ///
 /// **The chip itself is not in this file.** It is `DateStripChip` in
 /// `liquid_glass.dart`, and the brief's recipe for it lives there too: 4px
@@ -16,6 +14,11 @@ import '../utils/design_tokens.dart';
 /// shadow of its own. The selected day label is also the one place in the brief
 /// that sets **italic at 900 weight**, on the theory that leaning the type
 /// forward implies motion.
+///
+/// **No header and no range control.** The custom-range trigger is one of the
+/// hero card's own actions now, and this strip is that card's footer; the strip
+/// is only the seven chips. [dateSelectionLabel] still renders the trigger's
+/// tooltip.
 ///
 /// This file owns the strip: the row geometry, the width the chips are given,
 /// and the measurement that decides that width. The width probe below is the
@@ -29,7 +32,6 @@ class DateStrip extends StatelessWidget {
     required this.rangeStart,
     required this.rangeEnd,
     required this.onSelectDate,
-    required this.onPickRange,
   });
 
   final List<DateTime> days;
@@ -37,7 +39,6 @@ class DateStrip extends StatelessWidget {
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final ValueChanged<DateTime> onSelectDate;
-  final VoidCallback onPickRange;
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -49,8 +50,8 @@ class DateStrip extends StatelessWidget {
     // `fontSize: 10, fontWeight: w600` — a *measurement* style that disagreed
     // with the *drawing* style on two of the three properties that decide a
     // label's width. `DateStripChip` sets the day name in `AppType.labelMicro`:
-    // 10sp at **w700**, with `letterSpacing: 0.12em`, which on a three-letter
-    // day name is another 3.6dp the probe never asked for. So the strip measured
+    // 10sp at **w600**, with `letterSpacing: 0.04em`, which on a three-letter
+    // day name is another 1.2dp the probe never asked for. So the strip measured
     // every chip against a style narrower than the one it rendered, and the
     // chips were laid out a few dp too tight for their own contents.
     //
@@ -94,63 +95,13 @@ class DateStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            // **The legend leads and the calendar button trails, because the
-            // strip has to read as one grid.**
-            //
-            // It used to be the other way round: a `Padding(horizontal: 2)` with
-            // a 48dp `IconButton` and a 4dp gap, then an `Expanded` legend. That
-            // put the legend text's left edge at 2 + 48 + 4 = 54dp while the chip
-            // row below started at 0, and it pulled the header's right edge in to
-            // maxWidth - 2 while the chips ran to maxWidth. Three different edges
-            // inside one widget, which is what the Overview calendar's "slightly
-            // off-centre" look was: nothing was misaligned by much and nothing
-            // was aligned, and the eye reads the sum rather than the parts.
-            //
-            // Trailing the button collapses it to two, and both of them are now
-            // the chip row's: the legend starts where the first chip starts, and
-            // the button's touch target ends where the last chip ends. The 48dp
-            // target is kept deliberately — it is below the 48dp minimum tap
-            // size, and shrinking it to match a text baseline would be trading an
-            // accessibility floor for optical tidiness.
-            Expanded(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    _rangeLabel(),
-                    style: AppType.labelUppercase.copyWith(color: faintColor),
-                  ),
-                  Text(
-                    rangeStart != null ? 'Range' : 'Pick a day',
-                    style: AppType.labelMicro.copyWith(color: faintColor),
-                  ),
-                ],
-              ),
-            ),
-            Material(
-              type: MaterialType.transparency,
-              child: IconButton(
-                tooltip: 'Pick a date range',
-                constraints: const BoxConstraints.tightFor(
-                  width: 48,
-                  height: 48,
-                ),
-                padding: EdgeInsets.zero,
-                onPressed: onPickRange,
-                icon: Icon(
-                  Icons.calendar_month_outlined,
-                  size: 16,
-                  color: faintColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+        // **No header row, and no control of its own.** The row used to hold a
+        // `Spacer` and a calendar `IconButton`, which after the weather glyph was
+        // removed left a strip of empty space above the chips with one button
+        // floating at its right end. The trigger is now one of the hero card's
+        // own actions and the strip is that card's footer, so the dates sit
+        // inside the surface describing "now" instead of in a row of their own.
+        // [dateSelectionLabel] still supplies the button's tooltip.
         LayoutBuilder(
           builder: (context, constraints) {
             // **The gap is a ladder, and it steps down before the type does.**
@@ -169,11 +120,11 @@ class DateStrip extends StatelessWidget {
             // so the strip now takes the widest gap it can afford and only
             // falls through to scrolling when even zero does not fit — which is
             // the 3x system-font case the scroll view was actually built for.
-            final needed = _widestDayNameWidth(context) + 12 + 1;
+            final needed = _widestDayNameWidth(context) + 16 + 1;
             final slack =
                 (constraints.maxWidth - needed * days.length) /
                 (days.length - 1);
-            const ladder = [6.0, 4.0, 2.0, 0.0];
+            const ladder = [8.0, 6.0, 4.0, 2.0, 0.0];
             final gap = ladder.firstWhere(
               (g) => g <= slack,
               orElse: () => ladder.last,
@@ -228,18 +179,33 @@ class DateStrip extends StatelessWidget {
     );
   }
 
-  String _rangeLabel() {
-    if (rangeStart != null && rangeEnd != null) {
-      return '${rangeStart!.day} ${monthName(rangeStart!.month)} '
-          '${rangeStart!.year} \u2013 '
-          '${rangeEnd!.day} ${monthName(rangeEnd!.month)} ${rangeEnd!.year}';
-    }
-    final today = DateTime.now();
-    if (_isSameDay(selectedDate, today)) return 'Today';
-    if (_isSameDay(selectedDate, today.subtract(const Duration(days: 1)))) {
-      return 'Yesterday';
-    }
-    return '${dayNameFull(selectedDate.weekday)}, '
-        '${selectedDate.day} ${monthName(selectedDate.month)} ${selectedDate.year}';
+}
+
+/// One line describing the strip's current selection, e.g. `Today`, `Yesterday`
+/// or `Sat, 11 Oct 2026`, or the two dates of a range.
+///
+/// **Top-level, because the trigger is no longer the strip's.** The calendar
+/// button is a hero-card action now and this is its tooltip; the function used to
+/// be private to [DateStrip] when the button lived in the strip's own header.
+String dateSelectionLabel({
+  required DateTime selectedDate,
+  DateTime? rangeStart,
+  DateTime? rangeEnd,
+  DateTime? now,
+}) {
+  bool sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  if (rangeStart != null && rangeEnd != null) {
+    return '${rangeStart.day} ${monthName(rangeStart.month)} '
+        '${rangeStart.year} \u2013 '
+        '${rangeEnd.day} ${monthName(rangeEnd.month)} ${rangeEnd.year}';
   }
+  final today = now ?? DateTime.now();
+  if (sameDay(selectedDate, today)) return 'Today';
+  if (sameDay(selectedDate, today.subtract(const Duration(days: 1)))) {
+    return 'Yesterday';
+  }
+  return '${dayNameFull(selectedDate.weekday)}, '
+      '${selectedDate.day} ${monthName(selectedDate.month)} ${selectedDate.year}';
 }
