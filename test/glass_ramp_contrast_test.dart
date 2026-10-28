@@ -4,18 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart';
 
-/// The blue system's own contrast claims, measured on both ramps.
+/// The WattVision contrast claims, measured.
 ///
-/// **This exists because the light ramp shipped broken and nothing said so.** The
-/// page went from a flat neutral to a blue gradient, the glass became
-/// brightness-aware afterwards, and the failure mode is the quiet one: a caption
-/// that measures 1.4:1 on a pale page looks like a deliberate muted label at a
-/// glance, on a screenshot, and in every test that only checks the dark ramp.
-///
-/// So the rules are stated as properties over [AppSurfaces.captionSurfaces()] and
-/// the real fills, read out of the tokens rather than written down here — a
-/// literal list of hex values in a test whose job is to describe this app's own
-/// tokens is a copy, and copies drift.
+/// WattVision is dark-only: both ramps resolve to the same flat dark values.
+/// Page #121212, cards #1E1E1E, glass ink measured against the single dark page.
 double _contrast(Color a, Color b) {
   double ch(double v) =>
       v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
@@ -89,12 +81,12 @@ void main() {
       });
 
       test('glass ink clears AA on its own glass fill over every page stop', () {
-        // **Glass carries DARK ink in both ramps, and this is the rule that the
-        // light mode was missing.** The wash is always white, so the pill is a
-        // light chip whichever page is behind it — which means its label must be
-        // dark whichever ramp is live. The earlier version inverted the wash to
-        // black in light mode "to match the ink", which drags the pill toward
-        // the ink on it: 2.48:1.
+        // **Glass carries DARK ink, and this is the rule that makes the wash
+        // safe.** The wash is always white, so the pill is a light chip whatever
+        // page is behind it — which means its label must be dark. An earlier
+        // version inverted the wash to black "to match the ink", which drags the
+        // pill toward the ink on it and loses the contrast the wash was there to
+        // buy.
         for (final fill in <Color>[AppGlass.fillSoft, AppGlass.fillStrong]) {
           for (final page in AppGlass.pageGradient) {
             final washed = Color.alphaBlend(fill, page);
@@ -115,9 +107,9 @@ void main() {
       });
 
       test('the glass wash is white in both ramps', () {
-        // Pinned because inverting it is the tempting fix and it is the wrong one:
-        // a black wash under navy ink lands 2.48:1. The lever is the ink, not
-        // the wash.
+        // Pinned because inverting it is the tempting fix and it is the wrong
+        // one: a black wash under dark ink loses the lift the wash exists for.
+        // The lever is the ink, not the wash.
         expect(
           AppGlass.fillSoft.computeLuminance(),
           greaterThan(0.9),
@@ -126,8 +118,8 @@ void main() {
       });
 
       test('the hero ink clears AA on every stop of the hero gradient', () {
-        // The hero is navy in both ramps, so its ink is white in both. This
-        // pins that claim rather than assuming it.
+        // The hero is a deep gradient and its ink is white at three strengths.
+        // This pins that claim rather than assuming it.
         for (final stop in AppGlass.heroGradient) {
           for (final ink in <Color>[
             AppGlass.inkStrong,
@@ -146,7 +138,7 @@ void main() {
       });
 
       test('the sheet ink clears AA on the sheet', () {
-        // The sheet is opaque white paper in both ramps, so this must hold twice.
+        // The sheet is an opaque card, so its ink is measured against it.
         for (final pair in <List<Color>>[
           <Color>[AppGlass.sheetTitleInk, AppGlass.sheet],
           <Color>[AppGlass.sheetRowInk, AppGlass.sheetRow],
@@ -163,9 +155,9 @@ void main() {
       });
 
       test('a breach stays red and stays distinguishable from the accent', () {
-        // The accent moved to blue in both ramps, so red now means exactly one
-        // thing. If the two ever collide, "this reading is wrong" and "this is
-        // the app's colour" become the same pixel.
+        // The accent is cyan, so red means exactly one thing. If the two ever
+        // collide, "this reading is wrong" and "this is the app's colour" become
+        // the same pixel.
         expect(
           AppPalette.statusBad,
           isNot(AppPalette.error),
@@ -175,22 +167,15 @@ void main() {
     });
   }
 
-  test('the two ramps share one accent hue, which is the whole point', () {
-    // The bug: light was red and dark was blue, so the app had two identities
-    // and toggling the theme changed the brand. One hue, two lightnesses.
-    expect(
-      HSLColor.fromColor(AppPaletteTheme.light.error).hue,
-      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.error).hue, 6.0),
-      reason: 'the accent hue is not shared between the ramps',
-    );
+  test('both ramps resolve to the same WattVision dark values', () {
+    // WattVision is dark-only: both static palettes are identical.
+    expect(AppPaletteTheme.light.error, AppPaletteTheme.dark.error);
+    expect(AppPaletteTheme.light.onHue, AppPaletteTheme.dark.onHue);
   });
 
-  test('the light page is actually lighter than the dark page', () {
-    // Otherwise "light mode" is a label on the same screen.
-    expect(
-      AppGlass.pageGradientLight.last.computeLuminance(),
-      greaterThan(AppGlass.pageGradient.last.computeLuminance() + 0.2),
-      reason: 'the light page gradient is not lighter than the dark one',
-    );
+  test('the page is flat dark #121212 in both ramps', () {
+    // WattVision spec: flat page in both ramps.
+    expect(AppGlass.pageGradientLight.last.computeLuminance(),
+        AppGlass.pageGradient.last.computeLuminance());
   });
 }

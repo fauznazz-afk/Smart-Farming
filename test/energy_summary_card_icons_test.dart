@@ -157,7 +157,8 @@ void main() {
           reason:
               'the ${entry.value} icon #${_hex(colours[entry.key])} is '
               '$measured:1 on its own tile fill #${_hex(fill)}; the old fixed '
-              'HSL step measured 1.97:1 on Dracula and the icon was invisible',
+              'HSL step this replaced measured 1.97:1 on the surface it was '
+              'never checked against, and the icon was invisible',
         );
       }
     });

@@ -22,18 +22,18 @@ class GlassHeroStat {
   final VoidCallback? onTap;
 }
 
-/// The navy gradient card at the top of the dashboard.
+/// The gradient card at the top of the dashboard.
 ///
-/// It is the only surface in the app that is *not* the page colour: the whole
+/// It is the only surface in the app that is *not* a card or the page: the whole
 /// card is one deep blue gradient carrying four rows of white ink and
-/// translucent white fills, because the page's own blue is too close to the
-/// card's for a filled shape to separate them.
+/// translucent white fills, so it separates from the flat dark page by hue
+/// rather than by a tonal step.
 ///
 /// Everything translucent here sits on that gradient, so it needs white ink at
-/// three strengths and white fill at three strengths — which is why it does not
-/// reuse the soft-UI shadow pair the rest of the app uses. The figure is
-/// baseline-aligned against its unit and uses tabular figures so a value that
-/// refreshes every ten seconds does not jitter the layout.
+/// three strengths and white fill at three strengths — which is why it owns its
+/// own ink ramp instead of reading the card's. The figure is baseline-aligned
+/// against its unit and uses tabular figures so a value that refreshes every ten
+/// seconds does not jitter the layout.
 class GlassHeroCard extends StatelessWidget {
   const GlassHeroCard({
     super.key,
@@ -248,11 +248,10 @@ class GlassCircleButton extends StatelessWidget {
   /// than on the hero.
   ///
   /// **The defaults are hero-only and that is the reason these exist.** A 20%
-  /// white wash with a white glyph is legible over the navy hero and nothing
-  /// else: on the light page the wash all but disappears and white-on-white is
-  /// 1.00:1. A page button therefore wants the near-white card fill with dark ink
-  /// — `AppSurfaces.surface` / `AppSurfaces.onSurface` — which is the one pairing
-  /// that clears AA on both ramps.
+  /// white wash with a white glyph is legible over the hero and nothing else:
+  /// the wash has no body against the page. A page button therefore wants the
+  /// card fill with card ink — `AppSurfaces.surface` /
+  /// `AppSurfaces.onSurface` — which is the pairing that clears AA on the card.
   final Color? fill;
   final Color? ink;
 

@@ -8,8 +8,8 @@ import '../utils/design_tokens.dart';
 /// `pressed` flag since the soft-UI migration, and nothing in the app ever
 /// passed it, so the app shipped a press vocabulary with no way to reach it.
 /// Under the previous system the flag only added a small extra shadow, which is
-/// not enough to read as a press; the flag now *drops* the stamped shadow,
-/// which is the geometry that makes it read as one.
+/// not enough to read as a press; the flag now *drops* the shadow, which is the
+/// geometry that makes it read as one.
 ///
 ///
 /// The old animation was a swap between the neumorphic shadow pairs, not a
@@ -21,13 +21,13 @@ import '../utils/design_tokens.dart';
 /// halo in their old positions simultaneously, and that read as a rendering
 /// fault rather than as a button being held.
 ///
-/// **Under the brutalist system, press feedback is scale and the stamped
-/// shadow, and both are geometry.** A press flattens the surface into the page:
-/// [AppCard.pressed] drops its hard offset shadow, so the card moves *toward*
-/// the canvas rather than away from it, and the whole widget shrinks by 5% at
-/// the same time. That is the brief's `active:scale-95`, and it is a change of
-/// the same *kind* the old press was — the old one swapped a raised shadow pair
-/// for an inset one and relied on nothing but geometry to say "pushed".
+/// **Press feedback is scale and the shadow, and both are geometry.** A press
+/// flattens the surface into the page: [AppCard.pressed] drops its shadow, so the
+/// card moves *toward* the canvas rather than away from it, and the whole widget
+/// shrinks by 5% at the same time. That is the brief's `active:scale-95`, and it
+/// is a change of the same *kind* the old press was — the old one swapped a
+/// raised shadow pair for an inset one and relied on nothing but geometry to say
+/// "pushed".
 ///
 /// The scale nudge is 5%, which is the figure the brief states outright rather
 /// than one tuned here. It is on the *whole* widget rather than on the shadow,

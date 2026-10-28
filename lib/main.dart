@@ -22,33 +22,30 @@ void main() {
 
 /// The app's one `ColorScheme`.
 ///
-/// **`ColorScheme.fromSeed` is deliberately not used, and the reason is the same
-/// measurement that used to justify a hand-built Dracula scheme.** Material's
-/// tonal mapping takes a seed and derives a colour chosen to stay legible on a
-/// *light* surface, so on a `#0F0F11` page it darkens every role to move toward
-/// white and lands the focal colour in a band that has nothing to do with the
-/// brief's palette. The brief's hues are hand-specified and measured, and the
-/// only thing that survives here is the reason it did before: a derived role is
-/// a copy that drifts the moment a surface moves.
+/// **`ColorScheme.fromSeed` is deliberately not used.** Material's tonal mapping
+/// takes a seed and derives a colour chosen to stay legible on a *light* surface,
+/// so on a `#121212` page it darkens every role toward white and lands the focal
+/// colour in a band that has nothing to do with the WattVision palette. The
+/// palette's hues are hand-specified and measured; a derived role is a copy that
+/// drifts the moment a surface moves.
 ///
-/// **Every accent-bearing role resolves to [AppPalette.error], and that is the
-/// root of the black-and-red panel.** Material derives an enormous amount of
-/// chrome from this one object — `FilledButton`'s fill and ink, the selected
-/// `Chip`, the `SegmentedButton` selection, a `Switch`'s active track, a
-/// `Checkbox`, the focus ring, text selection handles, the progress indicator —
-/// and none of it was listed anywhere except here. A lime scheme therefore
-/// survived every per-widget conversion, because the widget was reading the
-/// scheme and the scheme still said lime. `primary`/`secondary`/`tertiary` and
-/// their containers are now all the one accent, so there is no role left that
-/// can reintroduce a second hue.
+/// **Every accent-bearing role resolves to [AppPalette.error], the cyan data
+/// accent.** Material derives an enormous amount of chrome from this one object —
+/// `FilledButton`'s fill and ink, the selected `Chip`, the `SegmentedButton`
+/// selection, a `Switch`'s active track, a `Checkbox`, the focus ring, text
+/// selection handles, the progress indicator — and none of it was listed anywhere
+/// except here. A stale scheme therefore survives every per-widget conversion,
+/// because the widget reads the scheme and the scheme still says the old hue.
+/// `primary`/`secondary`/`tertiary` and their containers are all the one accent,
+/// so there is no role left that can reintroduce a second hue.
 ///
 /// `secondaryContainer` is not optional here: it is what a selected `ChoiceChip`
 /// paints, and leaving it at Material's derived value would put a desaturated
 /// near-invisible fill behind the alarm-history filter chips.
 ///
-/// `onHue` on every role it can sit on is not decoration. On the accent
-/// `#1D4ED8` white ink measures **6.70:1** and black **3.13:1**, so black
-/// fails AA for body text and white clears it by a wide margin.
+/// `onHue` on every role it can sit on is not decoration. On the cyan accent
+/// `#00E5FF`, white ink is about **1.4:1** and dark `#121212` clears AA easily,
+/// so the token ink is the only legible one.
 ColorScheme _appColorScheme() => ColorScheme(
   brightness: AppTheme.brightness,
   primary: AppPalette.error,
@@ -108,7 +105,7 @@ TextTheme _appTextTheme() {
   );
 }
 
-/// The app's buttons: a solid accent pill with dark ink.
+/// The app's buttons: a solid accent fill with the token ink.
 ///
 /// `filledButtonTheme` was simply absent for most of this app's life, so every
 /// `FilledButton` — "Sign in", "Save settings", "Play camera" — was a raw
@@ -116,21 +113,19 @@ TextTheme _appTextTheme() {
 /// Two things were wrong with that on a device and only one was cosmetic: the
 /// shape was flat, and the label failed contrast because `ColorScheme.fromSeed`
 /// paired a light seed with a light `onPrimary`.
-/// The brief's `button-primary`, applied to every filled button in the app.
 ///
-/// Accent fill, black ink, `AppRadius.card` (8px — the brief's default for
-/// buttons), 56dp tall. Label is `AppType.buttonLabel`: 13px at 900 with 0.1em
-/// tracking — buttons shout.
+/// The brief's `button-primary`, applied to every filled button in the app:
+/// accent fill, token ink, `AppRadius.card` (16px), 56dp tall. Label is
+/// `AppType.buttonLabel`: 13px at 900 with 0.1em tracking — buttons shout.
 ///
-/// **White ink on the accent, and it is measured rather than preferred:** 6.70:1
-/// against 3.13:1 for black. `AppPalette.onHue` was written for a lime fill and
-/// its name is a leftover; what it has always meant is *the ink that clears AA
-/// on this fill*, and on this blue that is white.
+/// **`AppPalette.onHue` is the ink that clears AA on this fill**, which on
+/// WattVision's bright cyan is dark `#121212`. White would be about 1.4:1.
 ///
 /// The 56dp is `minimumSize` rather than `fixedSize`, so the button still grows
-/// with the user's font scale. `elevation: 0` keeps Material from adding a soft
-/// shadow underneath the hard one, which the call sites paint themselves through
-/// `AppShadows.stampedIn` — a solid offset rectangle in the accent at 20%.
+/// with the user's font scale. `elevation: 0` keeps Material from adding its own
+/// shadow underneath; the call sites paint a tinted one themselves through
+/// `AppShadows.stampedIn` — a soft shadow in the accent, so the lift carries the
+/// button's own hue rather than a neutral black.
 FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
   style: ButtonStyle(
     backgroundColor: WidgetStatePropertyAll(AppPalette.error),
@@ -153,17 +148,13 @@ FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
 /// The brief's `button-secondary` and `button-text`.
 ///
 /// An outlined button is the page colour with a hairline and **no shadow at
-/// all** — the brief reserves the stamped displacement for filled surfaces, so a
-/// secondary button reads as flat and a primary one as stamped. Text buttons
-/// are transparent with the accent ink at the label size.
+/// all** — the lift is reserved for filled surfaces, so a secondary button reads
+/// as flat and a primary one as lifted. Text buttons are transparent with the
+/// accent ink at the label size.
 ///
-/// **The ink is page ink, because the fill is the page.** The label was
-/// `AppSurfaces.onSurface`, which is navy in both ramps since the cards went
-/// near-white — **1.22:1** on the dark page, so the button was a rectangle with
-/// no visible label. The two call sites that override this (the settings
-/// section's secondary buttons and the report's period button) already use
-/// `AppGlass.pageInkStrong` for the same reason, so the default has to agree
-/// with them.
+/// **The ink is page ink, because the fill is the page.** `AppSurfaces.onSurface`
+/// is the card's ink, which is right on a card and wrong on a fill that is the
+/// page itself; page ink is the token that matches this fill.
 OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
   style: ButtonStyle(
     backgroundColor: WidgetStatePropertyAll(AppSurfaces.page),
@@ -194,17 +185,18 @@ TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
 
 /// Styling for every `SegmentedButton` in the app.
 ///
-/// **The selected segment is a solid fill with dark ink and the unselected one is
-/// a hairline on the card.** That is the brief's `chip-active` / `chip`, and it
-/// is a change of kind rather than of degree: Material fills the selected segment
-/// with `secondaryContainer`, which `ColorScheme.fromSeed` derives by
-/// desaturating the seed until it reads as a neutral — invisible on a near-black
-/// card, which is where this card's three call sites live.
+/// **The selected segment is a solid accent fill with the token ink and the
+/// unselected one is a hairline on the card.** That is the brief's
+/// `chip-active` / `chip`, and it is a change of kind rather than of degree:
+/// Material fills the selected segment with `secondaryContainer`, which
+/// `ColorScheme.fromSeed` derives by desaturating the seed until it reads as a
+/// neutral — invisible on a dark card, which is where this card's three call
+/// sites live.
 ///
 /// The fill is the accent, because a segmented control is chrome and a filter
 /// chip is the one shape allowed to pill. It states the same thing as the
 /// colour scheme's `secondaryContainer`, deliberately: a `SegmentedButton` that
-/// reads red while an unthemed `Chip` beside it does not is two systems on one
+/// reads cyan while an unthemed `Chip` beside it does not is two systems on one
 /// screen.
 SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
   style: ButtonStyle(
@@ -234,13 +226,10 @@ SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
 /// The app's input fields.
 ///
 /// **The fill is [AppSurfaces.input], which is the same value as
-/// [AppSurfaces.surface]: a text field is a surface.** The old system needed an
-/// The app's input fields.
-///
-/// **The fill is [AppSurfaces.input], which is the same value as
-/// [AppSurfaces.surface]: a text field is a surface.** 56dp tall, the stamped
-/// shadow, and a 2px [AppPalette.error] border on focus — the accent, which is
-/// the only attention hue in the palette that is not also a severity.
+/// [AppSurfaces.surface]: a text field is a surface.** 56dp tall, with the
+/// hairline edge doing the defining rather than a shadow, and a 2px
+/// [AppPalette.error] border on focus — the accent, which is the only attention
+/// hue in the palette that is not also a severity.
 InputDecorationTheme _inputTheme() => InputDecorationTheme(
   filled: true,
   fillColor: AppSurfaces.input,
@@ -286,25 +275,18 @@ ThemeData appThemeData() => ThemeData(
   fontFamily: AppType.sans,
   textTheme: _appTextTheme(),
   scaffoldBackgroundColor: AppSurfaces.page,
-  // **Every `AppBar` is transparent, so the page gradient shows through.**
+  // **Every `AppBar` is transparent, so the page shows through.**
   //
   // There was no `appBarTheme` at all, so every `AppBar` painted
-  // `colorScheme.surface` — a near-white slab in **both** ramps, because cards
-  // are near-white in both now. On a page that is supposed to be a blue gradient
-  // that put a white rectangle across the top of the Settings, the energy
-  // report, alarm history and every other screen with a default `AppBar`, and it
-  // was invisible until the alarm history screen was measured at **1.00:1**
-  // for its own title.
+  // `colorScheme.surface` — a card-coloured slab across the top of Settings, the
+  // energy report, alarm history and every other screen with a default `AppBar`.
   //
-  // Transparent rather than page-coloured: the page is a *gradient*, and a flat
-  // colour cannot follow a gradient. What the bar needs is to be out of the way.
+  // Transparent rather than page-coloured: the page is a sweep, and a flat
+  // colour cannot follow it. What the bar needs is to be out of the way.
   //
   // **And the ink is page ink, because the bar is over the page.** The scheme's
-  // default bar ink is `onSurface`, which is navy in **both** ramps now that the
-  // cards are near-white — navy on the dark page measured **1.22:1**, so every
-  // title was invisible. `AppGlass.pageInkStrong` is white in the dark ramp and
-  // navy in the light one, and measures **10.90:1** on the sweep's top stop and
-  // **12.56:1** on the flat page.
+  // default bar ink is `onSurface`, which is card ink. `AppGlass.pageInkStrong`
+  // is the token for content on the bare page.
   appBarTheme: AppBarTheme(
     backgroundColor: Colors.transparent,
     surfaceTintColor: Colors.transparent,
@@ -353,12 +335,12 @@ ThemeData appThemeData() => ThemeData(
   ),
   // The date pickers' chrome, which otherwise falls back to Material 3's own
   // dark defaults (`#1C1B1F`-family surface containers) and shows up as a
-  // foreign grey dialog on both ramps. Every role here reads the same tokens a
-  // card does: near-white fill, navy ink, the one accent — so the picker reads
-  // as an app surface in dark mode instead of a system one. The header takes
-  // the accent with white ink, matching the hero card, and in-range days take
-  // the 12% accent wash from [AppBorders.categoricalWash] for the same
-  // contrast reason that value was chosen.
+  // foreign grey dialog. Every role here reads the same tokens a card does:
+  // card fill, card ink, the one accent — so the picker reads as an app surface
+  // instead of a system one. The header takes the accent with its token ink,
+  // matching the hero card, and in-range days take the 12% accent wash from
+  // [AppBorders.categoricalWash] for the same contrast reason that value was
+  // chosen.
   datePickerTheme: DatePickerThemeData(
     backgroundColor: AppSurfaces.surface,
     surfaceTintColor: Colors.transparent,
@@ -463,14 +445,13 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
     super.dispose();
   }
 
-  /// Re-resolves `system` when the platform flips.
+  /// Re-resolves the platform brightness.
   ///
-  /// **Without this, `ThemeMode.system` desyncs from itself.**
-  /// `MaterialApp` follows the platform on its own — that is what the mode
-  /// means — so the moment the user toggles Android's dark theme, the
-  /// `ThemeData` flips and `AppTheme` does not, because a static has no
-  /// platform listener. The result is the light palette telling Material it is
-  /// bright: white ink on white cards, with nothing thrown.
+  /// **Kept even though WattVision is dark-only.** `AppTheme.applyMode` clamps
+  /// every mode to dark, so this is a no-op today — but it is the one listener
+  /// that would keep a future ramp from desyncing: `MaterialApp` follows the
+  /// platform on its own, and a static palette has no platform listener of its
+  /// own.
   @override
   void didChangePlatformBrightness() {
     if (_mode != ThemeMode.system) return;
@@ -483,22 +464,17 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
     if (!mounted) return;
     // **The palette has to be applied here, not just the mode stored.**
     // `MaterialApp` reads `themeMode` and picks a slot, but both slots are built
-    // from `AppTheme.brightness` — which is still its `dark` default at this
-    // point, because nothing has called `AppTheme.applyMode` yet. Setting the
-    // mode alone gives Material a light slot that holds a dark `ThemeData`, so
-    // the app comes back up dark while the settings screen says Light, and the
-    // first tap on the segmented control is the thing that "fixes" it.
+    // from `AppTheme.brightness`, so the static has to be resolved before the
+    // first build or the tree paints with whatever default it started on.
     AppTheme.applyMode(stored, platformBrightness());
     setState(() => _mode = stored);
   }
 
   /// Applies [mode]: swaps the palette *first*, then rebuilds.
   ///
-  /// The order matters and is the one thing that cannot be got wrong here. If
-  /// the tree rebuilt before `AppTheme.apply` ran, one frame would paint with
-  /// the new `ThemeData` and the old surface stack — and on the light palette
-  /// that frame has white ink on white, which is the "white flash" this whole
-  /// static design was meant to avoid.
+  /// The order matters. If the tree rebuilt before `AppTheme.apply` ran, one
+  /// frame would paint with the new `ThemeData` and the old surface stack — the
+  /// "white flash" this whole static design was meant to avoid.
   void _applyMode(ThemeMode mode) {
     AppTheme.applyMode(mode, platformBrightness());
     setState(() => _mode = mode);
@@ -510,7 +486,6 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
 
   @override
   Widget build(BuildContext context) {
-    final light = AppTheme.brightness == Brightness.light;
     return MaterialApp(
       title: 'EnerGrow',
       debugShowCheckedModeBanner: false,
@@ -525,50 +500,35 @@ class _PltsMonitoringAppState extends State<PltsMonitoringApp>
       //
       // `targetSdk` 36 is edge-to-edge, so the system gesture bar's own strip
       // belongs to the app and the platform ignores
-      // `systemNavigationBarColor` below. The dashboard used to cover that
-      // strip by accident: with `extendBody: true` its body painted to the very
-      // bottom edge, past the nav bar. Docking the bar (`extendBody: false`)
-      // removed that accident, and the window's own background showed through —
-      // black, in both palettes, under the gesture pill.
-      //
-      // This is the one paint that has to follow the palette, so it reads
-      // `AppSurfaces.page` here rather than being left as `MaterialApp`'s
-      // default. Reading `AppSurfaces` in `build` is what makes the swap: the
-      // palette is already `applyMode`d by the time either theme slot is built.
+      // `systemNavigationBarColor` below. Docking the bar (`extendBody: false`)
+      // leaves the window's own background showing under the gesture pill, so
+      // this is the one paint that has to follow the palette.
       color: AppSurfaces.page,
       // **Both slots, and `themeMode` choosing between them.**
       //
       // `theme:` and `darkTheme:` are the *same* `ThemeData` built from the same
-      // tokens — what differs is which one `MaterialApp` publishes, and both
-      // read from `AppTheme`, which has already been swapped by the time either
-      // is built. Two slots rather than one rebuilt `theme:` because
-      // `MaterialApp` re-derives `Theme.of(context)` from the slot it picks, and
-      // only the slot mechanism animates and re-inherits that correctly.
+      // tokens — `AppTheme` clamps every mode to dark, so both slots carry the
+      // WattVision dark palette. Two slots rather than one rebuilt `theme:`
+      // because `MaterialApp` re-derives `Theme.of(context)` from the slot it
+      // picks, and only the slot mechanism animates and re-inherits that
+      // correctly.
       theme: appThemeData(),
       darkTheme: appThemeData(),
       themeMode: _mode,
       builder: (context, child) {
         // **Transparent, because the glass bar now paints that strip itself.**
-        // These two used to be `AppSurfaces.page`, which was a flat navy strip
-        // under a translucent white bar: a hard horizontal seam across the
-        // bottom of the screen, right where the user's thumb is. `GlassNavBar`
-        // now reads the bottom inset itself and paints its glass down into the
-        // gesture-bar region, so the platform must add nothing of its own colour
-        // there. `contrastEnforced: false` is what stops Android painting a
-        // scrim over a transparent navigation bar on API 29+.
+        // `GlassNavBar` reads the bottom inset itself and paints its glass down
+        // into the gesture-bar region, so the platform must add nothing of its
+        // own colour there. `contrastEnforced: false` is what stops Android
+        // painting a scrim over a transparent navigation bar on API 29+.
         //
-        // **The handle's brightness still follows the palette.** A transparent
-        // strip shows whatever is behind it — the light glass bar — so a dark
-        // handle is the readable one there; this is not a value to be pinned
-        // once and forgotten.
+        // The icons are light because the app is dark-only.
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: SystemUiOverlayStyle(
+          value: const SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
-            statusBarIconBrightness:
-                light ? Brightness.dark : Brightness.light,
+            statusBarIconBrightness: Brightness.light,
             systemNavigationBarColor: Colors.transparent,
-            systemNavigationBarIconBrightness:
-                light ? Brightness.dark : Brightness.light,
+            systemNavigationBarIconBrightness: Brightness.light,
             systemNavigationBarDividerColor: Colors.transparent,
             systemNavigationBarContrastEnforced: false,
           ),

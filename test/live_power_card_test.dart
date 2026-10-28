@@ -293,7 +293,13 @@ void main() {
       expect(find.text('Standby'), findsOneWidget);
     });
 
-    testWidgets('renders in dark mode', (tester) async {
+    // Was "renders in dark mode", which used to differ from the first test only
+    // by the ramp it applied. There is one appearance now, so the two pumps are
+    // identical — which makes this a check on the thing the ramp swap was really
+    // covering: the palette lives in statics, so a second pump in the same
+    // isolate has to render the same card rather than one left over from a
+    // previous test.
+    testWidgets('a second pump renders the same card', (tester) async {
       await tester.pumpWidget(
         wrap(
           LivePowerCard(
@@ -328,10 +334,10 @@ void main() {
     });
 
     // **The charge bar is painted from a token, not from a literal.** That claim
-    // used to be checked once per theme, and the loop was the point: Dracula
-    // derived its own track, so a card that took a `bool isDark` would render
-    // Dracula's page with the dark track — still builds, still finds every text,
-    // and wrong in a way only a pixel comparison catches.
+    // used to be checked once per appearance, and the loop was the point: an
+    // appearance that derived its own track would render the page with the wrong
+    // track — still builds, still finds every text, and wrong in a way only a
+    // pixel comparison catches.
     //
     // There is one appearance now, so there is one track and one bar. What is
     // left worth asserting is the thing the loop could not have caught: the

@@ -106,8 +106,8 @@ const List<NavDestination> kNavDestinations = [
 /// **54 is where a second reduction stopped.** The user called the 64 version
 /// "masih agak mengganggu … lebih ke bulky" — still bulky — and height is what
 /// makes a bar bulky: at 54 the pill is 26 dp above and below a 22 dp glyph,
-/// which reads as a floating capsule rather than a slab, and a fully round
-/// `AppRadius.pill` at that height is a shape rather than a chamfer.
+/// which reads as a floating capsule rather than a slab, and a generous corner
+/// radius at that height is a shape rather than a chamfer.
 ///
 /// It stops at 54 rather than going lower because **the bar's height is also
 /// the vertical touch target** — `_NavItem`'s `InkWell` fills a
@@ -266,59 +266,46 @@ class GlassNavBar extends StatelessWidget {
                   // The bar used to paint `AppSurfaces.page` outright, which
                   // was right while the page was one flat colour: bar and page
                   // were the same value and only the hairline separated them.
-                  // The page is now a vertical sweep, so painting its mid-tone
-                  // here lays a rectangle of a slightly different blue across
-                  // the bottom of the screen with a visible seam at the join —
-                  // the one place on a phone the user's thumb rests, and so the
-                  // one place a seam is most legible.
+                  // The page is a gradient slot even though WattVision flattens
+                  // it, so painting its mid-tone here would lay a rectangle of a
+                  // slightly different shade across the bottom of the screen
+                  // with a visible seam at the join — the one place on a phone
+                  // the user's thumb rests, and so the one place a seam is most
+                  // legible.
                   //
                   // Translucent white over the gradient lets the sweep continue
                   // through the bar, which is the reason the rest of the screen
                   // is built this way at all.
                   color: AppGlass.fillStrong,
-                  // **A stadium, not an 8px rectangle.** This was
-                  // `AppRadius.card`, and the user's read on it was "masih
-                  // kotak" — still square. That is a measurement, not a
-                  // preference: 8 px on a bar 76 dp tall is a corner radius
-                  // of 10% of the height, which at a phone's physical
-                  // density is about two millimetres. It reads as a
-                  // slightly chamfered rectangle, which is what it is.
-                  //
-                  // A tab bar is the one component in the app that is
-                  // *floating* — it is `extendBody: true`, painted over the
-                  // page, with a gap under it and page visible on both
-                  // sides. A floating object with near-square corners does
-                  // not read as floating; it reads as a strip that happens
-                  // to be inset. `AppRadius.pill` is the token that already
-                  // means "fully round" and it is what the pressed
-                  // `InkWell` in `_NavItem` uses, so the ripple and the
-                  // silhouette finally agree — the ripple was a capsule
-                  // over a chamfered rectangle.
-                  //
-                  // The bar's own clip below carries the same value, and the
-                  // test asserts the two are the same number, because that
-                  // disagreement is invisible in the source and visible on
-                  // the device.
-                  // **Rounded at the top, flush at the bottom.**
+                  // **Rounded at the top, flush at the bottom, and the sheet's
+                  // radius rather than the card's.**
                   //
                   // It used to be `BorderRadius.zero` on the argument that a
                   // docked bar's corners are off-screen, so the radius has
                   // nothing to describe. That is only true of the *bottom* two.
-                  // The bar is `extendBody: true` and 54dp tall, so its top
-                  // corners sit in the middle of the page with the blue sweep
-                  // visible on either side of them — and square, which is what
-                  // read as "too square at the bottom" rather than as a bar.
-                  // The bottom two stay flush: rounding them would cut the
-                  // gesture-bar inset out of the shape.
+                  // The bar is `extendBody: true`, so its top corners sit in the
+                  // middle of the page with the page visible on either side of
+                  // them — and square, which is what read as "too square at the
+                  // bottom" rather than as a bar. The bottom two stay flush:
+                  // rounding them would cut the gesture-bar inset out of the
+                  // shape.
+                  //
+                  // `AppRadius.sheet` rather than `AppRadius.card`, because a bar
+                  // is a larger object than a card and a card-sized corner on it
+                  // reads as a chamfered rectangle rather than as a rounded edge.
+                  // The bar's own clip below carries the same value, and the test
+                  // asserts the two are the same number, because that
+                  // disagreement is invisible in the source and visible on the
+                  // device.
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppRadius.sheet),
                   ),
                   // **A top hairline only.** A docked bar's left, right and
                   // bottom edges are the page's own edges — a border there
                   // is a line drawn along the screen.
-                  // A white hairline, not the neutral one: over the blue bar a
-                  // slate border is a grey line on a blue field and reads as
-                  // dirt, where a translucent white reads as an edge.
+                  // A white hairline, not the neutral one: over the glass bar a
+                  // slate border reads as dirt, where a translucent white reads
+                  // as an edge.
                   border: Border(
                     top: BorderSide(color: AppGlass.divider, width: 1),
                   ),
@@ -516,16 +503,12 @@ class _NavItem extends StatelessWidget {
 /// Selection used to be "the icon turns red", and there was no fill behind it.
 /// The bar now paints [_NavBubble] behind the selected slot, so the selected
 /// glyph has to be [AppPalette.onHue] — the same token the bubble's ink was
-/// measured with. The bubble is `#1D4ED8` in both ramps: white on it measures
-/// **6.70:1** and black **3.13:1**, so the ink follows the fill rather than
-/// being picked, and the token is what keeps the two in step. The bubble
-/// itself clears 1.4.11's 3:1 against the bar it sits on — **3.56:1** on the
-/// dark ramp's 68% white wash over `#1B3260` and **6.21:1** on the light
-/// ramp's over `#D4E5FA`.
+/// measured with. The bubble is the accent: on WattVision's bright cyan the
+/// token ink is dark `#121212`, and the ink follows the fill rather than being
+/// picked. The token is what keeps the two in step.
 ///
 /// The inactive glyph is `AppGlass.navInkSoft`, because the bar is a glass
-/// surface and the ink on glass is the token that does not invert with the
-/// ramp.
+/// surface and the ink on glass is the token that follows the wash.
 class _NavDestination extends StatelessWidget {
   const _NavDestination({
     required this.selected,
@@ -540,11 +523,9 @@ class _NavDestination extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // **`onHue`, not `error`.** The bubble is behind this glyph, so accent ink
-    // on an accent fill is accent-on-accent. See the class doc for the measured
-    // numbers.
-    // The inactive glyph is glass ink, not `AppGlass.inkSoft`: `inkSoft` is white
-    // at 70% and is the hero's ink, and the bar is a glass surface over the
-    // page, where white is invisible in the light ramp's pale-blue wash.
+    // on an accent fill is accent-on-accent. See the class doc.
+    // The inactive glyph is glass ink, not `AppGlass.inkSoft`: `inkSoft` is the
+    // hero's ink, and the bar is a glass surface over the page.
     final color = selected ? AppPalette.onHue : AppGlass.navInkSoft;
     return Pressable(
       pressedScale: 0.90,

@@ -1,5 +1,15 @@
 # EnerGrow 1.9.0 (build 18)
 
+> **Superseded by the WattVision retheme.** This note describes Midnight
+> Categorical — the release that removed the four appearance presets. The
+> dark-only decision, the deleted `AppElevation`, and the removed Settings →
+> Appearance section all still hold. What changed afterwards: the palette is
+> WattVision (`#121212` page, `#1E1E1E` cards, cyan `#00E5FF`, alert red
+> `#FF453A`), the typefaces are Inter + JetBrains Mono rather than Space Grotesk +
+> Plus Jakarta Sans, the categorical hue-per-category table below is replaced by
+> one accent plus the red/green/blue chart triad, and card radius stayed 16 rather
+> than going to 24. See `CHANGELOG.md` `[Unreleased]` and `FEATURE.md` §14.
+
 **Midnight Categorical** — one visual system instead of four, colour as a
 vocabulary, three typefaces bundled.
 

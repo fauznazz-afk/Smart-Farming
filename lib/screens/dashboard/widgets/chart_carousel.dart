@@ -44,16 +44,14 @@ class _ChartCarouselState extends State<ChartCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    // **The dots are page ink, and they were the accent.** Two generations of
-    // "not amber" here, both settling on a categorical hue, and the hue had the
-    // same problem the chart header's live dot had: `AppPalette.error` is
-    // `#1D4ED8` in both ramps and measures **1.09:1** on the dark ramp's own page
-    // stop. `AppGlass.active` (`#2F6FED`) is not the answer either — it is the
-    // selected *sheet row* outline, chosen to clear 3:1 on white, and it lands
-    // at 1.61:1 on that same stop.
+    // **The dots are page ink, and they were the accent.** The accent had the
+    // same problem the chart header's live dot had: it is a hue measured against
+    // a card, not against the page it was being drawn on. `AppGlass.active` is
+    // not the answer either — it is the selected *sheet row* outline, chosen to
+    // clear 3:1 on a sheet, not on the page.
     //
     // So the pager is drawn in the page ink ramp, like every other piece of
-    // chrome that sits on the page gradient: the current page at
+    // chrome that sits on the page: the current page at
     // [AppGlass.pageInkStrong] and the rest at [AppGlass.pageInkSoft]. Width
     // carries "which one" and colour only carries weight.
     return Column(

@@ -167,12 +167,12 @@ class FormattedMarkdownText extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         // **`surfaceMuted`, not `page`.** This block is drawn *inside* a chat
-        // bubble and `AppSurfaces.page` is a deep blue (`#1B3260`) on the dark
-        // ramp, so the navy code ink measured **1.22:1** against its own
-        // background — a code block rendered as an empty black hole.
-        // `surfaceMuted` is the step the inline-code chip two widgets up already
-        // uses, so the two read as one code vocabulary, and it is the same token
-        // that value documents as a fill rather than a track.
+        // bubble, and `AppSurfaces.page` is the darkest value in the app — code
+        // ink on it measured **1.22:1** against its own background, a code block
+        // rendered as an empty hole. `surfaceMuted` is the step the inline-code
+        // chip two widgets up already uses, so the two read as one code
+        // vocabulary, and it is the same token that value documents as a fill
+        // rather than a track.
         color: AppSurfaces.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: AppBorders.hairlineBorder,
@@ -276,10 +276,10 @@ class FormattedMarkdownText extends StatelessWidget {
                 // **Explicit, and this is a correction rather than a
                 // restatement.** With no colour the `Text` inherited the
                 // ambient default, which is `bodyMedium` — the *muted* ink — and
-                // `onSurfaceVariant` on `surfaceMuted` measures **4.15:1** in the
-                // light ramp. This chip is 11 px, the size with the least room,
-                // and it is a code fragment rather than prose. Full card ink
-                // clears at 10.6:1 and 12.5:1.
+                // `onSurfaceVariant` on `surfaceMuted` measures **4.15:1**, under
+                // the 4.5:1 a text run has to clear. This chip is 11 px, the size
+                // with the least room, and it is a code fragment rather than
+                // prose. Full card ink clears it comfortably.
                 color: AppSurfaces.onSurface,
               ),
             ),

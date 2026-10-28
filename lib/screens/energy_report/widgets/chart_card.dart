@@ -197,11 +197,11 @@ class _SelectedBucketReadout extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             // **`surfaceAlt`, not `track`.** This chip sits *inside* the card, and
-            // `AppSurfaces.track` is near-black on the dark ramp — it is a bar's
-            // floor, drawn under a fill that carries its own contrast. Card ink
-            // on it measured **1.22:1** in dark mode. `surfaceAlt` is the one
-            // step above the card and is what `AppTile` uses for the same job, so
-            // this chip and the totals tiles above it now match.
+            // `AppSurfaces.track` is the page colour — it is a bar's floor, drawn
+            // under a fill that carries its own contrast. Card ink on it measured
+            // **1.22:1**. `surfaceAlt` is the one step above the card and is what
+            // `AppTile` uses for the same job, so this chip and the totals tiles
+            // above it now match.
             color: AppSurfaces.surfaceAlt,
             borderRadius: AppRadius.all(AppRadius.badge),
             border: Border.all(color: appDivider(opacity: 0.5)),

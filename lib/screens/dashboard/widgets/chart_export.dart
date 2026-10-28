@@ -146,9 +146,8 @@ Future<ByteData?> composeChartImage(
       // exported file differ from the screen it came from.
       //
       // **Page ink, because the caption sits on the page-coloured margin.** The
-      // canvas is painted `AppSurfaces.page` and `AppSurfaces.onSurface` is
-      // *card* ink — navy in both ramps since the cards went near-white — which
-      // measured **1.22:1** on that canvas in the dark ramp.
+      // canvas is painted `AppSurfaces.page`, so the ink on it is the page's own
+      // token rather than the card's.
       style: AppType.numeralLg.copyWith(color: AppGlass.pageInkStrong),
     ),
     textDirection: textDirection,

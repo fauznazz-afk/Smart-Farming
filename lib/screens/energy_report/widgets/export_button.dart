@@ -27,17 +27,15 @@ class ExportButton extends StatelessWidget {
         //
         // **The `AppCard` wrapper is gone, and that is deliberate.** It used to
         // put this button inside a card, which is a `surface` fill carrying its
-        // own stamped shadow — so the one object the brief says may be a large
-        // accent fill sat inside a second, quieter box, with two shadows and two
-        // edges. The brief is explicit that "the only large fill ever rendered
-        // in primary is the primary button", and this is it.
+        // own lift — so the one object the brief says may be a large accent fill
+        // sat inside a second, quieter box, with two shadows and two edges. The
+        // brief is explicit that "the only large fill ever rendered in primary is
+        // the primary button", and this is it.
         //
         // The shadow is painted by the `DecoratedBox` behind the button rather
         // than by `FilledButton`'s `elevation`, because Material maps elevation
-        // through `kElevationToShadow` and can only produce a blurred halo —
-        // the one shadow language the brief bans. `AppShadows.stampedIn` is
-        // the tinted variant: a solid offset rectangle in the accent at 20%,
-        // so the displacement itself bleeds the fill's own colour.
+        // through `kElevationToShadow` and cannot carry a hue. `stampedIn` is the
+        // tinted variant: the lift is the accent, so it reads as part of the fill.
         return DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: AppRadius.all(AppRadius.card),

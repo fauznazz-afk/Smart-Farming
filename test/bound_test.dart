@@ -429,9 +429,9 @@ void main() {
     });
   });
 
-  group('the palette swap', () {
-    // **This is the dashboard's 1.13.0 light-theme bug, at the size it can be
-    // tested.**
+  group('the token, not the parent rebuild, decides a repaint', () {
+    // **This is the dashboard's 1.13.0 frozen-palette bug, at the size it can be
+    // tested — and the palette swap it was found with no longer exists.**
     //
     // `AppSurfaces` and `AppPalette` are static getters, so a panel reads the
     // current palette at build time and a rebuild is all it needs to follow a
@@ -439,99 +439,74 @@ void main() {
     // then `setState`, so the whole tree does rebuild — and every `Bound` in it
     // gets `didUpdateWidget` with an unchanged listenable and an unchanged
     // token, which is precisely the case in which `Bound` keeps its cached
-    // child. Nothing rebuilt. The panels were left in the old palette until the
-    // next ten-second poll bumped a revision, so the app was one colour and one
-    // panel another.
+    // child. Nothing rebuilt, and the panels were left in the old palette until
+    // the next ten-second poll bumped a revision.
     //
-    // The dashboard's `_visualToken` did not contain the palette at all, even
-    // though the comment on `_bindRevision` says that is the very reason a
-    // token exists. This test is the missing half of that sentence: it shows
-    // that the swap is invisible without it and immediate with it.
-    tearDown(() => AppTheme.apply(Brightness.dark));
+    // WattVision is dark-only, so `AppTheme.apply` clamps every brightness to
+    // dark and there is no second palette to swap to. **What still matters is
+    // the rule that bug exposed**, and it is the rule these two tests pin: a
+    // parent rebuild with an unchanged token keeps the cached child, so
+    // anything a builder closes over has to be *in* the token.
+    // `dashboard_screen.dart` keeps `AppTheme.brightness` in `_visualToken` for
+    // exactly that reason — so a future ramp cannot reintroduce the bug — and
+    // these tests are what say the entry is load-bearing rather than decorative.
 
-    // **The swap is what `main.dart` does**: `AppTheme.applyMode`, then a
-    // `setState` on the root, which rebuilds this host and every `Bound` under
-    // it with an unchanged listenable.
-    Future<void> swapPalette(WidgetTester tester) async {
-      AppTheme.apply(Brightness.light);
+    /// What `main.dart` does: change what the builder reads, then `setState` on
+    /// the root, which rebuilds this host and every `Bound` under it with an
+    /// unchanged listenable.
+    Future<void> refreshRoot(WidgetTester tester) async {
       tester.state<_PaletteHostState>(find.byType(_PaletteHost)).refresh();
       await tester.pumpAndSettle();
     }
 
-    Color paintedAccent(WidgetTester tester) => tester
-        .widget<Text>(
-          find.descendant(of: find.byType(Bound), matching: find.byType(Text)),
-        )
-        .style!
-        .color!;
-
-    testWidgets('a token without the palette keeps the old ink', (
-      tester,
-    ) async {
+    testWidgets('an unchanged token keeps the cached child', (tester) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
-      AppTheme.apply(Brightness.dark);
 
       await tester.pumpWidget(
-        wrap(_PaletteHost(live: live, tokenCarriesPalette: false)),
+        wrap(_PaletteHost(live: live, tokenFollowsRebuild: false)),
       );
-      final dark = AppPalette.error;
-      final darkPage = AppSurfaces.page;
+      expect(find.text('builds: 1'), findsOneWidget);
 
-      await swapPalette(tester);
+      await refreshRoot(tester);
 
       expect(
-        AppSurfaces.page,
-        isNot(darkPage),
+        find.text('builds: 1'),
+        findsOneWidget,
         reason:
-            'The palette really did change - otherwise this proves nothing. '
-            'The witness is the page, not the accent: the blue system '
-            'deliberately shares one accent hue across both ramps, so the '
-            'accent is identical here by design and can no longer stand as '
-            'proof that a swap happened.',
-      );
-      expect(
-        paintedAccent(tester),
-        dark,
-        reason:
-            'The Bound kept its cached child, so the panel is still painted in '
-            'the previous palette. This is the failure. Nothing throws; the app '
-            'just shows two palettes at once until the next poll.',
+            'The Bound kept its cached child across a root rebuild, which is '
+            'the whole point of the class: a poll that changes nothing must not '
+            'rebuild the tree. If this ever reads `builds: 2`, `Bound` has '
+            'stopped caching and every card on the dashboard re-runs on every '
+            'parent frame.',
       );
     });
 
-    testWidgets('the palette in the token repaints immediately', (
-      tester,
-    ) async {
+    testWidgets('a changed token repaints on the same frame', (tester) async {
       final live = ValueNotifier<int>(0);
       addTearDown(live.dispose);
-      AppTheme.apply(Brightness.dark);
 
       await tester.pumpWidget(
-        wrap(_PaletteHost(live: live, tokenCarriesPalette: true)),
+        wrap(_PaletteHost(live: live, tokenFollowsRebuild: true)),
       );
-      final darkPage = AppSurfaces.page;
+      expect(find.text('builds: 1'), findsOneWidget);
 
-      await swapPalette(tester);
+      await refreshRoot(tester);
 
-      final painted = paintedAccent(tester);
       expect(
-        painted,
-        AppPalette.error,
+        find.text('builds: 2'),
+        findsOneWidget,
         reason:
-            'The brightness changed the token, the builder re-ran, and the panel '
-            'is in the new palette on the same frame.',
+            'The token changed, so the builder re-ran on the same frame. This '
+            'is the half `_visualToken` buys: without the palette in the token '
+            'the cached child above survives a palette change and the panel '
+            'paints the old colours until the next poll.',
       );
-      // **The repaint is proved by the page, not the accent.** The accent is one
-      // hue across both ramps by design, so `painted == dark` here is the correct
-      // outcome and asserting otherwise would be asserting a second brand
-      // colour. What the test is really about — that the builder re-ran on the
-      // same frame rather than leaving a cached child — is witnessed by the
-      // page value the builder also reads.
       expect(
+        tester.widget<Text>(find.text('builds: 2')).style?.color,
         AppSurfaces.page,
-        isNot(darkPage),
-        reason: 'the palette did not actually swap, so the repaint is untested',
+        reason: 'the builder reads the live palette, so a re-run is what makes '
+            'it current rather than a copy of the frame it was built in',
       );
     });
   });
@@ -836,17 +811,21 @@ class _SubViewHostState extends State<_SubViewHost> {
 /// A `Bound` whose token is computed in `build`, which is how the dashboard does
 /// it: `_visualToken` is a getter, so a parent rebuild recomputes it.
 ///
-/// **The flag is the whole experiment.** With [tokenCarriesPalette] false the
-/// token is `Object.hash` of the same two constants across a palette swap, so
-/// `Bound` sees no change and keeps its child - the bug. With it true the
-/// brightness is in the hash, so the token differs and the builder re-runs.
-/// A token frozen by the test instead of computed here would make the first
-/// case pass for the wrong reason.
+/// **The flag is the whole experiment.** With [tokenFollowsRebuild] false the
+/// token is `Object.hash` of the same two constants across a root rebuild, so
+/// `Bound` sees no change and keeps its child. With it true the rebuild counter
+/// is in the hash, so the token differs and the builder re-runs. A token frozen
+/// by the test instead of computed here would make the first case pass for the
+/// wrong reason.
+///
+/// The builder's `Text` carries its own build count so the cached-child half is
+/// observable from outside, and its ink is read from the live palette so the
+/// re-run half is too.
 class _PaletteHost extends StatefulWidget {
-  const _PaletteHost({required this.live, required this.tokenCarriesPalette});
+  const _PaletteHost({required this.live, required this.tokenFollowsRebuild});
 
   final ValueNotifier<int> live;
-  final bool tokenCarriesPalette;
+  final bool tokenFollowsRebuild;
 
   @override
   State<_PaletteHost> createState() => _PaletteHostState();
@@ -854,6 +833,7 @@ class _PaletteHost extends StatefulWidget {
 
 class _PaletteHostState extends State<_PaletteHost> {
   int _bumps = 0;
+  int _builds = 0;
 
   void refresh() => setState(() => _bumps++);
 
@@ -863,11 +843,16 @@ class _PaletteHostState extends State<_PaletteHost> {
       Text('bumps: $_bumps'),
       Bound(
         listenable: widget.live,
-        token: widget.tokenCarriesPalette
-            ? Object.hash('pv', AppTheme.brightness)
+        token: widget.tokenFollowsRebuild
+            ? Object.hash('pv', _bumps)
             : Object.hash('pv', 0),
-        builder: () =>
-            Text('accent', style: TextStyle(color: AppPalette.error)),
+        builder: () {
+          _builds++;
+          return Text(
+            'builds: $_builds',
+            style: TextStyle(color: AppSurfaces.page),
+          );
+        },
       ),
     ],
   );

@@ -14,6 +14,10 @@ import '../models/settings_keys.dart';
 /// where it can reach a Settings screen four navigations deep, and only the
 /// *effect* lives in the static.
 ///
+/// **WattVision is dark-only, so `AppTheme` ignores the choice.** The scope stays
+/// because `MaterialApp` needs a `themeMode` and a stored value should not be
+/// discarded; every mode resolves to dark.
+///
 /// `MaterialApp`'s `builder:` is above every route, so the scope it installs is
 /// visible to all of them without any route knowing about the root widget.
 class ThemeModeScope extends InheritedWidget {
@@ -40,9 +44,9 @@ class ThemeModeScope extends InheritedWidget {
 
 /// Reads the stored preference.
 ///
-/// **`system` when nothing is stored, and it is a real default rather than a
-/// fallback.** A user whose phone is already in dark mode gets dark without
-/// ever touching a setting, which is the same answer they would have picked.
+/// **`system` when nothing is stored.** WattVision is dark-only, so the value is
+/// informational — `AppTheme` clamps every mode to dark — but it is still read
+/// and written so an upgrade does not silently discard what the user chose.
 Future<ThemeMode> loadThemeMode() async {
   final p = await SharedPreferences.getInstance();
   return switch (p.getString(SettingsKeys.themeMode)) {

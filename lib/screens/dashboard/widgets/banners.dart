@@ -43,22 +43,14 @@ class TelemetryErrorView extends StatelessWidget {
             // value.** The rule [_statusBannerEdge] documents still holds — a
             // condition is a glyph and a word, never a block of colour — but
             // `TelemetryErrorView` is the `Scaffold` body, so this glyph is drawn
-            // straight onto the page gradient with no card behind it, and the card
-            // value is `#D01E1E`: measured **2.02:1** against the dark ramp's top
-            // stop and 2.32:1 against its bottom one, which is a 42px glyph
-            // disappearing into the sweep. `statusBadOnPage` is the same red at
-            // the lightness the dark page needs (**5.74:1** at the top stop,
-            // **6.62:1** at the bottom) and resolves to `#B91C1C` in light mode,
-            // where the page is pale and the card value is what would have been
-            // correct.
+            // straight onto the page with no card behind it.
             Icon(Icons.cloud_off, size: 42, color: statusBadOnPage),
             const SizedBox(height: 12),
             Text(
               'Failed to fetch telemetry from ThingsBoard.',
               textAlign: TextAlign.center,
-              // Directly on the page, not on a card: the `pageInk` ramp inverts
-              // with the ramp, which card ink (`AppSurfaces.onSurface`, navy in
-              // both palettes) cannot do because it is white in neither.
+              // Directly on the page, not on a card: page ink is the token for
+              // content on the bare page.
               style: AppType.headlineLg.copyWith(color: AppGlass.pageInkStrong),
             ),
             const SizedBox(height: 8),
@@ -71,19 +63,12 @@ class TelemetryErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             // **The brief's `button-primary`, and the only large accent fill
-            // allowed anywhere in the app.** Blue fill, white ink,
-            // `button-label` type, 8px radius, 56dp tall, with the tinted
-            // displacement `4px 4px 0` at 20% in the same hue in place of the
-            // black one.
+            // allowed anywhere in the app.** Accent fill, token ink,
+            // `button-label` type, card radius, 56dp tall, with a tinted lift in
+            // the same hue rather than a neutral black one.
             //
-            // It was lime, which is the clearest single instance of the bug the
-            // conversion is fixing: a saturated brand fill on a *retry* button
-            // is chrome, and chrome has one colour.
-            //
-            // **The ink is white, and that was measured rather than assumed.**
-            // On this blue fill (`#1D4ED8`) black is **3.13:1** — under AA for
-            // body text — and white is **6.70:1**. `AppPalette.onHue` is white
-            // in both ramps, so it is the ink every saturated fill takes.
+            // **The ink is `AppPalette.onHue`, which is dark on WattVision's
+            // bright cyan.** White on this fill is about 1.4:1.
             //
             // The shadow sits on a wrapping `DecoratedBox` rather than on the
             // button's own style, because a `BoxShadow` in a `BoxDecoration`
@@ -111,12 +96,9 @@ class TelemetryErrorView extends StatelessWidget {
                   foregroundColor: AppPalette.onHue,
                   disabledBackgroundColor: AppSurfaces.surfaceAlt,
                   // **Card ink, not page ink.** The disabled fill is
-                  // `AppSurfaces.surfaceAlt`, which is near-white in *both*
-                  // ramps, so the ink on it has to be the ink that binds to a
-                  // white card. `AppGlass.pageInkSoft` is white in dark mode, and
-                  // white at 78% over a near-white fill measured **1.00:1** — a
-                  // "Try again" button with no label. `onSurfaceVariant` clears
-                  // at 7.08:1 in dark and 6.92:1 in light.
+                  // `AppSurfaces.surfaceAlt`, a raised dark step, so the ink on
+                  // it is the ink that binds to a card. `onSurfaceVariant` is
+                  // the muted card ink and clears AA on it.
                   disabledForegroundColor: AppSurfaces.onSurfaceVariant,
                   minimumSize: const Size.fromHeight(56),
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -146,11 +128,11 @@ class OfflineBanner extends StatelessWidget {
     final color = statusWarn;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      // **The stamped tier.** A banner is a card that happens to be transient,
-      // so it takes the brief's `4px 4px 0 rgba(0,0,0,0.3)` like any other —
-      // it was the one flat surface on the page that had no reason to be flat.
-      // `AppCard` rather than `AppSurface`, because `AppSurface` has no shadow
-      // parameter and adding one there is another agent's file.
+      // **The lifted tier.** A banner is a card that happens to be transient, so
+      // it takes the card's lift like any other — it was the one flat surface on
+      // the page that had no reason to be flat. `AppCard` rather than
+      // `AppSurface`, because `AppSurface` has no shadow parameter and a banner
+      // is a card.
       child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         border: _statusBannerEdge(color),
@@ -217,9 +199,15 @@ class EnergyAlertBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return Container(
       padding: const EdgeInsets.all(12),
-      border: _statusBannerEdge(statusAlert),
+      decoration: BoxDecoration(
+        color: const Color(0xFF3A1C1C),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border(
+          left: BorderSide(color: AppPalette.statusBad, width: 4),
+        ),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -234,7 +222,7 @@ class EnergyAlertBanner extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         message,
-                        style: AppType.bodySm.copyWith(color: appPrimaryText),
+                        style: AppType.bodySm.copyWith(color: statusBad),
                       ),
                     ),
                   )
@@ -353,8 +341,8 @@ class ConnectionStatusBanner extends StatelessWidget {
       // [AppRadius.card], so the second radius is simply gone rather than
       // corrected.
       //
-      // On `AppCard` rather than `AppSurface` for the stamped shadow; the hue
-      // goes through [_statusBannerEdge], on the rule that documents.
+      // On `AppCard` rather than `AppSurface` for the card's lift; the hue goes
+      // through [_statusBannerEdge], on the rule that documents.
       child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         border: _statusBannerEdge(color),

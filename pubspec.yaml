@@ -100,9 +100,9 @@ flutter:
   # Android the variable wght axis is not applied reliably, so a variable file
   # declared once would render every weight at its default.
   
-  # Inter is the entire system per the MiniDash brief: 400 for the rare
-  # lowercase body line, 700 for the uppercase labels, 900 (Black) for displays,
-  # numerals and button labels. The weight is in the filename.
+  # Inter is the entire system: 400 for the rare lowercase body line, 700 for
+  # the uppercase labels, 900 (Black) for displays and numerals. The weight is in
+  # the filename.
   #
   # 500 and 600 are declared because `design_tokens.dart` asks for them by
   # weight. Flutter resolves a requested weight to the NEAREST declared cut, so

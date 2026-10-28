@@ -130,9 +130,9 @@ berarti aplikasi rusak. Detail lengkap ada di [AGENTS.md](./AGENTS.md#background
 - **Pemberitahuan versi baru**: sekali sehari membandingkan rilis GitHub terbaru
   dengan versi terpasang, dan muncul banner kalau ada yang lebih baru. Membuka
   halaman rilis di browser; **tidak mengunduh atau memasang apa pun**
-- Dark & light mode (Light / Dark / Auto, persisten lintas restart), empat
-  pilihan aksen, dan sistem permukaan **soft-UI opaque** (kartu se warna
-  halaman, kedalaman dari pasangan bayangan satu arah cahaya)
+- **Dark-only**, dengan sistem permukaan **WattVision**: halaman flat `#121212`,
+  kartu `#1E1E1E`, satu aksen data cyan, dan satu lift bayangan. Tidak ada
+  pemilih tema maupun aksen — pilihan Light / Dark / Auto sudah dihapus
 - **Ekspor chart sebagai PNG 1920×1080** dengan judul dan keterangan rentang,
   dari tombol unduh di setiap kartu grafik
 - Konfigurasi ThingsBoard tersimpan di secure storage, bukan di teks biasa
@@ -159,7 +159,7 @@ Aplikasi ini **tidak punya backend sendiri**. Autentikasi, data, dan histori sem
 langsung dari ThingsBoard yang sudah live di
 `https://dashboard.mbkm20262027.tech`. Pengecekan alarm background memakai endpoint
 yang sama, dengan token yang diteruskan dari Dart dan disimpan terenkripsi di
-**AndroidKeyStore** — token asli tetap milik `flutter_secure_storage` dan tidak pernah
+**AndroidKeyStore** — token asli tetap milik `flutter_secure_storage` dan tidak
 pernah ditulis di luar itu.
 
 ---
@@ -184,9 +184,9 @@ lib/
 │   ├── alarm_settings.dart          # Ambang dari SharedPreferences
 │   ├── energy_forecast_service.dart
 │   ├── energy_report_service.dart
+│   ├── theme_mode.dart              # Preferensi tema lama; selalu resolve ke dark
 │   └── connection_health_service.dart
 ├── screens/                         # Login, dashboard, laporan, settings, CCTV, riwayat
-├── theme/app_theme_controller.dart
 └── widgets/                         # Primitif permukaan (AppCard, AppTile, AppBadge) — nama file `liquid_glass.dart` sudah tidak akurat
 
 android/app/src/
@@ -302,7 +302,7 @@ Semua dicek di **Xiaomi 24090RA29G (Android 16, API 36)**. Rincian per-area di
 - [x] Tab PV / AC / Battery dengan chart 3 seri
 - [x] Chart Hydroponics (Temperature dua sensor, Humidity, Light, TDS) dan Fish (pH, Temperature, Turbidity)
 - [x] Energy analytics, termasuk proyeksi runtime baterai
-- [x] Pengaturan Environment alerts (field min/max) dan Appearance (ganti accent)
+- [x] Pengaturan Environment alerts (field min/max); ~~Appearance (ganti accent)~~ — dihapus, aplikasi dark-only
 - go2rtc CCTV live, video decode berjalan
 - [x] **Alarm background**: notifikasi muncul saat app tertutup, 450 ms, tanpa duplikat
 - [x] Alarm dijalankan ulang setelah reboot (`BOOT_COMPLETED`)

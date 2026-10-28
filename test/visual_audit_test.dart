@@ -1,39 +1,46 @@
-/// Golden-image harness for the Neon Brutalist restyle of 10 October 2026.
+/// Golden-image harness for the WattVision restyle.
 ///
 /// ## What this is for
 ///
-/// Four agents restyled `lib/` onto the brief at `DESIGN (1).md` — acid lime
-/// `#C6FF00`, Inter at 900/700/400, 8px radii, hard `4px 4px 0` offset shadows.
-/// `design_tokens.dart` is the single source of truth, and a *token* being right
-/// says nothing about a *screen* being right: `FEATURE.md`'s header exists
-/// because three label regressions once passed `flutter analyze`, a release
-/// build and every test in this repo.
+/// `lib/` is built on the brief at `DESIGN.md` — a flat `#121212` page, `#1E1E1E`
+/// cards, one cyan accent `#00E5FF`, Inter for prose and JetBrains Mono for
+/// figures. `design_tokens.dart` is the single source of truth, and a *token*
+/// being right says nothing about a *screen* being right: `FEATURE.md`'s header
+/// exists because three label regressions once passed `flutter analyze`, a
+/// release build and every test in this repo.
 ///
 /// This file renders the key screens at a phone width (411 dp) inside the app's
 /// real `AppBackground` and writes each one to
-/// `test/visual_audit/<name>_<light|dark>.png`, so a human can **look** at the
-/// design without a device. It is a review harness, not a mutation guard: when
-/// a widget changes shape the image changes and that is the point.
+/// `test/visual_audit/<name>_<ramp>.png`, so a human can **look** at the design
+/// without a device. It is a review harness, not a mutation guard: when a widget
+/// changes shape the image changes and that is the point.
 ///
-/// **Every screen is rendered in both ramps, and the file name says which.**
+/// **Every screen is rendered in every ramp in [kRamps], and the file name says
+/// which. There is one ramp today.**
 ///
 /// The ramp is not a parameter any widget can see: `AppTheme.apply` swaps the
-/// `AppSurfaces` and `AppPalette` statics, so light and dark are two *global
-/// states* rather than two arguments. That has two consequences this harness
-/// has to respect, and both of them were found by looking at the images rather
-/// than by reading the code.
+/// `AppSurfaces` and `AppPalette` statics, so a ramp is a *global state* rather
+/// than an argument. That has two consequences this harness has to respect, and
+/// both of them were found by looking at the images rather than by reading the
+/// code.
 ///
 ///  * **The ramp has to be applied before the theme is built.**
 ///    `appThemeData()` reads `AppTheme.brightness` and the two statics, and
 ///    every widget reads the statics while it builds. Applying the ramp after
 ///    the pump would repaint nothing that was already on screen.
-///  * **The ramp leaks between cases**, so `tearDown` puts it back to dark
-///    after every test. A case that left the light palette behind would tint
-///    the next case's chrome, and the image would look wrong for a reason that
-///    has nothing to do with the widget under review.
+///  * **The ramp leaks between cases**, so `tearDown` re-applies it after every
+///    test. A case that left a different ramp behind would tint the next case's
+///    chrome, and the image would look wrong for a reason that has nothing to do
+///    with the widget under review.
 ///
-/// A screen that was only ever looked at in one ramp is a screen nobody has
-/// reviewed in the other, so both are written every time.
+/// **WattVision is dark-only**, so `AppTheme.apply` clamps its argument to
+/// `Brightness.dark` and [kRamps] holds one entry. The harness kept its
+/// ramp-suffix plumbing — the key on the root, the suffix in the file name, the
+/// per-ramp loop — because that plumbing is what makes a second ramp a
+/// one-line change rather than a rewrite. What it did *not* keep is a second
+/// golden per case: the `_light.png` files were pictures of a palette the app
+/// can no longer paint, so they were deleted rather than regenerated as
+/// duplicates.
 ///
 /// ## Regenerating the images
 ///
@@ -42,12 +49,11 @@
 /// ```
 ///
 /// **On the 7 GB machine this repo is developed on, run it one case at a
-/// time.** The whole-file command renders eleven screens in two ramps each,
-/// and the process is killed part-way through with the isolate's
-/// "did not complete" — the same symptom `run_tests_per_file.ps1` exists to
-/// work around, and the same one this file's own header has always warned
-/// about. A case on its own is a fresh process with the whole machine's RAM
-/// behind it, and it is reliable:
+/// time.** The whole-file command renders eleven screens, and the process is
+/// killed part-way through with the isolate's "did not complete" — the same
+/// symptom `run_tests_per_file.ps1` exists to work around, and the same one this
+/// file's own header has always warned about. A case on its own is a fresh
+/// process with the whole machine's RAM behind it, and it is reliable:
 ///
 /// ```powershell
 /// foreach ($c in 'glass_nav_bar_expanded','live_power_card','telemetry_card',
@@ -83,13 +89,12 @@
 ///    says so itself. A golden generated on Windows will not match one
 ///    generated on Linux. Do not chase that across machines.
 ///
-/// ## Two ramps, and why the file name carries them
+/// ## One ramp, and why the file name still carries it
 ///
-/// Every case is rendered twice — once with `AppTheme.apply(Brightness.light)`
-/// and once with `AppTheme.apply(Brightness.dark)` — and the golden is named
-/// `<case>_light.png` / `<case>_dark.png`.
+/// Every case is rendered once per entry in [kRamps] — one entry, dark — and the
+/// golden is named `<case>_<ramp>.png`.
 ///
-/// The ramp is **global mutable state**: `AppTheme.apply` swaps the
+/// The ramp is **global mutable state**: `AppTheme.apply` sets the
 /// `AppSurfaces` and `AppPalette` statics that every widget reads while it
 /// builds, and `AppTheme.brightness` is what `AppGlass` reads to pick the page
 /// gradient. It is applied *before* `appThemeData()` is called, because that
@@ -97,10 +102,10 @@
 /// `ColorScheme`; a ramp applied afterwards would leave the chrome in the
 /// previous ramp while the widgets below it repainted in the new one.
 ///
-/// And it is reset in `tearDown`, because the statics outlive the test that
-/// set them: a case that left the light palette behind would tint the next
-/// case's chrome, and the resulting image would be wrong for a reason that has
-/// nothing to do with the widget under review.
+/// And it is re-applied in `tearDown`, because the statics outlive the test that
+/// set them: a case that left a different ramp behind would tint the next case's
+/// chrome, and the resulting image would be wrong for a reason that has nothing
+/// to do with the widget under review.
 ///
 /// ## Constraints this file keeps
 ///
@@ -189,10 +194,12 @@ const String _iconFont = 'fonts/MaterialIcons-Regular.otf';
 
 /// The ramps every case is rendered in, in the order they are captured.
 ///
-/// **A fixed list, not `Brightness.values`.** The order decides which capture
-/// is written first, and spelling the list out means a ramp added later cannot
-/// silently reorder the files that already exist.
-const List<Brightness> kRamps = <Brightness>[Brightness.light, Brightness.dark];
+/// **A fixed list, not `Brightness.values`, and it holds one entry.** WattVision
+/// is dark-only — `AppTheme.apply` clamps its argument — so a second entry here
+/// would render the same pixels under a different file name. The list is spelled
+/// out rather than derived so that adding a ramp later cannot silently reorder
+/// the files that already exist.
+const List<Brightness> kRamps = <Brightness>[Brightness.dark];
 
 /// The suffix a ramp contributes to a golden's file name.
 String _rampSuffix(Brightness brightness) =>
@@ -255,8 +262,8 @@ void main() {
   group('visual audit goldens', () {
     // **The ramp is global state, so it is put back after every case.**
     //
-    // `AppTheme.apply` swaps the `AppSurfaces` and `AppPalette` statics, and
-    // those outlive the test that set them. A case that left the light palette
+    // `AppTheme.apply` sets the `AppSurfaces` and `AppPalette` statics, and
+    // those outlive the test that set them. A case that left a different ramp
     // behind would tint the next case's chrome, and the resulting image would
     // be wrong for a reason that has nothing to do with the widget under
     // review.
@@ -849,9 +856,9 @@ void main() {
 
 /// Where this file writes its goldens, relative to the test file.
 ///
-/// **The ramp is in the name.** Light and dark are two images of the same
-/// case, and a name that did not say which was which would leave a reviewer
-/// comparing the wrong two files.
+/// **The ramp is in the name even though there is only one.** A name that did
+/// not say which ramp an image came from would leave a reviewer comparing the
+/// wrong two files the day a second ramp lands.
 String _goldenKey(String name, Brightness brightness) =>
     'visual_audit/${name}_${_rampSuffix(brightness)}.png';
 

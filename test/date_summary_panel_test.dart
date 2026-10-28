@@ -411,8 +411,8 @@ void main() {
       //
       // Scoped to the `TerminalPanel` itself, not to an `AppCard`: the panel is
       // built from raw tokens rather than `AppCard` (its build comment explains
-      // why — the dead `stamped` shadow), so an `AppCard` finder here matched
-      // nothing and the assertion read as "no label anywhere".
+      // why — it owns its own lift), so an `AppCard` finder here matched nothing
+      // and the assertion read as "no label anywhere".
       expect(
         find.descendant(
           of: find.byType(TerminalPanel),

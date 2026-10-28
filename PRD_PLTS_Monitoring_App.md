@@ -7,7 +7,15 @@
 **Status:** Rilis 1.8.0 terbit 7 Oktober 2026: audit keamanan penuh sumber
 (sepuluh temuan ditutup), lapisan skeuomorfis, dan tema keempat Skeuo yang
 membawa palet brief desain sendiri — amber `#F59E0B` dengan lime `#C4F042` pada
-halaman `#0A0A0C`, dapat dipilih di Settings → Appearance. Rilis 1.6.0 terbit
+halaman `#0A0A0C`, dapat dipilih di Settings → Appearance.
+
+**Retheme terbaru (belum dirilis):** seluruh sistem visual diganti ke
+**WattVision** — halaman flat `#121212`, kartu `#1E1E1E`, satu aksen cyan
+`#00E5FF`, satu lift bayangan — dan aplikasi menjadi **dark-only**. Settings →
+Appearance beserta `kAccentPalette` dihapus; preferensi tema lama tetap dibaca
+lalu diabaikan. Rincian di `CHANGELOG.md` `[Unreleased]` dan `FEATURE.md` §14.
+
+Rilis 1.6.0 terbit
 28 September 2026: halaman Hydroponics dan Fish
 dari device ThingsBoard keempat, navigasi bawah 4 tab dengan tab Power
 terpadu, OpenWeatherMap dihapus beserta izin lokasinya, serta perbaikan
@@ -73,7 +81,8 @@ Aplikasi mengakses ThingsBoard melalui HTTPS. Tidak ada backend/API kustom, push
 - Dashboard menghindari rebuild saat hasil telemetry tidak berubah. Perubahan
   telemetri diumumkan lewat penghitung revisi, bukan `setState`, agar pohon
   widget tidak dibangun ulang.
-- Tampilan mendukung tema gelap dan terang serta pilihan warna aksen.
+- Tampilan **dark-only** dengan satu aksen data cyan. Tidak ada pemilih tema
+  maupun aksen; `AppTheme.apply` mengunci palet dark di lapisan token.
 - **Overview merangkum sebagai strip verdict, bukan sebagai barisan angka.** Strip
   itu mencetak satu verdict untuk baterai, satu untuk jaringan AC, dan jumlah
   alarm aktif, jadi pertanyaannya "apakah aman" dijawab tanpa membaca angka.
@@ -147,11 +156,12 @@ Karena itu ada **dua** trigger, bukan satu: satu `setInexactRepeating` untuk rit
 
 **Status: Diimplementasikan.**
 
-- Preferensi tema (System/Light/Dark), warna aksen, polling, peringatan energi/lingkungan, ambang stale/SOC, batas sensor, dan URL CCTV disimpan lokal.
+- Polling, peringatan energi/lingkungan, ambang stale/SOC, batas sensor, dan URL CCTV disimpan lokal. Preferensi tema lama (`theme_mode`, `theme_seed`) masih dibaca lalu diabaikan, karena aplikasi sudah dark-only dengan satu aksen.
 - Batas lingkungan punya default yang bekerja: suhu 15-35 °C, kelembapan 40-85 %,
   TDS >= 800 ppm, dan alert lingkungan aktif secara default.
 - Pengguna dapat melihat versi aplikasi yang dibaca dari metadata paket, serta melakukan logout.
-- Pengaturan mengoptimalkan efek visual untuk performa.
+- Section Performance (dan `performanceMode`) sudah dihapus: tidak ada efek visual
+  berat yang perlu di-gate, karena blur dan orb gradient tidak ada lagi.
 
 ## 5. Kebutuhan nonfungsional
 
@@ -385,7 +395,7 @@ dokumen dan bertahan setelah hardware-nya berubah. Aturannya di `AGENTS.md`
 - `aapt2 dump badging`: `versionName=1.8.0`, `versionCode=17`.
 - Manifest APK release **tidak** memuat `AlarmDebugReceiver`; hanya
   `AlarmCheckReceiver` dan `AlarmBootReceiver`, seperti yang diwajibkan `AGENTS.md`.
-- `flutter analyze` bersih; `flutter test` 774 lulus di 50 file, dijalankan
+- `flutter analyze` bersih; `flutter test` 865 lulus di 74 file, dijalankan
   per-file — lihat catatan OOM di bawah.
 
 **Yang tidak diverifikasi di perangkat, dan tetap terbuka.** `adb install -r`
@@ -395,10 +405,15 @@ terbukti di layar**, dan tidak boleh dibaca sebagai beres hanya karena suite hij
 
 - CCTV tidak diputar — nol aktivitas dekoder tercatat, dan apakah itu regresi dari
   1.7.2 belum diketahui.
-- Tema Skeuo belum pernah difoto di layar.
-- Ramp shadow Skeuo diturunkan dari luminansi halaman, bukan diukur; scanline tepi
-  atas (`FEATURE.md` §18.5) belum diambil untuk tema mana pun.
-- Ketidakseimbangan shadow tema light belum diperbaiki.
+- ~~Tema Skeuo belum pernah difoto di layar.~~
+- ~~Ramp shadow Skeuo diturunkan dari luminansi halaman, bukan diukur; scanline tepi
+  atas (`FEATURE.md` §18.5) belum diambil untuk tema mana pun.~~
+- ~~Ketidakseimbangan shadow tema light belum diperbaiki.~~
+
+  Ketiga butir di atas **tidak berlaku lagi**: tema Skeuo, pasangan bayangan dan
+  mode light sudah dihapus oleh retheme WattVision. Yang tersisa sebagai hutang
+  adalah satu hal yang sama bentuknya — belum ada scanline tepi atas untuk lift
+  WattVision yang sekarang, dan itu tercatat di `FEATURE.md` §18.5.
 - Pemeriksaan alarm background belum pernah terlihat berjalan; nol log
   `EnerGrowAlarm*` selama 80 detik, dan stand-down foreground sendiri tidak
   menlog sehingga "berhenti karena aplikasi terbuka" tidak bisa dibedakan dari

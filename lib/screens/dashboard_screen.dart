@@ -66,32 +66,6 @@ import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
 
-/// Horizontal margin of a dashboard page: how far every card sits from the left
-/// and right edge of the display.
-///
-/// It is a local constant and not a token in `design_tokens.dart` only because
-/// the shadow arithmetic below is a property of `AppElevation.raised`, and that
-/// file belongs to the surface work rather than to this screen. If the numbers
-/// there change, this one has to be re-derived rather than nudged.
-///
-/// 16dp fitted the *contact* shadow and clipped the ambient half of the same
-/// shadow against the screen edge. `AppElevation.raised` is a contact shadow at
-/// offset 3 / blur 6 and an ambient one at offset 9 / blur 22, and Flutter paints
-/// a box shadow as a mask blur of sigma = blurRadius / 2 translated by the
-/// offset. So the ambient reaches:
-///
-///  * `9 + 11 = 20dp` at one sigma, still about 60% of its 0x40 peak — this is
-///    the part that actually draws the edge, and 16dp cut it in half.
-///  * `9 + 22 = 31dp` at two sigma, about 13% of peak, which is a couple of
-///    levels of alpha over the page and cannot be seen.
-///
-/// 24dp shows the whole visible core with 4dp to spare and still clips only the
-/// invisible tail. 32dp would show the tail too and costs 16dp of chart plot on a
-/// 381dp-wide viewport, which is a bad trade for 3% alpha.
-///
-/// The cost is 16dp of width per side: on this device a card goes from 349dp to
-/// 333dp, so every two-column metric cell loses 8dp. That is the one thing here
-/// that cannot be checked without the device.
 /// The dashboard's horizontal page margin, in logical pixels.
 ///
 /// **Public so a test can read it rather than restate it.** Every page is a
@@ -106,16 +80,24 @@ import 'settings_screen.dart';
 /// 16, not 24: the brief's `spacing.gutter`. It is also the carousel's bleed on
 /// each side, which is why it is written as the token rather than as a second
 /// number — one value, one meaning.
+///
+/// **The old 24 was shadow clearance and it is gone with the shadow.** It had
+/// been derived so the ambient half of a raised shadow pair would not be clipped
+/// by the screen edge — 9dp offset plus 11dp at one sigma, 20dp of visible core
+/// with 4dp to spare. WattVision's lift is `AppShadows.subtle`, one 24dp blur at
+/// 10dp offset, and the card is separated by a hairline rather than by a halo, so
+/// there is nothing left for the extra 8dp to protect. Dropping to the gutter
+/// buys 16dp of card width back.
 const double kDashboardPageMargin = AppSpacing.gutter;
 
 /// The gap between two cards on the same page.
 ///
 /// **A spacing value now, not a shadow-geometry one, and the number moved with
-/// the design.** The gap used to be 20 because the *soft* ambient shadow needed
-/// that much room to finish its falloff; with the brief's hard `4px 4px 0`
-/// displacement there is no falloff to protect, only a 4px footprint that needs
-/// to clear the card below it. 12 is the brief's `spacing.md` and leaves 8dp
-/// between one card's shadow and the next card's top edge.
+/// the design.** The gap used to be 20 because the ambient shadow needed that
+/// much room to finish its falloff; with a tighter lift there is no falloff to
+/// protect, only the footprint itself, which needs to clear the card below it.
+/// 12 is the brief's `spacing.md` and leaves 8dp between one card's shadow and
+/// the next card's top edge.
 const double _cardGap = AppSpacing.md;
 
 /// The gap above a chart section header, which is a different job from [\_cardGap].
@@ -139,8 +121,8 @@ const double _chartHeaderGap = 28;
 /// the other direction. So the body asks for the gap alone.
 ///
 /// **20 rather than something smaller.** The nav bar used to carry the same
-/// `AppElevation.raised` pair as every card, so its ambient half reached 20dp at
-/// 1 sigma, and a gap below that let the shadow land on the last card. It is a
+/// raised shadow pair as every card, so its ambient half reached 20dp at one
+/// sigma, and a gap below that let the shadow land on the last card. It is a
 /// flat bar with no shadow now, so 20 is spacing rather than shadow clearance —
 /// which is the same number for a different reason, and worth saying so the next
 /// person does not "tidy" it back down on the strength of a stale comment.
@@ -368,10 +350,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   // The Performance setting used to be threaded through every card here and was
   // part of `_visualToken`. It gated a `BackdropFilter` that no longer exists:
   // surfaces are opaque, so a card has nothing to frost. The preference key and
-  // the controller field are still there, because the Appearance section still
-  // offers the switch and a stored value should not be silently discarded; the
-  // switch itself is being relabelled to match what it now does, which is
-  // nothing on this screen.
+  // the controller field are still there so a stored value is not silently
+  // discarded; nothing on this screen reads it.
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   @override
   void initState() {
@@ -1711,48 +1691,24 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // **The single resolution every card in this frame agrees on.**
-    //
-    // It used to be `Theme.of(context).brightness == Brightness.dark`, which was
-    // exact for the two themes that existed and stopped being exact when Dracula
-    // landed: Dracula is published as `ThemeMode.dark`, so the brightness reads
-    // the same as the app's own dark mode and cannot tell them apart. Going
-    // through [resolveAppTheme] with the controller's stored option is what
-    // recovers the third value.
-    //
-    // It is resolved *here*, once, and threaded down as a parameter. That is the
-    // documented reason the parameter exists: a `MaterialApp` publishes one
-    // `ThemeData` for the whole subtree, so a widget that inferred its own mode
-    // could disagree with its neighbours and produce a frame that is half Dracula
-    // and half the app's dark mode. `AppCard.theme` and `DateStripChip.theme`
-    // are required rather than optional for exactly the same reason.
-    //
-    // With a single dark theme, the resolution is gone and every card simply
-    // reads the same token file.
+    // **One palette, resolved statically.** `AppSurfaces` / `AppPalette` are
+    // read through getters at build time, so a widget never has to infer a mode
+    // from `Theme.of(context)` and cannot disagree with its neighbours about
+    // which ramp is live.
     return Scaffold(
       extendBodyBehindAppBar: true,
-      // **The page colour, not transparent — and this is the black strip under
-      // the nav bar in the light theme.**
+      // **The page colour, not transparent — and this is the strip under the nav
+      // bar.**
       //
       // The Scaffold's rect covers the whole screen, but its *body* slot stops at
       // the nav bar, and `AppBackground` paints only the body. So the strip below
       // the bar — the `SafeArea`'s bottom padding, the system gesture inset — was
-      // painted by nothing at all, and in the dark palette that reads as correct
-      // because the page is nearly black anyway. In the light palette it read as
-      // a black band under a white bar.
+      // painted by nothing at all.
       //
       // The settings screen has always been right on this: it leaves
       // `backgroundColor` unset, so it takes `scaffoldBackgroundColor`, which is
       // `AppSurfaces.page` and opaque. That is the whole difference, and this is
       // now the same one line.
-      //
-      // Four Android-side levers were tried first and none of them moved it —
-      // `navigationBarColor`, `windowLightNavigationBar`, `windowBackground` and
-      // the OS dark-mode setting. They could not have: `dumpsys window` does
-      // report a SystemUI window down there, but what is showing through it was
-      // never painted by us. The measurement that settled it was sampling the
-      // screenshot — the app's own colour at y=2650 and black at y=2690 — with
-      // `windowBackground` deliberately set to magenta, which did not appear.
       backgroundColor: AppSurfaces.page,
       appBar: _buildAppBar(),
       body: AppBackground(child: _buildBody()),
@@ -1761,10 +1717,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       // `extendBody: true` lets the body paint all the way to the screen's
       // bottom edge so an overlay bar can sit over the content. That is the
       // right trade for a floating object and the wrong one for a docked bar:
-      // nothing covers the strip below it, so in the light palette — where the
-      // system navigation bar is translucent over a near-white page — the last
-      // row of the Overview panel showed through under the bar and through the
-      // gesture inset as well.
+      // nothing covers the strip below it, so the last row of the Overview panel
+      // showed through under the bar and through the gesture inset as well.
       //
       // The reservation in `glassNavBarReservedHeight` still applies. It was
       // written for the overlay case, where the body had to reserve the space
@@ -1808,9 +1762,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           // shows as a slightly different shade of the same colour once you
           // scroll. **The sweep's first stop, not the flat page.** The bar is
           // transparent over the body, so what is behind it is the *top* of the
-          // gradient — `#223C6B` in the dark ramp — and the flat page
-          // (`#1B3260`) sits **1.15:1** away from it, which is a visible band
-          // of a slightly different blue under the bar.
+          // gradient, and reading the flat page instead would leave a visible
+          // band of a slightly different shade under the bar the moment the two
+          // diverged.
           final baseColor = AppGlass.pageGradient.first;
           return DecoratedBox(
             decoration: BoxDecoration(
@@ -1843,9 +1797,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       // things the user can already see, on the one surface present on all tabs.
       //
       // **The token, and the ink comes from the bar.** The literal style had no
-      // colour, so the title took the bar's foreground — navy in both ramps
-      // since the cards went near-white, which on the dark page is invisible.
-      // The colour is `AppGlass.pageInkStrong`, from the theme's `AppBarTheme`.
+      // colour, so the title took the bar's foreground, which is not the page
+      // ink this bar actually needs. The colour is `AppGlass.pageInkStrong`, from
+      // the theme's `AppBarTheme`.
       title: const Text('EnerGrow', style: AppType.appBarTitle),
       actions: const <Widget>[],
     );
@@ -2035,28 +1989,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     // this is not a token added for one widget.
     _selectedRangeStart,
     _selectedRangeEnd,
-    // **The palette's brightness, and this was the gap that froze the app on
-    // the old theme's colours for up to a full poll interval.**
-    //
-    // `_applyMode` in `main.dart` calls `AppTheme.applyMode` and then
-    // `setState`, so the root rebuilds, `MaterialApp` rebuilds and this screen
-    // rebuilds. Every `Bound` below it gets `didUpdateWidget` with the same
-    // listenable and the same token, and `Bound`'s one rule is to keep its
-    // cached child in exactly that case - so not one panel, grid, chart or
-    // banner was rebuilt. `AppSurfaces` and `AppPalette` are static getters
-    // resolved at build time, so the panels would have read the *new* palette
-    // the moment they next rebuilt; they simply had no reason to until the
-    // telemetry poll bumped a revision, which is up to ten seconds away.
-    //
-    // The symptom is the whole app in one palette and one panel in the other,
-    // which is worse than either being wrong on its own: the Overview and the
-    // Power tab disagree about what colour the accent is.
-    //
-    // **`Brightness`, not `ThemeMode`.** Two modes resolve to one brightness -
-    // `ThemeMode.dark` and a `ThemeMode.system` on a dark phone - and what the
-    // panels read is the palette, not the preference. Hashing the mode would
-    // rebuild every bound subtree on a preference change that painted no
-    // different pixel.
+    // **The palette's brightness, kept in the token even though the app is
+    // dark-only.** `AppSurfaces` and `AppPalette` are static getters resolved at
+    // build time, so a `Bound` whose builder closes over them must rebuild when
+    // the palette changes. Today that never happens; the entry stays so a future
+    // ramp cannot reintroduce the frozen-palette bug where every panel kept its
+    // cached child and painted the old colours until the next poll.
     AppTheme.brightness,
   );
 
@@ -2065,10 +2003,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// The theme is part of the token because it is part of what every card inside
   /// reads, and this is the mechanism `AGENTS.md` warns about: a `Bound` whose
   /// builder closes over new data without a matching token change is silently
-  /// dropped. It was a `bool` here before, which meant dark and Dracula hashed
-  /// the same and switching between them would not have rebuilt anything; the
-  /// enum makes the two distinct, which is the whole reason the token type
-  /// changed with it.
+  /// dropped.
   Widget _bindRevision(Listenable listenable, Widget Function() builder) {
     return Bound(listenable: listenable, token: _visualToken, builder: builder);
   }
@@ -2248,8 +2183,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
   }
 
-  /// The navy glass hero: the site's name, today's date, the sun glyph, the
-  /// array's live output, and the three figures that qualify it.
+  /// The glass hero: the site's name, today's date, the sun glyph, the array's
+  /// live output, and the three figures that qualify it.
   ///
   /// **The hero is PV output, and that is the same call `OverviewPanel` makes**,
   /// with the same trade-off recorded there: at midnight it reads zero, and the

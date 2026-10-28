@@ -55,28 +55,26 @@ import 'dashboard/utils/design_tokens.dart';
 ///
 /// **What was actually wrong, then.** The fill was never the defect; the
 /// absence of a shadow was. This panel was once the only surface in the app
-/// painted with no `boxShadow` at all, and in a style where depth is carried
-/// *entirely* by the shadow, a shape with no shadow whose fill is 15.62:1 from
-/// the page is a hole by definition. `AppCard` now carries
-/// [AppShadows.stamped] — the brief's `4px 4px 0` hard offset — which costs no
-/// video area and puts the panel on the same footing as every card around it.
+/// painted with no `boxShadow` at all, and in a style where depth is carried by
+/// the shadow, a shape with no shadow whose fill is far from the page is a hole
+/// by definition. `AppCard` now carries a lift, which costs no video area and
+/// puts the panel on the same footing as every card around it.
 ///
-/// **Dark mode: nothing to fix, and the same call is still correct.** Measured
-/// against the page, this ground is **1.19:1** — the panel is already
-/// effectively the page, so there is no hole and no cliff. The stamped shadow
-/// still applies, and does much less, because a black shadow on a near-black
+/// **The panel is already effectively the page**, so there is no hole and no
+/// cliff to fix: measured against the page this ground is **1.19:1**. The lift
+/// still applies, and does much less, because a dark shadow on a near-black
 /// surface is a small relative move. Stated rather than left implicit, because
-/// "the dark-mode fix is the absence of a fix" is the kind of thing that gets
-/// read as an oversight.
+/// "the fix here is the absence of a fix" is the kind of thing that gets read as
+/// an oversight.
 ///
 /// **No border on the panel.** WCAG 1.4.11 is already satisfied by the fill at
 /// 15.62:1, five times the 3:1 it asks for, and `AppBorders.hairline` cannot be
-/// reused here even if it were needed: that constant is `#333333`, tuned to be
-/// a whisper on the card, and it measures **19.58:1** on this matte. The same
-/// constant means opposite things on the two fills, and the wrong one of those
-/// meanings is a drawn white rim, which is the failure the flat system exists
-/// to remove. The *controls* that float over the video are a different matter
-/// and do take `AppBorders.boundary` — see `CctvRoundControl`.
+/// reused here even if it were needed: that constant is tuned to be a whisper on
+/// the card, and it measures **19.58:1** on this matte. The same constant means
+/// opposite things on the two fills, and the wrong one of those meanings is a
+/// drawn white rim, which is the failure the flat system exists to remove. The
+/// *controls* that float over the video are a different matter and do take
+/// `AppBorders.boundary` — see `CctvRoundControl`.
 ///
 /// The value is already a very dark neutral carrying the page's own green
 /// cast — `g-r` is 5/255 here against 6/255 on the page — so "a very dark
@@ -404,14 +402,14 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             children: [
               Row(
                 children: [
-                  // Circular icon badge with a primary colour categorical wash.
+                  // Circular icon badge on the raised tile step.
                   //
-                  // **Neutral now, and it was lime.** The brief reserves
-                  // primary for the CTA, the active tab, the active chip, the
-                  // live dot, the peak bar and the focus ring — it is not a
-                  // decorative icon colour. The screen already states its state
-                  // in the status pill two widgets to the right, so a second
-                  // lime glyph beside it was the hue meaning two things.
+                  // **Neutral, and it was a hue.** The accent is reserved for
+                  // the CTA, the active tab, the active chip, the live dot, the
+                  // peak bar and the focus ring — it is not a decorative icon
+                  // colour. The screen already states its state in the status
+                  // pill two widgets to the right, so a second accent glyph
+                  // beside it would be the hue meaning two things.
                   //
                   // The tone becomes the brief's `tab-item-inactive` ink on
                   // `surfaceAlt` one step above the card, which is the same
@@ -442,10 +440,8 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
                       // **Page ink, and this header is on the page.** The whole
                       // embedded column is a list item in the dashboard's own
                       // page builder, above the video card — not inside one — so
-                      // card ink (navy in both ramps since the cards went
-                      // near-white) measured **2.10:1** on the dark ramp's page
-                      // stop. The white chip beside it is a chip and takes chip
-                      // ink; this line is page and takes page ink.
+                      // it takes the page's ink rather than the card's. The chip
+                      // beside it is a chip and takes chip ink.
                       style: AppType.headlineMd.copyWith(
                         color: AppGlass.pageInkStrong,
                       ),
@@ -466,18 +462,17 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             ],
           ),
         ),
-        // The panel's frame — an `AppCard`: `surface` fill, hairline, 8px
-        // radius, and the stamped hard shadow `AppCard` now carries. The video
-        // matte (cctvVideoGround) stays the same.
+        // The panel's frame — an `AppCard`: `surface` fill, hairline, card
+        // radius, and the card's own lift. The video matte (cctvVideoGround)
+        // stays the same.
         AppCard(
           padding: EdgeInsets.zero,
           child: ClipRRect(
-            // **8px, not a pill.** The previous system rounded this to 999;
-            // the brief's image rule is explicit — "photos always sit inside a
-            // `rounded.lg` (8px) container with a hairline and
-            // `overflow-hidden`" — and its shape rule says the *only*
-            // full-round things are filter pills, avatars and progress tracks.
-            // A video panel is none of those.
+            // **The image rule is a hairline and a clip.** The previous system
+            // rounded this to 999; the brief's rule is that photos sit inside a
+            // card-radius container with a hairline and `overflow-hidden`, and
+            // its shape rule says the *only* full-round things are filter pills,
+            // avatars and progress tracks. A video panel is none of those.
             borderRadius: AppRadius.all(AppRadius.card),
             child: AspectRatio(
               aspectRatio: 16 / 9,
@@ -572,9 +567,9 @@ class _InfoBar extends StatelessWidget {
       ),
       // **Kept, and it is the one border on this bar.** `AppBorders.boundary`
       // is documented in `liquid_glass.dart` as existing for exactly two call
-      // sites and this is one of them. It is heavier than a hairline — 1.5px
-      // near-white — so it is worth saying that this bar sits *below* the
-      // video, not over it, and a hairline would clear 1.4.11 here. The reason
+      // sites and this is one of them. It is heavier than a hairline, so it is
+      // worth saying that this bar sits *below* the video, not over it, and a
+      // hairline would clear 1.4.11 here. The reason
       // it stays is that the bar is only ever built while a stream is running,
       // so it reads as part of the player assembly; a second, weaker edge
       // beside the panel's own hairline is two edge weights for one object.

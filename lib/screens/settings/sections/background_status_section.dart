@@ -196,7 +196,7 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     required bool ok,
     bool plain = false,
   }) {
-    // **Lime is gone from these rows, and that is the brief's doing, not a
+    // **The accent is gone from these rows, and that is the brief's doing, not a
     // retune.** The value used to be painted in `colorScheme.primary` when the
     // row was fine. The brief reserves primary for the CTA, the active tab, the
     // active chip, the live dot, the focus ring and peak data, and says
@@ -208,8 +208,7 @@ class _BackgroundStatusSectionState extends State<BackgroundStatusSection> {
     // reporting something affirmative, 400 for one that is not. The colour
     // moves to the measured pair the rest of the app asserts against — ordinary
     // ink when it is fine, `onSurfaceVariant` when it is not. Dropping the hue
-    // loses nothing that the weight does not already say, and it stops amber
-    // and lime both claiming "fine" on one card.
+    // loses nothing that the weight does not already say.
     final color = ok ? appPrimaryText : AppSurfaces.onSurfaceVariant;
     return Padding(
       // 2, not 3: five of these stack, and the panel look this page now has

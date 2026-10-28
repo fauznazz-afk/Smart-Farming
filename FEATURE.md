@@ -19,18 +19,17 @@ dokumen kedua.
 **Untuk agent:** cara kerja, aturan keras, dan jebakan harness-nya ada di
 AGENT_PLAYBOOK.md. Baca kedua dokumen ini sebelum menyentuh kode.
 
-**Status verifikasi:** 9 Oktober 2026, setelah `v1.8.0`. Flutter 3.47.5 /
+**Status verifikasi:** setelah retheme WattVision (belum dirilis). Flutter 3.47.5 /
 Dart 3.13.4, target Android (API 36). `flutter analyze` bersih, `flutter test`
-**810 lulus** di 52 file, `./gradlew :app:testDebugUnitTest` 11 lulus.
+**865 lulus** di 74 file, `./gradlew :app:testDebugUnitTest` 11 lulus.
 
 Suite Dart **harus** dijalankan per-file lewat `tool/run_tests_per_file.ps1`,
-karena mesin 7 GB ini tidak menyelesaikan satu run penuh: pada 9 Oktober 2026 run
-penuh mencapai 805 test lalu mati di `metric_grid_test.dart`, yang lulus 10/10
-dalam satu detik kalau sendiri. Gejalanya `did not complete` tanpa stack trace,
-dan **file yang dilaporkan berubah-ubah antar run** — `metric_grid`, sebelum itu
-`live_power_card`, sebelum itu `cctv` — jadi nama file di output itu bukan
-petunjuk ke bugnya. Nomor di atas berasal dari run per-file dengan 2 percobaan,
-nol file gagal setelah percobaan.
+karena mesin 7 GB ini tidak menyelesaikan satu run penuh: run per-file terakhir
+mencapai 865 test di 74 file dengan **satu** file OOM (`live_power_card_test.dart`)
+yang lulus 58/58 saat dijalankan sendiri. Gejalanya `did not complete` tanpa stack
+trace, dan **file yang dilaporkan berubah-ubah antar run** — `live_power_card`,
+sebelum itu `metric_grid`, sebelum itu `cctv` — jadi nama file di output itu bukan
+petunjuk ke bugnya. Runner mencoba tiga kali per file.
 
 **Temuan 30 September sore yang menutup §18.2 butir 3.** `test/color_helpers_test.dart`
 mengukur AA terhadap daftar hex yang **semuanya basi** — enam dari enam tidak
@@ -52,9 +51,10 @@ bukan guard.
   (6,37–7,75) dan Temperature `suhu` (24,99–31,53 °C) — `suhu` adalah key yang
   benar-benar dipublikasikan device dan kekhawatiran bahwa ia kosong **tidak
   terbukti**
-- Sistem permukaan soft-UI terverifikasi di kedua mode: pasangan bayangan
-  terbaca, kartu elevated, chip **inset** vs **raised**, tidak ada hijau di tepi
-  kartu
+- Sistem permukaan terverifikasi di kedua mode pada rilis 1.7.0 (pasangan
+  bayangan terbaca, kartu elevated, chip **inset** vs **raised**, tidak ada hijau
+  di tepi kartu). Sejak retheme WattVision sistem itu **sudah tidak ada**: satu
+  lift, hairline, dan aplikasi dark-only — lihat §14
 - 20 rule ter-push ke modul native, session loaded, tidak ada crash di logcat
 - 120 fps dilaporkan **oleh pemilik perangkat**, bukan diukur dengan
   `dumpsys gfxinfo` — belum ada bukti frame rate dari alat
@@ -685,12 +685,16 @@ Dipin oleh 5 test Kotlin.
 `Save settings` hanya ada di daftar kategori** — untuk menyimpan, pengguna harus
 kembali dulu.
 
-### Dua model persistensi berbeda
+### Satu model persistensi
 
 | Section | Cara disimpan |
 |---|---|
-| Appearance, Performance | **langsung** lewat `AppThemeController`, tanpa tombol save |
-| Semua lainnya | buffered di `SettingsController`, ditulis `save()` yang memvalidasi dulu lalu `Navigator.pop(context, true)` |
+| Semua section | buffered di `SettingsController`, ditulis `save()` yang memvalidasi dulu lalu `Navigator.pop(context, true)` |
+
+Dulu Appearance dan Performance ditulis **langsung** lewat `AppThemeController`,
+tanpa tombol save — itu sebabnya ada dua model. Kedua section itu sudah dihapus:
+aplikasi dark-only dan tidak punya accent pilihan, jadi tidak ada state tampilan
+yang perlu ditulis seketika, dan `AppThemeController` ikut hilang.
 
 Dashboard hanya reload preferensi dan memanggil `AlarmNotificationService.sync()`
 kalau Settings mengembalikan `changed == true`.
@@ -699,8 +703,8 @@ kalau Settings mengembalikan `changed == true`.
 
 | Section | Kontrol | Key | Tipe | Default | Berdampak |
 |---|---|---|---|---|---|
-| **Appearance** | Theme mode | `theme_mode` | String | dark | ✅ |
-| | Accent colour (4 pilihan) | `theme_seed` | int | `0xFF35A968` | ✅ |
+| ~~**Appearance**~~ | ~~Theme mode~~ | `theme_mode` | String | dark | **⛔ dihapus** — dark-only, kunci tetap dibaca lalu diabaikan |
+| | ~~Accent colour (4 pilihan)~~ | `theme_seed` | int | — | **⛔ dihapus** — satu aksen cyan, tidak bisa dipilih |
 | **Monitoring** | Auto refresh telemetry | `auto_refresh` | bool | on | ✅ |
 | | Refresh interval | `refresh_seconds` | int | 10 s | ✅ |
 | **Energy alerts** | Enable energy alerts | `energy_alerts_enabled` | bool | on | ✅ |
@@ -777,28 +781,28 @@ so alarms are only reported while the app is open."*
 
 ## 14. Tema dan visual
 
-**Sistem permukaan soft-UI, opaque, satu arah cahaya.** Ini menggantikan
-"liquid glass" yang ada sampai rilis 1.6.1. Alasan dan sejarah
-keputusannya ada di `AGENTS.md` §"Soft-UI surfaces" dan di `CHANGELOG.md`
-1.7.0.
+**Sistem permukaan WattVision: halaman flat gelap, kartu lebih terang, satu
+aksen data.** Ini menggantikan sistem soft-UI yang berjalan sampai retheme
+Oktober 2026. Spesifikasi lengkapnya ada di header
+`dashboard/utils/design_tokens.dart`, dan aturan yang mengikat ada di
+`AGENTS.md` §"WattVision surfaces".
 
 | Fitur | Detail |
 |---|---|
-| Mode | System / Light / Dark, `ColorScheme.fromSeed` |
-| Accent | 4 pilihan: EnerGrow green · Solar amber · Ocean cyan · Forest teal — **tidak pernah diubah otomatis** |
-| Token layer | `dashboard/utils/design_tokens.dart`: `AppSurfaces`, `AppRadius`, `AppElevation`, `appDivider`, `AppMotion`. Satu-satunya tempat fill, radius, pasangan bayangan, dan durasi ditulis |
-| Primitif | `AppCard` (+`inset` / `pressed`), `AppTile`, `AppBadge`, `AppDivider`, `DateStripChip`, `AppBackground` — semuanya di `widgets/liquid_glass.dart` (nama file tidak lagi akurat) |
-| Fill | **Opaque.** Kartu = warna halaman. Kelembaman dibawa pasangan bayangan, bukan transparansi |
-| Bayangan raised | **Tiga**, bukan dua: `contact` (offset 3, blur 6) + `ambient` (offset 9, blur 22) + `bounce` putih (offset −6, blur 14) |
-| Tekan | **Dua state, bukan satu.** `pressed` = blok yang meng-*flatten*; `insetDeep` = teluk yang masuk lebih dalam. `AppCard.pressed` sudah ada sejak migrasi soft-UI dan **tidak ada pun call site yang memakainya** sampai 1.7.0 |
-| Halaman light | **Mid-tone `#E1E7E4`**, bukan putih. Hampir putih membuat separuh bayangan tidak punya tempat untuk menjadi lebih terang, dan hasilnya terbaca Material, bukan soft-UI |
-| Arah cahaya | Dari kiri-atas, seluruh aplikasi. `AppElevation.raised` / `.inset` |
-| Radius | Satu skala: `card 16` · `pill 22` · `tile 14` · `inset 12` · `badge 10` · `bar 4`. Sebelumnya 12 nilai dari 3 sampai 28 |
-| Border | Netral, sangat tipis — **bukan** accent. Border berwarna adalah tepi yang digambar, dan tepi yang digagradalah yang harus digantikan gaya ini |
-| Tombol | `filledButtonTheme` diturunkan dari seed pengguna. Fill + label dihitung per mode, bukan diwarisi dari `ColorScheme.fromSeed` |
-| Blur | **Tidak ada.** `BackdropFilter` dan orb gradient dihapus; section Performance dihapus |
-| Rebuild granular | `Bound` dengan token. Punya test pertamanya di `test/bound_test.dart` (13 kasus) |
-| Aksesibilitas | `faintColor` dan `statusOk/Warn/Bad` diukur terhadap permukaan opaque nyata; `test/color_helpers_test.dart` menjaga klaim itu |
+| Mode | **Dark-only.** `AppTheme.apply` mengabaikan argumennya dan selalu memilih palet dark, jadi `AppTheme.brightness` selalu `Brightness.dark`. Mesin ramp (`applyMode`, dua record `AppSurfacesPalette`) dipertahankan supaya call site tidak perlu ditulis ulang, tapi keduanya berisi nilai yang sama |
+| Accent | **Satu**: cyan `#00E5FF`. Tidak ada picker accent, tidak ada `kAccentPalette`, tidak ada `ColorScheme.fromSeed` |
+| Token layer | `dashboard/utils/design_tokens.dart`: `AppSurfaces`, `AppPalette`, `AppGlass`, `AppRadius`, `AppBorders`, `AppShadows`, `AppSpacing`, `AppType`, `AppMotion`. Satu-satunya tempat fill, radius, border, bayangan dan durasi ditulis |
+| Primitif | `AppCard` (+`pressed`), `AppTile`, `AppBadge`, `AppDivider`, `DateStripChip`, `AppBackground` — semuanya di `widgets/liquid_glass.dart` |
+| Halaman | **Flat `#121212`.** Slot gradient tetap ada (`pageGradient`), tapi ketiga stopnya `#121212` dan `pageFallback` juga `#121212`, jadi seam tidak mungkin muncul |
+| Kartu / tile | Kartu `#1E1E1E`, tile `#252525`, border `1px solid #2C2C2E`, radius kartu 16, padding 20 |
+| Bayangan | **Satu lift**, `AppShadows.subtle` — sepasang bayangan biru gelap, bukan tangga elevasi. `AppShadows.stamped` / `stampedIn` tinggal sebagai alias kompatibilitas untuk tombol berisi |
+| Tekan | `AppCard.pressed` menjatuhkan lift dan widget mengecil 5% (`active:scale-95`). Satu state, bukan dua |
+| Ink | `AppSurfaces.onSurface` `#FFFFFF` untuk kartu, `#98989D` untuk metadata; `AppGlass.pageInk*` untuk konten di halaman; `AppPalette.onHue` `#121212` untuk apa pun yang digambar di atas aksen cyan |
+| Status | `statusBad` `#FF453A`, `statusWarn` amber, `statusOk` `#32D74B` — semuanya berarti *kondisi*, tidak pernah dekorasi. Banner alert: fill `#3A1C1C`, border kiri merah 4px |
+| Tipografi | Inter untuk judul/body (judul kartu 24 semibold), JetBrains Mono untuk angka KPI (32 bold, tabular) |
+| Blur | **Tidak ada.** `BackdropFilter` dan orb gradient dihapus |
+| Rebuild granular | `Bound` dengan token. Test-nya di `test/bound_test.dart` (15 kasus) |
+| Aksesibilitas | `faintColor` dan `statusOk/Warn/Bad` diukur terhadap permukaan nyata yang dibaca dari `AppSurfaces`; `test/color_helpers_test.dart`, `test/theme_palette_contrast_test.dart` dan `test/glass_ramp_contrast_test.dart` menjaga klaim itu. `statusBad` terukur 4.4995…:1 di `#252525`, karena itu test memakai `contrastEpsilon = 0.01` |
 
 **Aturan warna yang berlaku di seluruh aplikasi:**
 
@@ -812,7 +816,7 @@ keputusannya ada di `AGENTS.md` §"Soft-UI surfaces" dan di `CHANGELOG.md`
 4. **Triad dipakai ulang, bukan diperluas.** Menambah hue baru untuk
    accommodate chip baru adalah kesalahan yang sama dengan rotasi hue, terbalik.
 
-### Mengapa kedalaman ada di bayangan, bukan di fill
+### Mengapa kedalaman ada di tepi, bukan di fill
 
 Ini aturan, bukan selera, dan angka-angkanya diukur.
 
@@ -827,21 +831,19 @@ melintasi fill berbeda sifatnya dan sudah diukur lalu **ditolak**:
 | 10 % | 3.69:1 |
 | 15 % | 3.34:1 |
 
-AA 4.5. Maka deepen = properti bayangan.
+AA 4.5. Maka deepen = properti tepi, bukan properti fill.
 
-**Light mode butuh dua putaran, dan pengukuran pikselnya yang jadi argumen.** Pada
-`0x4D`/`0x33` separuh gelap hanya mencapai luminansi 219 terhadap halaman 229.5 —
-turun 4,6 %, yang blur buat setipis itu sehingga separuh kerja dibawa bounce
-dan kartu terbaca *terang*, bukan berdiri di permukaan. Sekarang `0x66`/`0x40`.
-Dark mode tidak perlu padanan dan tidak diubah: sudah 17,6 terhadap 31,4, karena
-bayangan hitam di permukaan hampir-hitam tetap gerakan relatif yang besar.
+**WattVision membawa aturan itu ke kesimpulan berikutnya: satu lift, bukan
+tangga.** Hierarki sekarang dibawa oleh fill — `#121212` halaman, `#1E1E1E`
+kartu, `#252525` tile — yang bersifat absolut, sedangkan bayangan bersifat
+relatif: ia hanya berarti "di atas itu" kalau ada tangga untuk dinaiki. Satu lift
+plus hairline `1px` memberi kedalaman tanpa mengklaim tingkatan yang tidak ada.
 
-Terukur di perangkat (Xiaomi, kedua mode, via scanline brightness):
-
-```
-dark  : kartu 31.4 → contact 17.6, pulih ~35px   (turun 44 %)
-light : halaman 229.5 → contact 213              (turun 7,2 %)
-```
+Angka di atas tetap dicatat karena merekalah alasan gradien-fill tidak boleh
+kembali, bukan karena sistem light-nya masih ada. Pengukuran scanline perangkat
+(lihat riwayat rilis 1.7.1) juga tetap berlaku sebagai metode: **hubungan
+aritmetika dan piksel adalah dua klaim berbeda, dan hanya satu di antaranya yang
+dilihat pengguna.**
 
 ### Yang dihapus dan tidak ada lagi
 
@@ -854,6 +856,11 @@ light : halaman 229.5 → contact 213              (turun 7,2 %)
   dan tidak dibaca siapa pun
 - `filledButtonTheme` yang tidak pernah ada — itu sebabnya tombol di dark mode
   pernah menampilkan label putih di atas hijau terang (~1,5:1)
+- **Section Appearance** di Settings (`Light` / `Dark` / `Auto`) beserta
+  `kAccentPalette`. Dark-only, jadi ketiga pilihan itu tidak punya efek; kunci
+  preferensi tetap dibaca supaya instalasi lama tidak kehilangan setting lain
+- **`AppElevation`** — tangga `raised` / `inset` / `pressed` / `insetDeep`. Satu
+  lift sekarang, dan state tekan adalah `AppCard.pressed`
 
 ---
 
@@ -963,7 +970,7 @@ foreground(true) → alarm sync → fetch pertama.
 ## 18. Celah yang diketahui
 
 Semua **terverifikasi dengan membaca kode** pada 28 September 2026, dan
-diperbarui pada 30 September 2026 setelah restyle soft-UI dan penambahan chart.
+diperbarui setelah retheme WattVision dan penambahan chart.
 Dari versi sebelumnya, delapan celah fungsional sudah diperbaiki — tujuh pada
 rilis 1.6.0, satu pada 1.6.1, dan §18.1 butir 2 pada 1.7.0 — dan satu terbukti
 bukan celah; semuanya dikeluarkan dari daftar ini, bersama simbol-simbol mati
@@ -1006,13 +1013,15 @@ diverifikasi di perangkat ada di §18.5.
    `calendar_month_outlined` ↔ `date_range_outlined` menurut apakah rentang
    aktif, dan tooltip dibangun dari `describeHistoryRange` yang sama dengan
    header chart, jadi tooltip dan header tidak bisa berbeda.
-3. **`FilledButton` masih blok accent rata.** Bentuk dan kontrasnya sudah benar,
-   tapi neumorphism yang ketat akan membuatnya raised atau inset. **Sengaja tidak
-   diubah** — ia satu-satunya kontrol yang fill-nya adalah accent, dan
-   membalikinya membuat accent berhenti terbaca sebagai aksi.
-4. **Kotak hitam CCTV di light mode** masih menusuk di halaman neumorphic terang.
-   `0xFF080D0A` adalah permukaan di belakang video, bukan permukaan bertema, dan
-   belum diputuskan apa yang benar di sana.
+3. ~~**`FilledButton` masih blok accent rata.**~~ **Sudah terjawab, bukan
+   diperbaiki.** Catatan lamanya bilang neumorphism ketat akan membuatnya raised
+   atau inset; WattVision tidak punya tangga elevasi, jadi "rata" adalah bentuk
+   yang benar. Tombol berisi tetap satu-satunya kontrol dengan fill aksen, dan
+   lift-nya (`AppShadows.stampedIn`) membawa hue aksennya sendiri.
+4. ~~**Kotak hitam CCTV di light mode** menusuk di halaman neumorphic terang.~~
+   **Tidak berlaku.** Tidak ada light mode, dan `cctvOverlayScrim` adalah
+   permukaan di belakang video yang memang tidak boleh bertema — ia harus
+   mengalahkan piksel kamera apa pun, bukan berbaur dengan halaman.
 5. ~~**Bayangan kanan kartu terpotong tepi layar.**~~ **Diperbaiki: margin
    halaman 16 → 24 dp.** Aritmetikanya: `BoxShadow` digambar sebagai mask blur
    `sigma = blurRadius / 2`, jadi contact (offset 3, blur 6) menjangkau 9 dp dan
@@ -1021,12 +1030,18 @@ diverifikasi di perangkat ada di §18.5.
    **tepat di tengah bagian yang penting**. 24 dp menampilkan seluruh 1σ dengan
    sisa 4 dp. 32 dp juga akan menampilkan ekor 2σ, tetapi memakan 16 dp dari plot
    chart di viewport 381 dp — tradeoff buruk untuk 3 % alpha.
-   **Tidak** diperbaiki dengan mengecilkan `AppElevation.raised`: contact sudah
-   muat dan Ambient-lah yang butuh ruang, dan kebalikannya mengubah ambient
+   **Tidak** diperbaiki dengan mengecilkan pasangan bayangan raised: contact sudah
+   muat dan ambient-lah yang butuh ruang, dan kebalikannya mengubah ambient
    kembali menjadi contact kedua — persis "bevel CSS neumorphism 1990s" yang
    komentar file token sendiri ada untuk cegah. Margin navbar dinaikkan 14 → 24 dp
    pada saat yang sama; kalau tidak, pil akan menonjol 10 dp dari kolom konten
    dan setiap halaman akan memperlihatkan langkah di bawah.
+
+   **Dan sekarang angkanya 16 lagi.** WattVision mengganti pasangan itu dengan
+   satu lift 24 dp blur pada offset 10, sementara kartu dipisahkan hairline
+   `1px` — jadi tidak ada halo 20 dp yang perlu dilindungi. Margin kembali ke
+   `AppSpacing.gutter` dan mendapat 16 dp lebar kartu lagi; alasannya ditulis di
+   `kDashboardPageMargin`.
 6. ~~**`energy_report_screen.dart` punya `_pickPeriod()` dengan nol call site.**~~
    **Premis saya salah; agent yang saya beri tugas mengecek call graph-nya dan
    tidak memercayai kata-kata saya.** `_pickPeriod` tersambung ke tombol
@@ -1043,6 +1058,11 @@ diverifikasi di perangkat ada di §18.5.
    bermula dari laporan, bukan dari pengukuran.
 
 ### 18.0c Scanline kartu di perangkat, dan alpha Dracula yang salah 1,9×
+
+> **Rekaman historis.** Tema Dracula dan pasangan bayangan raised sudah tidak ada
+> sejak retheme WattVision. Angka di bawah tetap disimpan karena dua alasan:
+> inilah bukti mengapa satu scanline mengalahkan seluruh test suite, dan inilah
+> alasan `AppShadows` sekarang berisi **satu** lift alih-alih tangga.
 
 `FEATURE.md` §18.5 sudah meminta scanline kecerahan piksel melintasi tepi kartu
 sejak file ini ada. **Permintaan itu akhirnya dijalankan**, dan yang ia temukan
@@ -1099,6 +1119,12 @@ dengan alasannya dicatat di test itu sendiri.
 
 ### 18.0d Hairline yang paling terang di tepi kartu
 
+> **Rekaman historis, dan kesimpulannya sudah digantikan.** Hairline sekarang
+> `#2C2C2E` pada halaman `#121212` — sebuah bisikan, jauh di bawah 3:1, dan
+> sengaja begitu (`AGENTS.md` §"WattVision surfaces"). Yang tetap berlaku adalah
+> temuannya: **alpha bukan kuantitas perseptual**, jadi satu nilai alpha tidak
+> berarti sama di dua halaman yang jaraknya ke putih berbeda.
+
 Scanline yang sama menemukan bug kedua, di file yang sama dan tidak terkait
 dengan alpha bayangan.
 
@@ -1141,15 +1167,18 @@ halaman 42,4, palung di celah 20 dp turun ke 22,2 (−20,2); di dark halaman 31,
 turun ke 14,6 (−16,8). Ambient (`blurRadius` 22 dp) masih −2,7 pada 22 dp dari
 tepi kartu, jadi dua ambient menumpuk di seluruh celah dan saling menambah.
 
-**Tidak diubah, dan alasannya bukan karena tidak qrsa.** Fenomena ini ada di
-ketiga tema dengan bentuk yang sama, termasuk light mode — dan light mode
-adalah mode yang untuknya seluruh sistem ini disetel dan tidak dikeluhkan.
-Menyingkirkan
-ambient berarti memperkecil `blurRadius`, yang melawan seluruh proyek soft-UI
-dan membuat bayangan lebih keras. Itu keputusan struktural, bukan perbaikan
-warna, dan seharusnya diambil karena desires keseluruhan bentuk, bukan karena
-satu scanline. Tercatat di sini supaya tidak hilang, dan supaya tidak ada yang
-menganggapnya sudah diperbaiki.
+**Tidak diubah waktu itu, dan alasannya bukan karena tidak terasa.** Fenomena ini
+ada di ketiga tema dengan bentuk yang sama, termasuk light mode — dan light mode
+adalah mode yang untuknya seluruh sistem itu disetel dan tidak dikeluhkan.
+Menyingkirkan ambient berarti memperkecil `blurRadius`, yang melawan seluruh
+proyek soft-UI dan membuat bayangan lebih keras; itu keputusan struktural, bukan
+perbaikan warna.
+
+**Sekarang sudah tidak berlaku, dan itu bukan perbaikan yang direncanakan.** Satu
+lift WattVision tidak punya dua ambient yang bisa menumpuk di celah, jadi
+fenomena ini hilang bersama sistemnya. Dicatat karena metode pengukurannya masih
+berlaku: satu scanline bisa membatalkan derivasi aritmetika yang lolos semua
+test.
 
 ### 18.0f Nol yang dipabrikasi di tiga widget, dan kalimat yang paling berbahaya
 
@@ -1208,11 +1237,17 @@ alasan tertulis: *"no text is ever drawn on one"*. Alasan itu **benar untuk prog
 `AppSurfaces.track` punya dua konsumen, dan pengecualian yang ditulis untuk satu
 diterapkan ke keduanya. Pola yang sama persis dengan bug daftar surface kemarin.
 
-Perbaikannya dua bagian, bukan satu: fill → `AppSurfaces.input` (4,99–5,02:1) **dan**
-`AppElevation.inset` — karena tile sebelumnya **tidak punya inner shadow sama
-sekali**, dan kesan inset-nya datang 100 % dari fill yang lebih gelap. Mengganti
-fill tanpa shadow akan meratakan tile. Guard-nya diuji dengan membalik tiap
-bagian secara terpisah: fill saja → 2 test gagal, shadow saja → 1 test gagal.
+Perbaikannya dua bagian, bukan satu: fill → `AppSurfaces.input` **dan** shadow
+inset — karena tile sebelumnya **tidak punya inner shadow sama sekali**, dan
+kesan inset-nya datang 100 % dari fill yang lebih gelap. Mengganti fill tanpa
+shadow akan meratakan tile. Guard-nya diuji dengan membalik tiap bagian secara
+terpisah: fill saja → 2 test gagal, shadow saja → 1 test gagal.
+
+**WattVision mengubah kedua bagiannya lagi, dan arahnya berlawanan.** Tile
+sekarang `AppSurfaces.surfaceAlt` `#252525` — *lebih terang* dari kartu, bukan
+lebih gelap — tanpa inner shadow sama sekali. Yang tetap berlaku adalah
+pelajarannya, bukan nilainya: **sebuah pengecualian yang ditulis untuk satu
+konsumen akan dipakai konsumen kedua tanpa ada yang memeriksa ulang.**
 
 **Badge "Resolved" hijau melanggar aturan warna app sendiri.** Agent menemukan
 argumen yang lebih kuat dari yang saya tulis di `AGENTS.md`: ini bukan soal hue,
@@ -1405,9 +1440,11 @@ Bukan bug, tapi mudah disalahpahami:
 - ~~Token bayangan belum punya test.~~ Diperbaiki:
   `test/design_tokens_test.dart`, 12 kasus, tiap guard diverifikasi dengan
   **mematahkan bug-nya di file token lalu memastikan test gagal** — one-axis
-  shadow, single blur radius, pressed yang membesar, `insetDeep` yang dangkal,
-  fill yang beda dari page. Kelimanya tertangkap. Guard yang tidak bisa gagal
-  bukan guard.
+  shadow, single blur radius, pressed yang membesar, inset yang dangkal, fill
+  yang beda dari page. Kelimanya tertangkap. Guard yang tidak bisa gagal bukan
+  guard. **Kelima aturan itu sudah digantikan WattVision** (satu lift, satu
+  state tekan, tile yang lebih terang dari kartu); yang tetap berlaku adalah
+  metodenya, dan file test-nya sekarang 27 kasus.
 - ~~`test/cctv_test.dart` (34 test) melebihi anggaran RAM untuk satu run
   penuh.~~ **Dipecah 9 Oktober 2026.** Jadi `cctv_allowlist_test.dart` (15,
   Dart murni), `cctv_status_test.dart` (13, model status dan widget-nya) dan
@@ -1427,9 +1464,13 @@ Bukan bug, tapi mudah disalahpahami:
   Dracula 1,9× terlalu lemah — kartu memang terbaca rata, bukan persepsi — dan
   lalu hairline ternyata unsur **paling terang** di tepi kartu pada kedua tema
   gelap, lebih terang dari bounce Dracula: 59,4 lawan 58,4. Detail, angka dan
-  perbaikannya di §18.0c. Yang **masih** terukur tanpa diperbaiki adalah scanline
-  melintasi celah antar kartu, palungnya −20,2 di Dracula dan −16,8 di dark;
-  alasannya ada di §18.0c.
+  perbaikannya di §18.0c.
+
+  **Dan sekarang terutang lagi, untuk sistem yang berbeda.** Retheme WattVision
+  mengganti seluruh permukaan — halaman `#121212`, kartu `#1E1E1E`, satu lift
+  `AppShadows.subtle`, hairline `#2C2C2E` — dan belum ada satu pun scanline
+  untuknya. Metodenya tetap sama dan tetap wajib: satu scanline bisa membatalkan
+  derivasi aritmetika yang lolos semua test, dan itu sudah terjadi sekali.
 - **Nilai bertanda negatif di hero card.** Saat screenshot terakhir baterai standby
   0 W, jadi hanya `Standby` yang terlihat. Kodenya mencetak nilai mentah, tapi belum
   pernah dilihat di layar.
@@ -1460,10 +1501,11 @@ Bukan bug, tapi mudah disalahpahami:
   **Akar masalahnya bukan ketiga widget itu, melainkan harness-nya.**
   `live_power_card_test.dart` memang memarametrisasi lebar dan skala, dan
   **lulus** — karena ia merender kartu pada lebar permukaan penuh, sedangkan
-  setiap halaman dashboard adalah `ListView` dengan padding 24 dp per sisi. Jadi
-  **kartu di ponsel 320 dp itu selebar 272 dp**, dan setiap lebar yang diklaim
-  diuji test itu 48 dp lebih longgar daripada perangkatnya. Test mengukur widget
-  yang lebih lebar daripada widget yang benar-benar tampil, dan itu gagal
+  setiap halaman dashboard adalah `ListView` dengan padding 24 dp per sisi
+  (sekarang 16, `kDashboardPageMargin`). Jadi **kartu di ponsel 320 dp itu
+  selebar 272 dp** — 288 dp dengan margin sekarang — dan setiap lebar yang
+  diklaim diuji test itu 48 dp lebih longgar daripada perangkatnya. Test mengukur
+  widget yang lebih lebar daripada widget yang benar-benar tampil, dan itu gagal
   *senyap*: tidak ada assertion yang melemah, hanya assertion yang diam.
 
   Setelah marginnya benar, **dua cacat langsung muncul** yang tidak ada
@@ -1487,14 +1529,13 @@ Bukan bug, tapi mudah disalahpahami:
   yang tugasnya menggambarkan tata letak aplikasi adalah salinan, dan `FEATURE.md`
   sudah mencatat harga satu salinan basi di repo ini.
 - **~~Tekan pada kontrol.~~ Terverifikasi 30 September 2026** untuk date strip
-  chip dan navbar; `Pressable` belum dipasang di tombol `FilledButton` (lihat
-  §18.0 butir 3) atau di kartu mana pun yang bisa ditekan. Yang benar-benar
-  belum dilihat: **state `insetDeep`** pada well, karena butuh jari yang menahan
-  di atas screenshot, dan `AppMotion.press` yang diukur — 150 ms turun, 120 ms
-  naik, asimetri itu disengaja tapi belum pernah terasa di tangan.
-- **~~State tekan navbar.~~ Terverifikasi** secara geometri, bukan visual: pair
-  `pressed` dan `insetDeep` ada dan keduanya dipakai, tapi animasi itu sendiri
-  baru satu siklus dan belum dinilai apakah terasa fisik atau hanya bergerak.
+  chip dan navbar. **State tekan sekarang satu, bukan dua** — `AppCard.pressed`
+  menjatuhkan lift dan mengecil 5%, jadi `insetDeep` yang tidak pernah terlihat
+  di tangan itu sudah tidak ada. Yang tetap belum terasa di tangan:
+  `AppMotion.press` — 150 ms turun, 120 ms naik, asimetri itu disengaja.
+- **~~State tekan navbar.~~ Terverifikasi** secara geometri, bukan visual:
+  animasi itu baru satu siklus dan belum dinilai apakah terasa fisik atau hanya
+  bergerak. Berlaku juga untuk state tekan yang sekarang.
 - **Stream CCTV end-to-end** di URL produksi, dan stream kedua `?src=cam2`.
 - ~~**Halaman Fish dan Hydroponics belum pernah dibuka di perangkat.**~~
   **Terverifikasi 29 September 2026.** Keduanya dirender di Xiaomi 24090RA29G:

@@ -122,7 +122,7 @@ class AccountSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The brief's `button-secondary`. Logout is a real destructive action, so
-    // it is *not* the primary CTA — the lime fill is reserved, per the brief,
+    // it is *not* the primary CTA — the accent fill is reserved, per the brief,
     // for the one action the screen exists to complete, and on Settings that
     // is Save. A page-fill block behind a hairline says "action" without
     // shouting, which is the right register for leaving.

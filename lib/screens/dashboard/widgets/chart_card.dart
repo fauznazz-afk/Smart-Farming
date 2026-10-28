@@ -43,18 +43,15 @@ class ChartSectionHeader extends StatelessWidget {
     );
     // **Page ink, because this row is not inside the card.** Every call site is
     // `dashboard_screen.dart`'s `_chartSectionThunks`, which puts this row
-    // straight onto `AppBackground` with the chart card *below* it. Card ink
-    // (`AppSurfaces.onSurface*`) is navy in both ramps since the cards went
-    // near-white, which is right on a card and measured **2.10:1** on the dark
-    // ramp's own page stop — this header was unreadable in dark mode.
+    // straight onto `AppBackground` with the chart card *below* it. Card ink is
+    // the token for content on a card, and this header is on the page.
     //
-    // **The live indicator is a glass chip, and that is the whole change.** It
-    // was `AppPalette.error` behind a local `AppGlass.isDark` branch, because
-    // the accent measured **1.09:1** on the dark ramp's own page stop: a blue dot
-    // on a blue page, needing a fifth value to be visible. `GlassPageHeader`
-    // already answered the same question the system way — a white wash lifts the
-    // chip clear of the page in *both* ramps and the ink follows the wash. See
-    // [_LivePill].
+    // **The live indicator is a glass chip.** It was `AppPalette.error` behind a
+    // local `AppGlass.isDark` branch, because the accent measured poorly against
+    // the page it was drawn on: a cyan dot on a near-black page, needing a fifth
+    // value to be visible. `GlassPageHeader` already answered the same question
+    // the system way — a white wash lifts the chip clear of the page and the ink
+    // follows the wash. See [_LivePill].
     return Row(
       children: [
         Expanded(
@@ -110,12 +107,12 @@ class ChartSectionHeader extends StatelessWidget {
 
 /// The live/polling indicator: a wifi glyph and a word on a white wash.
 ///
-/// **One axis of state, in the fill, and nothing else.** This was the accent in
-/// one ramp and white in the other behind a local `AppGlass.isDark` branch, which
-/// existed because the blue accent measures **1.09:1** on the dark ramp's own page
-/// stop — no token carries a saturated hue there, and the branch was a fifth
-/// value living in a widget. A wash is the system's own answer to a chip on the
-/// page: it lifts the surface clear in both ramps, and the ink follows the wash
+/// **One axis of state, in the fill, and nothing else.** The pill used to switch
+/// between the accent and white behind a local `AppGlass.isDark` branch, which
+/// existed because the accent measures poorly on the page it is drawn on — no
+/// token carries a saturated hue there, and the branch was a fifth value living
+/// in a widget. A wash is the system's own answer to a chip on the page: it
+/// lifts the surface clear, and the ink follows the wash
 /// ([AppGlass.pageGlassInk]), exactly as `GlassPageHeader` and the hour pills
 /// already do.
 ///
@@ -401,8 +398,8 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
   //
   // The old line was `override ?? categoryColorForKey(key) ?? AppPalette.primary`,
   // and that trailing `?? AppPalette.primary` is worth naming: a key the category
-  // table did not know about fell back to lime, so *adding a telemetry key* was
-  // enough to change the colour of a chart.
+  // table did not know about fell back to the brand hue, so *adding a telemetry
+  // key* was enough to change the colour of a chart.
   _Scaled _seriesFor(_MetricSpec spec, Color? override) {
     final key = spec.series.key;
     final seriesPoints = widget.points[key] ?? const <TelemetryPoint>[];
@@ -438,14 +435,10 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
         // `AppSurfaces.border` at 24% — enough to separate the fill from the
         // card behind it without drawing a second outline.
         //
-        // **The ink is white, and it was navy.** `AppSurfaces.tooltip` is a dark
-        // navy in *both* ramps (`#0B2545` light, `#0F172A` dark) and
-        // `appPrimaryText` is `AppSurfaces.onSurface` — the same `#0B2545` — so
-        // the tooltip text measured **1.00:1** in light and **1.16:1** in dark.
-        // A tooltip nobody can read is the one widget on this card that must be
-        // legible, so the ink is the ink-on-a-saturated-fill token. There is no
-        // "ink on `AppSurfaces.tooltip`" token; `AppPalette.onHue` is the same
-        // white under a name that fits.
+        // **The ink is card ink, because the tooltip fill is a dark surface.**
+        // `AppSurfaces.tooltip` is `#2C2C2E` in WattVision, so the readable ink
+        // is `AppSurfaces.onSurface` (white). `AppPalette.onHue` is the dark ink
+        // for a saturated *bright* fill and would measure about 1.4:1 here.
         //
         // `fitInsideHorizontally` and `fitInsideVertically` are load-bearing and
         // not padding: they are what stop a tooltip at the far right of the plot
@@ -475,7 +468,7 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
             ];
             final tooltip = LineTooltipItem(
               '$time\n${values.join('  \u00b7  ')}',
-              AppType.strong.copyWith(color: AppPalette.onHue),
+              AppType.strong.copyWith(color: AppSurfaces.onSurface),
             );
             return List<LineTooltipItem?>.generate(
               touchedSpots.length,
@@ -503,6 +496,23 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
             // every series equally, so two series in different slots still read
             // as two series and two in the same slot still read as one.
             color: item.series.color.withValues(alpha: 0.85),
+            // WattVision: area soften under a single series; multi-series groups
+            // stay hairline-only (see comment above) because overlapping fills
+            // muddy the reading.
+            // fl_chart 0.68.0 still names the field belowBarData.
+            belowBarData: series.length == 1
+                ? BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        item.series.color.withValues(alpha: 0.30),
+                        const Color(0x0D30D158), // spec green #30D158 at 5%
+                      ],
+                    ),
+                  )
+                : null,
             dotData: const FlDotData(show: false),
           ),
       ],

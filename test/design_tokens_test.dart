@@ -99,11 +99,11 @@ void main() {
   });
 
   group('the tonal ramp is a ramp, not a set of unrelated fills', () {
-    test('each step is lighter than the one below it', () {
-      // Check light mode - luminance values are between 0 and 1, higher is lighter
+    test('each card step is lighter than the one below it', () {
+      // WattVision is a dark ramp: page < card < tile.
       double l(Color c) => c.computeLuminance();
       expect(l(AppSurfaces.surface), greaterThan(l(AppSurfaces.page)), reason: 'surface should be lighter than page');
-      expect(l(AppSurfaces.surfaceAlt), lessThan(l(AppSurfaces.surface)), reason: 'surfaceAlt should be darker than surface');
+      expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.surface)), reason: 'surfaceAlt should be lighter than surface');
       expect(l(AppSurfaces.surfaceAlt), greaterThan(l(AppSurfaces.page)), reason: 'surfaceAlt should be lighter than page');
     });
 
@@ -347,7 +347,8 @@ void main() {
       // it that way while every card in the app rendered flat. A single shadow
       // wide enough to see reads as a float — a halo with nothing joining the
       // shape to the page — so the shape is the claim: a tight contact shadow at
-      // a small offset, then a wide ambient one at a large offset, both navy.
+      // a small offset, then a wide ambient one at a large offset, both tinted
+      // with the hero's blue rather than left neutral.
       expect(AppShadows.subtle.length, 2);
       expect(
         AppShadows.subtle.first.blurRadius,
@@ -442,7 +443,7 @@ void main() {
 
     test('common compositions are defined', () {
       expect(AppSpacing.gutter, 16);
-      expect(AppSpacing.cardPadding, 12);
+      expect(AppSpacing.cardPadding, 20);
       expect(AppSpacing.sectionGap, 16);
     });
   });

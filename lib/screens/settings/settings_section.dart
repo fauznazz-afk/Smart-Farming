@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'sections/about_section.dart';
 import 'sections/ai_section.dart';
 import 'sections/alerts_section.dart';
-import 'sections/appearance_section.dart';
 import 'sections/background_status_section.dart';
 import 'sections/installation_section.dart';
 import 'sections/monitoring_section.dart';
@@ -32,12 +31,6 @@ List<SettingsSection> buildSettingsSections({
   required Future<void> Function() onLogout,
 }) =>
     [
-      SettingsSection(
-        title: 'Appearance',
-        subtitle: 'Light, dark, or follow your phone.',
-        icon: Icons.palette_outlined,
-        builder: (_, settings) => const AppearanceSection(),
-      ),
       SettingsSection(
         title: 'Monitoring',
         subtitle: 'Set how often live telemetry updates.',

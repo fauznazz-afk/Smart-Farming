@@ -4,7 +4,8 @@
 /// Dashboard / alarm services (reads), so they are declared in one place to
 /// prevent the two sides from drifting apart.
 abstract final class SettingsKeys {
-  // Appearance
+  // Appearance — retained so a stored value is not discarded, but WattVision is
+  // dark-only and `AppTheme` clamps every mode to dark.
   static const themeMode = 'theme_mode';
 
   // Monitoring

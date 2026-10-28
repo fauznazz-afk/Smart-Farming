@@ -6,6 +6,10 @@ import '../services/energy_forecast_service.dart';
 import '../utils/energy_comparison.dart';
 import 'liquid_glass.dart';
 
+/// Bolivian residential tariff, CRE upper residential step.
+/// shortcut: fixed rate, all utilities/steps differ (0.66–0.84); make a Settings field when the tariff must be exact.
+const double kTariffBsPerKwh = 0.84;
+
 class EnergySummaryCard extends StatelessWidget {
   const EnergySummaryCard({
     super.key,
@@ -142,6 +146,13 @@ class EnergySummaryCard extends StatelessWidget {
                     style: AppType.numeralLg.copyWith(color: appPrimaryText),
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  '≈ Bs. ${(value * kTariffBsPerKwh).toStringAsFixed(2)}',
+                  style: AppType.caption.copyWith(
+                    color: AppSurfaces.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   label,
@@ -170,35 +181,12 @@ class EnergySummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **Two colours, and for the first time they are genuinely different.**
-    //
-    // They were hard-coded amber and blue, which meant a user who selected
-    // "Ocean cyan" got two large saturated tiles in colours that appear nowhere
-    // in Settings. That is the same objection as the hue rotation, in a place
-    // where it is more visible: the Overview page stopped matching the rest of
-    // the app.
-    //
-    // The second attempt derived both from the user accent and separated them
-    // only by lightness, and that was worse in a way worth recording. `metricColor`
-    // takes an `index` and deliberately **ignores** it, so routing both tiles
-    // through it collapsed them onto one value and the PV/AC distinction
-    // disappeared entirely -- a real bug, caught by a test. The escape was
-    // `strongMetricColor`, which is not the same colour, and then two HSL
-    // lightnesses of one hue.
-    //
-    // Both of those are lightness operations on a hue, and lightness is exactly
-    // where this fails: `themeColor(lightness: 0.52)` on the old Dracula purple
-    // was `#7A47C2`, measured at **1.97:1** on the chrome surface. The AC icon
-    // was effectively invisible. These are icons, so WCAG 1.4.11 asks 3:1 and
-    // not the 4.5:1 text gets, and it needed three hand-tuned lightness steps
-    // per theme to clear it.
-    //
-    // A categorical system removes the problem instead of tuning it. `accent`
-    // and `secondary` are the brief's own two hues, 176.7 degrees apart, and
-    // they measure 13.72:1 and 6.62:1 on `surface` -- both clear 3:1 for a
-    // graphic and 4.5:1 for text with nothing left to tune. They are also the
-    // same two hues every other PV and AC surface in the app uses, so these
-    // tiles stop being a special case and become the consistent one.
+    // **Two colours, from the categorical vocabulary.** PV and AC each take their
+    // own hue from `categoryColor`, which is the same lookup every other PV and
+    // AC surface in the app uses. Deriving them from a user accent by lightness
+    // was the old approach and it collapsed the two tiles onto one value or
+    // pushed one icon under 3:1; a categorical system removes the problem instead
+    // of tuning it.
     final solarColor = categoryColor(MetricCategory.pv);
     final loadColor = categoryColor(MetricCategory.ac);
 

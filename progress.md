@@ -9,6 +9,15 @@ Dokumen ini adalah **handoff** untuk sesi berikutnya. Tujuannya supaya agent bar
 - **Status**: rilis **1.11.0 (build 22)** di `origin/main`, commit `f758488`.
   Rilis sebelumnya: 1.10.0 (11 Oktober 2026, build 21).
 
+> **Catatan untuk sesi berikutnya: dokumen ini berhenti di 1.11.0 dan sebagian
+> sudah tidak berlaku.** Sesudahnya ada 1.12–1.15 dan retheme **WattVision** yang
+> mengganti seluruh sistem visual: halaman flat `#121212`, kartu `#1E1E1E`, satu
+> aksen cyan `#00E5FF`, satu lift bayangan, dan aplikasi menjadi **dark-only**.
+> Rujukan yang berlaku sekarang: `AGENTS.md` §"WattVision surfaces",
+> `FEATURE.md` §14, dan `CHANGELOG.md` `[Unreleased]`. Bagian di bawah yang
+> menyebut aksen merah, canvas pitch black, meter segmented, atau Appearance
+> adalah rekaman sesi, bukan keadaan kode sekarang.
+
 - **Sesi kesebelas (12 Okt 2026)** menutup perubahan visual terbesar sejak
   1.10.0: aksen tunggal merah di seluruh aplikasi (akar lime ternyata di
   `main.dart`'s `ColorScheme`, bukan di widget), canvas **pitch black**
@@ -301,7 +310,7 @@ lib/                                    62 file, 11.445 baris
     alarm_notification_service.dart     notifikasi dan background alarm
     connection_health_service.dart      status multi-transport
     cctv_url.dart                       host allowlist dan secure storage
-  theme/app_theme_controller.dart
+    theme_mode.dart                     preferensi tema lama (selalu resolve ke dark)
   screens/
     dashboard_screen.dart               1.490 baris, state container, komposisi 5 tab
     dashboard/

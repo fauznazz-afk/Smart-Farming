@@ -1,15 +1,20 @@
 /// Every surface, radius, edge, type, shadow, spacing and motion value in the
 /// app.
 ///
-/// **This file was rewritten against the MiniDash brief on 15 October 2026.**
+/// **Rethemed to the WattVision system on 28 October 2026, and the app is
+/// dark-only now.**
 ///
-/// MiniDash is a widget-like, compact design system for mobile dashboards:
-/// - **Colors**: Primary #6366F1 (indigo), Secondary #14B8A6 (teal), Tertiary
-///   #F59E0B (amber), Background #F3F4F6, Surface #FFFFFF
-/// - **Spacing**: 4/8/12/16/20/24/32/40/48 base scale
-/// - **Radius**: 0/4/8/12/16/9999 for full spectrum
-/// - **Elevation**: Soft shadows with blur (subtle/medium/large/overlay)
-/// - **Typography**: Inter (headlines), DM Sans (body), IBM Plex Mono (code)
+/// WattVision (designmd.ai, MIT) is a flat dark dashboard system:
+/// - **Background**: #121212, **Cards**: #1E1E1E, borders/grid #2C2C2E,
+///   hover tile #252525
+/// - **Accent (data)**: #00E5FF cyan; **alert/red**: #FF453A;
+///   **live/normal green**: #32D74B; warning amber stays for the stale tier
+/// - **Text**: #FFFFFF / #98989D
+/// - **Typography**: Inter (titles/body), JetBrains Mono (KPI figures), tabular
+/// - **Alert box**: fill #3A1C1C, red ink, 4px red left border (banners.dart)
+///
+/// Both brightness ramps carry the same values: the ramp machinery stays, but
+/// every mode resolves to WattVision dark.
 library;
 
 import 'dart:ui' show PlatformDispatcher;
@@ -47,19 +52,18 @@ class AppSurfaces {
 
   static List<Color> captionSurfaces() => [page, surface, surfaceAlt];
 
-  /// The card surface dark ink binds hardest on.
+  /// The card surface current ink binds hardest on.
   ///
-  /// **The darker of [surface] and [surfaceAlt], and it has to be computed rather
-  /// than named.** It used to be `surfaceAlt` unconditionally, which was right
-  /// only while `surfaceAlt` happened to be the darker of the two. The blue system
-  /// inverted that in the dark ramp — cards are near-white, so the white tile
-  /// stopped being the hard case and the slightly-grey card became it. Naming one
-  /// of them would have measured every caption against the *forgiving* surface in
-  /// one ramp, which is the quiet failure this getter exists to prevent.
-  static Color get bindingCaptionSurface =>
-      surface.computeLuminance() <= surfaceAlt.computeLuminance()
-      ? surface
-      : surfaceAlt;
+  /// Light ink binds against the lighter surface; dark ink binds against the
+  /// darker one. Compute it so a future ramp cannot measure captions against the
+  /// forgiving card surface by name.
+  static Color get bindingCaptionSurface {
+    final textIsLight = onSurface.computeLuminance() > 0.5;
+    final surfaceIsHarder = textIsLight
+        ? surface.computeLuminance() >= surfaceAlt.computeLuminance()
+        : surface.computeLuminance() <= surfaceAlt.computeLuminance();
+    return surfaceIsHarder ? surface : surfaceAlt;
+  }
 }
 
 class AppSurfacesPalette {
@@ -91,67 +95,46 @@ class AppSurfacesPalette {
 
   static const AppSurfacesPalette dark = AppSurfacesPalette(
     brightness: Brightness.dark,
-    // **The darkest step of the sweep, not a separate near-black.**
-    //
-    // The dark ramp used to carry its own flat page, `#0B1120`, next to a
-    // gradient that ran `#2C5599` to `#203E6B`. Three page values in one ramp:
-    // the flat page, the sweep, and the fallback. The flat page was the one you
-    // saw whenever the gradient was not painted - the AI chat background, the
-    // report's period button, the chart export canvas - so the app had a
-    // near-black page and a blue page, and the seam between them was visible
-    // wherever they met.
-    //
-    // It is now the sweep's own foot, so the flat page and the body are the
-    // same colour and the seam is gone. Measured on the new value: white ink
-    // 12.56:1, the navy glass ink on a 45% white wash over it 4.68:1, and the
-    // page twins at 5.6:1 or better.
-    page: Color(0xFF1B3260),
-    surface: Color(0xFFF8FAFC),
-    surfaceAlt: Color(0xFFFFFFFF),
-    surfaceMuted: Color(0xFFE2E8F0),
-    onSurface: Color(0xFF0B2545),
-    // **One step darker than the light ramp's, because this is the ramp whose
-    // caption surface is the near-white card.** `#4A6791` measured 4.46:1 on
-    // `surfaceAlt` — 0.04 under AA, which is a rounding difference wearing a
-    // pass's clothing. `#42597F` clears it on both card surfaces.
-    onSurfaceVariant: Color(0xFF42597F),
-    // Same value as [surfaceMuted] — see the light ramp's note on the identity.
-    border: Color(0xFFE2E8F0),
-    input: Color(0xFFFFFFFF),
-    // The page, because an un-lit meter segment is a hole in the surface it
-    // sits on, and the meter sits on a card.
-    track: Color(0xFF1B3260),
-    tooltip: Color(0xFF0F172A),
+    // WattVision: flat #121212 page (designmd spec).
+    page: Color(0xFF121212),
+    // WattVision: cards #1E1E1E.
+    surface: Color(0xFF1E1E1E),
+    // WattVision: hover tile #252525.
+    surfaceAlt: Color(0xFF252525),
+    surfaceMuted: Color(0xFF2C2C2E),
+    onSurface: Color(0xFFFFFFFF),
+    // WattVision: muted text #98989D.
+    onSurfaceVariant: Color(0xFF98989D),
+    // Same value as [surfaceMuted] — documented identity kept.
+    border: Color(0xFF2C2C2E),
+    // Input tracks surface identity.
+    input: Color(0xFF1E1E1E),
+    // The page — un-lit meter segment is a hole in the surface.
+    track: Color(0xFF121212),
+    // WattVision: tooltip #2C2C2E.
+    tooltip: Color(0xFF2C2C2E),
   );
 
   static const AppSurfacesPalette light = AppSurfacesPalette(
     brightness: Brightness.light,
-    // **The page, sheet rows, cards and ink are all blue-tinted now.** They were
-    // neutral greys (`#F3F4F6`, `#E5E7EB`, `#6B7280`), which was correct while
-    // the page was a flat grey and wrong the moment the page became a blue
-    // sweep: a neutral grey card on a blue field reads as a dirty smudge rather
-    // than as a panel, and a neutral grey caption reads as grey-on-blue rather
-    // than as a lighter step of the same hue. Every neutral here has moved one
-    // step toward the page's own hue so the light ramp is blue-tinted paper
-    // rather than grey paper sitting on a blue page.
-    page: Color(0xFFDCE9FB),
-    surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF1F6FD),
-    surfaceMuted: Color(0xFFC3D8F3),
-    // Navy ink rather than `#111827`. Near-black on a blue page is a third hue
-    // on screen; the page's own darkest stop is what the eye adapts to, so the
-    // ink is drawn from the same family.
-    onSurface: Color(0xFF0B2545),
-    onSurfaceVariant: Color(0xFF3E5B84),
-    // **The same value as [surfaceMuted], and that identity is a documented
-    // decision rather than a copy.** A border and a deep fill are different roles
-    // that resolve to the same step, the way `pill` and `round` do. When they
-    // drifted apart (`#CBDDF5` against `#C3D8F3`) the hairline became invisible
-    // against a card and the ramp gained a fifth step for no reason.
-    border: Color(0xFFC3D8F3),
-    input: Color(0xFFFFFFFF),
-    track: Color(0xFFDCE9FB),
-    tooltip: Color(0xFF0B2545),
+    // WattVision: flat #121212 page (designmd spec).
+    page: Color(0xFF121212),
+    // WattVision: cards #1E1E1E.
+    surface: Color(0xFF1E1E1E),
+    // WattVision: hover tile #252525.
+    surfaceAlt: Color(0xFF252525),
+    surfaceMuted: Color(0xFF2C2C2E),
+    onSurface: Color(0xFFFFFFFF),
+    // WattVision: muted text #98989D.
+    onSurfaceVariant: Color(0xFF98989D),
+    // Same value as [surfaceMuted] — documented identity kept.
+    border: Color(0xFF2C2C2E),
+    // Input tracks surface identity.
+    input: Color(0xFF1E1E1E),
+    // The page — un-lit meter segment is a hole in the surface.
+    track: Color(0xFF121212),
+    // WattVision: tooltip #2C2C2E.
+    tooltip: Color(0xFF2C2C2E),
   );
 }
 
@@ -178,17 +161,13 @@ class AppTheme {
   static Brightness get brightness => _brightness;
 
   static void applyMode(ThemeMode mode, Brightness platform) {
-    apply(switch (mode) {
-      ThemeMode.light => Brightness.light,
-      ThemeMode.dark => Brightness.dark,
-      ThemeMode.system => platform,
-    });
+    apply(Brightness.dark);
   }
 
   static void apply(Brightness brightness) {
-    _brightness = brightness;
-    AppSurfaces.apply(brightness);
-    AppPalette.apply(brightness);
+    _brightness = Brightness.dark;
+    AppSurfaces.apply(Brightness.dark);
+    AppPalette.apply(Brightness.dark);
   }
 }
 
@@ -232,8 +211,7 @@ class AppPalette {
 
   // The page twins. **Use these for anything drawn on the page gradient** — a
   // CCTV status pill, a banner with no card behind it, a live dot. The plain
-  // `success` / `warning` / `statusBad` are for cards, and a card is near-white
-  // in both ramps, so those have to be dark.
+  // `success` / `warning` / `statusBad` are for cards.
   static Color get successOnPage => AppTheme.brightness == Brightness.dark
       ? _active.successOnPage
       : _active.successOnPageLight;
@@ -302,14 +280,7 @@ class AppPaletteTheme {
   final Color error;
   final Color statusBad;
 
-  /// The page twins of [success], [warning] and [statusBad].
-  ///
-  /// **One status colour cannot serve a white card and a dark page.** A card
-  /// needs a dark hue and a page needs a light one, and the two requirements are
-  /// about 2.5:1 apart — there is no value that clears 4.5:1 on both. So the
-  /// meaning is carried by two tokens and the call site says which surface it is
-  /// on. Drawing the card value on the page, or the page value on a card, is a
-  /// legibility bug that no test on a single surface can see.
+  /// The page twins of [success], [warning] and [statusBad], per ramp.
   final Color successOnPage;
   final Color warningOnPage;
   final Color statusBadOnPage;
@@ -326,138 +297,67 @@ class AppPaletteTheme {
   final Color onHue;
 
   static const AppPaletteTheme light = AppPaletteTheme(
-    // **The same hue as the dark ramp, one step deeper.** It was red `#EF4444`
-    // here and blue `#3B82F6` in dark, which meant the app had two identities
-    // and the user picked between them by toggling the theme. One hue, two
-    // lightnesses — and red stays red for exactly one job, which is saying a
-    // reading is wrong, via `statusBad` below.
-    //
-    // `#1D4ED8` rather than the dark ramp's `#3B82F6`: this one has to clear
-    // **4.5:1 as text on a white card**, because panel headings and the selected
-    // chip's label are drawn in it, and `#3B82F6` measured 3.52:1 there.
-    primary: Color(0xFF1D4ED8),
-    secondary: Color(0xFF0E7490),
-    tertiary: Color(0xFFB45309),
-    // **Darkened for the same reason the dark ramp's were.** These were
-    // `#10B981` / `#F59E0B`, which measure 2.5 and 2.1:1 on a white card.
-    success: Color(0xFF047857),
-    warning: Color(0xFFB45309),
-    // Orange-red rather than a second amber: an alert and a warning are
-    // different conditions, and `color_helpers_test.dart` asserts the four
-    // status colours stay pairwise distinguishable.
-    statusAlert: Color(0xFFC2410C),
-    error: Color(0xFF1D4ED8),
-    // **The only red in the ramp**, and one step darker than the dark ramp's:
-    // `#DC2626` measured 4.45:1 on `surfaceAlt` — 0.05 under AA, which is a
-    // rounding difference dressed up as a pass. `#D01E1E` clears it on both
-    // card surfaces.
-    statusBad: Color(0xFFD01E1E),
-    // **The light ramp's page twins are its card values, a step deeper.** Its page
-    // is pale, so a dark hue is legible on both surfaces and the ramp needs no
-    // branch — which is why there is one pair of numbers here and two in the dark
-    // ramp. All three sit a step below their card twin because the page is 12
-    // points off white: green measured 4.46:1 as `#047857`, amber 4.09:1 as
-    // `#B45309`, and both had to move.
-    successOnPage: Color(0xFF065F46),
-    warningOnPage: Color(0xFF9A4707),
-    statusBadOnPage: Color(0xFFB91C1C),
-    successOnPageLight: Color(0xFF065F46),
-    warningOnPageLight: Color(0xFF9A4707),
-    statusBadOnPageLight: Color(0xFFB91C1C),
-    info: Color(0xFF1D4ED8),
-    // The chart triad is unchanged by the accent move: red/green/blue is a data
-    // vocabulary, not a brand one.
-    chartRed: Color(0xFFDC2626),
-    chartGreen: Color(0xFF047857),
-    chartBlue: Color(0xFF1D4ED8),
-    // **White ink, not black — and it is measured, not chosen.** Black on
-    // `#1D4ED8` is 4.06:1, under AA; white is 5.75:1. The previous pairing was
-    // worse in both directions: white on the old red was 3.76:1 *and* black was
-    // the token, so neither ink passed on the value that was actually there.
-    onPrimary: Color(0xFFFFFFFF),
-    onSecondary: Color(0xFFFFFFFF),
-    onTertiary: Color(0xFFFFFFFF),
-    onHue: Color(0xFFFFFFFF),
+    // WattVision: cyan data accent (designmd spec).
+    primary: Color(0xFF00E5FF),
+    // WattVision: live/normal lime green.
+    secondary: Color(0xFF32D74B),
+    // WattVision: warning amber.
+    tertiary: Color(0xFFFBBF24),
+    success: Color(0xFF32D74B),
+    warning: Color(0xFFFBBF24),
+    // Orange, distinct from warning on purpose.
+    statusAlert: Color(0xFFFF9F0A),
+    error: Color(0xFF00E5FF),
+    // Spec alert red — the only red in the ramp.
+    statusBad: Color(0xFFFF453A),
+    successOnPage: Color(0xFF32D74B),
+    warningOnPage: Color(0xFFFBBF24),
+    statusBadOnPage: Color(0xFFFF453A),
+    successOnPageLight: Color(0xFF32D74B),
+    warningOnPageLight: Color(0xFFFBBF24),
+    statusBadOnPageLight: Color(0xFFFF453A),
+    info: Color(0xFF00E5FF),
+    // Chart triad: alert red / chart green / 4th-series blue.
+    chartRed: Color(0xFFFF453A),
+    chartGreen: Color(0xFF30D158),
+    chartBlue: Color(0xFF5E9EFF),
+    // Measured: white on cyan #00E5FF ~1.4:1, dark ink ~10:1.
+    onPrimary: Color(0xFF121212),
+    onSecondary: Color(0xFF121212),
+    onTertiary: Color(0xFF121212),
+    onHue: Color(0xFF121212),
   );
 
   static const AppPaletteTheme dark = AppPaletteTheme(
-    // **`#1D4ED8`, same as light — not the `#3B82F6` this ramp started with.**
-    // The lighter blue was chosen as a *graphic* on the dark page, and it clears
-    // 3:1 there easily. But the same token draws panel headings and the selected
-    // chip's label on a **white card**, where it measured **3.52:1** — under AA
-    // for text. One accent has to work in both roles, and the binding one is the
-    // card, because that is where it is read as words.
-    primary: Color(0xFF1D4ED8),
-    // **The same teal the light ramp uses, and it is the second series in
-    // `kChartSeriesOrder`.** It used to be `#22D3EE`, a cyan bright enough to
-    // read on the old near-black page - and illegible on the near-white *card*
-    // the chart is actually drawn on, at **1.73:1**. The chart marks are on
-    // cards in both ramps, so the series colours have to be legible on a card,
-    // and this one measures 5.12:1 there.
-    secondary: Color(0xFF0E7490),
-    tertiary: Color(0xFFB45309),
-    // **The dark ramp's status colours are DARK, and that is the whole cost of
-    // the white card.** Cards are near-white in both ramps, so a status colour
-    // read as text on a card has to be dark — and the values this ramp carried
-    // (`#34D399`, `#FBBF24`, `#F87171`) measured **1.92 / 1.67 / 2.77:1** on
-    // white. They are the right values for the *page*, which is why the
-    // `…OnPage` twins below exist rather than these being simply darkened.
-    success: Color(0xFF047857),
-    warning: Color(0xFFB45309),
-    // See the light ramp's note: an alert is orange-red, not a second amber.
-    statusAlert: Color(0xFFC2410C),
-    error: Color(0xFF1D4ED8),
-    // **The same red as the light ramp, and the card is why.** Both ramps draw
-    // near-white cards, so a breach colour has to be dark in both — and this
-    // value measured **4.45:1** on `surfaceAlt`, under AA by a rounding
-    // difference. One red, one value, both ramps.
-    statusBad: Color(0xFFD01E1E),
-    // **The page twins, and they are the values this ramp used to carry.**
-    //
-    // Measured on the dark page they now sit on: 8.24 / 8.71 / 6.62:1 bare, and
-    // 6.22 / 6.71 / 5.29:1 on the badge's own 12% wash, which is the surface the
-    // CCTV status pill actually puts them on.
-    //
-    // **The red moved and the other two did not.** `#F87171` was the old value
-    // and it was tuned for a near-black page; on this page it measured 3.18:1 at
-    // the light end of the sweep, which is a breach indicator that reads as a
-    // smudge. It is now `#FCA5A5`, which is one step lighter at the *same hue*
-    // (0.0 degrees, measured) and clears at 5.74:1 bare. The green and the amber
-    // were measured at the stops this page now has and needed no change.
-    successOnPage: Color(0xFF34D399),
+    // WattVision: cyan data accent (designmd spec).
+    primary: Color(0xFF00E5FF),
+    // WattVision: live/normal lime green.
+    secondary: Color(0xFF32D74B),
+    // WattVision: warning amber.
+    tertiary: Color(0xFFFBBF24),
+    success: Color(0xFF32D74B),
+    warning: Color(0xFFFBBF24),
+    // Orange, distinct from warning on purpose.
+    statusAlert: Color(0xFFFF9F0A),
+    error: Color(0xFF00E5FF),
+    // Spec alert red — the only red in the ramp.
+    statusBad: Color(0xFFFF453A),
+    successOnPage: Color(0xFF32D74B),
     warningOnPage: Color(0xFFFBBF24),
-    statusBadOnPage: Color(0xFFFCA5A5),
-    // The light ramp's page is pale, so its page twins are its card values with
-    // all three a step deeper: the light page (`#DCE9FB`) is 12 points off white,
-    // and a hue that clears 4.5:1 on a white card is still under it on the page.
-    successOnPageLight: Color(0xFF065F46),
-    warningOnPageLight: Color(0xFF9A4707),
-    statusBadOnPageLight: Color(0xFFB91C1C),
-    info: Color(0xFF1D4ED8),
-    // **The chart triad is the SAME in both ramps, and that is the fix.**
-    //
-    // The dark ramp used to carry a *brighter* triad — `#F87171`, `#34D399`,
-    // `#60A5FA` — on the reasoning that chart lines are drawn on cards and a
-    // triad tuned to the page would vanish on white. The reasoning was
-    // backwards: the cards are near-white in **both** ramps, so the bright triad
-    // is the one tuned to the page, and it is the one that vanishes on the card.
-    // Measured on the card the charts are actually drawn on: `#F87171` 2.64:1,
-    // `#34D399` **1.84:1**, `#60A5FA` 2.43:1 — and the legend labels are drawn
-    // *in the series colour*, so the green series' label was 1.84:1 text. The
-    // same triad in both ramps measures 4.62 / 5.24 / 6.41:1 on the card, and
-    // the legend text is legible.
-    //
-    // **Red/green/blue is a data vocabulary, not a brand one.** The hues are
-    // fixed, the order is fixed, and they mean the same thing in both ramps.
-    chartRed: Color(0xFFDC2626),
-    chartGreen: Color(0xFF047857),
-    chartBlue: Color(0xFF1D4ED8),
-    // **White, not black.** The ink follows the fill, and the fill is the same
-    // value the light ramp uses.
-    onPrimary: Color(0xFFFFFFFF),
-    onSecondary: Color(0xFFFFFFFF),
-    onTertiary: Color(0xFFFFFFFF),
-    onHue: Color(0xFFFFFFFF),
+    statusBadOnPage: Color(0xFFFF453A),
+    successOnPageLight: Color(0xFF32D74B),
+    warningOnPageLight: Color(0xFFFBBF24),
+    statusBadOnPageLight: Color(0xFFFF453A),
+    info: Color(0xFF00E5FF),
+    // Chart triad: alert red / chart green / 4th-series blue.
+    chartRed: Color(0xFFFF453A),
+    chartGreen: Color(0xFF30D158),
+    chartBlue: Color(0xFF5E9EFF),
+    // Measured: white on cyan #00E5FF ~1.4:1, dark ink ~10:1.
+    onPrimary: Color(0xFF121212),
+    onSecondary: Color(0xFF121212),
+    onTertiary: Color(0xFF121212),
+    onHue: Color(0xFF121212),
   );
 }
 
@@ -481,7 +381,7 @@ class AppSpacing {
 
   // Common compositions
   static const double gutter = 16;
-  static const double cardPadding = 12;
+  static const double cardPadding = 20;
   static const double sectionGap = 16;
 }
 
@@ -499,14 +399,14 @@ class AppRadius {
   static const double xl = 16;
   static const double full = 9999;
 
-  // The blue system's own radii, which are not the 4/8/12/16 scale.
+  // Component radii that do not fit the 4/8/12/16 scale.
   //
   // **These four are read off the reference card by card, not picked.** The hero
   // is the roundest thing on the screen because it is the biggest; the sheet is
   // one step tighter because it is taller; the pills and the sheet rows are
   // tighter again because they are small enough that a 28 would read as a lozenge.
-  static const double hero = 28;    // the navy gradient card
-  static const double sheet = 24;   // the opaque white bottom sheet
+  static const double hero = 28;    // the gradient hero card
+  static const double sheet = 24;   // the opaque bottom sheet
   static const double stat = 16;    // the translucent three-column stat card
   static const double tilePill = 14; // high/low pills and the hour pills
   static const double sheetRow = 12; // one row inside the sheet
@@ -537,10 +437,10 @@ class AppShadows {
   /// **Raised: two shadows, and the contact one is the load-bearing half.**
   ///
   /// This was a single `0x0A000000` at a 1px offset and a 2px blur — four percent
-  /// of neutral black, two pixels wide. On this app's mid-tone blue page that is
-  /// not visible at all, which is why every card, tile and panel read as a flat
-  /// rectangle with a hairline and nothing else. That is the "flat sekali" the
-  /// surface system was reported as.
+  /// of neutral black, two pixels wide. On a dark page that is not visible at
+  /// all, which is why every card, tile and panel read as a flat rectangle with a
+  /// hairline and nothing else. That is the "flat sekali" the surface system was
+  /// reported as.
   ///
   /// A single shadow wide enough to see reads as a *float*: a dark halo around a
   /// shape, with nothing joining the shape to the page. So there are two. The
@@ -549,13 +449,10 @@ class AppShadows {
   /// the construction `AppGlass.heroShadow` already uses at hero scale; this tier
   /// is the one for a card.
   ///
-  /// **Navy, not black, and that is the page's colour.** A neutral black shadow
-  /// laid over a blue field desaturates it and reads as grey dirt rather than as
-  /// shade. The alphas sit one step under the hero's measured pair
-  /// (`0x3D` dark / `0x1F` light), because a card is smaller than a hero — and
-  /// light mode is the weaker of the two for the reason recorded on
-  /// `AppGlass.heroShadow`: the light page is already a short distance from the
-  /// card, so the shadow only has to add depth.
+  /// **Tinted with the hero's own deep blue rather than left neutral.** A
+  /// neutral black shadow laid over a cool page desaturates it and reads as grey
+  /// dirt rather than as shade; carrying the hero's hue keeps the lift in the
+  /// app's colour family. The alphas sit one step under the hero's measured pair.
   static List<BoxShadow> get subtle => <BoxShadow>[
         BoxShadow(
           color: AppGlass.isDark
@@ -614,12 +511,14 @@ class AppShadows {
         ),
       ];
 
-  // ══ Backward compatibility aliases (from Neon Brutalist) ════════════════
+  // ══ Backward compatibility aliases ═════════════════════════════════════
 
-  /// Alias for `medium` — the stamped tier for cards, inputs, list rows
+  /// Alias for `medium` — the resting lift for cards, inputs and list rows.
   static List<BoxShadow> get stamped => medium;
 
-  /// Tinted stamped shadow for primary button — returns medium with hue wash
+  /// A lift tinted with [hue] rather than neutral black, for a filled button
+  /// that should read as its own colour. Material's `elevation` cannot carry a
+  /// hue, so the call sites paint this through a `DecoratedBox` behind the fill.
   static List<BoxShadow> stampedIn(Color hue) => [
         BoxShadow(
           color: hue.withValues(alpha: 0.15),
@@ -723,7 +622,7 @@ class AppType {
   static const TextStyle displayMd = TextStyle(
     fontFamily: heading,
     fontSize: 24,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     height: 1.17,
     letterSpacing: -0.02 * 24,
     fontFeatures: [FontFeature.tabularFigures()],
@@ -826,11 +725,11 @@ class AppType {
   // shove its own unit sideways.
 
   static const TextStyle numeralXl = TextStyle(
-    fontFamily: heading,
-    fontSize: 28,
+    fontFamily: mono,
+    fontSize: 32,
     fontWeight: FontWeight.w700,
     height: 1.0,
-    letterSpacing: -0.02 * 28,
+    letterSpacing: -0.02 * 32,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -1047,11 +946,11 @@ class AppMotion {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SECTION 9: GLASS (AppGlass) — the blue reference system
+// SECTION 9: GLASS (AppGlass) — WattVision glass + sheets
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// The blue system: a gradient page, a navy gradient hero, translucent white
-/// glass over it, and exactly one opaque surface — the sheet.
+/// WattVision extras: flat dark page, a gradient hero, translucent white glass
+/// over it, and dark opaque sheets.
 ///
 /// **Every value here comes off the reference card, and the two opacities are
 /// the load-bearing part.** The whole glass effect is one white at two alphas:
@@ -1062,130 +961,79 @@ class AppMotion {
 ///
 /// The sheet is the only opaque fill in the system, and that is the reference's
 /// own rule: the glass is for things sitting *on* the hero, and the sheet is a
-/// different layer of interface that happens to be white. [sheetRow] is a light
-/// grey rather than a tint of the sheet, because a tint would let the page
-/// gradient show through the one surface that is supposed to be opaque.
+/// different layer of interface. [sheetRow] is a raised step rather than a tint
+/// of the sheet, because a tint would let the page show through the one surface
+/// that is supposed to be opaque.
 class AppGlass {
   const AppGlass._();
 
-  /// **Which ramp is live.** Everything below branches on this rather than
-  /// hardcoding white, because the light ramp has the same problem in reverse:
-  /// the page is *pale*, so white-on-pale has no contrast and the whole system
-  /// collapses into a white screen. Dark ink is the light ramp's ink, and
-  /// translucent **black** is its glass — the tint has to invert with the ink,
-  /// because glass only reads when it is lighter (or darker) than what is
-  /// behind it.
+  /// **Which ramp is live.** Dark-only: this always reports dark.
   static Brightness get brightness => AppTheme.brightness;
 
   static bool get isDark => brightness == Brightness.dark;
 
-  /// Page gradient, top → bottom. **The screen is never a flat colour.**
+  /// Page gradient, top → bottom. **WattVision: flat #121212.**
   ///
-  /// **Every stop is dark enough to carry white ink, and that is measured, not
-  /// stylistic.** This ramp started at `#A9C7F7` — a pale blue copied off the
-  /// reference — which put white page ink at **1.72:1** on the top third of the
-  /// screen: the nav bar's inactive glyph, the hour pills and the page headings
-  /// were all invisible there. The reference gets away with a light top because
-  /// its top third is empty; this app puts content in it.
-  ///
-  /// So the sweep is deepened end to end while staying unmistakably blue, and
-  /// `test/glass_ramp_contrast_test.dart` pins white ink at AA against all
-  /// three stops so it cannot be lightened back.
+  /// Kept as a three-stop list so every call site that paints a sweep still
+  /// works; the stops are identical, so it renders flat.
   static const List<Color> pageGradientDark = <Color>[
-    // **Deep, and nearly even, and the evenness is the point.**
-    //
-    // The pill is a 45% white wash, so what matters is not the page's own value
-    // but where that wash lands. A ramp that keeps darkening toward the bottom
-    // puts its darkest stop under the pill and drops the label to 4.01:1 — the
-    // bottom of a gradient is where content is densest, so it cannot also be
-    // where contrast is worst. These three sit inside a narrow band: the sweep
-    // still reads, and no stop starves the glass above it.
-    //
-    // **The band is also what keeps the page twins legible, and that is the
-    // second reason for it.** They are drawn on the page - the CCTV status pill,
-    // a banner's glyph - and the old ramp failed them: on `#2C5599` the green
-    // measured 3.81:1, the amber 4.39:1 and the red **2.65:1** - and that red
-    // was `#F87171`, the twin the ramp carried then; the twin it carries now,
-    // `#FCA5A5`, measures 3.86:1 there, so the old ramp failed this red too,
-    // just less badly. Which is a breach indicator that reads as a smudge. On
-    // these stops the twins measure 5.67 / 6.53 / 5.74 bare at their worst
-    // stop, and the badge's own 12% wash under each reads 4.55 / 5.24 / 4.63 -
-    // so the pill's *label*, which is 10dp text, clears AA on every stop instead
-    // of only on the deepest one.
-    //
-    // The deepest stop is `#1B3260`, and it is the **flat page** too (see
-    // `AppSurfaces.dark.page`), so the strip under the nav bar, the AI chat
-    // background and the chart export canvas are the same blue as the body
-    // rather than a second, unrelated dark.
-    Color(0xFF223C6B),
-    Color(0xFF1E3960),
-    Color(0xFF1B3260),
+    // WattVision: flat #121212 page (designmd spec).
+    Color(0xFF121212),
+    // WattVision: flat #121212 page.
+    Color(0xFF121212),
+    // WattVision: flat #121212 page — also the flat page (see AppSurfaces.page).
+    Color(0xFF121212),
   ];
 
   /// **The page sweep for the active ramp.**
   ///
-  /// **A getter, and that is the whole fix.** It was one `const` list named
-  /// `pageGradient` holding the dark stops, with a separate unused
-  /// `pageGradientLight` beside it — so light mode painted the dark blue and
-  /// every light-mode contrast number was measured against a page the light ramp
-  /// does not have. Two names for one thing, and the second one was dead.
+  /// A getter, so a call site never captures a stale list.
   static List<Color> get pageGradient =>
       isDark ? pageGradientDark : pageGradientLight;
 
-  /// The light ramp's page: the same blue, washed almost to white.
-  ///
-  /// **The top stop is near-white on purpose.** The blue is the product's
-  /// identity and it does not leave in light mode — what changes is that the
-  /// page gets out of the way, so a user who picked Light for battery or glare
-  /// is not looking at a saturated blue field. The bottom stop stays tinted so
-  /// the sweep still reads as a gradient and the sheet has something to lift off.
+  /// The light ramp's page: unused, kept identical to dark so the dark-only
+  /// contract is literal rather than merely unused.
   static const List<Color> pageGradientLight = <Color>[
-    Color(0xFFF7FAFE),
-    Color(0xFFE8F1FD),
-    // **Was `#BCD6F6`, and it was too blue for navy ink.** The light ramp's glass
-    // is translucent *black*, so a saturated page stop plus a black wash lands
-    // the pill at a mid-blue that navy ink measures 2.48:1 against. The stop is
-    // pulled back toward white; the gradient still reads because the top stop is
-    // warmer and the whole thing is cooler than a neutral page.
-    Color(0xFFD4E5FA),
+    Color(0xFF121212),
+    Color(0xFF121212),
+    Color(0xFF121212),
   ];
 
-  /// Hero gradient, top-left → bottom-right, navy into deeper navy.
+  /// Hero gradient, top-left → bottom-right, deep into deeper.
   static const List<Color> heroGradient = <Color>[
     Color(0xFF35619F),
     Color(0xFF1E3E75),
   ];
 
-  /// **45% and 68%, and the number is a measurement.**
+  /// **55% and 68%, and the number is a measurement.**
   ///
   /// The wash started at 14% / 34%, which is what "glass" looks like on a dark
-  /// card over a dark page — and it is why both ramps failed. A 14% white wash
-  /// over a mid-blue page lands on a **mid-tone**: too dark for dark ink and too
+  /// card over a dark page — and it is why the pair failed. A 14% white wash
+  /// over a dark page lands on a **mid-tone**: too dark for dark ink and too
   /// light for white ink, so neither passes. Measured 2.41:1 for dark ink and
   /// 3.77:1 for white on the same pill.
   ///
   /// The wash has to carry the surface all the way to light, so that the dark
-  /// label on it has something to read against in both ramps. 45% reads as a
-  /// tinted chip on the dark page and as a barely-there lift on the light one;
-  /// 68% is the selected state and the nav bar.
-  static const double softAlpha = 0.45;
+  /// label on it has something to read against. 55% reads as a tinted chip on
+  /// the dark page; 68% is the selected state and the nav bar. The wash over the
+  /// flat #121212 page must keep glass ink AA.
+  static const double softAlpha = 0.55;
   static const double strongAlpha = 0.68;
 
   /// A resting glass surface: the stat card, a high/low pill, an hour pill.
   ///
-  /// **Always white, in both ramps — and the ink on it is always dark.**
+  /// **Always white — and the ink on it is always dark.**
   ///
   /// **This is the reference's own rule and it is what makes the wash safe.**
   /// A translucent white pill over the dark page comes out *lighter* than the
-  /// page, and over the light page it comes out lighter too: the wash decides
-  /// the surface's lightness, not the page behind it. So the pill is a light
-  /// chip in both ramps and its label is dark in both — which is the only
-  /// pairing that clears AA twice.
+  /// page: the wash decides the surface's lightness, not the page behind it. So
+  /// the pill is a light chip and its label is dark — which is the only pairing
+  /// that clears AA.
   ///
-  /// It also means the wash must NOT invert per ramp. An earlier version used a
-  /// black wash in light "so the tint would match the ink", which drags the pill
-  /// toward the navy ink sitting on it: measured **2.48:1**. Inverting the wash
-  /// is the wrong lever; the ink is the thing that follows the wash.
+  /// It also means the wash must NOT invert. An earlier version used a black
+  /// wash "so the tint would match the ink", which drags the pill toward the dark
+  /// ink sitting on it. Inverting the wash is the wrong lever; the ink is the
+  /// thing that follows the wash.
   static Color get fillSoft => Colors.white.withValues(alpha: softAlpha);
 
   /// The selected glass surface: the highlighted hour pill. A stronger white, so
@@ -1193,21 +1041,21 @@ class AppGlass {
   static Color get fillStrong => Colors.white.withValues(alpha: strongAlpha);
 
   /// A third, middle strength for the high/low pills, which sit on the hero's
-  /// lighter half and need more body than an hour pill on the page gradient.
+  /// lighter half and need more body than an hour pill on the page does.
   static Color get fill => Colors.white.withValues(alpha: 0.20);
 
   /// **The ink for content sitting on a [fillSoft] / [fillStrong] surface.**
   ///
-  /// Dark in both ramps, because the wash is white in both. This is deliberately
-  /// *not* [pageInkStrong]: that is for content on the bare page, where the ramp
-  /// does decide the ink. On glass the wash decides it.
+  /// Dark, because the wash is white. This is deliberately *not*
+  /// [pageInkStrong]: that is for content on the bare page. On glass the wash
+  /// decides the ink.
   static const Color pageGlassInk = Color(0xFF0B2545);
   // **The same value as [pageGlassInk], and the measurement is why.**
   //
-  // A tinted wash gives a label no headroom: 4.31:1 for a slightly lighter navy
-  // against a requirement of 4.5. The distinction that a caption needs is
-  // carried by size and weight, which is what the type scale is for — not by a
-  // fifth ink value that only half the ramps could afford.
+  // A tinted wash gives a label no headroom: a slightly lighter step lands under
+  // the 4.5:1 the ink has to clear. The distinction a caption needs is carried by
+  // size and weight, which is what the type scale is for — not by a fifth ink
+  // value.
   static Color get pageGlassInkSoft => pageGlassInk;
 
   /// The ink on the **nav bar**, which is a strong glass wash over the page and
@@ -1219,15 +1067,10 @@ class AppGlass {
   static Color get divider =>
       (isDark ? Colors.white : Colors.black).withValues(alpha: 0.22);
 
-  /// The two arrows on the high/low pills. Warm for the one that means "up",
-  /// the hero's own blue for the one that means "down" — so the arrow is the
-  /// only warm pixel in a cool screen, which is what makes it read as a
-  /// direction rather than as a character.
-  ///
-  /// **The down arrow is stepped up in light mode** because `#7FB2FF` is a pale
-  /// blue and the light ramp's page is also pale blue; at that value the arrow
-  /// reads as part of the background. Light mode gets the same hue at full
-  /// strength, which is the one place this system uses an unpastel'd value.
+  /// The two arrows on the high/low pills. Warm for the one that means "up", a
+  /// cool blue for the one that means "down" — so the arrow is the only warm
+  /// pixel in a cool screen, which is what makes it read as a direction rather
+  /// than as a character.
   static Color get arrowUp => isDark ? arrowUpDark : arrowUpLight;
   static Color get arrowDown => isDark ? arrowDownDark : arrowDownLight;
 
@@ -1236,73 +1079,51 @@ class AppGlass {
   static const Color arrowUpLight = Color(0xFFE85D1F);
   static const Color arrowDownLight = Color(0xFF1D5FD6);
 
-  /// A saturated blue that clears **3:1 on the dark page**, for accent *graphics*
-  /// drawn on the page gradient.
+  /// The accent as a *graphic* drawn on the page, rather than on a card.
   ///
-  /// **The accent itself cannot do this, and the measurement is the whole reason
-  /// the token exists.** `#1D4ED8` is the brand colour and it is right on a white
-  /// *card*, but the same blue on the dark page's own stops measures
-  /// **1.09 / 1.35 / 1.60:1** — under WCAG 1.4.11's 3:1 for a graphical object,
-  /// and under the 1.4.11 contrast the live dot, the carousel dot and a section
-  /// heading need there. No hue in the ramp clears it either (`#2F6FED` reaches
-  /// only 2.35), which is why this is a second blue rather than a lighter tint
-  /// of the first.
-  static const Color accentOnPage = Color(0xFF93C5FD);
+  /// WattVision's cyan clears 3:1 on #121212 for a live dot, a carousel dot and a
+  /// section heading. Kept as its own token because a card accent and a page
+  /// accent are measured against different grounds even when they are one hue.
+  static const Color accentOnPage = Color(0xFF00E5FF);
 
   /// White ink at three strengths, which is what the **hero** needs: a title, a
   /// value, and a label. One colour at three alphas rather than three greys,
-  /// because a grey chosen for a label on navy reads warm against a blue and this
-  /// cannot.
+  /// because a grey chosen for a label on the hero reads flat against its
+  /// gradient and this cannot.
   ///
-  /// **These do not invert with the theme, and that is the one exception.** The
-  /// hero is a navy gradient in both ramps — it is the same card either way, so
-  /// its ink is white either way. Everything drawn on the *page* instead uses
-  /// [pageInkStrong] / [pageInk] / [pageInkSoft], which do.
+  /// The hero is a deep gradient, so its ink is white. Everything drawn on the
+  /// *page* instead uses [pageInkStrong] / [pageInk] / [pageInkSoft].
   static Color get inkStrong => Colors.white;
   static Color get ink => Colors.white.withValues(alpha: 0.92);
   static Color get inkSoft => Colors.white.withValues(alpha: 0.70);
 
   /// Ink for content sitting **directly on the page**, not inside the hero.
   ///
-  /// **This is the token the light mode was missing.** White ink over the dark
-  /// ramp's blue page is the whole reason the dark theme read; the same white
-  /// over the light ramp's near-white page is invisible, so light mode needs
-  /// navy ink and the nav bar, the status strip and the date strip all have to
-  /// read these rather than the hero's white.
+  /// White on #121212. The light branch stays for the dark-only clamp: if a
+  /// future ramp ever ships, this token already answers it.
   static Color get pageInkStrong =>
       isDark ? Colors.white : const Color(0xFF0B2545);
   static Color get pageInk =>
       isDark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF10294D);
-  // **Darker than the obvious `#3A5A87`, and 3.87:1 is why.** That was measured
-  // on the light ramp's own bottom stop. The soft ink is a caption weight, which
-  // is the size that has the least room, so it takes the darkest value of the
-  // three rather than a mid one.
   static Color get pageInkSoft =>
       isDark ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF24446F);
 
   /// The one opaque surface, and its two greys.
-  static const Color sheet = Color(0xFFFFFFFF);
-  static const Color sheetRow = Color(0xFFF4F5F7);
-  static const Color sheetTitleInk = Color(0xFF1A1A1A);
-  static const Color sheetRowInk = Color(0xFF1A1A1A);
-  static const Color sheetRowInkMuted = Color(0xFF5A5F6B);
+  static const Color sheet = Color(0xFF1E1E1E);
+  static const Color sheetRow = Color(0xFF252525);
+  static const Color sheetTitleInk = Color(0xFFFFFFFF);
+  static const Color sheetRowInk = Color(0xFFFFFFFF);
+  static const Color sheetRowInkMuted = Color(0xFF98989D);
 
   /// The sheet's grab handle, and the two page dots.
-  static const Color handle = Color(0xFFCBD2DC);
-  static const Color dotInactive = Color(0xFFC7CCD6);
-  static const Color active = Color(0xFF2F6FED);
+  static const Color handle = Color(0xFF4A4A50);
+  static const Color dotInactive = Color(0xFF48484E);
+  static const Color active = Color(0xFF00E5FF);
 
-  /// The hero's own shadow. A navy card on a blue page cannot be separated by a
-  /// tonal step the way a white card on navy could, so it carries a deep soft
-  /// one instead — and it is the only shadow in the system, because glass is not
+  /// The hero's own shadow. A gradient card on a dark page cannot be separated
+  /// by a tonal step the way a lighter card could, so it carries a deep soft one
+  /// instead — and it is the only shadow in the system, because glass is not
   /// a thing that gets a shadow, it is a thing that gets a border.
-  ///
-  /// **Stronger in light mode, and that is a measurement rather than a
-  /// preference.** Over the dark ramp the page is darker than the card, so the
-  /// card already separates and the shadow only has to add depth. Over the light
-  /// ramp's pale page the same navy shadow falls on a near-white field where it
-  /// is far more visible, so it is pulled back rather than pushed up — a heavier
-  /// shadow there reads as a smudge under a card rather than as lift.
   static List<BoxShadow> get heroShadow => <BoxShadow>[
         BoxShadow(
           color: isDark ? const Color(0x3D0B2545) : const Color(0x1F0B2545),
@@ -1325,11 +1146,6 @@ class AppGlass {
 
   /// The page gradient as a box decoration's linear gradient, for the one
   /// widget that owns the backdrop.
-  ///
-  /// **A getter, not a constant, and it branches on the ramp.** It was a
-  /// hardcoded dark-blue sweep, so light mode painted a saturated blue behind a
-  /// palette built for near-white — the single biggest reason light mode looked
-  /// broken rather than merely plain.
   static LinearGradient get pageSweep => LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -1340,15 +1156,10 @@ class AppGlass {
   ///
   /// **This is the fallback, not the design.** It is what an overscroll bounce
   /// exposes above and below the sweep, and what shows for the one frame before
-  /// the gradient resolves, so it must match the ramp's own page or the seam is
-  /// visible at exactly the moment the user is dragging.
-  ///
-  /// The dark ramp's was `#4A7FD4`, a *light* blue, while its page was
-  /// near-black: the two were unrelated, so a bounce flashed a colour the app
-  /// otherwise never drew. It is now the dark page, which is the same value
-  /// the gradient resolves to at its foot.
+  /// the gradient resolves, so it must match the page or the seam is visible at
+  /// exactly the moment the user is dragging.
   static Color get pageFallback =>
-      isDark ? const Color(0xFF1B3260) : const Color(0xFFBCD6F6);
+      isDark ? const Color(0xFF121212) : const Color(0xFF121212);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

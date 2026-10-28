@@ -34,24 +34,17 @@ class GlassPageHeader extends StatelessWidget {
         //
         // **A white wash, not [AppBorders.categoricalWash], and this is the same
         // correction `AppGlass.fillSoft` documents.** The wash used to be the
-        // accent at 20%, measured at 4.20:1 over a *card*. This header is not
-        // over a card — all five call sites in `dashboard_screen.dart` put it
-        // straight onto `AppBackground` — and over the dark ramp's own blue page
-        // the accent against that wash measured **1.09:1**: the glyph and the
-        // chip behind it were the same blue. A wash has to lift the chip clear of
-        // the page in *both* ramps, which is what a white wash does and what
+        // accent at 20%, measured over a *card*. This header is not over a card —
+        // all five call sites in `dashboard_screen.dart` put it straight onto
+        // `AppBackground` — and a tint of the same hue as the glyph inside it
+        // leaves the glyph and its own chip at one value. A wash has to lift the
+        // chip clear of the page, which is what a white wash does and what
         // re-tinting a saturated one never can.
         //
         // The ink follows the wash, for the reason `AppGlass.pageGlassInk`
-        // exists: dark navy on a white wash in both ramps. `accent` is unread
-        // here now, which costs nothing — `categoryColor` resolves to one value
-        // for all five categories, so the chip never said which one this was.
-        //
-        // In the light ramp the chip is a near-invisible lift rather than the
-        // pale blue it was. That is the trade and it is recorded rather than
-        // hidden: the light ramp's page is `#F7FAFE`, so a 45% white wash over it
-        // is `#FBFCFE`. There is no token for a page-level chip that keeps its
-        // hue on both pages.
+        // exists: dark ink on a white wash. `accent` is unread here now, which
+        // costs nothing — `categoryColor` resolves to one value for all five
+        // categories, so the chip never said which one this was.
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -69,10 +62,9 @@ class GlassPageHeader extends StatelessWidget {
         //
         // **Page ink, not card ink, and the word "card" in the sentence above is
         // the historical one.** This header is not inside a card: all five call
-        // sites put it directly on the page gradient. `AppSurfaces.onSurface` is
-        // navy in *both* ramps now, which is right for a card and wrong here —
-        // navy on the dark ramp's own blue page measured **2.10:1**. `AppGlass`'s
-        // page ramp is the only one that inverts.
+        // sites put it directly on the page. `AppSurfaces.onSurface` is the token
+        // for content on a card and is wrong here — the page has its own ink
+        // ramp, and this header is on the page.
         Text(
           title,
           style: AppType.headlineLg.copyWith(color: AppGlass.pageInkStrong),

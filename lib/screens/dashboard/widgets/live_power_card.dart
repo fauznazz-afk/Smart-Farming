@@ -13,8 +13,8 @@ import '../utils/design_tokens.dart';
 /// on purpose.** It was 8 for the split bar and 6 for the SOC gauge — two
 /// different heights for the same component, which is how you end up with a card
 /// whose two bars disagree about what a bar is. `AppShadows.glow` is the fill's,
-/// not the track's, and it is derived from the fill hue rather than hard-coded
-/// lime: see `AppShadows.glow`'s contract and the note on [_SocLine].
+/// not the track's, and it is derived from the fill hue rather than hard-coded:
+/// see `AppShadows.glow`'s contract and the note on [_SocLine].
 const double _kBarHeight = 12;
 
 /// The brief's progress track: the page colour, a 1px `border` hairline,
@@ -463,19 +463,17 @@ class _SocLine extends StatelessWidget {
           //
           // The brief's `progress-bar`: 12px tall, track on the page colour with
           // a 1px `border` hairline, full-round ends, and the fill carrying the
-          // glow — `shadow-[0_0_10px_rgba(198,255,0,0.5)]` in the brief's own
-          // example. See [_kBarHeight] and [_trackBarDecoration].
+          // glow. See [_kBarHeight] and [_trackBarDecoration].
           //
-          // **The glow is derived from the fill hue rather than written as
-          // lime, and that is a deliberate divergence from the brief's example
-          // value.** `AppShadows.glow` takes the hue it should be lit with, and
+          // **The glow is derived from the fill hue rather than written as a
+          // literal.** `AppShadows.glow` takes the hue it should be lit with, and
           // `design_tokens_test.dart` exercises it for all five categories — so
-          // a violet battery fill glowing violet is the token's own contract,
-          // and hard-coding the lime from the example would make the glow mean
-          // "lime" on a bar that is not lime. What is preserved is the property
-          // the brief actually cares about: the glow's colour *is* the fill's
-          // colour, so it reads as the bar emitting rather than as a coloured
-          // halo borrowed from somewhere else.
+          // a violet battery fill glowing violet is the token's own contract, and
+          // hard-coding one hue would make the glow mean that hue on a bar that is
+          // not. What is preserved is the property the brief actually cares
+          // about: the glow's colour *is* the fill's colour, so it reads as the
+          // bar emitting rather than as a coloured halo borrowed from somewhere
+          // else.
           child: SizedBox(
             height: _kBarHeight,
             child: Stack(
@@ -906,8 +904,8 @@ class _Term extends StatelessWidget {
     //
     // It is a tone step, not a border-and-shadow. The brief puts tiles on the
     // flat tier, and this card already carries two glowing bars a few pixels
-    // below; a stamped shadow on each term would make the row louder than the
-    // numbers it is there to deliver.
+    // below; a shadow on each term would make the row louder than the numbers it
+    // is there to deliver.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(_kTilePadding),

@@ -179,12 +179,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             vertical: AppSpacing.xs,
           ),
           // **`AppSurface`, not `AppCard`, and the difference is the shadow.**
-          // The brief's `list-row` is `surface` + a 1px hairline + 8px radius +
-          // 16 padding + `boxShadow: none` — list rows are explicitly the *flat*
-          // tier, alongside the app bar and the chips. `AppCard` carries
-          // `AppShadows.stamped` by construction and has no way to decline it,
-          // so using it here would have stamped nine rows and contradicted the
-          // one tier the brief cares most about separating.
+          // The brief's `list-row` is `surface` + a 1px hairline + radius +
+          // padding + `boxShadow: none` — list rows are explicitly the *flat*
+          // tier, alongside the app bar and the chips. `AppCard` carries a lift
+          // by construction and has no way to decline it, so using it here would
+          // have raised nine rows and contradicted the one tier the brief cares
+          // most about separating.
           //
           // The padding is passed in rather than left to the child so the
           // layout is byte-identical to the card it replaced: `AppSurface` has

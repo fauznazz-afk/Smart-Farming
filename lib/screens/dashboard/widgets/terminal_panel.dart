@@ -15,26 +15,20 @@
 ///
 /// ## One accent, and what it costs
 ///
-/// The rest of the app is categorical: PV lime, AC blue, Battery violet, and so
-/// on, so a hue means a category of data. **This panel carries no category hue
-/// at all, and that is a real divergence, not an oversight.** A terminal panel
-/// gets its hierarchy from weight, case, tracking and position, and a
-/// categorical hue sitting in every row would flatten exactly the structure the
-/// panel is building.
+/// The rest of the app is categorical, so a hue means a category of data.
+/// **This panel carries no category hue at all, and that is a real divergence,
+/// not an oversight.** A terminal panel gets its hierarchy from weight, case,
+/// tracking and position, and a categorical hue sitting in every row would
+/// flatten exactly the structure the panel is building.
 ///
-/// **The panel is paper on the blue page.** It is [AppSurfaces.surface] —
-/// near-white in *both* ramps — with an [AppBorders.hairlineBorder] around it
-/// and a soft [AppShadows.subtle] lifting it off the page, so the darkness in
-/// this design system belongs to the page and the panel is the thing that lifts
-/// off it. It was a black instrument once; there is no black surface left in the
-/// system to be one.
+/// **The panel is a card on the page.** It is [AppSurfaces.surface] with an
+/// [AppBorders.hairlineBorder] around it and a soft [AppShadows.subtle] lifting
+/// it off the page, so the darkness in this design system belongs to the page and
+/// the panel is the thing that lifts off it.
 ///
-/// Its single accent is [AppPalette.primary], and it is spent on the hero
-/// figure, the slot name above it and the meter's fill: the places that say
-/// *this is the reading*, as opposed to *this is a field name*. **Red no longer
-/// appears as an accent here at all** — under this palette `AppPalette.error` is
-/// the same blue as the accent, which made it a colour that could not be named,
-/// so it was replaced by the token that means "the accent". Red is
+/// Its single accent is the cyan data accent, spent on the hero figure, the slot
+/// name above it and the meter's fill: the places that say *this is the reading*,
+/// as opposed to *this is a field name*. The alert red is
 /// [AppPalette.statusBad] and is used for exactly one thing: a reading that is
 /// out of bounds ([TerminalRow.alert] and [TerminalTag.alert]).
 ///
@@ -90,11 +84,12 @@ class TerminalPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **Built from tokens rather than `AppCard`, because `AppCard` carries the
-    // hard `AppShadows.stamped` rectangle from the dead design system.** This
-    // panel lifts off the page with the card's hairline and a soft shadow
-    // instead. The transparent `Material` sits between the decoration and the
-    // content so the rows' `InkWell` ripples are not painted over by the fill.
+    // **Built from tokens rather than `AppCard`, so the panel owns its own
+    // lift.** The panel's shadow is the card's own tier, applied here rather
+    // than inherited, which is what lets the panel and the cards around it move
+    // independently. The transparent `Material` sits between the decoration and
+    // the content so the rows' `InkWell` ripples are not painted over by the
+    // fill.
     return Semantics(
       label: semanticLabel,
       container: true,
@@ -426,7 +421,7 @@ class _Dot extends StatelessWidget {
 ///
 /// **It is drawn in [AppPalette.primary] because that is the panel's accent, not
 /// because the reading is a breach.** The figure is the number the page is
-/// about, and an 88 dp glyph in the same blue as the slot name above it and the
+/// about, and an 88 dp glyph in the same accent as the slot name above it and the
 /// meter below it is what makes this read as one instrument rather than as five
 /// widgets. Red is [AppPalette.statusBad] on this panel and says only that a
 /// value is out of bounds.
@@ -689,7 +684,7 @@ class _TerminalHeroState extends State<TerminalHero>
 /// status louder than a real alarm. The outline says "this is a label" at the
 /// same volume as everything else, and the text carries the meaning.
 ///
-/// A resting tag is a quiet chip on a white card:
+/// A resting tag is a quiet chip on a card:
 /// [AppSurfaces.onSurfaceVariant] at 35% for the outline and solid for the
 /// text, at [AppRadius.badge] — the system's smallest radius, because a tag is
 /// a label and not a pill.
@@ -845,9 +840,8 @@ class _TerminalMeterState extends State<TerminalMeter>
     // alerting.** `alert` no longer changes the colour, because the accent is
     // already the accent — a second shade of it would say "worse" in a way the
     // panel cannot back up, and the row's own value already carries severity.
-    // The unfilled track is [AppSurfaces.track], which in this ramp is a step of
-    // the page, so an empty bar reads as an inset well on the white card rather
-    // than as a hole in it.
+    // The unfilled track is [AppSurfaces.track], which is the page colour, so an
+    // empty bar reads as an inset well on the card rather than as a hole in it.
     final fill = widget.color ?? AppPalette.primary;
     final clamped = widget.fraction.isNaN
         ? 0.0

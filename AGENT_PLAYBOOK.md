@@ -57,9 +57,9 @@ semua halaman:
 | `lib/screens/dashboard_screen.dart` | State, polling, riwayat, evaluasi alarm, dan susunan 5 halaman dalam satu file. 1 745 baris. |
 | `lib/utils/alarm_rules.dart` | Satu-satunya definisi apa yang dihitung sebagai alarm. Duplikasinya ada di Kotlin. |
 | `lib/widgets/liquid_glass.dart` | Primitif permukaan: `AppCard`, `AppTile`, `AppBadge`, `AppDivider`, `AppBackground`, `DateStripChip`. Dipakai semua kartu. **Nama file tidak lagi akurat.** Perubahan di sini terlihat di mana-mana. |
-| `lib/screens/dashboard/utils/design_tokens.dart` | **Satu-satunya tempat** fill, radius, pasangan bayangan, atau durasi ditulis. Kalau sebuah warna permukaan atau radius muncul di file lain, itu bug. |
+| `lib/screens/dashboard/utils/design_tokens.dart` | **Satu-satunya tempat** fill, radius, border, bayangan, atau durasi ditulis. Kalau sebuah warna permukaan atau radius muncul di file lain, itu bug. Sejak retheme WattVision: dark-only, `AppTheme.apply` mengunci palet dark di sini. |
 | `lib/screens/dashboard/widgets/chart_groups.dart` | Apa yang tiap halaman gambar. Kunci request, legenda, statistik, dan sumbu semua membacanya — tidak boleh ada daftar telemetry kedua di tempat lain. |
-| `lib/screens/dashboard/utils/pressable.dart` | State tekan. Pakai `builder`, bukan `child`, karena dekorasi juga harus berubah — dan `pressed` vs `insetDeep` bukan hal yang sama. |
+| `lib/screens/dashboard/utils/pressable.dart` | State tekan. Pakai `builder`, bukan `child`, karena dekorasi juga harus berubah. Satu state sekarang (`AppCard.pressed`: lift turun + 5% scale), bukan pasangan `pressed`/`insetDeep`. |
 | `lib/services/thingsboard_api.dart` | Client REST, lifecycle token, cache offline. |
 | `lib/screens/dashboard/widgets/chart_card.dart` | Chart 3 seri, sumbu, tooltip, statistik. |
 
@@ -619,15 +619,18 @@ Aturan tambahan:
   menyamakan "tidak diuji" dengan "lulus".
 - **Guard baru harus diuji dengan cara gagal.** Setelah menulis test untuk aturan
   baru, **patahkan aturan itu di file token, pastikan test-nya gagal, lalu
-  kembalikan.** Dikerlolankan pada 30 September 2026: lima guard
+  kembalikan.** Dikerjakan pada 30 September 2026: lima guard
   `design_tokens_test.dart` diuji dengan mematikan tiap bug-nya satu per satu
-  (one-axis shadow, single blur radius, pressed yang membesar, `insetDeep` yang
+  (one-axis shadow, single blur radius, pressed yang membesar, inset yang
   dangkal, fill yang beda dari page) dan kelimanya tertangkap. Guard yang tidak
-  pernah gagal belum tentu guard.
+  pernah gagal belum tentu guard. Kelima aturan itu sendiri sudah digantikan oleh
+  WattVision, tapi metodenya tetap.
 - **Verifikasi visual pakai angka, bukan mata.** Untuk perubahan surface, pakai
   scanline brightness piksel di tepi kartu. Bandingkan fill kartu, page, dan
-  titik tergelap dari shadow. Nilai acuan yang dipakai 30 Sep 2026: dark card
-  31.4 → contact 17.6; light page 229.5 → contact 213.
+  titik tergelap dari shadow. Nilai acuan 30 Sep 2026 (sistem lama, kini
+  historis): dark card 31.4 → contact 17.6; light page 229.5 → contact 213.
+  Untuk WattVision angkanya belum diambil — itu satu-satunya hutang visual yang
+  tercatat di `FEATURE.md` §18.5.
 - Gradle hanya wajib kalau alarm, rule, atau `AlarmMessageFormat.kt` berubah.
 - Kalau Anda menambahkan test, hitung ulang angka yang Anda sebut di dokumen dan
   di commit message. Angka basi lebih merusak daripada tidak menyebutnya.

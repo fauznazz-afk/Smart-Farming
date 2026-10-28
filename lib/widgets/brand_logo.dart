@@ -18,14 +18,14 @@ class BrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **The wordmark is the accent plus a neutral, and it used to be lime plus
-    // blue.** Both defaults were *category* hues doing a *brand* job, which is
-    // the same mistake the file's earlier note made about a second green: a
-    // colour that means something on one screen is spending that meaning here.
+    // **The wordmark is the accent plus a neutral.** Both defaults were once
+    // *category* hues doing a *brand* job, which is the same mistake the file's
+    // earlier note made about a second green: a colour that means something on
+    // one screen is spending that meaning here.
     //
     // So `primary` is the app's one accent and `secondary` is
-    // `AppSurfaces.onSurfaceVariant`. A wordmark in red and grey is a wordmark;
-    // a wordmark in red and blue is two charts with no axis.
+    // `AppSurfaces.onSurfaceVariant`. A wordmark in cyan and grey is a wordmark;
+    // a wordmark in two chart hues is two charts with no axis.
     //
     // Both parameters are still honoured: a caller that wants its own pair can
     // have one, and the defaults no longer contradict the palette.
@@ -35,10 +35,10 @@ class BrandLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        // **No blur.** The brief bans soft shadows outright, so the logo carries
-        // the stamped displacement like every other surface. A blurred halo
-        // here was the last soft shadow in the app.
-        boxShadow: AppShadows.stamped,
+        // **The same lift every other surface carries.** The logo used to take a
+        // tier of its own; there is one lift in the system now, so it takes that
+        // one rather than a fourth variant of the same idea.
+        boxShadow: AppShadows.subtle,
       ),
       child: Image.asset(
         'assets/energrow_logo.png',

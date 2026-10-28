@@ -272,13 +272,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // The flat page colour rather than `AppBackground`'s sweep: this screen is
-      // a list of white bubbles and nothing else, and the gradient behind them
-      // buys nothing. What it *does* need is for the few lines that are drawn
-      // **on** this colour — the app bar title, the unconfigured state, the
-      // intro headings — to use page ink rather than card ink. Card ink is navy
-      // in both ramps since the cards went near-white, and that measured
-      // **2.10:1** on the dark ramp's page value and is the reason the app bar
-      // title could not be read at all in dark mode.
+      // a list of bubbles and nothing else, and the gradient behind them buys
+      // nothing. What it *does* need is for the few lines that are drawn **on**
+      // this colour — the app bar title, the unconfigured state, the intro
+      // headings — to use page ink rather than card ink.
       backgroundColor: AppSurfaces.page,
       appBar: AppBar(
         backgroundColor: Colors.transparent,

@@ -144,12 +144,11 @@ class CctvStandbyOverlay extends StatelessWidget {
               // Solid accent circle with onHue ink (FAB-circle style).
               //
               // **Flat, and the two blurred shadows are gone.** They were a
-              // black 10px-blur offset plus a white 4px-blur highlight - the
-              // soft-UI vocabulary the brief bans outright ("don't apply
-              // blurred/soft shadows; the shadow language is hard, offset,
-              // no-blur"). What gives this control its edge over arbitrary
-              // camera pixels is `AppBorders.boundary`, the one edge in the
-              // system that carries a 3:1 claim.
+              // black blurred offset plus a white blurred highlight — depth from
+              // a light source, which this system does not have. What gives this
+              // control its edge over arbitrary camera pixels is
+              // `AppBorders.boundary`, the one edge in the system that carries a
+              // 3:1 claim.
               width: 68,
               height: 68,
               decoration: BoxDecoration(
@@ -233,12 +232,11 @@ class CctvErrorOverlay extends StatelessWidget {
           children: [
             Icon(
               Icons.videocam_off_rounded,
-              // **White, and this was `AppSurfaces.onSurface`.** The scrim is a
-              // very dark neutral in both ramps and card ink is navy in *both*
-              // ramps, so the glyph and the failure message were invisible in
-              // dark *and* light mode — 1.25:1 either way. `AppGlass.ink` is the
-              // app's only ink that does not follow the ramp, and that is
-              // exactly right on a ground this dark: **19.2:1** here.
+              // **White, because the scrim under it is the one backdrop nobody
+              // can measure against.** The scrim is a near-black neutral, so the
+              // ink has to be the one that does not follow the palette — card ink
+              // and page ink both answer the app's own surfaces, and this is not
+              // one of them.
               color: AppGlass.ink,
               size: 34,
             ),
@@ -287,12 +285,10 @@ class CctvErrorOverlay extends StatelessWidget {
                 TextButton(
                   onPressed: onBack,
                   style: TextButton.styleFrom(
-                    // **White, not the accent.** `AppPalette.error` is `#1D4ED8`
-                    // in both ramps and this scrim is a near-black neutral, so
-                    // "Back" measured **2.86:1** — a text button nobody could
-                    // see. A saturated hue on a dark ground needs a light step of
-                    // itself, and the step this system already owns is the hero's
-                    // white ink.
+                    // **White, not the accent.** The scrim is a near-black
+                    // neutral, so the accent would sit on a ground it was never
+                    // measured against. The step this system already owns for a
+                    // dark ground is the hero's white ink.
                     foregroundColor: AppGlass.ink,
                     textStyle: AppType.labelMicro,
                     padding: const EdgeInsets.symmetric(
@@ -338,8 +334,8 @@ class CctvRoundControl extends StatelessWidget {
           // A scrim, not a shadow: this control floats over arbitrary camera
           // pixels, so the gradient is there to give the white glyph a floor to
           // sit on regardless of what is behind it. The centre stop is a *white*
-          // lift at 12% and was `AppSurfaces.onSurface` at the same alpha —
-          // navy at 12% over black is a colour with no name and no effect.
+          // lift at 12%; a dark tint at that alpha over black would be a colour
+          // with no name and no effect.
           gradient: RadialGradient(
             center: const Alignment(-0.3, -0.3),
             radius: 0.7,
@@ -352,12 +348,11 @@ class CctvRoundControl extends StatelessWidget {
           // edge is the one border in the system that carries WCAG 1.4.11's 3:1
           // for a UI component boundary, and this is exactly the case it exists
           // for: nothing tonal can promise a visible edge over a bright frame.
-          // The 15% white it replaced measured nowhere near that, so this is
-          // strengthening the claim rather than changing it.
           border: AppBorders.boundaryBorder,
-          // The blurred 8px drop shadow is gone with the brief's ban on blur.
-          // What separates the control from the video is the radial gradient
-          // plus this boundary; a soft halo over a live feed reads as a smudge.
+          // **No shadow.** What separates the control from the video is the
+          // radial gradient plus this boundary; a halo over a live feed reads as
+          // a smudge, and a shadow that has to work over arbitrary camera pixels
+          // cannot promise anything the boundary does not.
         ),
         child: Material(
           color: Colors.transparent,
@@ -365,11 +360,10 @@ class CctvRoundControl extends StatelessWidget {
           child: IconButton(
             tooltip: tooltip,
             onPressed: onPressed,
-            // **White, and this was `AppSurfaces.onSurface`** — navy in both
-            // ramps, on a control whose own floor is a black radial gradient.
-            // The full-screen and stop glyphs were navy on black at **1.25:1**.
+            // **White, because the floor under it is a black radial gradient.**
             // The claim this control exists to make is WCAG 1.4.11's 3:1 over
-            // arbitrary video, which only the boundary edge was carrying.
+            // arbitrary video, and card ink on that floor would be
+            // near-black-on-near-black — only the boundary edge would carry it.
             color: AppGlass.inkStrong,
             icon: Icon(icon),
           ),

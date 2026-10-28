@@ -110,14 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         // Not `const`: the ink is a brightness-aware getter.
                         //
-                        // **Card ink, explicitly — and this was page ink.** It was
-                        // `AppGlass.pageInkStrong`, which was correct when the fix
-                        // for the pale *page* went in and is wrong here: this word
-                        // is inside the `AppCard`, and `surface` is near-white in
-                        // **both** ramps. White on `#F8FAFC` is **1.05:1**, so the
-                        // app's name was invisible on the login card in dark mode
-                        // and visible in light. Card ink is navy in both ramps,
-                        // which is the one value that works on this fill twice.
+                        // **Card ink, explicitly — and this was page ink.** This
+                        // word is inside the `AppCard`, so the ink on it is the
+                        // card's own token, not the page's.
                         Align(
                           alignment: Alignment.center,
                           child: Text(
@@ -209,15 +204,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                        // The brief's `button-primary`, and the tinted hard
-                        // shadow is what makes it the one electric object on the
-                        // page. Painted by the `DecoratedBox` behind the button
-                        // rather than by `FilledButton`'s own `elevation`,
-                        // because Material maps elevation through
-                        // `kElevationToShadow` and can only produce a blurred
-                        // halo — the one shadow language the brief bans
-                        // outright. The hue is the accent, so the offset strip
-                        // bleeds the same colour as the fill.
+                        // The brief's `button-primary`, and the tinted lift is
+                        // what makes it the one electric object on the page.
+                        // Painted by the `DecoratedBox` behind the button rather
+                        // than by `FilledButton`'s own `elevation`, because
+                        // Material maps elevation through `kElevationToShadow`
+                        // and cannot carry a hue. The shadow is the accent, so it
+                        // reads as part of the fill rather than as a grey halo.
                         DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: AppRadius.all(AppRadius.card),

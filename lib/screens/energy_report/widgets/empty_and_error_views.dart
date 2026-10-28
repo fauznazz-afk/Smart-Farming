@@ -68,19 +68,16 @@ class ErrorView extends StatelessWidget {
               // muted body style — the same colour, now stated.
               //
               // **Page ink, not card ink: `ErrorView` is the `Scaffold` body, so
-              // it is drawn straight onto the page gradient and is not inside a
-              // card like `EmptyPeriodView` above.** Card ink is navy in both
-              // ramps since the cards went near-white, and that measured
-              // **2.10:1** on the dark ramp's page stop — an error message the
-              // user cannot read is the worst place for it to happen.
+              // it is drawn straight onto the page and is not inside a card like
+              // `EmptyPeriodView` above.** An error message the user cannot read
+              // is the worst place for the wrong token to land.
               style: AppType.bodyMd.copyWith(color: AppGlass.pageInk),
             ),
             const SizedBox(height: AppSpacing.md),
-            // The brief's `button-primary`, standing on the page with its
-            // tinted hard shadow. The shadow comes from the `DecoratedBox`
-            // behind the button rather than from `FilledButton`'s `elevation`,
-            // which Material maps through `kElevationToShadow` and can only
-            // render as a blurred halo — the one shadow language the brief bans.
+            // The brief's `button-primary`, standing on the page with its tinted
+            // lift. The shadow comes from the `DecoratedBox` behind the button
+            // rather than from `FilledButton`'s `elevation`, which Material maps
+            // through `kElevationToShadow` and cannot tint.
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: AppRadius.all(AppRadius.card),

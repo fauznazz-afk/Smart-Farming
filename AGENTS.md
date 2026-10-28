@@ -93,36 +93,27 @@ units make the comparison real — which is why `temp_dht` and `temp_ds18b20` sh
 one and lux does not share with anything. A chart whose shape is an artefact of
 the units is worse than no chart, because it looks like a reading.
 
-**Depth belongs in the shadow, never in the fill.** This is measured, not
-preferred. A `BoxShadow` is painted *outside* the decoration's rect, so it is
-incapable of darkening a card's own interior — which is where every caption in
-this app is drawn. A gradient across the fill can, and the numbers are why it was
-rejected: at 4% the light-mode worst case is already 4.15:1, at 10% it is 3.69,
-at 15% it is 3.34, and AA is 4.5. So when a surface needs to feel thicker, raise
-the shadow alphas. They are free.
+**Depth is a hairline and one lift, not an elevation ladder.** WattVision
+separates a card from the page with a `1px` border and `AppShadows.subtle`; there
+is no `raised` / `inset` / `pressed` scale and no light source. This is the
+opposite of the soft-UI system this repo used to run, and the reason is that a
+shadow is a *relative* move: it says "this is above that" only when there is a
+ladder to be above. With one lift the hierarchy is carried by fill
+(`#121212` < `#1E1E1E` < `#252525`), which is absolute and survives any
+background.
 
-**A raised surface has three shadows, not two.** Two equal shadows read as a
-*float*: one dark halo and one light halo with no surface between them. Real
-extruded objects have a contact shadow — the tight dark line where the object
-meets what it sits on — and only then the ambient one spreading away from it. The
-dark half is two shadows at different scales for that reason, and the light half
-is one broad bounce, because a light source makes a small hard highlight and a
-wide soft one. Mirroring the dark pair exactly is what makes CSS neumorphism look
-like a 1990s bevel.
+**A gradient inside a fill is a contrast change, and it was measured.** An earlier
+system put a gradient across the card fill to make it feel thicker, and the
+numbers are why it was rejected: at 4% the light-mode worst case was already
+4.15:1, at 10% it was 3.69, at 15% 3.34, against AA's 4.5. **Depth belongs in the
+edge, never in the fill**, because a caption is drawn on the fill and a shadow is
+painted outside it.
 
-**Light mode is the harder mode for this style, and the two are not
-interchangeable.** A mid-tone page is by definition a short distance from both
-the white half and the dark half, so both have to work harder than on a
-near-black page. Concretely: the light dark-half reached only a 4.6% luminance
-drop at `0x4D`/`0x33` and had to go to `0x66`/`0x40`, while dark mode already
-measured a 44% drop and was left alone. When you deepen one mode, measure the
-other before assuming it followed.
-
-**"Pressed" is two states, not one.** A raised block being pushed flattens into
-the page; a well being pushed goes *deeper* into it. `AppElevation.pressed` and
-`AppElevation.insetDeep` are the two, and they differ in which way the offsets
-point, not only in size — inverting `insetDeep` produces a chip that pops *out*
-of the bar when the finger pushes it in. There is a test for exactly that.
+**"Pressed" is one state now: the surface flattens.** [AppCard.pressed] drops its
+lift and the widget shrinks 5%, which is the design's `active:scale-95`. The old
+two-state `AppElevation.pressed` / `insetDeep` pair is gone with the elevation
+ladder; inverting an inset offset produced a chip that popped *out* of the bar when
+the finger pushed it in, and that class of bug is now unrepresentable.
 
 **Measure the screen, not the code.** A shadow can be in the token file, reach
 `flutter analyze` and pass every test, and still be invisible on the device. The
@@ -130,12 +121,12 @@ check is a scanline of pixel brightness across a card edge, and the numbers to
 compare are the card fill against the page and against the shadow's darkest
 point.
 
-**That scanline was finally taken on 1 October 2026, and it invalidated a
-derivation.** Dracula's shadow alphas had been solved so that each shadow's
-*composited* luminance step on `#282A36` equalled the step it makes on the dark
-page, and `design_tokens_test.dart` asserted that equality to within 0.0007 and
-passed. A scanline of the same card on the same build measured ΔL **8.2 against
-the dark theme's 15.9** — 52% of it, with the suite green.
+**That scanline was taken on 1 October 2026, and it invalidated a derivation.**
+Dracula's shadow alphas had been solved so that each shadow's *composited*
+luminance step on `#282A36` equalled the step it makes on the dark page, and
+`design_tokens_test.dart` asserted that equality to within 0.0007 and passed. A
+scanline of the same card on the same build measured ΔL **8.2 against the dark
+theme's 15.9** — 52% of it, with the suite green.
 
 The reason is not a typo. It is that the mask blur removes a different fraction
 of each page's shadow, so the same blur and the same alpha land on different
@@ -159,39 +150,47 @@ Two things follow, and both are in the code:
 `FEATURE.md` §18.5 has been updated: the top-edge scanline is the one open
 question this leaves.
 
-### Soft-UI surfaces, and why they are opaque
+### WattVision surfaces, and why the page is flat
 
-The surface system is opaque soft-UI: a card is the **same colour as the page**,
-and all of its depth comes from a dual shadow pair with one light source, from
-the top left, app-wide. `design_tokens.dart` is the only place a fill, a radius,
-a shadow or a duration is written.
+The surface system is **WattVision**: a flat `#121212` page, `#1E1E1E` cards,
+`#252525` tiles, a `1px solid #2C2C2E` border on every card, and **one** lift
+(`AppShadows.subtle`) rather than an elevation ladder. `design_tokens.dart` is the
+only place a fill, a radius, a shadow or a duration is written.
 
-The opacity is the load-bearing part, and it is the opposite of what the app used
-to do. Card fills were a gradient at alpha 0.44 to 0.66, composited over three
-large radial-gradient orbs, so the rendered fill varied continuously with the
-pixel. `test/color_helpers_test.dart` has always asserted contrast against
-opaque constants, which is what made its claim true rather than approximately
-true.
+**The app is dark-only, and the clamp is in the token layer.** `AppTheme.apply`
+ignores its `Brightness` argument and always resolves the dark palette, so
+`AppTheme.brightness` is always `Brightness.dark`. The ramp machinery is kept —
+`applyMode`, the two `AppSurfacesPalette` records, `kRamps` in the golden harness —
+because removing it would mean rewriting every call site to prove a point, and
+because the light record is a byte-for-byte copy that costs nothing. **Any test
+that swaps light↔dark to prove a repaint is therefore structurally impossible**;
+assert a changing token instead. `test/bound_test.dart` documents that rewrite.
 
 Three things that are easy to break:
 
-**The light-mode page must stay a mid-tone.** It is `#E1E7E4`. It was
-`#F1F4F2`, and that is close enough to white that the light half of every
-shadow pair had nowhere to be lighter *to* — only the dark half showed, and
-every card read as flat Material with a grey edge. Do not "brighten" it. This is
-the single most consequential value in the token file.
+**The page is the darkest surface, not a mid-tone.** `#121212` page < `#1E1E1E`
+card < `#252525` tile. A tinted wash on the page comes out *lighter* than the page,
+which is why glass chips take dark ink; the wash decides the ink, not the surface
+behind it. Do not "lift" the page to make a card read — move the card instead.
 
-**The hairline must stay neutral.** It was tinted with the theme accent, which
-put a green outline on every card and silently undid the entire migration: a
-coloured border is a drawn edge, and a drawn edge is the thing this style exists
-to replace. It is a very light neutral now, kept because WCAG 1.4.11 wants 3:1
-for a component boundary and no test measures it.
+**The hairline is a grouping cue and stays under 3:1.** `#2C2C2E` on `#121212` is a
+whisper, deliberately. The one edge that carries WCAG 1.4.11's 3:1 is
+`AppBorders.boundary`, and it exists for controls floating over arbitrary pixels
+(the CCTV overlay). Reaching 3:1 with the hairline would frame every surface on
+the screen, which is a heavier visual than the design asks for.
 
 **`AppCard` must keep its transparent `Material` between the decorated box and
 the content.** An opaque fill paints over the ink layer of the nearest Material
 above it, so every `ListTile`, `SwitchListTile` and `InkWell` inside a card has
 its splash and hover state covered. `settings_screen_test.dart` catches this as a
 test failure; the navigation bar's own ink is the same defect and has no test.
+
+**The accent is cyan `#00E5FF` and the status red is `#FF453A`.** The accent is a
+*data* colour: a chart line, a KPI figure, the live dot. Red means a condition —
+`AppPalette.statusBad`, `statusBadFill`, the alert banner. Because the accent is
+light and saturated, anything drawn *on* it takes `AppPalette.onHue` (dark
+`#121212`); white on it is about 1.4:1. `statusBad` measures 4.4995…:1 on
+`#252525`, which is why the contrast tests use `contrastEpsilon = 0.01`.
 
 There is one rule here that is about *content* rather than about surfaces, and it
 is older than any of this: **the app never varies a hue automatically.**
@@ -201,22 +200,19 @@ per index was implemented so the PV, AC and battery pages would be
 distinguishable by colour, and it was reverted because a colour the user did not
 choose is a colour they cannot predict.
 
-The chart series are the documented exception and they now have a second half.
-A chart group with more than one series uses the fixed red/green/blue triad in
-the same order, because three lightness steps of one hue are indistinguishable on
-a phone. A group with a **single** series uses the user's accent, and that is not
-a preference: there is nothing to distinguish it from, and painting it red would
-give one colour two meanings in one app — "this is the voltage series" on one page
-and "something is wrong" on another, in an app whose own rule is that a status
-colour means a condition rather than an identity. The triad is **reused, never
-extended**; adding a hue to accommodate a new chip is the same mistake as the
-rotation, running the other way.
+The chart series are the documented exception. A chart group with more than one
+series uses the fixed red/green/blue triad in the same order, because three
+lightness steps of one hue are indistinguishable on a phone. A group with a
+**single** series uses the accent, and that is not a preference: there is nothing
+to distinguish it from, and painting it red would give one colour two meanings in
+one app — "this is the voltage series" on one page and "something is wrong" on
+another, in an app whose own rule is that a status colour means a condition rather
+than an identity. The triad is **reused, never extended**; adding a hue to
+accommodate a new chip is the same mistake as the rotation, running the other way.
 
-The same reasoning applies to `kAccentPalette`. It has four entries, two of which
-are genuinely close in hue, and separating them by moving `Ocean cyan` was also
-tried and reverted — that would silently change what an existing setting means.
-**If colour needs to vary, it becomes a setting the user picks.** Do not invent a
-default that reshapes the colour they already chose.
+`kAccentPalette` and the Settings appearance picker are **gone** — the app has one
+appearance and no user-chosen accent. A stored theme preference is still read so an
+existing install is not surprised, but it resolves to dark either way.
 
 Two related rules, both learned by getting them wrong:
 
@@ -228,19 +224,18 @@ Two related rules, both learned by getting them wrong:
   permanently occupied the space where a real warning needs to go.
 
 Contrast claims are measured, not asserted. The `faintColor` and `status*` values
-were documented as passing AA while the light-mode amber was actually at 4.02:1
-on the glass card fill. `test/color_helpers_test.dart` now measures each one
-against the real surfaces from `main.dart` and `liquid_glass.dart`, not against
-white, and 8-bit quantisation is why the hue tolerances there are 0.5° rather
-than exact.
+were once documented as passing AA while the light-mode amber was actually at
+4.02:1 on the glass card fill. `test/color_helpers_test.dart` now measures each one
+against the real surfaces read out of `AppSurfaces`, not against white, and 8-bit
+quantisation is why the hue tolerances there are 0.5° rather than exact.
 
 **That test then failed in the opposite direction, and the failure is the lesson.**
 Its surface list was six hand-written hex values, copied in when the glass fills
-were replaced. The soft-UI work changed those fills a third time without touching
-the test, and because the stale light values were *lighter* than the real ones it
-measured against a more forgiving surface than the one rendering: `faintColor` sat
-at 4.47:1, `statusBad` 4.48, `statusAlert` 4.47, three under AA, with the suite
-green and a comment insisting every hex was a real fill. It survived two commits.
+were replaced. A later surface change moved those fills again without touching the
+test, and because the stale values were *lighter* than the real ones it measured
+against a more forgiving surface than the one rendering: `faintColor` sat at
+4.47:1, `statusBad` 4.48, `statusAlert` 4.47, three under AA, with the suite green
+and a comment insisting every hex was a real fill. It survived two commits.
 
 **So the surface list is read out of `AppSurfaces` rather than written down, and
 it must stay that way.** A literal in a test whose job is to describe the app's
@@ -254,21 +249,13 @@ commit.** The values here have almost no margin by design — 4.55 to 4.59 again
 text changed. Adjust them by **scaling every channel by one factor**, which
 preserves hue and saturation exactly, not by stepping HSL lightness: HSL moved
 `faintColor` from 150.00° to 146.67° at a 0.6% darkening, and a caption colour that
-shifts hue when you darken it reads warm beside a green theme.
+shifts hue when you darken it reads warm beside a cool accent.
 
 **Green means a problem is absent, and the user did not choose it.** Status
-colours are for warnings. A healthy reading takes the accent and ordinary text;
-it does not take `statusOk`, and it does not get a green outline. Three green
-elements beside an amber theme is the clearest possible statement that two
-palettes are on screen at once, and the boring case is not information.
-
-**One documented exception, and it is deliberate.** The device chart series are
-fixed red, green and blue, and the chart is the one place where "voltage is red"
-is worth more than theme consistency — three lightness steps of one hue are
-indistinguishable on a phone, and dash patterns to compensate read as broken
-lines. It is also the only place on the dashboard where a quantity is not the
-user's data at all but a trend they are reading, which is a different job from
-showing them a sensor value.
+colours are for warnings. A healthy reading takes the accent and ordinary text; it
+does not take `statusOk`, and it does not get a green outline. A cyan accent beside
+three green elements is the clearest possible statement that two palettes are on
+screen at once, and the boring case is not information.
 
 ### Polling and rebuilds
 
@@ -717,13 +704,15 @@ actually bitten:
 
 ```
 flutter analyze                                          # must stay clean
-.\tool\run_tests_per_file.ps1                            # 810 tests in 52 files
+.\tool\run_tests_per_file.ps1                            # 74 files, ~900 tests
 cd android && ./gradlew :app:testDebugUnitTest           # 11 tests, alarm parity + host allowlist
 ```
 
-All three were re-run green on Windows on 9 October 2026: 810 passed across 52
-files, 0 files failing after retries. On Windows the third command is
-`.\gradlew.bat` instead of `./gradlew`:
+All three were re-run green on Windows after the WattVision retheme: `flutter
+analyze` clean, and 74 files / 865 tests per-file. That run reported **one** file
+(`live_power_card_test.dart`) OOM-killed after three retries; it passes 58/58 in
+one go on its own, which is the documented machine limit below and not an
+assertion. On Windows the third command is `.\gradlew.bat` instead of `./gradlew`:
 
 ```powershell
 flutter analyze

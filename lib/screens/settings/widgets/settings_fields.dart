@@ -422,22 +422,22 @@ class LabeledDropdown extends StatelessWidget {
 /// * **56dp, not 48.** The brief's `height: 56px`. It is set as `minimumSize`
 ///   rather than as a fixed `SizedBox` height so the button still grows with the
 ///   user's font scale — 48 was the accessibility floor and this is above it.
-/// * **8px, not a pill.** `AppRadius.card`. The pill came from the previous
-///   system's rounded-soft look; the brief is explicit that "filter chips are
-///   full-pill, everything else is 8px".
+/// * **Card radius, not a pill.** `AppRadius.card`. The pill came from the
+///   previous system's rounded-soft look; WattVision reserves the full round for
+///   filter chips, avatars and progress tracks, and a save button is none of
+///   those.
 /// * **`AppType.buttonLabel`, not `label-uppercase`.** 13px at weight 900 with
 ///   0.1em tracking. Buttons shout; the brief gives them the display weight at
 ///   label size, which is not the same as a 12px/700 metadata line.
-/// * **The tinted hard shadow**, `AppShadows.stampedIn(AppPalette.error)`.
-///   That is the brief's signature move for the one button allowed to be
-///   electric: a solid offset rectangle in the accent at 20%, no blur, so the
-///   displacement itself bleeds the same colour as the fill.
+/// * **The tinted lift**, `AppShadows.stampedIn(AppPalette.error)`. The one
+///   button allowed to be electric carries a shadow in its own hue rather than a
+///   neutral black one, so the lift reads as part of the fill.
 ///
 /// The shadow is painted by a [DecoratedBox] *behind* the button rather than by
 /// `FilledButton.styleFrom`, because Material's `elevation` maps through
-/// `kElevationToShadow` and can only ever produce a blurred halo — the exact
-/// thing the brief bans. `DecoratedBox` paints its decoration first and then its
-/// child, so only the 4px offset strip is visible around the opaque accent fill.
+/// `kElevationToShadow` and cannot carry a hue. `DecoratedBox` paints its
+/// decoration first and then its child, so only the offset strip is visible
+/// around the opaque accent fill.
 class SaveSettingsButton extends StatelessWidget {
   const SaveSettingsButton({
     super.key,
@@ -525,12 +525,8 @@ class SecondaryButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         backgroundColor: AppSurfaces.page,
         // **Page ink on a page-coloured fill**, for the same reason the energy
-        // report's period button gives up card ink: `AppSurfaces.page` is
-        // near-black on the dark ramp and pale on the light one, so the ink has
-        // to follow it. Card ink is navy in both ramps since the cards went
-        // near-white and measured **1.22:1** against this fill in dark mode —
-        // "Check now" and "Battery settings" were two black rectangles with no
-        // visible label.
+        // report's period button gives up card ink: the fill is the page, so the
+        // ink has to be the page's own token rather than the card's.
         foregroundColor: AppGlass.pageInkStrong,
         disabledBackgroundColor: AppSurfaces.page,
         disabledForegroundColor: AppGlass.pageInkSoft,

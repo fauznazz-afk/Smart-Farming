@@ -7,10 +7,13 @@
 /// names meant the roughly forty call sites needed no change, and dropping the
 /// parameter meant none of them is left holding a value that means nothing.
 ///
-/// What every primitive lost is its shadow list. There is no elevation here; a
-/// surface is distinguished by a tonal step and a 1px hairline, and that is the
-/// whole depth system. See `design_tokens.dart` for why the three-shadow pair is
-/// gone rather than reduced, and `AppBorders` for the hairline that replaced it.
+/// **The depth system is a tonal step, a hairline, and one lift.** A surface is
+/// distinguished by its fill and its 1px border; the card tier additionally
+/// carries [AppShadows.subtle], which is one value for the whole app rather than
+/// a scale. There is no elevation ladder here — nothing is "higher" than
+/// anything else, and a card is not floating above the page, it is sitting on it.
+/// See `design_tokens.dart` for why the three-shadow pair is gone rather than
+/// reduced, and `AppBorders` for the hairline that carries most of the edge.
 library;
 
 import 'package:flutter/material.dart';
@@ -21,12 +24,14 @@ import '../screens/dashboard/utils/design_tokens.dart';
 
 /// The page backdrop.
 ///
-/// **A vertical sweep, not a flat fill, and not the old orb field.** The blue
-/// system is built on the page being *blue*, and a flat page with translucent
-/// white cards on it reads as grey rather than as glass — the transparency only
-/// means something if there is a gradient behind it for the white to lift off.
-/// Three radial orbs were tried and reverted: they put a visible circular edge
-/// in the middle of the scroll area, which is a texture nobody asked for.
+/// **A vertical sweep, not a flat fill, and not an orb field.** The sweep exists
+/// because the glass chips are translucent white: the transparency only means
+/// something if there is a gradient behind it for the white to lift off. WattVision
+/// flattens that sweep to a single `#121212` — the page is one value by design —
+/// but the gradient slot stays, so a page that wants depth again is a token
+/// change rather than a widget change. Three radial orbs were tried and
+/// reverted: they put a visible circular edge in the middle of the scroll area,
+/// which is a texture nobody asked for.
 ///
 /// [AppSurfaces.page] stays the fallback colour underneath, which is what shows
 /// during the one frame between the paint and the gradient's first resolve, and
@@ -219,14 +224,13 @@ class AppCard extends StatelessWidget {
         border: edge,
         // **The card's own lift, and it replaced a 4%-black smudge.**
         //
-        // This used to be `AppShadows.stamped` — the alias for a single
-        // `0x0A000000` at 6px blur, left over from a design system whose cards
-        // were separated by a solid displaced rectangle. Four percent of black
-        // over this page is not a shadow, so the card had a hairline and nothing
-        // else and the whole interface read as flat. `subtle` is the two-shadow
-        // pair the rest of the system uses. The pressed state still drops it,
-        // which is what makes a press read as the card being pushed *into* the
-        // page rather than lifted off it.
+        // It used to be a single `0x0A000000` at 6px blur, left over from a
+        // design system whose cards were separated by a solid displaced
+        // rectangle. Four percent of black over this page is not a shadow, so the
+        // card had a hairline and nothing else and the whole interface read as
+        // flat. `subtle` is the two-shadow pair the rest of the system uses. The
+        // pressed state still drops it, which is what makes a press read as the
+        // card being pushed *into* the page rather than lifted off it.
         boxShadow: pressed ? null : AppShadows.subtle,
       ),
       padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
@@ -388,11 +392,11 @@ class AppDivider extends StatelessWidget {
 
 /// One day in the horizontal date strip. The brief's `chip` / `chip-active`.
 ///
-/// **The active state is the brief's, not a derived one**: a solid categorical
-/// fill with dark ink and *no* border. That is a change of kind rather than of
-/// degree — the old version raised the selected chip off the page with a shadow
-/// pair and dropped the unselected one into a well, and the difference between
-/// them was a geometry. Here the difference is a fill and an ink colour.
+/// **The active state is the brief's, not a derived one**: a solid accent fill
+/// with the accent's own ink and *no* border. That is a change of kind rather
+/// than of degree — the old version raised the selected chip off the page with a
+/// shadow pair and dropped the unselected one into a well, and the difference
+/// between them was a geometry. Here the difference is a fill and an ink colour.
 class DateStripChip extends StatelessWidget {
   const DateStripChip({
     super.key,
@@ -419,24 +423,17 @@ class DateStripChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **Selected is the accent, and it was lime.** The brief's `chip-active` is
-    // a `primary` fill with `on-primary` ink, and in this app `primary` resolves
-    // to the one accent, red. The date strip is the only filter chip on the
-    // dashboard, so the selected day is the one place on the page allowed to
-    // carry the accent fill. That is why the selected day label is the one the
-    // brief asks to lean: italic at 900 weight.
+    // **Selected is the accent.** The brief's `chip-active` is a `primary` fill
+    // with `on-primary` ink, and in this app `primary` resolves to the cyan data
+    // accent. The date strip is the only filter chip on the dashboard, so the
+    // selected day is the one place on the page allowed to carry the accent fill.
     //
-    // **The ink is `AppPalette.onHue` — white — because black fails here.**
-    // `onHue` was written for lime, where black and white were 14:1 and 1.9:1,
-    // so the name reads like it belongs to the old brand hue rather than to the
-    // role. It does not: on this blue fill black measures **3.13:1**, under AA
-    // for body text, and white **6.70:1**. The day number here is the largest
-    // text on the page, so it is the one that would have been read.
+    // **The ink is `AppPalette.onHue`, which is dark.** WattVision's cyan is a
+    // bright fill, so the token ink is `#121212` and it clears AA on it; white
+    // would be about 1.4:1.
     final fill = isSelected ? AppPalette.error : AppSurfaces.surface;
-    // **Card ink, not page ink.** The unselected chip carries its own white fill
-    // (`AppSurfaces.surface`) in both ramps, so it is a card and not a bare
-    // patch of page — and a white fill takes navy ink in either ramp, which is
-    // exactly what `AppSurfaces.onSurface*` now resolves to.
+    // **Card ink, not page ink.** The unselected chip carries the card fill
+    // (`AppSurfaces.surface`), so it is a card and not a bare patch of page.
     final ink = isSelected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
     final numberInk = isSelected ? AppPalette.onHue : AppSurfaces.onSurface;
 

@@ -2,16 +2,30 @@
 
 ### Changed
 
-- **The dark theme was three different blues.** The page was near-black, the
-  gradient behind it was mid-blue, and the flat fallback under an overscroll was
-  a third value again — so the app had a black page and a blue page and a
-  visible seam wherever they met. All three are now the same blue family: the
-  page, the sweep and the fallback are one ramp, and the page is the sweep's own
-  foot. The dark chart colours were unified with the light ramp's for the same
-  reason: the charts are drawn on cards, and the cards are near-white in *both*
-  ramps, so a triad tuned to the page was the one that vanished — the green
-  series measured **1.84:1** on the card it was actually drawn on, and its
-  legend label with it.
+- **The app is on the WattVision design system, and it is dark-only.** The whole
+  surface stack moved: a flat `#121212` page, `#1E1E1E` cards, `#252525` tiles, a
+  `1px solid #2C2C2E` border on every card, one cyan data accent `#00E5FF`, alert
+  red `#FF453A`, and one lift (`AppShadows.subtle`) instead of an elevation
+  ladder. Card padding went 12 → 20, titles are Inter 24 semibold, and KPI figures
+  are JetBrains Mono 32 bold. Every energy figure now shows its `Bs.` equivalent
+  beside the kWh at the tariff the report already used.
+- **The appearance setting is gone.** `AppTheme.apply` clamps every brightness to
+  dark, so the Light/Dark/Auto picker and the accent picker had nothing left to
+  do; the Settings section was deleted rather than left as three controls that do
+  nothing. A stored preference is still read and ignored rather than discarded, so
+  an existing install does not see a settings-reset on upgrade.
+- **The `_light.png` visual-audit goldens were deleted.** With the clamp in place
+  they were byte-identical duplicates of their `_dark` twins — pictures of a
+  palette the app can no longer paint. The harness kept its ramp-suffix plumbing
+  so a second ramp would be a one-line change to `kRamps`.
+- **The page, the sweep behind it and the overscroll fallback were three
+  different values.** The app had a black page, a mid-blue gradient and a third
+  flat colour under an overscroll, with a visible seam wherever they met. They are
+  one ramp now — and under WattVision all three are literally `#121212`, so the
+  seam is unrepresentable rather than merely small. The chart colours were unified
+  the same way for the same reason: the charts are drawn on cards, so a triad
+  tuned to the page was the one that vanished — the green series measured
+  **1.84:1** on the card it was actually drawn on, and its legend label with it.
 - **The fonts were two families at once, and two of their weights were
   imaginary.** A style that asked for Semi-bold was painted Bold, and one that
   asked for Medium was painted Regular, because those two instances were not

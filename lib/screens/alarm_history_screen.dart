@@ -118,20 +118,16 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        // **Page ink, because the bar is transparent and the body is the page
-        // gradient.** `extendBodyBehindAppBar` plus `Colors.transparent` puts
-        // the title on the sweep, and the scheme's default bar ink is card ink —
-        // navy in both ramps since the cards went near-white, which measured
-        // **2.10:1** on the dark ramp's own top stop. One parameter covers the
-        // title, the leading arrow and the action icons together.
+        // **Page ink, because the bar is transparent and the body is the page.**
+        // `extendBodyBehindAppBar` plus `Colors.transparent` puts the title on
+        // the page, and the scheme's default bar ink is card ink. One parameter
+        // covers the title, the leading arrow and the action icons together.
         //
         // **`backgroundColor: Colors.transparent` is the load-bearing half.** The
         // comment above said the bar was transparent but the parameter was never
-        // set, so the bar painted `colorScheme.surface` — near-white in both
-        // ramps — and the white page ink on it measured **1.00:1** in dark mode:
-        // an "Alarm History" title the user could not read. `ai_chat_screen.dart`
-        // has the same transparent-bar arrangement and sets all three parameters
-        // together; this one was missing the background.
+        // set, so the bar painted `colorScheme.surface` and the page ink on it
+        // was unreadable. `ai_chat_screen.dart` has the same transparent-bar
+        // arrangement and sets all three parameters together.
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -239,11 +235,11 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             ? appPrimaryText
             : _colorForSeverity(alarm.severity);
         // **The brief's `list-row`, and the shadow is the change.** `AppCard`
-        // carries `AppShadows.stamped` by construction and cannot decline it;
-        // the brief puts list rows in the *flat* tier — "top app bar, tab bar,
-        // badges, chips: no shadow" — so a row that is stamped is a row one
-        // tier too loud, and nine of them stacked is a page that reads as nine
-        // cards rather than as one list.
+        // carries a lift by construction and cannot decline it; the brief puts
+        // list rows in the *flat* tier — "top app bar, tab bar, badges, chips:
+        // no shadow" — so a row that is lifted is a row one tier too loud, and
+        // nine of them stacked is a page that reads as nine cards rather than as
+        // one list.
         //
         // `AppSurface` is the same surface kit without the shadow, and the
         // transparent `Material` is kept for the same reason `AppCard` keeps
