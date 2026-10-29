@@ -82,7 +82,7 @@ class GlassHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = <Widget>[];
     for (var i = 0; i < trailingActions.length; i++) {
-      if (i > 0) actions.add(const SizedBox(width: 8));
+      if (i > 0) actions.add(const SizedBox(width: AppSpacing.sm));
       actions.add(trailingActions[i]);
     }
 
@@ -101,8 +101,19 @@ class GlassHeroCard extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
+        // **A 2 dp accent hairline, not another shadow.** The hero and the
+        // 7-day sheet below it both carry a shadow, so on a dark page the two
+        // separate by a soft grey haze that is nearly invisible at phone
+        // brightness -- the hero read as "a card that happens to be blue"
+        // rather than as the page's primary surface. A cyan rim at 22% is the
+        // cheapest way to make the top of the page the obvious top: it is the
+        // data accent, it is 2 dp, and it costs no vertical space.
+        border: Border.all(
+          color: AppPalette.primary.withValues(alpha: 0.22),
+          width: 2,
+        ),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -123,11 +134,13 @@ class GlassHeroCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       title,
-                      style: AppType.headlineLg.copyWith(
+                      // The name is a greeting, not a headline: at headlineLg a
+                      // long display name wrapped and pushed the figure down.
+                      style: AppType.headlineMd.copyWith(
                         color: AppGlass.inkStrong,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
                       style: AppType.bodySm.copyWith(color: AppGlass.inkSoft),
@@ -139,11 +152,18 @@ class GlassHeroCard extends StatelessWidget {
                 Row(mainAxisSize: MainAxisSize.min, children: actions),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: AppSpacing.xl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              Icon(icon, size: 88, color: AppGlass.inkStrong),
+              // **64, down from 88.** An 88 dp weather glyph beside a 54 sp
+              // figure made the icon the loudest thing on the card and pushed
+              // the figure into the remaining ~55% of the width, where a
+              // four-digit reading ellipsised. The glyph is chrome that
+              // *explains* the number; it must not outshout it. 64 still reads
+              // as a picture at arm's length and gives the figure the room it
+              // needs.
+              Icon(icon, size: 64, color: AppGlass.inkStrong),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -183,19 +203,19 @@ class GlassHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: <Widget>[
               Expanded(
                 child: _MiniPill(label: highLabel, value: highValue, up: true),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _MiniPill(label: lowLabel, value: lowValue, up: false),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           Container(
             height: 64,
             decoration: BoxDecoration(
@@ -205,9 +225,9 @@ class GlassHeroCard extends StatelessWidget {
             child: Row(children: statCells),
           ),
           if (footer != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Divider(height: 1, thickness: 1, color: AppGlass.divider),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.md),
             footer!,
           ],
         ],
@@ -257,9 +277,13 @@ class GlassCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // **44, not 40.** The Material minimum is 44 dp, and four of these sit in
+    // a row the user reaches for with a thumb on the page's most-used card.
+    // 4 dp is invisible and it is the difference between meeting the floor
+    // and missing it.
     final button = SizedBox(
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
@@ -268,8 +292,8 @@ class GlassCircleButton extends StatelessWidget {
           child: Stack(
             children: <Widget>[
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: fill ?? AppGlass.fill,
                   shape: BoxShape.circle,

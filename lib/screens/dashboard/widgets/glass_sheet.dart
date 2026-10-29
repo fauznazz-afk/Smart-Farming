@@ -53,20 +53,10 @@ class GlassSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppGlass.handle,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
+          // The grab handle is gone. It is a bottom-sheet affordance and this
+          // is a card in the scroll flow: page is visible above and below it,
+          // so there is nothing to drag. It said "swipe me up" and did nothing.
+          const SizedBox(height: AppSpacing.lg),
           // The title carries the route, so it is the one tappable thing in a
           // sheet whose rows are not. `Material` sits inside the decorated
           // container for the same reason `AppCard` does: outside it, the opaque
@@ -118,7 +108,8 @@ class GlassSheet extends StatelessWidget {
               children: <Widget>[
                 for (var i = 0; i < children.length; i++) ...<Widget>[
                   children[i],
-                  if (i != children.length - 1) const SizedBox(height: 10),
+                  if (i != children.length - 1)
+                    const SizedBox(height: AppSpacing.sm),
                 ],
               ],
             ),
