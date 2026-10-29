@@ -146,12 +146,18 @@ class _LoginScreenState extends State<LoginScreen> {
                               FocusScope.of(context).nextFocus(),
                           decoration: InputDecoration(
                             labelText: 'Username / Email',
+                            // Same 48dp box the password field's default icon
+                            // occupies: a 24dp glyph in a 12dp pad. The username
+                            // glyph used to be a 22dp asset in a 13dp pad, so
+                            // the two fields' left icons sat at different sizes
+                            // and offsets - visible as the user icon reading
+                            // smaller and nudged right of the lock below it.
                             prefixIcon: Padding(
-                              padding: const EdgeInsets.all(13),
+                              padding: const EdgeInsets.all(AppSpacing.md),
                               child: Image.asset(
                                 'assets/user_icon.png',
-                                width: 22,
-                                height: 22,
+                                width: 24,
+                                height: 24,
                                 color: Theme.of(context).colorScheme.onSurface,
                                 colorBlendMode: BlendMode.srcIn,
                                 semanticLabel: 'User',
