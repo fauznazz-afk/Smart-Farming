@@ -313,6 +313,24 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
               });
             }
           },
+          // **HTTP errors are a separate callback from resource errors, and
+          // this used to be unhandled.** `onWebResourceError` covers transport
+          // failures; a 4xx/5xx from the camera host arrives here instead. Left
+          // unhandled, a camera answering 503 is indistinguishable from one that
+          // loaded fine -- the spinner stops and the panel shows a dead frame
+          // with no status. Only the camera origin counts: `onHttpError` fires
+          // for every sub-resource, and a 404 on some third-party beacon must
+          // not be reported as the camera being down.
+          onHttpError: (error) {
+            final uri = error.response?.uri;
+            if (!mounted || uri == null) return;
+            if (!isAllowedCctvSubresource(uri)) return;
+            if (error.response!.statusCode < 400) return;
+            setState(() {
+              _loading = false;
+              _failed = true;
+            });
+          },
         ),
       );
     setState(() => _controller = controller);

@@ -103,6 +103,10 @@ bool isAllowedCctvStreamQuery(Uri uri) {
 /// It does not answer "can the camera host ask for things?" -- sub-resources
 /// still go anywhere, which is inherent to a WebView and a hardening note
 /// rather than a break, because the host is the user's own camera box.
+///
+/// **[isAllowedCctvSubresource] is the companion that answers the second
+/// question for HTTP failures only** -- see there for why the answer is not
+/// "block everything else".
 bool isAllowedCctvNavigation(Uri uri) {
   if (uri.scheme.toLowerCase() != 'https') return false;
   if (uri.host.toLowerCase() != allowedCctvHost) return false;
@@ -110,6 +114,22 @@ bool isAllowedCctvNavigation(Uri uri) {
   if (uri.userInfo.isNotEmpty) return false;
   return true;
 }
+
+/// Whether a **sub-resource that failed to load** came from the camera origin.
+///
+/// This is the hardening half of [isAllowedCctvNavigation], and it is
+/// deliberately narrower than a sub-resource allowlist. Blocking every request
+/// to another host would mean deciding, from Dart, which of a player page's
+/// fetches are "its own" -- fonts, the go2rtc websocket, a CDN copy of a script.
+/// A guard that guesses wrong here refuses the player, which is the failure the
+/// navigation guard already cost once (see [parseAllowedCctvUrl]).
+///
+/// So the rule is: **same checks as navigation, and only used to decide whether
+/// a reported failure is the camera's problem.** `onHttpError` fires for every
+/// resource, so this is what keeps a 404 on an ad beacons's URL from being
+/// reported as "the camera is offline" -- the screen shows the failure state on
+/// a main-frame error only, and this is the same-origin predicate behind it.
+bool isAllowedCctvSubresource(Uri uri) => isAllowedCctvNavigation(uri);
 
 /// Load the saved CCTV URL from secure storage.
 Future<String> loadCctvUrl() async {

@@ -190,5 +190,42 @@ void main() {
         );
       });
     });
+
+    group('isAllowedCctvSubresource', () {
+      // The companion the `onHttpError` handler asks before it turns a failed
+      // fetch into the offline state. It has to agree with the navigation guard
+      // on origin, and it has to disagree with a permissive version of itself:
+      // a third-party beacon that 404s is not the camera being down.
+      test('accepts any path on the camera origin', () {
+        expect(
+          isAllowedCctvSubresource(
+            Uri.parse('https://cctv.mbkm20262027.tech/api/streams'),
+          ),
+          isTrue,
+        );
+        expect(
+          isAllowedCctvSubresource(
+            Uri.parse('https://cctv.mbkm20262027.tech/stream.html?src=cam1'),
+          ),
+          isTrue,
+        );
+      });
+
+      test('rejects another host, cleartext and credentials', () {
+        for (final value in <String>[
+          'https://beacon.example/p.gif',
+          'http://cctv.mbkm20262027.tech/api/streams',
+          'https://user:pw@cctv.mbkm20262027.tech/api/streams',
+          'https://cctv.mbkm20262027.tech:8443/api/streams',
+          'https://cctv.mbkm20262027.tech.evil.example/x',
+        ]) {
+          expect(
+            isAllowedCctvSubresource(Uri.parse(value)),
+            isFalse,
+            reason: 'this sub-resource must not count as the camera: $value',
+          );
+        }
+      });
+    });
   });
 }
