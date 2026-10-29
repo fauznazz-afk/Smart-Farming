@@ -17,8 +17,6 @@
 /// every mode resolves to WattVision dark.
 library;
 
-import 'dart:ui' show PlatformDispatcher;
-
 import 'package:flutter/material.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -31,7 +29,8 @@ import 'package:flutter/material.dart';
 class AppSurfaces {
   const AppSurfaces._();
 
-  static AppSurfacesPalette _palette = AppSurfacesPalette.light;
+  // Dark, so the first frame before [apply] cannot take the light leg.
+  static AppSurfacesPalette _palette = AppSurfacesPalette.dark;
 
   static void apply(Brightness brightness) {
     _palette = brightness == Brightness.light
@@ -147,24 +146,31 @@ class AppTheme {
 
   /// The brightness the app is running in.
   ///
-  /// **Read from `dart:ui`, not from the binding.** This used to be
-  /// `WidgetsBinding.instance.platformDispatcher.platformBrightness`, and
-  /// `WidgetsBinding.instance` throws "Binding has not yet been initialized"
-  /// when no binding has been created - so every plain `test()` that touched a
-  /// ramp-dependent token died in the static initializer before its first
-  /// assertion could run. `dart:ui`'s `PlatformDispatcher.instance` is the
-  /// very object the binding hands out (`BindingBase.platformDispatcher`
-  /// returns `ui.PlatformDispatcher.instance`), so the value is unchanged and
-  /// the crash is gone.
-  static Brightness _brightness = PlatformDispatcher.instance.platformBrightness;
+  /// **Starts dark, not the platform's value.** It used to seed from
+  /// `PlatformDispatcher.instance.platformBrightness`, which is read *before*
+  /// `runApp` and before `applyMode` can clamp it - so on a device set to light
+  /// the first frame took the light leg of every ramp-branching token:
+  /// `pageInkStrong` came out `#0B2545` on a `#121212` page, `divider` black on
+  /// black, `arrowUp` orange. WattVision is dark-only, so the initial value is
+  /// the app's own value; nothing can disagree with it because nothing can
+  /// change it but [apply].
+  static Brightness _brightness = Brightness.dark;
 
   static Brightness get brightness => _brightness;
 
-  static void applyMode(ThemeMode mode, Brightness platform) {
-    apply(Brightness.dark);
-  }
+  /// Resolves a [ThemeMode] and a platform brightness to the one appearance.
+  ///
+  /// **Both arguments are ignored and that is the contract.** The signature is
+  /// kept because `MaterialApp` owns a `themeMode` and the root widget has to
+  /// answer it; the answer is always dark.
+  static void applyMode(ThemeMode mode, Brightness platform) => apply();
 
-  static void apply(Brightness brightness) {
+  /// Re-resolves every ramp. **One appearance, so there is nothing to choose.**
+  ///
+  /// The parameter is kept rather than deleted because the test suite drives
+  /// both ramps through this call to prove they are identical; the body clamps
+  /// it, which is what makes "dark-only" true rather than merely intended.
+  static void apply([Brightness? brightness]) {
     _brightness = Brightness.dark;
     AppSurfaces.apply(Brightness.dark);
     AppPalette.apply(Brightness.dark);
@@ -184,7 +190,8 @@ class AppPalette {
         : AppPaletteTheme.dark;
   }
 
-  static AppPaletteTheme _active = AppPaletteTheme.light;
+  // Dark, for the same reason [AppSurfaces] starts dark.
+  static AppPaletteTheme _active = AppPaletteTheme.dark;
 
   // Core colors
   static Color get primary => _active.primary;
@@ -208,6 +215,9 @@ class AppPalette {
   /// read as the same one. Amber is the warning; orange-red is the alert.
   static Color get statusAlert => _active.statusAlert;
   static Color get statusBad => _active.statusBad;
+
+  /// The alert banner's fill. See [AppPaletteTheme.alertFill].
+  static Color get alertFill => _active.alertFill;
 
   // The page twins. **Use these for anything drawn on the page gradient** — a
   // CCTV status pill, a banner with no card behind it, a live dot. The plain
@@ -251,6 +261,7 @@ class AppPaletteTheme {
     required this.success,
     required this.warning,
     required this.statusAlert,
+    required this.alertFill,
     required this.error,
     required this.statusBad,
     required this.successOnPage,
@@ -277,6 +288,13 @@ class AppPaletteTheme {
 
   /// Serious but not yet a breach. A distinct hue from [warning] on purpose.
   final Color statusAlert;
+
+  /// The alert banner's fill, a deep desaturated red under [statusBad] ink.
+  ///
+  /// Its own token rather than a literal in `banners.dart`, because the fill and
+  /// the 4px edge that sits on it are one recipe and the edge already reads
+  /// [statusBad]. Both ramps carry the same value: it is a wash of the one red.
+  final Color alertFill;
   final Color error;
   final Color statusBad;
 
@@ -307,6 +325,8 @@ class AppPaletteTheme {
     warning: Color(0xFFFBBF24),
     // Orange, distinct from warning on purpose.
     statusAlert: Color(0xFFFF9F0A),
+    // The alert banner's fill: a deep red that carries statusBad ink.
+    alertFill: Color(0xFF3A1C1C),
     error: Color(0xFF00E5FF),
     // Spec alert red — the only red in the ramp.
     statusBad: Color(0xFFFF453A),
@@ -339,6 +359,8 @@ class AppPaletteTheme {
     warning: Color(0xFFFBBF24),
     // Orange, distinct from warning on purpose.
     statusAlert: Color(0xFFFF9F0A),
+    // The alert banner's fill: a deep red that carries statusBad ink.
+    alertFill: Color(0xFF3A1C1C),
     error: Color(0xFF00E5FF),
     // Spec alert red — the only red in the ramp.
     statusBad: Color(0xFFFF453A),

@@ -202,7 +202,7 @@ class EnergyAlertBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF3A1C1C),
+        color: AppPalette.alertFill,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border(
           left: BorderSide(color: AppPalette.statusBad, width: 4),

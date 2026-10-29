@@ -474,7 +474,7 @@ class SaveSettingsButton extends StatelessWidget {
             // disabled — `onPressed` is null — it just says so with its label
             // rather than by turning into a different button.
             disabledBackgroundColor: AppPalette.error,
-            disabledForegroundColor: AppPalette.onHue,
+            disabledForegroundColor: AppPalette.onHue.withValues(alpha: 0.70),
             textStyle: AppType.buttonLabel,
             minimumSize: const Size(0, 56),
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),

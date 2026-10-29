@@ -505,7 +505,7 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
                       end: Alignment.bottomCenter,
                       colors: [
                         item.series.color.withValues(alpha: 0.30),
-                        const Color(0x0D30D158), // spec green #30D158 at 5%
+                        item.series.color.withValues(alpha: 0.05),
                       ],
                     ),
                   )

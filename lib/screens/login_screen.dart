@@ -231,7 +231,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 backgroundColor: AppPalette.error,
                                 foregroundColor: AppPalette.onHue,
                                 disabledBackgroundColor: AppPalette.error,
-                                disabledForegroundColor: AppPalette.onHue,
+                                disabledForegroundColor:
+                                    AppPalette.onHue.withValues(alpha: 0.70),
                                 textStyle: AppType.buttonLabel,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: AppRadius.all(AppRadius.card),

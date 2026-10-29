@@ -295,11 +295,15 @@ class GlassCircleButton extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: fill ?? AppGlass.fill,
+                  color: fill ?? AppGlass.fillSoft,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(icon, size: 20, color: ink ?? AppGlass.inkStrong),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: ink ?? AppGlass.pageGlassInk,
+                ),
               ),
               if (badge)
                 Positioned(
@@ -338,7 +342,7 @@ class _MiniPill extends StatelessWidget {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        color: AppGlass.fill,
+        color: AppGlass.fillSoft,
         borderRadius: BorderRadius.circular(AppRadius.tilePill),
       ),
       alignment: Alignment.center,
@@ -350,7 +354,7 @@ class _MiniPill extends StatelessWidget {
               '$label: $value',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppType.bodyMd.copyWith(color: AppGlass.ink),
+              style: AppType.bodyMd.copyWith(color: AppGlass.pageGlassInk),
             ),
           ),
           const SizedBox(width: 4),
@@ -376,6 +380,11 @@ class _StatCell extends StatelessWidget {
     // **Ink, not fill.** The cell sits inside a translucent wash on the hero
     // gradient, so a filled ripple would paint a solid chip over the glass and
     // break the one surface the card is made of.
+    //
+    // **And the ink follows the wash, not the hero.** The wash under this cell
+    // is [AppGlass.fillSoft] — 55% white, a light chip — so the label and the
+    // figure are the dark glass ink. The hero's own white ink is for content on
+    // the gradient; on the chip it measured under 2:1.
     final cell = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
@@ -383,7 +392,9 @@ class _StatCell extends StatelessWidget {
           stat.label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppType.labelMicro.copyWith(color: AppGlass.inkSoft),
+          style: AppType.labelMicro.copyWith(
+            color: AppGlass.pageGlassInkSoft,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -391,7 +402,7 @@ class _StatCell extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: AppType.numeralMd.copyWith(
-            color: AppGlass.inkStrong,
+            color: AppGlass.pageGlassInk,
           ),
         ),
       ],

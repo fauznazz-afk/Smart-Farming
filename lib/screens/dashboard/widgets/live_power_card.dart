@@ -30,18 +30,17 @@ const double _kBarHeight = 12;
 /// the floor stop and the shading goes one step further from it at the top,
 /// which is what makes a well read as a hole rather than as a flat stripe.
 ///
-/// The `0xFF000000` is the one literal in here and it is **inherited, not
-/// invented** — it was the top stop of the SOC track's gradient before this was
-/// extracted, and it is unchanged. The token file has no pure black to point at:
-/// the darkest value it defines is [AppSurfaces.track] itself, and
-/// [AppPalette.onHue] means "ink on a saturated fill" rather than "black", so
-/// naming it here would be a lie about what the value is for.
+/// The shading stop is [AppSurfaces.page], not a literal — it was the top stop
+/// of the SOC track's gradient before this was extracted, and the value is
+/// unchanged. It used to be `0xFF000000` because the token file had no pure
+/// black to point at; it now does, and [AppSurfaces.page] is the role that
+/// actually describes it.
 BoxDecoration _trackBarDecoration() => BoxDecoration(
   gradient: LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color.lerp(AppSurfaces.track, const Color(0xFF000000), 0.18)!,
+      Color.lerp(AppSurfaces.track, AppSurfaces.page, 0.18)!,
       AppSurfaces.track,
     ],
   ),

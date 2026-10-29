@@ -68,7 +68,8 @@ class ExportButton extends StatelessWidget {
                 // still disabled — `onPressed` is null — it says so with its
                 // label rather than by becoming a different button.
                 disabledBackgroundColor: AppPalette.error,
-                disabledForegroundColor: AppPalette.onHue,
+                disabledForegroundColor:
+                    AppPalette.onHue.withValues(alpha: 0.70),
                 // 13/900/0.1em. Buttons shout; `label-uppercase` is the
                 // metadata line and this is not metadata.
                 textStyle: AppType.buttonLabel,
