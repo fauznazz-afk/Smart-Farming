@@ -333,7 +333,7 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
                       _ExportButton(busy: _exporting, onPressed: _export),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.md),
                   Expanded(
                     child: Listener(
                       onPointerDown: (_) => onPointerActive(true),
@@ -345,14 +345,14 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.md),
                   if (scaled.length == 1)
                     _SingleSeriesStatistics(scaled.first)
                   else
                     Row(
                       children: [
                         for (var i = 0; i < scaled.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 16),
+                          if (i > 0) const SizedBox(width: AppSpacing.lg),
                           _SeriesStatistics(scaled[i]),
                         ],
                       ],
