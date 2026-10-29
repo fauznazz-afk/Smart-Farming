@@ -200,18 +200,23 @@ class _MetricRow extends StatelessWidget {
                 )
               : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 13),
+            // 14, from 13, so the row clears 48 dp with the 20 sp figure it
+            // carries. 13 landed at 46 on the battery page's `%` row.
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               children: [
                 ExcludeSemantics(
-                  child: Icon(metric.icon, size: 19, color: accent),
+                  child: Icon(metric.icon, size: 18, color: accent),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
                     metric.label,
+                    // The card's own secondary ink, not the primary: a row
+                    // label is the muted half and the figure is the reading.
+                    // Primary ink on both made every row a wall of white.
                     style: AppType.labelUppercase.copyWith(
-                      color: appPrimaryText,
+                      color: AppSurfaces.onSurfaceVariant,
                     ),
                   ),
                 ),

@@ -58,6 +58,21 @@ Widget powerSelector(int selected, ValueChanged<int> onSelect) {
       ],
       selected: {selected},
       showSelectedIcon: false,
+      // **The design system's own style, not Material's default.** The default
+      // is a 14 sp w500 label on a 40 dp pill; every other control in the app
+      // speaks `buttonLabel` (13 sp, w900, tracked). Left at the default this
+      // selector was the one control on the Power page that looked borrowed.
+      style: SegmentedButton.styleFrom(
+        textStyle: AppType.buttonLabel,
+        selectedBackgroundColor: AppPalette.error,
+        selectedForegroundColor: AppPalette.onHue,
+        foregroundColor: AppSurfaces.onSurfaceVariant,
+        side: BorderSide(color: AppSurfaces.border),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+      ),
       onSelectionChanged: (selection) => onSelect(selection.first),
     ),
   );

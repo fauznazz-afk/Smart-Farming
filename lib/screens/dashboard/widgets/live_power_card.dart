@@ -81,12 +81,12 @@ class LivePowerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Header(pzemStale: pzemStale, ageLabel: pzemAgeLabel),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.md),
           _PowerFlow(
             pvPower: pvPower,
             acPower: acPower,
@@ -359,7 +359,7 @@ class _PowerFlow extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
         // **The brief's bar, and the height is the recipe.**
         // `progress-bar` is 12px tall on the page colour with a 1px `border`
         // hairline and full-round ends — a stadium, not a stripe of paint. This
@@ -407,9 +407,9 @@ class _PowerFlow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         _SocLine(soc: soc),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           acPower == null
               ? 'House draw unavailable until the meter reports'
@@ -425,7 +425,12 @@ class _PowerFlow extends StatelessWidget {
               ? 'The array covers the house, '
                     '${spareWatts.toStringAsFixed(0)} W spare'
               : 'The array is just covering the house load',
-          style: AppType.labelMicro.copyWith(
+          // **Body, not the 10 sp micro label.** This is the only sentence on
+          // the card; at `labelMicro` it was the smallest text under a row of
+          // 24 sp figures, which reads as a footnote to nothing. `bodySm` is
+          // the same size the hero's subtitle uses, so a sentence looks like a
+          // sentence on both surfaces.
+          style: AppType.bodySm.copyWith(
             color: acPower != null && !coversLoad && !batteryMakesUp
                 ? statusWarn
                 : faint,
