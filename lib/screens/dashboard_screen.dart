@@ -2,15 +2,12 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/telemetry_export.dart';
 
-import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
 import '../services/alarm_bridge.dart';
 import '../services/alarm_notification_service.dart';
-import '../services/alarm_settings.dart';
 import '../services/app_update_service.dart';
 import '../services/cctv_url.dart';
 import '../services/connection_health_service.dart';
@@ -22,7 +19,6 @@ import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
 import '../utils/app_update.dart';
 import '../utils/ai_provider.dart';
-import '../utils/poll_interval.dart';
 import '../widgets/liquid_glass.dart';
 import 'ai_chat_screen.dart';
 import 'alarm_history_screen.dart';
@@ -45,6 +41,7 @@ import 'dashboard/pages/chart_sections.dart';
 import 'dashboard/pages/detail_pages.dart';
 import 'dashboard/pages/overview_page.dart';
 import 'dashboard/state/alarms_mixin.dart';
+import 'dashboard/state/preferences_mixin.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
@@ -90,7 +87,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
-    with WidgetsBindingObserver, DashboardAlarms {
+    with WidgetsBindingObserver, DashboardAlarms, DashboardPreferences {
   // ── Navigation & lifecycle ───────────────────────────────────────────────────
   final _pageController = PageController();
   final ValueNotifier<int> _selectedPage = ValueNotifier(0);
@@ -127,11 +124,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// pull-to-refresh could only either skip the fetch or fire a second one
   /// concurrently, and the first of those is a lie told to the user's finger.
   Completer<void>? _telemetryInFlight;
-  String? _error;
+  @override
+  String? lastError;
   bool _isOfflineMode = false;
   DateTime? _cachedTelemetryTime;
   DateTime? _lastSuccessfulTelemetryAt;
-  bool _realtimeConnected = false;
+
+  /// The WebSocket's view of the link, read by the poll floor and the wifi glyph.
+  @override
+  bool realtimeConnected = false;
+
+  @override
+  ThingsBoardApi get preferencesApi => widget.api;
+
   late final ThingsBoardRealtimeService _realtimeService =
       ThingsBoardRealtimeService(
         api: widget.api,
@@ -196,25 +201,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   DateTime? _energyUpdatedAt;
   double _solarKwh = 0;
   double _loadKwh = 0;
-  double? _dailyProductionTargetKwh;
-
-  /// Rupiah per kWh, and the array's nameplate in watts. Both null until the
-  /// user supplies them — see `_loadPreferences`.
-  double? _electricityTariffPerKwh;
-  double? _pvInstalledWp;
 
   /// Whether a CSV is being fetched and built, so the action cannot be pressed
   /// twice and a second fetch cannot race the first one's share sheet.
   bool _exportingCsv = false;
 
   // ── Refresh & preferences ────────────────────────────────────────────────────
-  bool _autoRefresh = true;
-  int _refreshSeconds = 10;
-  Timer? _refreshTimer;
-  final _connectionHealth = ConnectionHealthService();
+  // The preference fields and the poll timer live in
+  // `dashboard/state/preferences_mixin.dart`.
   late final Listenable _connectionChromeListenable = Listenable.merge([
     _liveRevision,
-    _connectionHealth,
+    connectionHealth,
   ]);
 
   // ── Alerts ───────────────────────────────────────────────────────────────────
@@ -235,9 +232,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _updateDismissed = false;
 
   // ── Misc ─────────────────────────────────────────────────────────────────────
-  String _displayName = '';
-  String _cctvUrl = defaultAllowedCctvUrl;
-  String _cctvUrlFish = defaultAllowedFishCctvUrl;
   final ValueNotifier<int> _cctvKeepAlive = ValueNotifier(0);
   final ValueNotifier<int> _liveRevision = ValueNotifier(0);
   // One counter per ThingsBoard device, for the cards that read exactly one
@@ -273,11 +267,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _fetchAll();
+    fetchAll();
     unawaited(_realtimeService.start());
     _fetchEnergyHistory();
-    _loadPreferences();
-    _loadDisplayName();
+    loadPreferences();
+    loadDisplayName();
     // The screen is already on screen at this point, so the background check
     // has to stand down before its next tick rather than at the first resume
     // callback, which may not arrive for a while.
@@ -335,7 +329,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _chartRevision.dispose();
     alertMessages.dispose();
     _cctvKeepAlive.dispose();
-    _refreshTimer?.cancel();
+    cancelRefreshTimer();
     // Nothing is evaluating alarms once this screen is gone, so the background
     // check has to be allowed to run again.
     unawaited(AlarmBridge.instance.setForeground(false));
@@ -346,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _restartRefreshTimer();
+      restartRefreshTimer();
       // Tells the background check to stand down: the dashboard polls every ten
       // seconds and evaluates the same rules, so a background tick on top of that
       // is duplicate work against the same ThingsBoard instance.
@@ -354,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      _refreshTimer?.cancel();
+      cancelRefreshTimer();
       unawaited(AlarmBridge.instance.setForeground(false));
     }
   }
@@ -384,96 +378,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     return false;
   }
 
-  // ── Preferences ──────────────────────────────────────────────────────────────
-  Future<void> _loadDisplayName() async {
-    final name = await widget.api.fetchDisplayName();
-    if (mounted) setState(() => _displayName = name);
-  }
-
-  Future<void> _loadPreferences() async {
-    final preferences = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    final cctvUrl = await loadCctvUrl();
-    if (!mounted) return;
-    final fishCctvUrl = await loadFishCctvUrl();
-    if (!mounted) return;
-    final thresholds = readAlarmThresholds(preferences);
-    setState(() {
-      _autoRefresh = preferences.getBool(SettingsKeys.autoRefresh) ?? true;
-      _refreshSeconds = preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
-      setThresholds(thresholds);
-      _dailyProductionTargetKwh = _readDouble(
-        preferences,
-        SettingsKeys.dailyProductionTargetKwh,
-      );
-      // The same two optional numbers the Settings screen writes. Null until
-      // the user supplies them, which is what hides the cost and performance
-      // card rather than filling it with zeros.
-      _electricityTariffPerKwh = _readDouble(
-        preferences,
-        SettingsKeys.electricityTariffPerKwh,
-      );
-      _pvInstalledWp = _readDouble(preferences, SettingsKeys.pvInstalledWp);
-      _cctvUrl = cctvUrl;
-      _cctvUrlFish = fishCctvUrl;
-    });
-    _restartRefreshTimer();
-    // Must precede the first evaluation, otherwise every alarm looks new to a
-    // fresh process and gets announced again on top of the background's.
-    await primeActiveAlerts();
-    if (!mounted) return;
-    evaluateEnergyAlerts();
-    // The background check evaluates the same rules, so it has to be told when
-    // the thresholds change. A threshold raised above the current SOC would
-    // otherwise keep notifying from the background for up to a quarter of an
-    // hour after the user turned it off.
-    unawaited(AlarmNotificationService.sync(api: widget.api));
-  }
-
-  static double? _readDouble(SharedPreferences preferences, String key) =>
-      double.tryParse(preferences.getString(key) ?? '');
-
-  void _restartRefreshTimer() {
-    _refreshTimer?.cancel();
-    if (!_autoRefresh) {
-      _connectionHealth.markDisconnected(ConnectionTransport.polling);
-      return;
-    }
-    _connectionHealth.markConnected(ConnectionTransport.polling);
-    // **The interval depends on whether the WebSocket is carrying telemetry.**
-    //
-    // It did not, and the line was plainly `Duration(seconds: _refreshSeconds)`.
-    // The WebSocket pushes every value into these slots the moment it arrives --
-    // see `_handleRealtimeTelemetry` -- so a 10 s REST re-read is fetching values
-    // the screen already has, and does it for three devices for as long as the
-    // app stays open.
-    //
-    // The floor is 60 s and the poll still runs, because the socket sends no
-    // ping and a dead-but-open connection is only noticed by a re-read. The
-    // reasoning and the arithmetic are in `utils/poll_interval.dart`.
-    final interval = effectivePollIntervalSeconds(
-      requestedSeconds: _refreshSeconds,
-      realtimeConnected: _realtimeConnected,
-    );
-    _refreshTimer = Timer.periodic(Duration(seconds: interval), (_) async {
-      final started = DateTime.now();
-      await _fetchAll();
-      if (_error == null) {
-        _connectionHealth.markSuccess(
-          ConnectionTransport.polling,
-          latency: DateTime.now().difference(started),
-        );
-      } else {
-        _connectionHealth.markError(
-          ConnectionTransport.polling,
-          degraded: true,
-        );
-      }
-    });
-  }
-
   // ── Telemetry fetching ───────────────────────────────────────────────────────
-  Future<void> _fetchAll() async {
+  @override
+  Future<void> fetchAll() async {
     if (_telemetryRequestInFlight) return;
     _telemetryRequestInFlight = true;
     final flight = Completer<void>();
@@ -508,7 +415,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final fishChanged = !sameTelemetry(_fish, results[3]);
       final changed =
           _loading ||
-          _error != null ||
+          lastError != null ||
           batteryChanged ||
           pzemChanged ||
           sensorChanged ||
@@ -548,9 +455,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
       _lastSuccessfulTelemetryAt = now;
       _loading = false;
-      _error = null;
+      lastError = null;
       _isOfflineMode = false;
-      _connectionHealth.markSuccess(
+      connectionHealth.markSuccess(
         ConnectionTransport.rest,
         latency: DateTime.now().difference(started),
         updatedAt: now,
@@ -594,7 +501,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         unawaited(_fetchEnergyHistory());
       }
     } catch (error) {
-      _connectionHealth.markError(ConnectionTransport.rest, degraded: true);
+      connectionHealth.markError(ConnectionTransport.rest, degraded: true);
       if (!mounted) return;
       if (error.toString().contains('Token expired')) {
         // Same as an explicit logout: the session is over, so the background
@@ -607,9 +514,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       await _applyOfflineFallback();
       final message = error.toString();
-      if (_error != message || _loading) {
+      if (lastError != message || _loading) {
         final wasLoading = _loading;
-        _error = message;
+        lastError = message;
         _loading = false;
         _notifyLive(
           wasLoading: wasLoading,
@@ -691,19 +598,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _handleRealtimeConnection(bool connected) {
-    if (!mounted || _realtimeConnected == connected) return;
-    setState(() => _realtimeConnected = connected);
+    if (!mounted || realtimeConnected == connected) return;
+    setState(() => realtimeConnected = connected);
     if (connected) {
-      _connectionHealth.markConnected(ConnectionTransport.webSocket);
+      connectionHealth.markConnected(ConnectionTransport.webSocket);
     } else {
-      _connectionHealth.markDisconnected(ConnectionTransport.webSocket);
+      connectionHealth.markDisconnected(ConnectionTransport.webSocket);
     }
     // The poll interval follows this state, so the timer has to be re-armed
     // when it changes -- in both directions. Without the second call the socket
     // could drop and the dashboard would keep the 60 s safety-net cadence for
     // the rest of the session, which is the exact case the short interval exists
     // for. Re-arming is cheap: it cancels a timer and makes another.
-    _restartRefreshTimer();
+    restartRefreshTimer();
   }
 
   void _handleRealtimeTelemetry(
@@ -757,15 +664,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     // already on screen, which is the common case for a device that reports on a
     // slow cycle. Those frames used to be indistinguishable from real changes.
     final changed =
-        wasLoading || _error != null || !sameTelemetry(slot, updated);
-    _connectionHealth.markSuccess(
+        wasLoading || lastError != null || !sameTelemetry(slot, updated);
+    connectionHealth.markSuccess(
       ConnectionTransport.webSocket,
       latency: DateTime.now().difference(values.values.first.timestamp),
       updatedAt: latest,
     );
     _isOfflineMode = false;
     _lastSuccessfulTelemetryAt = DateTime.now();
-    _error = null;
+    lastError = null;
     _loading = false;
     _notifyLive(wasLoading: wasLoading, changed: changed);
     // One frame, one device, one card. The same `sameTelemetry` gate above
@@ -810,7 +717,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_telemetryRequestInFlight) {
       await _telemetryInFlight?.future;
     }
-    await _fetchAll();
+    await fetchAll();
     if (_selectedIndex == 0) {
       if (_energyRequestInFlight) {
         await _energyInFlight?.future;
@@ -1348,7 +1255,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       appPageRoute<bool>(page: SettingsScreen(onLogout: _logout)),
     );
     if (changed == true) {
-      _loadPreferences();
+      loadPreferences();
     }
   }
 
@@ -1462,13 +1369,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// they are separate from [_aiThresholds]: an assistant told the tariff is a
   /// threshold would answer "your tariff is breached".
   Map<String, String> _aiInstallation() {
-    final target = _dailyProductionTargetKwh;
+    final target = dailyProductionTargetKwh;
     return {
-      if (_pvInstalledWp != null)
-        'array nameplate': '${slotNumber(_pvInstalledWp, decimals: 0)} Wp',
-      if (_electricityTariffPerKwh != null)
+      if (pvInstalledWp != null)
+        'array nameplate': '${slotNumber(pvInstalledWp, decimals: 0)} Wp',
+      if (electricityTariffPerKwh != null)
         'electricity tariff':
-            '${slotNumber(_electricityTariffPerKwh, decimals: 0)} per kWh',
+            '${slotNumber(electricityTariffPerKwh, decimals: 0)} per kWh',
       if (target != null && target > 0)
         'daily production target': '${slotNumber(target, decimals: 1)} kWh',
     };
@@ -1493,15 +1400,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     final money = moneyForPeriod(
       solarKwh: _solarKwh,
       loadKwh: _loadKwh,
-      tariffPerKwh: _electricityTariffPerKwh,
+      tariffPerKwh: electricityTariffPerKwh,
     );
     return {
       if (peak != null) 'peak PV today': '${slotNumber(peak, decimals: 0)} W',
       'net energy today (solar minus load)':
           '${slotNumber(_solarKwh - _loadKwh, decimals: 2)} kWh',
-      if (_pvInstalledWp != null && _pvInstalledWp! > 0)
+      if (pvInstalledWp != null && pvInstalledWp! > 0)
         'specific yield today':
-            '${(_solarKwh * 1000 / _pvInstalledWp!).toStringAsFixed(2)} kWh/kWp',
+            '${(_solarKwh * 1000 / pvInstalledWp!).toStringAsFixed(2)} kWh/kWp',
       // A zero denominator is omitted rather than printed as infinity: no load
       // today is a fact worth leaving out, not a percentage worth inventing.
       if (_loadKwh > 0)
@@ -1649,8 +1556,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null && _battery == null) {
-      return TelemetryErrorView(message: _error!, onRetry: _fetchAll);
+    if (lastError != null && _battery == null) {
+      return TelemetryErrorView(message: lastError!, onRetry: fetchAll);
     }
     // No ValueListenableBuilder here any more. The physics reads the pointer flag
     // at gesture time, so touching a chart no longer rebuilds the PageView — and
@@ -1763,11 +1670,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ── Banners ──────────────────────────────────────────────────────────────────
   Object get _visualToken => Object.hash(
     _selectedDate,
-    _displayName,
+    displayName,
     // **The connection flag, and this was the gap that froze the Live/Polling
     // indicator on two tabs.**
     //
-    // `ChartSectionHeader` reads `_realtimeConnected` and paints a wifi glyph
+    // `ChartSectionHeader` reads `realtimeConnected` and paints a wifi glyph
     // with the word "Live" or "Polling" from it. That flag changes only via
     // `setState` in `_handleRealtimeConnection` -- it is not a notifier, and
     // `_chartRevision` is not bumped by it. So on any tab whose charts were bound
@@ -1791,7 +1698,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     // worth being precise about the shape: a token is unenforced by the compiler,
     // so a builder that reads a new piece of state and does not also add it to the
     // token fails *silently*. Nothing here throws.
-    _realtimeConnected,
+    realtimeConnected,
     // The thresholds belong here. Bound only rebuilds when the listenable fires or
     // this token changes, and _loadPreferences changes the thresholds with a plain
     // setState — so without this, saving a new limit left the environment grid
@@ -1858,7 +1765,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// itself and does not push the page content off screen.
   Widget _statusStripBuilder({required bool showAlerts}) {
     return _bindRevision(_connectionChromeListenable, () {
-      final failed = _error != null;
+      final failed = lastError != null;
       final offline = _isOfflineMode;
       final alerts = alertMessages.value;
       final stale = _staleDeviceNames();
@@ -1872,11 +1779,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         return ConnectionStatusBannerSwitcher(
           failed: true,
           staleNames: stale,
-          health: _connectionHealth.health,
+          health: connectionHealth.health,
           lastSuccessfulAt: _lastSuccessfulTelemetryAt,
-          errorMessage: _error,
+          errorMessage: lastError,
           visible: true,
-          onRetry: _fetchAll,
+          onRetry: fetchAll,
         );
       }
       if (offline) {
@@ -1888,7 +1795,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             bottomSpacing: 8,
             builder: () => OfflineBanner(
               cacheTime: _cachedTelemetryTime,
-              onRetry: _fetchAll,
+              onRetry: fetchAll,
             ),
           ),
         );
@@ -1909,11 +1816,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         return ConnectionStatusBannerSwitcher(
           failed: false,
           staleNames: stale,
-          health: _connectionHealth.health,
+          health: connectionHealth.health,
           lastSuccessfulAt: _lastSuccessfulTelemetryAt,
           errorMessage: null,
           visible: true,
-          onRetry: _fetchAll,
+          onRetry: fetchAll,
         );
       }
       return const SizedBox.shrink();
@@ -1964,7 +1871,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   List<Widget Function()> _overviewPage() => overviewPage(_overviewInputs);
 
   OverviewInputs get _overviewInputs => OverviewInputs(
-    displayName: _displayName,
+    displayName: displayName,
     battery: _battery,
     pzem: _pzem,
     sensor: _sensor,
@@ -1981,9 +1888,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     energyLoading: _energyLoading,
     energyError: _energyError,
     weeklyEnergySummary: _weeklyEnergySummary,
-    dailyProductionTargetKwh: _dailyProductionTargetKwh,
-    electricityTariffPerKwh: _electricityTariffPerKwh,
-    pvInstalledWp: _pvInstalledWp,
+    dailyProductionTargetKwh: dailyProductionTargetKwh,
+    electricityTariffPerKwh: electricityTariffPerKwh,
+    pvInstalledWp: pvInstalledWp,
     thresholds: thresholds,
     bindRevision: _bindRevision,
     liveRevision: _liveRevision,
@@ -2262,7 +2169,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       // Hydroponics is tab 2 of the four in `AppDestination` order.
       () => cameraPanel(
         keepAlive: _cctvKeepAlive,
-        streamUrl: _cctvUrl,
+        streamUrl: cctvUrl,
         selectedIndex: _selectedIndex,
         pageIndex: 2,
       ),
@@ -2301,7 +2208,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       // lands rather than below three charts.
       () => cameraPanel(
         keepAlive: _cctvKeepAlive,
-        streamUrl: _cctvUrlFish,
+        streamUrl: cctvUrlFish,
         selectedIndex: _selectedIndex,
         pageIndex: 3,
       ),
@@ -2329,7 +2236,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     selectedDate: _selectedDate,
     rangeStart: _selectedRangeStart,
     rangeEnd: _selectedRangeEnd,
-    realtimeConnected: _realtimeConnected,
+    realtimeConnected: realtimeConnected,
     busyNotifier: _historyBusyNotifier,
     requestInFlight: _historyRequestInFlight,
     onPointerActive: _setChartPointerActive,
