@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 // rather than free.
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plts_monitoring/screens/dashboard_screen.dart'
+import 'package:plts_monitoring/screens/dashboard/utils/design_tokens.dart'
     show kDashboardPageMargin;
 
 /// Every label a widget under test had to truncate, mapped to what it drew.

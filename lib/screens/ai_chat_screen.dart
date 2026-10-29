@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../services/ai_chat_service.dart';
 import '../services/ai_settings.dart';
 import '../utils/ai_provider.dart';
-import '../widgets/formatted_markdown_text.dart';
-import '../widgets/liquid_glass.dart';
+import 'chat/widgets/chat_app_bar.dart';
+import 'chat/widgets/chat_views.dart';
 import 'dashboard/utils/design_tokens.dart';
-import 'dashboard/widgets/glass_hero_card.dart';
 
 /// Ask the model a question about the current telemetry.
 ///
@@ -268,166 +267,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // The flat page colour rather than `AppBackground`'s sweep: this screen is
-      // a list of bubbles and nothing else, and the gradient behind them buys
-      // nothing. What it *does* need is for the few lines that are drawn **on**
-      // this colour — the app bar title, the unconfigured state, the intro
-      // headings — to use page ink rather than card ink.
-      backgroundColor: AppSurfaces.page,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        foregroundColor: AppGlass.pageInkStrong,
-        // The reference centres a plain title and hangs one round action on each
-        // side of it, so the default back arrow is replaced rather than kept
-        // alongside a second affordance for the same thing.
-        automaticallyImplyLeading: false,
-        centerTitle: true,
-        leadingWidth: 68,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: AppSpacing.md),
-          child: Center(
-            child: GlassCircleButton(
-              icon: Icons.arrow_back_rounded,
-              tooltip: 'Back',
-              fill: AppSurfaces.surface,
-              ink: AppSurfaces.onSurface,
-              onPressed: () => Navigator.maybePop(context),
-            ),
-          ),
-        ),
-        title: Text(
-          'Ask the assistant',
-          style: AppType.headlineMd.copyWith(color: AppGlass.pageInkStrong),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: Center(
-              child: GlassCircleButton(
-                icon: Icons.delete_outline,
-                tooltip: 'Clear conversation',
-                fill: AppSurfaces.surface,
-                ink: AppSurfaces.onSurface,
-                // Disabled rather than hidden while a reply is in flight: clearing
-                // the transcript mid-request would let the reply arrive into an
-                // empty history and then contradict it.
-                onPressed: _sending || _messages.isEmpty
-                    ? null
-                    : () => setState(() {
-                        _messages.clear();
-                        _sentAt.clear();
-                      }),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  Expanded(child: _transcript()),
-                  _error == null
-                      ? const SizedBox.shrink()
-                      : _errorBanner(_error!),
-                  _composer(),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _transcript() {
-    final settings = _settings;
-    if (settings == null || !settings.isConfigured) {
-      return _unconfigured();
-    }
-    if (_messages.isEmpty) return _intro();
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      itemCount:
-          _messages.length + (_sending && _streamingIndex == null ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Only show "Thinking..." indicator when NOT streaming (i.e., waiting for full response)
-        // When streaming, the partial response is already in the bubble
-        if (index == _messages.length) {
-          // Plain page ink, no card: this is an assistant turn waiting for its
-          // text, so it wears the same shape an assistant turn has once the text
-          // arrives. A spinner inside a card reads as a different thing.
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Row(
-              children: [
-                const _AssistantOrb(size: 36),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Reading the telemetry...',
-                  style: AppType.bodySm.copyWith(color: AppGlass.pageInkSoft),
-                ),
-              ],
-            ),
-          );
-        }
-        return _Bubble(
-          turn: _messages[index],
-          sentAt: index < _sentAt.length ? _sentAt[index] : null,
-        );
-      },
-    );
-  }
-
-  /// The empty state, and the only place the key is asked for.
-  Widget _unconfigured() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.key_off_outlined, size: 40, color: AppGlass.pageInkSoft),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'No API key yet',
-              style: AppType.headlineMd.copyWith(color: AppGlass.pageInkStrong),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'The assistant uses your own key, for your own provider. The app '
-              'ships none, and nothing is sent anywhere until you ask '
-              'something.',
-              style: AppType.bodySm.copyWith(color: AppGlass.pageInkSoft),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.icon(
-              onPressed: _openSettings,
-              icon: const Icon(Icons.settings_outlined, size: 20),
-              label: const Text('Open settings'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 48),
-                textStyle: AppType.buttonLabel,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _askSuggestion(String question) {
+    _input.text = question;
+    _send();
   }
 
   /// Pushes Settings and **re-reads the key on the way back**.
   ///
-  /// Without the re-read this screen keeps the `_settings` it loaded in
+  /// Without the re-read this screen keeps the settings it loaded in
   /// `initState`, and the user who taps "Open settings", pastes a key and comes
   /// straight back lands on the same "No API key yet" screen they left — which
   /// reads as the save having failed when nothing did.
@@ -439,434 +286,59 @@ class _AiChatScreenState extends State<AiChatScreen> {
     await _load();
   }
 
-  Widget _intro() {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      children: [
-        _SnapshotPanel(build: widget.telemetrySummary),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          'SUGGESTED QUESTIONS',
-          style: AppType.labelMicro.copyWith(color: AppGlass.pageInkSoft),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (final suggestion in _suggestions)
-              ActionChip(
-                avatar: Icon(Icons.bolt, size: 14, color: AppPalette.accent),
-                backgroundColor: AppSurfaces.surface,
-                side: AppBorders.hairline,
-                label: Text(
-                  suggestion,
-                  style: AppType.bodySm.copyWith(color: AppSurfaces.onSurface),
-                ),
-                onPressed: _sending ? null : () => _askSuggestion(suggestion),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _askSuggestion(String question) {
-    _input.text = question;
-    _send();
-  }
-
-  static const _suggestions = [
-    'How much power is the panel making right now?',
-    'What is the battery doing?',
-    'Is anything outside its alert limits?',
-    'How much energy has been produced today?',
-  ];
-
-  Widget _errorBanner(String message) {
-    return Container(
-      width: double.infinity,
-      color: AppSurfaces.surfaceAlt,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline, size: 18, color: AppSurfaces.onSurface),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(message, style: AppType.bodySm)),
-          TextButton(
-            onPressed: _sending ? null : _retryLastQuestion,
-            child: const Text('Retry'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            tooltip: 'Dismiss',
-            onPressed: () => setState(() => _error = null),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _composer() {
+  @override
+  Widget build(BuildContext context) {
     final configured = _settings?.isConfigured ?? false;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.md,
+    return Scaffold(
+      // The flat page colour rather than `AppBackground`'s sweep: this screen is
+      // a list of bubbles and nothing else, and the gradient behind them buys
+      // nothing. What it *does* need is for the few lines that are drawn **on**
+      // this colour - the app bar title, the unconfigured state, the intro
+      // headings - to use page ink rather than card ink.
+      backgroundColor: AppSurfaces.page,
+      appBar: chatAppBar(
+        context: context,
+        clearEnabled: !_sending && _messages.isNotEmpty,
+        onClear: () => setState(() {
+          _messages.clear();
+          _sentAt.clear();
+        }),
       ),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 56),
-        padding: const EdgeInsets.only(
-          left: AppSpacing.lg,
-          right: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: AppSurfaces.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          boxShadow: AppShadows.subtle,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _input,
-                enabled: configured && !_sending,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: kMaxQuestionChars,
-                textCapitalization: TextCapitalization.sentences,
-                style: AppType.bodyMd.copyWith(color: AppSurfaces.onSurface),
-                decoration: InputDecoration(
-                  isDense: true,
-                  counterText: '',
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  hintText: configured
-                      ? 'Message'
-                      : 'Add an API key in Settings first',
-                  hintStyle: AppType.bodyMd.copyWith(
-                    color: AppSurfaces.onSurfaceVariant,
-                  ),
-                ),
-                onSubmitted: (_) => _send(),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            // The send button lights up when there is something to send, and a
-            // button that stays live on an empty field makes the disabled state
-            // look broken rather than deliberate. Listening to the controller
-            // rather than to `onChanged: setState` keeps a keystroke off the
-            // transcript, which is the expensive part of this screen.
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _input,
-              builder: (context, value, _) => _SendButton(
-                onPressed:
-                    configured && !_sending && value.text.trim().isNotEmpty
-                    ? _send
-                    : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// `11:28 am` — a 12-hour clock, which is what the reference prints.
-///
-/// Top-level because [_Bubble] needs it and the state class does not, and a
-/// static private on the state would be a worse answer than a plain function.
-/// Hand-rolled rather than `intl`'s `DateFormat.jm()`: one format, no dependency.
-String _timeLabel(DateTime at) {
-  final hour24 = at.hour;
-  final hour = hour24 % 12 == 0 ? 12 : hour24 % 12;
-  final minute = at.minute.toString().padLeft(2, '0');
-  return '$hour:$minute ${hour24 < 12 ? 'am' : 'pm'}';
-}
-
-/// What the assistant can see, collapsed until it is asked for.
-///
-/// **Collapsed by default, and that is a device observation rather than a
-/// preference.** Once every telemetry key started carrying its unit the block
-/// grew past a full screen on this phone: the suggested questions — the one part
-/// of this screen a user can act on in one tap — ended up below the fold, with
-/// nothing on screen to scroll towards. The disclosure is still worth having; it
-/// just cannot be the first thing shown at full size.
-class _SnapshotPanel extends StatefulWidget {
-  const _SnapshotPanel({required this.build});
-
-  final String Function() build;
-
-  @override
-  State<_SnapshotPanel> createState() => _SnapshotPanelState();
-}
-
-class _SnapshotPanelState extends State<_SnapshotPanel> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // One tap target for the whole header row, so the row does not have to be
-        // a row of separately-pressable pieces.
-        Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            onTap: () => setState(() => _open = !_open),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-              child: Row(
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppPalette.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                    ),
-                    child: Icon(
-                      Icons.analytics_outlined,
-                      size: 16,
-                      color: AppPalette.accent,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(
-                      'CURRENT TELEMETRY',
-                      style: AppType.labelUppercase.copyWith(
-                        color: AppGlass.pageInkStrong,
-                      ),
+                    child: ChatTranscript(
+                      messages: _messages,
+                      sentAt: _sentAt,
+                      scroll: _scroll,
+                      configured: configured,
+                      sending: _sending,
+                      streamingIndex: _streamingIndex,
+                      telemetrySummary: widget.telemetrySummary,
+                      onSuggestion: _askSuggestion,
+                      onOpenSettings: _openSettings,
                     ),
                   ),
-                  AnimatedRotation(
-                    turns: _open ? 0.5 : 0,
-                    duration: AppMotion.state,
-                    child: Icon(
-                      Icons.expand_more_rounded,
-                      size: 20,
-                      color: AppGlass.pageInkSoft,
+                  if (_error != null)
+                    ChatErrorBanner(
+                      message: _error!,
+                      retryEnabled: !_sending,
+                      onRetry: _retryLastQuestion,
+                      onDismiss: () => setState(() => _error = null),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (_open) ...[
-          const SizedBox(height: AppSpacing.xs),
-          // Called here and not in the parent, so the text and nothing else
-          // reads the snapshot once: two `widget.telemetrySummary()` calls could
-          // straddle a poll and describe two different instants.
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Text(
-                widget.build(),
-                style: AppType.code.copyWith(
-                  color: AppSurfaces.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Taken fresh for each question, so answers use the readings as they '
-            'are when you ask.',
-            style: AppType.bodySm.copyWith(color: AppGlass.pageInkSoft),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// One turn of the transcript.
-///
-/// **The two roles are drawn differently, and the difference is the reference's:
-/// the user gets a white pill and the assistant gets no pill at all.** A reply
-/// drawn as a card reads as an object; a reply sitting on the page under its own
-/// label reads as prose. That also retires the 78%-width cap the user bubble
-/// needed — it existed to stop a bubble running the full width, and the reply is
-/// no longer one.
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.turn, this.sentAt});
-
-  final AiTurn turn;
-
-  /// Null only if [_messages] and [_sentAt] ever drift, which writing every turn
-  /// through one helper is what prevents.
-  final DateTime? sentAt;
-
-  @override
-  Widget build(BuildContext context) =>
-      turn.role == 'user' ? _userTurn(context) : _assistantTurn();
-
-  Widget _userTurn(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78,
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: AppSurfaces.surface,
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            boxShadow: AppShadows.subtle,
-          ),
-          child: FormattedMarkdownText(
-            text: turn.text,
-            isUser: true,
-            baseStyle: AppType.bodyMd.copyWith(
-              height: 1.45,
-              color: AppSurfaces.onSurface,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _assistantTurn() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const _AssistantOrb(),
-              const SizedBox(width: AppSpacing.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _timeLabel(sentAt ?? DateTime.now()),
-                    style: AppType.labelMicro.copyWith(
-                      color: AppGlass.pageInkSoft,
-                    ),
-                  ),
-                  Text(
-                    'AI Assistant',
-                    style: AppType.strong.copyWith(
-                      color: AppGlass.pageInkStrong,
-                    ),
+                  ChatComposer(
+                    input: _input,
+                    configured: configured,
+                    sending: _sending,
+                    onSend: _send,
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          FormattedMarkdownText(
-            text: turn.text,
-            isUser: false,
-            baseStyle: AppType.bodyMd.copyWith(
-              height: 1.5,
-              color: AppGlass.pageInk,
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
-/// The assistant's avatar: the app's own hero gradient in a circle.
-///
-/// **Navy rather than the reference's pink-orange sphere.** That orb is a mascot;
-/// this is a solar monitor. The hero is already the strongest colour in the app,
-/// so reusing it keeps one identity colour instead of adding a second — and it
-/// replaces a red-tinted circle, which was a status colour used as decoration.
-class _AssistantOrb extends StatelessWidget {
-  const _AssistantOrb({this.size = 36});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: AppGlass.heroGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(Icons.auto_awesome, size: size * 0.42, color: Colors.white),
-    );
-  }
-}
-
-/// The composer's send button: the reference's solid accent circle.
-///
-/// An arrow rather than the reference's microphone, because the app has no speech
-/// input — a mic that records nothing is worse than an arrow.
-class _SendButton extends StatelessWidget {
-  const _SendButton({required this.onPressed});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return Tooltip(
-      message: 'Send',
-      child: SizedBox.square(
-        dimension: 44,
-        child: Material(
-          // Required for the same reason it is in `GlassCircleButton`: the
-          // decorated Container below paints over any ink layer above it.
-          type: MaterialType.transparency,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onPressed,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: enabled
-                    ? const LinearGradient(
-                        colors: AppGlass.heroGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: enabled ? null : AppSurfaces.surfaceMuted,
-              ),
-              child: Icon(
-                Icons.arrow_upward_rounded,
-                size: 20,
-                color: enabled ? Colors.white : AppSurfaces.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

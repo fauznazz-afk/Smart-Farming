@@ -365,6 +365,33 @@ class AppPaletteTheme {
 // SECTION 4: SPACING (AppSpacing)
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// The dashboard's horizontal page margin, in logical pixels.
+///
+/// **Public so a test can read it rather than restate it.** Every page is a
+/// `ListView` whose padding is this value on each side, so a card on screen is
+/// `screenWidth - 2 * kDashboardPageMargin` dp wide. `test/widget_text_helpers.dart`
+/// needs that number to measure a card at the width it really has, and a test
+/// that copied the literal would be a copy — the failure mode `FEATURE.md`
+/// records twice already, where a list of surface hex values in
+/// `color_helpers_test.dart` drifted from the fills it claimed to measure and
+/// three colours sat under AA with the suite green.
+///
+/// 16, not 24: the brief's `spacing.gutter`. It is also the carousel's bleed on
+/// each side, which is why it is written as the token rather than as a second
+/// number — one value, one meaning.
+///
+/// **The old 24 was shadow clearance and it is gone with the shadow.** It had
+/// been derived so the ambient half of a raised shadow pair would not be clipped
+/// by the screen edge — 9dp offset plus 11dp at one sigma, 20dp of visible core
+/// with 4dp to spare. WattVision's lift is `AppShadows.subtle`, one 24dp blur at
+/// 10dp offset, and the card is separated by a hairline rather than by a halo, so
+/// there is nothing left for the extra 8dp to protect. Dropping to the gutter
+/// buys 16dp of card width back.
+///
+/// It lives here rather than on `dashboard_screen.dart` so a widget file can
+/// read it without importing the screen back.
+const double kDashboardPageMargin = AppSpacing.gutter;
+
 class AppSpacing {
   const AppSpacing._();
 

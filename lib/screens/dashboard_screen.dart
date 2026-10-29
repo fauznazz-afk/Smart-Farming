@@ -1,26 +1,19 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart';
 
-import '../utils/battery_sign.dart';
-import '../utils/csv_export.dart';
-import '../utils/solar_irradiance.dart';
+import '../utils/telemetry_export.dart';
 
 import '../models/settings_keys.dart';
 import '../models/telemetry_model.dart';
 import '../services/alarm_bridge.dart';
-import '../services/alarm_history_service.dart';
 import '../services/alarm_notification_service.dart';
 import '../services/alarm_settings.dart';
 import '../services/app_update_service.dart';
 import '../services/cctv_url.dart';
 import '../services/connection_health_service.dart';
-import '../services/energy_forecast_service.dart';
 import '../services/thingsboard_api.dart';
 import '../services/thingsboard_realtime_service.dart';
 import '../services/widget_refresh.dart';
@@ -29,13 +22,10 @@ import '../utils/alarm_rules.dart';
 import '../utils/app_log.dart';
 import '../utils/app_update.dart';
 import '../utils/ai_provider.dart';
-import '../utils/date_summary_stats.dart';
 import '../utils/poll_interval.dart';
-import '../utils/production_buckets.dart';
 import '../widgets/liquid_glass.dart';
 import 'ai_chat_screen.dart';
 import 'alarm_history_screen.dart';
-import 'cctv_screen.dart';
 import 'dashboard/charts/chart_data.dart';
 import 'dashboard/utils/app_motion.dart';
 import 'dashboard/utils/bound.dart';
@@ -47,48 +37,17 @@ import 'dashboard/utils/history_range.dart';
 import 'dashboard/utils/telemetry_helpers.dart';
 import 'dashboard/widgets/banners.dart';
 import 'dashboard/widgets/update_banner.dart';
-import 'dashboard/widgets/chart_carousel.dart';
-import 'dashboard/widgets/cost_summary_panel.dart';
-import 'dashboard/widgets/chart_card.dart';
 import 'dashboard/widgets/chart_groups.dart';
-import 'dashboard/widgets/date_strip.dart';
-import 'dashboard/widgets/date_summary_panel.dart';
 import 'dashboard/widgets/power_sub_tabs.dart';
-import 'dashboard/widgets/metric_grid.dart';
-import 'dashboard/widgets/metric_specs.dart';
 import 'dashboard/widgets/nav_bar.dart';
 import 'dashboard/widgets/terminal_panel.dart';
-import 'dashboard/utils/date_helpers.dart';
-import 'dashboard/widgets/telemetry_card.dart';
-import 'dashboard/widgets/glass_hero_card.dart';
-import 'dashboard/widgets/glass_sheet.dart';
+import 'dashboard/pages/chart_sections.dart';
+import 'dashboard/pages/detail_pages.dart';
+import 'dashboard/pages/overview_page.dart';
+import 'dashboard/state/alarms_mixin.dart';
 import 'energy_report_screen.dart';
 import 'login_screen.dart';
 import 'settings_screen.dart';
-
-/// The dashboard's horizontal page margin, in logical pixels.
-///
-/// **Public so a test can read it rather than restate it.** Every page is a
-/// `ListView` whose padding is this value on each side, so a card on screen is
-/// `screenWidth - 2 * kDashboardPageMargin` dp wide. `test/widget_text_helpers.dart`
-/// needs that number to measure a card at the width it really has, and a test
-/// that copied the literal would be a copy — the failure mode `FEATURE.md`
-/// records twice already, where a list of surface hex values in
-/// `color_helpers_test.dart` drifted from the fills it claimed to measure and
-/// three colours sat under AA with the suite green.
-///
-/// 16, not 24: the brief's `spacing.gutter`. It is also the carousel's bleed on
-/// each side, which is why it is written as the token rather than as a second
-/// number — one value, one meaning.
-///
-/// **The old 24 was shadow clearance and it is gone with the shadow.** It had
-/// been derived so the ambient half of a raised shadow pair would not be clipped
-/// by the screen edge — 9dp offset plus 11dp at one sigma, 20dp of visible core
-/// with 4dp to spare. WattVision's lift is `AppShadows.subtle`, one 24dp blur at
-/// 10dp offset, and the card is separated by a hairline rather than by a halo, so
-/// there is nothing left for the extra 8dp to protect. Dropping to the gutter
-/// buys 16dp of card width back.
-const double kDashboardPageMargin = AppSpacing.gutter;
 
 /// The gap between two cards on the same page.
 ///
@@ -99,14 +58,6 @@ const double kDashboardPageMargin = AppSpacing.gutter;
 /// 12 is the brief's `spacing.md` and leaves 8dp between one card's shadow and
 /// the next card's top edge.
 const double _cardGap = AppSpacing.md;
-
-/// The gap above a chart section header, which is a different job from [\_cardGap].
-///
-/// Larger than the card gap because a header belongs to what follows it, and it
-/// needs the previous card's shadow to have finished before the label lands. It
-/// also carries more text than a card boundary does, so a bare 20dp made the
-/// header look attached to the card above it.
-const double _chartHeaderGap = 28;
 
 /// The gap between the docked nav bar's top edge and the last card.
 ///
@@ -139,7 +90,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, DashboardAlarms {
   // ── Navigation & lifecycle ───────────────────────────────────────────────────
   final _pageController = PageController();
   final ValueNotifier<int> _selectedPage = ValueNotifier(0);
@@ -255,7 +206,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Whether a CSV is being fetched and built, so the action cannot be pressed
   /// twice and a second fetch cannot race the first one's share sheet.
   bool _exportingCsv = false;
-  static const _energyForecastService = EnergyForecastService();
 
   // ── Refresh & preferences ────────────────────────────────────────────────────
   bool _autoRefresh = true;
@@ -268,8 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   ]);
 
   // ── Alerts ───────────────────────────────────────────────────────────────────
-  final _alarmHistoryService = AlarmHistoryService();
-  final ValueNotifier<List<String>> _alertMessages = ValueNotifier(const []);
+  // The alarm fields and methods live in `dashboard/state/alarms_mixin.dart`.
 
   // ── App update ───────────────────────────────────────────────────────────────
   /// The newest release found, or null. A `ValueNotifier` because the banner is
@@ -284,39 +233,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// the one time a release matters most is the time the banner had been
   /// silenced.
   bool _updateDismissed = false;
-
-  /// Alarms currently raised, and the subset of them already reported.
-  ///
-  /// Seeded from the native alarm module so an alarm the background check
-  /// already notified about is not notified about again here, and published
-  /// back to it so the reverse also holds.
-  Set<String> _activeAlertIds = {};
-
-  /// Thresholds for every alert rule, resolved from settings in one place.
-  ///
-  /// Replaces eight separate fields whose defaults were previously repeated in
-  /// the settings controller, the dashboard and the background service, which is
-  /// how the same setting came to default to different values in different
-  /// readers.
-  AlarmThresholds _thresholds = AlarmThresholds.defaults;
-
-  /// The rule list, rebuilt only when the thresholds change.
-  ///
-  /// This was a getter, so every read rebuilt the whole list from scratch —
-  /// roughly fifteen `AlarmRule` objects plus nine short-lived helper instances.
-  /// `_evaluateEnergyAlerts` reads it on every telemetry frame the socket
-  /// delivers, and does so *before* its own `if (!changed) return` bail-out, so
-  /// the common case of nothing having changed still paid for a fresh rule list.
-  /// The thresholds only move in `_setThresholds`, which is the only writer.
-  late List<AlarmRule> _alarmRules = buildAlarmRules(_thresholds);
-
-  void _setThresholds(AlarmThresholds value) {
-    if (identical(value, _thresholds)) return;
-    _thresholds = value;
-    _alarmRules = buildAlarmRules(value);
-  }
-
-  int get _staleTelemetryMinutes => _thresholds.staleMinutes;
 
   // ── Misc ─────────────────────────────────────────────────────────────────────
   String _displayName = '';
@@ -417,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _fishRevision.dispose();
     _energyRevision.dispose();
     _chartRevision.dispose();
-    _alertMessages.dispose();
+    alertMessages.dispose();
     _cctvKeepAlive.dispose();
     _refreshTimer?.cancel();
     // Nothing is evaluating alarms once this screen is gone, so the background
@@ -485,7 +401,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() {
       _autoRefresh = preferences.getBool(SettingsKeys.autoRefresh) ?? true;
       _refreshSeconds = preferences.getInt(SettingsKeys.refreshSeconds) ?? 10;
-      _setThresholds(thresholds);
+      setThresholds(thresholds);
       _dailyProductionTargetKwh = _readDouble(
         preferences,
         SettingsKeys.dailyProductionTargetKwh,
@@ -504,9 +420,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     _restartRefreshTimer();
     // Must precede the first evaluation, otherwise every alarm looks new to a
     // fresh process and gets announced again on top of the background's.
-    await _primeActiveAlerts();
+    await primeActiveAlerts();
     if (!mounted) return;
-    _evaluateEnergyAlerts();
+    evaluateEnergyAlerts();
     // The background check evaluates the same rules, so it has to be told when
     // the thresholds change. A threshold raised above the current SOC would
     // otherwise keep notifying from the background for up to a quarter of an
@@ -656,7 +572,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         all: timestampChanged,
       );
       // **The alarm set is recomputed here, which is *after* every notifier bump
-      // above.** `_evaluateEnergyAlerts` writes `_activeAlertIds`, and
+      // above.** `evaluateEnergyAlerts` writes `activeAlertIds`, and
       // `SystemStatusStrip` reads its length inside a `Bound` whose token is
       // `_liveRevision` -- so the bump on the previous line rebuilt the strip with
       // the *previous* set. The count could then lag by up to a minute, until the
@@ -664,9 +580,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       //
       // So: recompute first, then bump. Order matters and this is the only place
       // it is visible.
-      final alertsBefore = _activeAlertIds.length;
-      _evaluateEnergyAlerts();
-      if (_activeAlertIds.length != alertsBefore) {
+      final alertsBefore = activeAlertIds.length;
+      evaluateEnergyAlerts();
+      if (activeAlertIds.length != alertsBefore) {
         // `_liveRevision` directly rather than `_notifyLive`, which returns early
         // when `changed` is false and so could not express "nothing about the
         // telemetry moved, but the alarm set did".
@@ -865,7 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       case ThingsBoardApi.deviceFish:
         _notifyDeviceRevisions(fish: changed);
     }
-    _evaluateEnergyAlerts();
+    evaluateEnergyAlerts();
   }
 
   static bool _isKnownDevice(String deviceId) =>
@@ -911,57 +827,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Alerts ───────────────────────────────────────────────────────────────────
-  void _evaluateEnergyAlerts() {
-    final now = DateTime.now();
-    final signals = evaluateAlarmRules(
-      rules: _alarmRules,
-      readings: _alarmReadings,
-      now: now,
-    );
-    final alerts = {for (final signal in signals) signal.id: signal.message};
-
-    final newSignals = newlyActiveSignals(
-      signals: signals,
-      alreadyActive: _activeAlertIds,
-    );
-    final nextMessages = signals.map((signal) => signal.message).toList();
-    final changed =
-        alerts.length != _activeAlertIds.length ||
-        !alerts.keys.every(_activeAlertIds.contains) ||
-        !sameStrings(nextMessages, _alertMessages.value);
-    if (!changed) return;
-    _activeAlertIds = alerts.keys.toSet();
-    _alertMessages.value = nextMessages;
-    unawaited(AlarmBridge.instance.setActiveAlerts(_activeAlertIds));
-
-    // Nothing is announced until the background module's active set has been
-    // read. Before that read completes every alarm looks new, because a fresh
-    // process starts with an empty set, and the first evaluation would report
-    // alarms the background had already reported. The banner still updates, so
-    // the user sees the state immediately either way.
-    if (_activeAlertsPrimed && newSignals.isNotEmpty) {
-      for (final signal in newSignals) {
-        _persistAlarm(signal, now);
-      }
-    }
-    // No SnackBar here, deliberately. The same messages already render in
-    // `EnergyAlertBanner` at the top of the list, above the greeting, so the
-    // SnackBar was the same sentence twice — once where the user was already
-    // looking and once over the bottom of the screen, where it covered the
-    // energy card and the navigation bar. Worse, it re-fired on every message
-    // change rather than on every new alarm, so a reading drifting in and out
-    // of range popped a bar every few seconds while the banner just sat there.
-    // The banner is persistent, non-modal, and does not obscure content; that
-    // is the right shape for a condition that is still true.
-  }
-
+  // `_setThresholds`, `evaluateEnergyAlerts`, `primeActiveAlerts` and
+  // `_persistAlarm` live in `dashboard/state/alarms_mixin.dart`; see the note
+  // there for why it is a mixin on this State rather than a service.
   /// The devices the rules read, in the shape the evaluator expects.
   ///
   /// A device missing from this list cannot raise anything at all: the evaluator
   /// skips any rule whose device has no reading, because a device that was never
   /// read is not the same as a device that stopped reporting. The fish device is
   /// here so that `stale_fish` and `offline_fish` can actually fire.
-  List<AlarmReading> get _alarmReadings => [
+  @override
+  List<AlarmReading> get alarmReadings => [
     if (_battery != null)
       AlarmReading(
         device: AlarmDevice.battery,
@@ -988,48 +864,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
   ];
 
-  /// Whether the background module's active set has been read yet.
-  bool _activeAlertsPrimed = false;
-
-  /// Reads the set of alarms the background check has already reported.
-  ///
-  /// Awaited during startup, before anything is allowed to announce an alarm.
-  /// Doing it lazily inside the evaluation was the earlier mistake: the read is
-  /// asynchronous, so the first evaluation always saw an empty set and reported
-  /// alarms that the background had already reported, which is exactly the
-  /// duplicate the shared set exists to prevent.
-  Future<void> _primeActiveAlerts() async {
-    if (_activeAlertsPrimed) return;
-    _activeAlertsPrimed = true;
-    final background = await AlarmBridge.instance.activeAlerts();
-    if (!mounted || background.isEmpty) return;
-    _activeAlertIds = {..._activeAlertIds, ...background};
-  }
-
-  void _persistAlarm(AlarmSignal signal, DateTime now) {
-    unawaited(
-      _alarmHistoryService.addAlarm(
-        AlarmRecord(
-          id: '${now.millisecondsSinceEpoch}_${signal.id}',
-          timestamp: now,
-          type: signal.type,
-          severity: signal.severity,
-          message: signal.message,
-          value: signal.value,
-        ),
-      ),
-    );
-    unawaited(
-      AlarmNotificationService.notifyAlarm(
-        id: signal.id,
-        title: signal.isCritical
-            ? 'EnerGrow: Critical alarm'
-            : 'EnerGrow: Warning alarm',
-        message: signal.message,
-        critical: signal.isCritical,
-      ),
-    );
-  }
+  @override
+  ThingsBoardApi get alarmApi => widget.api;
 
   // ── Energy summary ───────────────────────────────────────────────────────────
   Future<void> _fetchEnergyHistory() async {
@@ -1570,7 +1406,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       },
       // The same evaluator the banner and the background module use, so the
       // assistant cannot describe a condition the app is not showing.
-      activeAlarms: _alertMessages.value,
+      activeAlarms: alertMessages.value,
       thresholds: _aiThresholds(),
       installation: _aiInstallation(),
       derived: _aiDerived(),
@@ -1595,7 +1431,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Only the ones that are actually set: a null limit is not a threshold, and
   /// printing it as one would tell the assistant a rule exists that does not.
   Map<String, String> _aiThresholds() {
-    final t = _thresholds;
+    final t = thresholds;
     String c(double? value, String unit) =>
         value == null ? '' : '${slotNumber(value, decimals: 1)} $unit';
     return {
@@ -1644,7 +1480,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// and the screen cannot disagree about it. Kept short deliberately: anything
   /// the model can read straight off `devices` does not belong here.
   Map<String, String> _aiDerived() {
-    final peak = _pvPeakForWindow(_pzem?.latestValues['power_dc']);
+    // The highest PV output in the window the chart already holds. A running max
+    // in a widget would be a max since launch, which for something labelled
+    // "Peak" is a claim that silently stops being true.
+    final peak = pvPeakWatts(
+      _history['power_dc'] ?? const <TelemetryPoint>[],
+      livePower: _pzem?.latestValues['power_dc'],
+    );
     // The cost panel's own function, so the assistant cannot price a period the
     // app would refuse to price — an unset tariff is "the user has not told us",
     // not zero.
@@ -1955,7 +1797,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     // setState — so without this, saving a new limit left the environment grid
     // captioning its old range and the status strip judging against the old
     // low-SOC threshold, until the next telemetry change happened to rescue it.
-    _thresholds,
+    thresholds,
     // Which power sub-view is selected. PV, AC and Battery are three closure
     // lists spliced into the same Column, so their Bound widgets sit at the same
     // tree position and reuse each other's State. Bound keeps its cached child
@@ -2018,7 +1860,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return _bindRevision(_connectionChromeListenable, () {
       final failed = _error != null;
       final offline = _isOfflineMode;
-      final alerts = _alertMessages.value;
+      final alerts = alertMessages.value;
       final stale = _staleDeviceNames();
 
       // Each branch is wrapped in a BannerSwitcher rather than returned
@@ -2053,7 +1895,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       if (showAlerts) {
         return _bindRevision(
-          _alertMessages,
+          alertMessages,
           () => BannerSwitcher(
             visible: alerts.isNotEmpty,
             // The identity is the set of messages, so a *change* of alarm
@@ -2114,74 +1956,54 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Feeds the same readings the rule engine uses, so the banner and the alarms
   /// can never disagree about which devices stopped reporting.
   List<String> _staleDeviceNames() => staleDeviceNames(
-    readings: _alarmReadings,
-    staleMinutes: _staleTelemetryMinutes,
+    readings: alarmReadings,
+    staleMinutes: staleTelemetryMinutes,
   );
 
   // ── Overview page ────────────────────────────────────────────────────────────
-  List<Widget Function()> _overviewPage() {
-    return [
-      () => _bindRevision(_liveRevision, () => _glassHero()),
-      // **The date strip used to be its own block here.** It is inside the hero
-      // card now (`GlassHeroCard.footer`), with its range trigger among the
-      // card's actions, so the two rows are one surface instead of two unrelated
-      // ones with an empty header strip above the chips.
-      //
-      // **The CSV export row is gone from this page**, and the capability moved
-      // to the app bar rather than disappearing with it. It was a line of text
-      // right under the date strip, which is the most valuable real estate on the
-      // screen for the app's least-used feature.
-      () => const SizedBox(height: 18),
-      () => _bindRevision(_energyRevision, () => _forecastSheet()),
-      // **Cost and array performance, below the panel that reports the kWh it
-      // is derived from.**
-      //
-      // `_energyRevision`, not `_liveRevision` or `_chartRevision`: `_solarKwh`
-      // and `_loadKwh` are memoised by `_updateMemoizedEnergy`, which only the
-      // energy-history fetch and the 24h/7d toggle write, and both bump this
-      // counter. Binding it to the ten-second poll would rebuild a panel whose
-      // numbers cannot change ten times a second.
-      //
-      // The period label comes from the same switch the ENERGY section uses, so
-      // the two blocks cannot disagree about which window they are describing.
-      () => _bindRevision(_energyRevision, () {
-        final panel = _costSummaryPanel();
-        return panel == null
-            ? const SizedBox.shrink()
-            : Column(children: [const SizedBox(height: 8), panel]);
-      }),
-      // **The period summary, bound to `_chartRevision` and not `_liveRevision`.**
-      //
-      // It reads `_history`, which only the history fetch writes, and it reads
-      // nothing live — a day does not change because the meter ticked. Binding
-      // it to the live revision would rebuild it every ten seconds to produce
-      // identical numbers.
-      //
-      // The panel renders null for today's selection, which keeps it off the
-      // page entirely rather than showing an empty frame.
-      () => _bindRevision(_chartRevision, () {
-        final panel = _dateSummaryPanel();
-        return panel == null
-            ? const SizedBox.shrink()
-            : Column(children: [const SizedBox(height: 8), panel]);
-      }),
-      // **The old instrument panel is gone from this page, and that is the
-      // compaction.**
-      //
-      // `OverviewPanel` was a 25-row terminal readout — PV_OUT, POWER, SKY,
-      // ENERGY, SYSTEM, each with its own heading and rule — stacked *underneath*
-      // the glass hero and the 7-day sheet. Every headline figure
-      // on it was already on the page above: the hero carries PV output, peak,
-      // AC load, battery state and SOC; the sheet carries the 7-day totals. What
-      // it added was a second, taller way of reading the same numbers, which is
-      // why the Overview needed two scrolls to reach the nav bar.
-      //
-      // Nothing became unreachable. AC load, battery flow and both voltages are
-      // rows on the Power tab's own panel; lux, temperature and humidity are rows
-      // on Hydroponics and Fish. The nav bar reaches each in one tap, so the
-      // removed shortcut cost one tap on a route that still exists.
-    ];
-  }
+  List<Widget Function()> _overviewPage() => overviewPage(_overviewInputs);
+
+  OverviewInputs get _overviewInputs => OverviewInputs(
+    displayName: _displayName,
+    battery: _battery,
+    pzem: _pzem,
+    sensor: _sensor,
+    history: _history,
+    energyHistory: _energyHistory,
+    selectedDate: _selectedDate,
+    rangeStart: _selectedRangeStart,
+    rangeEnd: _selectedRangeEnd,
+    stripDays: _stripDays,
+    activeAlerts: activeAlertIds,
+    exportingCsv: _exportingCsv,
+    solarKwh: _solarKwh,
+    loadKwh: _loadKwh,
+    energyLoading: _energyLoading,
+    energyError: _energyError,
+    weeklyEnergySummary: _weeklyEnergySummary,
+    dailyProductionTargetKwh: _dailyProductionTargetKwh,
+    electricityTariffPerKwh: _electricityTariffPerKwh,
+    pvInstalledWp: _pvInstalledWp,
+    thresholds: thresholds,
+    bindRevision: _bindRevision,
+    liveRevision: _liveRevision,
+    energyRevision: _energyRevision,
+    chartRevision: _chartRevision,
+    onPickDate: _pickDateFromCalendar,
+    onOpenAlarmHistory: _openAlarmHistory,
+    onExportCsv: _exportCsv,
+    onOpenSettings: _openSettings,
+    onOpenBattery: _openBatteryFromStrip,
+    onOpenEnergyReport: _openEnergyReport,
+    onSelectDate: _selectDate,
+    onTogglePeriod: _setWeeklyEnergySummary,
+    loadSummaryHistory: _loadSummaryHistory,
+    summarySettled:
+        _historyLoaded.contains('env') ||
+        _historyLoadFailed.contains('env') ||
+        _historyLoaded.contains('fish') ||
+        _historyLoadFailed.contains('fish'),
+  );
 
   /// The glass hero: the site's name, today's date, the sun glyph, the array's
   /// live output, and the three figures that qualify it.
@@ -2195,379 +2017,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// The stat row is AC load, battery flow and state of charge: the three numbers
   /// that answer "where is the power going", which is the question the hero's own
   /// figure cannot.
-  Widget _glassHero() {
-    final pzem = _pzem;
-    final battery = _battery;
-    final lux = _sensor?.latestValues['lux'];
-    final pvPower = pzem?.latestValues['power_dc'];
-    final acPower = pzem?.latestValues['power_ac'];
-    final batteryPower = battery?.latestValues['power'];
-    final soc = battery?.latestValues['soc'];
-    final peak = _pvPeakForWindow(pvPower);
+  // anyone who re-adds a section, and removing them would have taken their tests
+  // with them.
 
-    // A device that has never reported prints `--`, never `0`. `slotNumber` owns
-    // that decision and every figure below goes through it, so the page cannot
-    // claim the panels produced nothing.
-    return GlassHeroCard(
-      title: _displayName.trim().isEmpty ? 'EnerGrow' : _displayName.trim(),
-      subtitle: _heroSubtitle(),
-      icon: _heroSkyIcon(lux),
-      figure: slotNumber(pvPower, decimals: 0),
-      unit: 'W',
-      conditionLabel: lux == null
-          ? 'No sky sensor'
-          : skyConditionFor(lux).label,
-      highLabel: 'Peak',
-      highValue: peak == null ? '--' : '${slotNumber(peak, decimals: 0)} W',
-      lowLabel: 'Load',
-      lowValue: '${slotNumber(acPower, decimals: 0)} W',
-      stats: [
-        // **Battery power in watts, not AC load.**
-        //
-        // AC load is the hero's `Load` pill directly above; printing it a second
-        // time in the stat row spent a third of that row on a number already on
-        // screen. What the row cannot answer is where the power is *going*, and
-        // the battery is the only device that both stores and returns it — so
-        // this is the signed figure straight from the BMS, the one
-        // `batteryChargeState` reads. See `lib/utils/battery_sign.dart`: a
-        // negative reading while the SOC falls means discharging, and the sign is
-        // never flipped at the call site, so this cell and the Battery page agree.
-        GlassHeroStat(
-          label: 'Battery Power',
-          value: '${slotNumber(batteryPower, decimals: 0)} W',
-          onTap: _openBatteryFromStrip,
-        ),
-        GlassHeroStat(
-          label: 'Battery',
-          value: batteryPower == null
-              ? '--'
-              : batteryChargeState(batteryPower).label,
-        ),
-        GlassHeroStat(
-          label: 'SOC',
-          value: '${slotNumber(soc, decimals: 0)}%',
-          onTap: _openBatteryFromStrip,
-        ),
-      ],
-      trailingActions: [
-        // First, because it is the only action that changes what the whole page
-        // below is describing.
-        GlassCircleButton(
-          icon: Icons.calendar_month_rounded,
-          tooltip: dateSelectionLabel(
-            selectedDate: _selectedDate,
-            rangeStart: _selectedRangeStart,
-            rangeEnd: _selectedRangeEnd,
-          ),
-          onPressed: _pickDateFromCalendar,
-        ),
-        GlassCircleButton(
-          icon: Icons.notifications_none_rounded,
-          badge: _activeAlertIds.isNotEmpty,
-          tooltip: 'Alarm history',
-          onPressed: _openAlarmHistory,
-        ),
-        GlassCircleButton(
-          icon: Icons.download_outlined,
-          tooltip: 'Export CSV',
-          onPressed: _exportingCsv ? null : _exportCsv,
-        ),
-        GlassCircleButton(
-          icon: Icons.menu_rounded,
-          tooltip: 'Settings',
-          onPressed: _openSettings,
-        ),
-      ],
-      // **The dates are the weather card's footer.** They describe the same
-      // "now" the card's own reading does, and as a separate block they needed a
-      // header row of their own that held nothing but their trigger.
-      footer: _dateStrip(),
-    );
-  }
-
-  /// "Senin, 15 Oktober 2026" — the reference's "Monday, June 23" line.
-  String _heroSubtitle() {
-    final now = DateTime.now();
-    return '${dayNameFull(now.weekday)}, ${now.day} ${monthName(now.month)} '
-        '${now.year}';
-  }
-
-  /// The sun glyph beside the hero figure.
-  ///
-  /// **Driven by lux, so the icon is a measurement rather than decoration** — the
-  /// reference's icon is a picture of the weather and this one is the sky the
-  /// greenhouse is actually under. Below the threshold it drops to a moon, which
-  /// is the one case where a solar dashboard genuinely has nothing to show.
-  IconData _heroSkyIcon(double? lux) {
-    if (lux == null) return Icons.cloud_queue_rounded;
-    return switch (skyConditionFor(lux)) {
-      SkyCondition.clear => Icons.wb_sunny_rounded,
-      SkyCondition.partlyCloudy => Icons.wb_cloudy_rounded,
-      SkyCondition.overcast => Icons.cloud_rounded,
-      SkyCondition.night => Icons.nightlight_round,
-    };
-  }
-
-  /// The white sheet: today's own row first, then the six previous days, oldest
-  /// first — today is deliberately not repeated inside the day loop.
-  ///
-  /// **Yesterday-to-today rather than today-forward.** The reference is a weather
-  /// forecast, so its rows are days that have not happened. This app has no
-  /// forecast — `EnergyForecastService` extrapolates the current day's power
-  /// curve, which is a projection of *today*, not of seven days. Showing a row
-  /// per upcoming day would mean printing a number the app cannot know, so the
-  /// sheet reports the seven days it actually has samples for.
-  Widget _forecastSheet() {
-    final totals = dailyTotals(
-      _energyHistory['power_dc'] ?? const <TelemetryPoint>[],
-      DateTime.now(),
-    );
-    final today = startOfLocalDay(DateTime.now());
-    // **The target and the runtime come from the service, and they are here
-    // because the instrument panel used to carry them.**
-    //
-    // `_dailyProductionTargetKwh` is a number the user types into Settings, so
-    // dropping the panel without carrying the target forward would have
-    // silently retired a setting they can still configure. `observedProduction`
-    // is the *measured* production today rather than the service's 24-hour
-    // extrapolation, which is why it is the one on screen.
-    final forecast = _energyForecastService.calculate(
-      history: _energyHistory,
-      latest: {...?_battery?.latestValues, ...?_pzem?.latestValues},
-      dailyProductionTargetKwh: _dailyProductionTargetKwh,
-      referenceDate: DateTime.now(),
-    );
-    final target = _dailyProductionTargetKwh;
-    return GlassSheet(
-      title: '7-Day Production',
-      onTitleTap: _openEnergyReport,
-      // **No page dots.** The reference carries three of them and they implied a
-      // swipeable pager; this sheet has no second page, so they were a promise
-      // the widget could not keep. A dead affordance is worse than no affordance.
-      trailing: const SizedBox.shrink(),
-      children: [
-        // **The unit is the trailing slot, never the number a second time.**
-        // These rows printed `1.37` and then `produksi 1.37 kWh` — the same figure
-        // twice with a word attached, which is what made the row too narrow for
-        // either half of it and the sentence ellipsised. The label already says
-        // which quantity it is; the trailing slot only needs to say the unit.
-        GlassSheetRow(
-          label: 'Today',
-          icon: Icons.bolt_rounded,
-          value: _energyLoading ? '...' : slotNumber(_solarKwh, decimals: 2),
-          // The unit and nothing else — see the note on the day rows.
-          trailing: _energyLoading ? 'Loading' : 'kWh',
-          highlight: true,
-        ),
-        if (target != null && target > 0)
-          GlassSheetRow(
-            label: 'Target',
-            icon: Icons.flag_rounded,
-            value: slotNumber(target, decimals: 1),
-            trailing:
-                '${((forecast.targetProgress ?? 0) * 100).clamp(0, 999).toStringAsFixed(0)}% tercapai',
-          ),
-        if (forecast.batteryDepletionHours != null)
-          GlassSheetRow(
-            label: 'Runtime',
-            icon: Icons.battery_charging_full_rounded,
-            value: slotNumber(forecast.batteryDepletionHours, decimals: 1),
-            trailing: 'h battery',
-          ),
-        if (_energyError != null)
-          GlassSheetRow(
-            label: 'Error',
-            icon: Icons.error_outline_rounded,
-            value: '--',
-            trailing: 'Riwayat daya gagal dimuat',
-          ),
-        for (final day in totals)
-          // Today is already the highlighted 'Today' row above; the loop lists
-          // only the six previous days.
-          if (day.date != today)
-            GlassSheetRow(
-              label: dayNameShort(day.date.weekday),
-              icon: Icons.wb_sunny_rounded,
-              value: day.isEmpty ? '--' : slotNumber(day.kwh, decimals: 2),
-              // The unit, never the figure again — see the note on `Hari ini`.
-              trailing: day.isEmpty ? 'No data' : 'kWh',
-            ),
-      ],
-    );
-  }
-
-  /// The cost and performance card, or null when the user has supplied neither
-  /// a tariff nor a nameplate.
-  ///
-  /// **It reads `_solarKwh` and `_loadKwh`, the same two numbers the ENERGY
-  /// section above prints.** It could compute its own from `_energyHistory`, and
-  /// that is the version that would be wrong: `_energyComparison` is anchored on
-  /// `DateTime.now()` and ignores the selected date, so a card bound to the date
-  /// strip and integrals of its own would show last-today's window while the row
-  /// above it showed something else.
-  // ── CSV export ───────────────────────────────────────────────────────────────
-
-  /// Fetches every telemetry key for the selected window and shares a CSV.
-  ///
-  /// **It fetches rather than dumping what is on screen.** `_history` only holds
-  /// the current tab's prefix, so exporting it would produce a file whose columns
-  /// depend on which tab the user happened to be on — a CSV that silently
-  /// changes shape is worse than no CSV at all.
-  ///
-  /// **Columns are prefixed with the device.** The four devices publish keys
-  /// this app knows about and nothing currently collides, so a bare key name
-  /// would work today. It would not survive a second voltage sensor, and the
-  /// collision would overwrite one column with another rather than fail.
-  Future<void> _exportCsv() async {
-    if (_exportingCsv) return;
-    setState(() => _exportingCsv = true);
-    try {
-      final window = historyTimeWindow(
-        rangeStart: _selectedRangeStart ?? _selectedDate,
-        rangeEnd: _selectedRangeEnd,
-        now: DateTime.now(),
-      );
-      final columns = <String, List<TelemetryPoint>>{};
-      for (final entry in ThingsBoardApi.deviceKeysById.entries) {
-        final prefix = _deviceColumnPrefix(entry.key);
-        final histories = await widget.api.fetchHistoryForKeys(
-          entry.key,
-          entry.value,
-          start: window.start,
-          end: window.end,
-          intervalMs: 30 * 60 * 1000,
-          limit: 2000,
-        );
-        for (final series in histories.entries) {
-          columns['$prefix.${series.key}'] = series.value;
-        }
-      }
-      if (!mounted) return;
-      final csv = buildTelemetryCsv(history: columns);
-      if (csv.isEmpty) {
-        _showExportNote('Nothing was recorded in this period.');
-        return;
-      }
-      final stamp = describeHistoryRange(
-        selectedDate: _selectedDate,
-        rangeStart: _selectedRangeStart,
-        rangeEnd: _selectedRangeEnd,
-        now: DateTime.now(),
-      );
-      await SharePlus.instance.share(
-        ShareParams(
-          title: 'EnerGrow telemetry',
-          subject: 'EnerGrow telemetry — $stamp',
-          files: [
-            XFile.fromData(
-              Uint8List.fromList(utf8.encode(csv)),
-              mimeType: 'text/csv',
-              name: 'energrow.csv',
-            ),
-          ],
-          fileNameOverrides: ['energrow.csv'],
-        ),
-      );
-    } catch (error) {
-      if (mounted) _showExportNote('Could not export: $error');
-    } finally {
-      if (mounted) setState(() => _exportingCsv = false);
-    }
-  }
-
-  /// A stable, short column prefix per device, so a file from two installations
-  /// of this app reads the same way.
-  static String _deviceColumnPrefix(String deviceId) => switch (deviceId) {
-    ThingsBoardApi.devicePzem => 'pzem',
-    ThingsBoardApi.deviceBattery => 'bat',
-    ThingsBoardApi.deviceSensor => 'env',
-    ThingsBoardApi.deviceFish => 'fish',
-    _ => 'dev',
-  };
-
-  void _showExportNote(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Widget? _costSummaryPanel() {
-    if (_electricityTariffPerKwh == null && _pvInstalledWp == null) return null;
-    return CostSummaryPanel(
-      solarKwh: _solarKwh,
-      loadKwh: _loadKwh,
-      periodLabel: _weeklyEnergySummary ? 'Last 7 days' : 'Last 24 hours',
-      onTogglePeriod: () => _setWeeklyEnergySummary(!_weeklyEnergySummary),
-      // **The window's real length, not a flat 24.** `_energyComparison` ends
-      // at "now" and starts at midnight, so at 09:00 the window is nine hours.
-      // Dividing by 24 there would report the array as a quarter of as
-      // productive as it is, every morning, until noon.
-      hours: _weeklyEnergySummary
-          ? 7 * 24
-          : DateTime.now()
-                    .difference(
-                      DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month,
-                        DateTime.now().day,
-                      ),
-                    )
-                    .inMinutes /
-                60,
-      tariffPerKwh: _electricityTariffPerKwh,
-      installedWp: _pvInstalledWp,
-    );
-  }
-
-  Widget _dateStrip() {
-    return DateStrip(
-      days: _stripDays,
-      selectedDate: _selectedDate,
-      rangeStart: _selectedRangeStart,
-      rangeEnd: _selectedRangeEnd,
-      onSelectDate: _selectDate,
-    );
-  }
-
-  // ── Period summary ──────────────────────────────────────────────────────────
-  //
-  // What the Overview shows for a day other than today: what came IN, what went
-  // OUT, and what the greenhouse and the fish tank did over the same window.
-  //
-  // **Today is excluded on purpose.** `OverviewPanel` already carries
-  // `ENERGY (24H)` with generation, load and the previous period, one screen
-  // above. Restating it in a second panel would be the same numbers twice, which
-  // is the "signal the same state three ways" failure the environment cards
-  // already committed once. For a past selection the Overview reports nothing,
-  // which is the gap this fills.
-
-  /// The highest PV output in the selected window, or null when there is none.
-  ///
-  /// **Read from the history the chart already holds**, rather than tracked in the
-  /// panel as values arrive. A running max in a widget is a max since the app
-  /// launched: it resets on every cold start and on every process death, which for
-  /// something labelled "Peak" is a claim that silently stops being true. The
-  /// arithmetic and the two reasons it is only over `power_dc` live in
-  /// [pvPeakWatts]; the only thing decided here is which window, which is what
-  /// makes this number and the plot describe the same period.
-  double? _pvPeakForWindow(double? livePower) => pvPeakWatts(
-    _history['power_dc'] ?? const <TelemetryPoint>[],
-    livePower: livePower,
-  );
-
-  /// Whether the selected day or range is anything other than today.
-  ///
-  /// Compares calendar days, not instants. The strip's chips are days and
-  /// `_selectedDate` arrives from `DateTime.now()` when nothing has been picked,
-  /// so any comparison at second resolution would be false for the whole
-  /// morning.
-  bool get _isSummaryPeriod =>
-      _selectedRangeStart != null ||
-      startOfDay(_selectedDate) != startOfDay(DateTime.now());
-
-  /// Fetches the greenhouse and fish-tank history the summary needs.
+  /// Fetches the greenhouse and fish-tank history the period summary needs.
   ///
   /// **Both go through the ordinary `_fetchHistoryFor`, so the summary and the
-  /// Environment and Fish charts read the same `_history` map and cannot
+  /// Environment and Fish charts read the same history map and cannot
   /// disagree.** A separate request into a separate field would be two copies of
   /// the same series with no compiler check between them — the shape
   /// `chart_groups.dart` exists to end.
@@ -2578,166 +2034,55 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Not called on startup: the initial selection is today, so the panel is not
   /// on screen and the request would be for nothing.
   void _loadSummaryHistory() {
-    if (!_isSummaryPeriod) return;
+    final isSummaryPeriod =
+        _selectedRangeStart != null ||
+        startOfDay(_selectedDate) != startOfDay(DateTime.now());
+    if (!isSummaryPeriod) return;
     for (final prefix in const ['env', 'fish']) {
       unawaited(_fetchHistoryFor(prefix));
     }
   }
 
-  /// The summary panel, or nothing when today is selected.
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  /// Fetches every telemetry key for the selected window and shares a CSV.
   ///
-  /// Empty while the request is outstanding, so the panel does not flash its
-  /// "nothing recorded" state on the way to having rows. `_historyLoadFailed` is
-  /// accepted as settled too, or a device ThingsBoard rejects would leave the
-  /// panel blank forever instead of saying it has no data.
-  Widget? _dateSummaryPanel() {
-    if (!_isSummaryPeriod) return null;
-    final settled =
-        _historyLoaded.contains('env') ||
-        _historyLoadFailed.contains('env') ||
-        _historyLoaded.contains('fish') ||
-        _historyLoadFailed.contains('fish');
-    if (!settled) return null;
-
-    final window = historyTimeWindow(
-      rangeStart: _selectedRangeStart ?? startOfDay(_selectedDate),
-      rangeEnd: _selectedRangeEnd,
-      now: DateTime.now(),
-    );
-    return DateSummaryPanel(
-      periodLabel: describeHistoryRange(
+  /// The fetching and the file itself live in `utils/telemetry_export.dart`,
+  /// which owns the two reasons the export does not dump what is on screen.
+  /// What stays here is the `_exportingCsv` guard and the snackbar.
+  Future<void> _exportCsv() async {
+    if (_exportingCsv) return;
+    setState(() => _exportingCsv = true);
+    try {
+      final csv = await buildTelemetryCsvForWindow(
+        widget.api,
         selectedDate: _selectedDate,
         rangeStart: _selectedRangeStart,
         rangeEnd: _selectedRangeEnd,
-      ),
-      // **The same `energyForPeriod` integral the ENERGY block uses, over the
-      // same `_energyHistory` map.** A second aggregation rule here would give
-      // the page two totals for one day and no way to tell which is right.
-      // `energyForCoveredPeriod` adds one thing `energyForPeriod` cannot do:
-      // return null rather than `0.0` when the window is not covered, because
-      // this history is a rolling fortnight and the picker reaches back ninety
-      // days.
-      solarKwh: energyForCoveredPeriod(
-        points: _energyHistory['power_dc'],
-        start: window.start,
-        end: window.end,
-      ),
-      loadKwh: energyForCoveredPeriod(
-        points: _energyHistory['power_ac'],
-        start: window.start,
-        end: window.end,
-      ),
-      environment: _summaryStats(kEnvironmentSpecs),
-      fish: _summaryStats(kFishSpecs),
-    );
+      );
+      if (!mounted) return;
+      if (csv == null) {
+        _showExportNote('Nothing was recorded in this period.');
+        return;
+      }
+      await shareTelemetryCsv(
+        csv,
+        describeHistoryRange(
+          selectedDate: _selectedDate,
+          rangeStart: _selectedRangeStart,
+          rangeEnd: _selectedRangeEnd,
+          now: DateTime.now(),
+        ),
+      );
+    } catch (error) {
+      if (mounted) _showExportNote('Could not export: $error');
+    } finally {
+      if (mounted) setState(() => _exportingCsv = false);
+    }
   }
 
-  /// Min/avg/max rows for one page's specs, from the history already in hand.
-  ///
-  /// **The rows are derived from `kEnvironmentSpecs` / `kFishSpecs` rather than
-  /// from a list written here.** Those are the declarations the metric grids
-  /// read, so a renamed label or a new sensor reaches this panel with no second
-  /// edit — and, the failure this repo has paid for twice, no way for the two to
-  /// drift apart silently.
-  ///
-  /// A spec with no history entry is skipped entirely rather than rendered as
-  /// `--`. `water_level_percent` is the case that matters: it is displayed on the
-  /// Fish grid and has no chart, so it is never requested, and a row of dashes
-  /// for it every time would read as a broken sensor rather than as a choice not
-  /// to chart a level.
-  List<DateSummaryStat> _summaryStats(List<MetricSpec> specs) {
-    return [
-      for (final spec in specs)
-        if (_history.containsKey(spec.key)) _summaryStat(spec),
-    ];
-  }
-
-  DateSummaryStat _summaryStat(MetricSpec spec) {
-    // Reduced once. The reduction is a full pass over the day's points and this
-    // runs for every spec on two pages on every chart revision.
-    final stats = periodStatsForPoints(_history[spec.key]);
-    final metric = spec.metric;
-    return DateSummaryStat(
-      label: spec.label,
-      stats: stats,
-      unit: spec.unit,
-      decimals: spec.decimals,
-      // The band comes from the same caption builder the grids use, so the
-      // summary grades against the thresholds in Settings and not against a
-      // default copied here.
-      limitLabel: environmentLimitLabel(spec, _thresholds),
-      // **Extrema, not the average.** A day that dipped to 12 °C for ten minutes
-      // has an average well inside the band, and the average is the one number
-      // that cannot say a limit was crossed.
-      //
-      // An unmonitored spec — `lux`, `PV_TEMP`, `water_level_percent` all carry
-      // no `metric` — cannot have breached, and reporting null is the only
-      // honest answer; guessing a bound here would invent an alarm the rules do
-      // not have.
-      breached:
-          metric != null &&
-          stats.breached(
-            min: _thresholds.minFor(metric),
-            max: _thresholds.maxFor(metric),
-          ),
-    );
-  }
-
-  // `_heroCard`, `_energySummaryCard` and `_dualCards` were here until the
-  // Overview became one panel. They are gone rather than kept as unused code
-  // because each one was a card the panel replaced outright, and leaving a
-  // private builder nobody calls is how the next reader concludes the page still
-  // has four sections.
-  //
-  // **Two things they owned had to move first**, and both did — the reasoning is
-  // at their new call sites:
-  //
-  //   * `_openBatteryFromStrip` was reachable only through
-  //     `SystemStatusStrip.onOpenBattery`. It is now `OverviewPanel.onOpenBattery`
-  //     and the `BAT_SOC` meter is the target.
-  //   * `_openEnergyReport` was reachable only through
-  //     `EnergySummaryCard.onOpenReport`. It is now
-  //     `OverviewPanel.onOpenEnergyReport` and the `ENERGY` heading is the
-  //     target.
-  //
-  // So this was a move, not a deletion. Their four widget files are also still
-  // here and still tested; what went is the *page section*, not the widgets —
-  // `LivePowerCard`, `EnergySummaryCard` and `SystemStatusStrip` remain live for
-  // anyone who re-adds a section, and removing them would have taken their tests
-  // with them.
-
-  Widget _environmentGrid() {
-    return MetricGrid(
-      title: 'Environment',
-      specs: kEnvironmentSpecs,
-      values: _sensor?.latestValues,
-      thresholds: _thresholds,
-      limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
-      staleMinutes: _staleTelemetryMinutes,
-      lastUpdate: _sensor?.lastUpdate,
-      // The alerts toggle governs the grid's warning colours too, not just the
-      // background rules — a limit the user switched off must stop colouring the
-      // page, or Settings and the dashboard contradict each other.
-      showGridColors: _thresholds.environmentAlerts,
-    );
-  }
-
-  Widget _fishGrid() {
-    return MetricGrid(
-      title: 'Water Quality',
-      specs: kFishSpecs,
-      values: _fish?.latestValues,
-      thresholds: _thresholds,
-      limitLabelFor: (spec) => environmentLimitLabel(spec, _thresholds),
-      showGridColors: _thresholds.fishAlerts,
-      // The readings still get the stale tag, so a dead sensor cannot present a
-      // page of plausible numbers as current.
-      staleMinutes: _staleTelemetryMinutes,
-      lastUpdate: _fish?.lastUpdate,
-      // Two columns, so four readings land as 2 + 2. Three would leave the fourth
-      // stranded beside a gap.
-      columns: 2,
-    );
+  void _showExportNote(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ── Detail pages ─────────────────────────────────────────────────────────────
@@ -2759,7 +2104,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         builder: (context, sub, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _powerSelector(sub),
+            powerSelector(sub, _selectPowerSub),
             const SizedBox(height: 12),
             // The page builders hand back lazily-invoked closures so the outer
             // ListView only realises visible items. Inside this one Column they
@@ -2777,25 +2122,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
   }
 
-  Widget _powerSelector(int selected) {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<int>(
-        segments: [
-          for (final tab in kPowerSubTabs)
-            ButtonSegment<int>(
-              value: kPowerSubTabs.indexOf(tab),
-              icon: Icon(tab.icon, size: 16),
-              label: Text(tab.label),
-            ),
-        ],
-        selected: {selected},
-        showSelectedIcon: false,
-        onSelectionChanged: (selection) => _selectPowerSub(selection.first),
-      ),
-    );
-  }
-
   void _selectPowerSub(int index) {
     if (index == _powerSubNotifier.value) return;
     _powerSubNotifier.value = index;
@@ -2810,20 +2136,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   List<Widget Function()> _pvPage() => [
-    () => GlassPageHeader(
-      title: 'PV Status',
-      icon: Icons.wb_sunny,
-      accent: categoryColor(MetricCategory.pv),
-    ),
-    () => const SizedBox(height: _cardGap),
+    () => detailHeader('PV Status', Icons.wb_sunny, MetricCategory.pv),
     () => _bindRevision(
       _pzemRevision,
-      () => _telemetryCard(_pzem, const [
+      () => detailTelemetryCard(_pzem, const [
         MetricDef('voltage_dc', 'Voltage DC', 'V', Icons.bolt),
         MetricDef('current_dc', 'Current DC', 'A', Icons.swap_horiz),
         MetricDef('power_dc', 'Power DC', 'W', Icons.wb_sunny),
         MetricDef('energy_dc', 'Energy', 'kWh', Icons.bar_chart),
-      ]),
+      ], staleTelemetryMinutes),
     ),
     // **Through `_chartSectionThunks`, which iterates the groups.** This used to
     // hand-write a header and one
@@ -2852,15 +2173,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   ];
 
   List<Widget Function()> _acPage() => [
-    () => GlassPageHeader(
-      title: 'AC Status',
-      icon: Icons.power,
-      accent: categoryColor(MetricCategory.ac),
-    ),
-    () => const SizedBox(height: _cardGap),
+    () => detailHeader('AC Status', Icons.power, MetricCategory.ac),
     () => _bindRevision(
       _pzemRevision,
-      () => _telemetryCard(_pzem, const [
+      () => detailTelemetryCard(_pzem, const [
         MetricDef('voltage_ac', 'Voltage AC', 'V', Icons.bolt),
         MetricDef('current_ac', 'Current AC', 'A', Icons.swap_horiz),
         MetricDef('power_ac', 'Power AC', 'W', Icons.power, decimals: 1),
@@ -2873,7 +2189,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         MetricDef('energy_ac', 'Energy', 'kWh', Icons.bar_chart),
         MetricDef('pf_ac', 'Power Factor', '', Icons.electric_meter),
-      ]),
+      ], staleTelemetryMinutes),
     ),
     // `_chartSections`, for the reason on the PV page: the hand-written
     // `.single` is what threw `Bad state: Too many elements` when the electrical
@@ -2882,15 +2198,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   ];
 
   List<Widget Function()> _batteryPage() => [
-    () => GlassPageHeader(
-      title: 'Battery Status',
-      icon: Icons.battery_charging_full,
-      accent: categoryColor(MetricCategory.battery),
-    ),
-    () => const SizedBox(height: _cardGap),
+    () => detailHeader('Battery Status', Icons.battery_charging_full, MetricCategory.battery),
     () => _bindRevision(
       _batteryRevision,
-      () => _telemetryCard(_battery, const [
+      () => detailTelemetryCard(_battery, const [
         MetricDef('voltage', 'Voltage', 'V', Icons.bolt),
         MetricDef('current', 'Current', 'A', Icons.swap_horiz),
         MetricDef('power', 'Power', 'W', Icons.bolt_outlined, decimals: 1),
@@ -2919,7 +2230,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           Icons.battery_full,
           decimals: 0,
         ),
-      ]),
+      ], staleTelemetryMinutes),
     ),
     // `_chartSections`, for the reason on the PV page.
     ..._chartSectionThunks('battery'),
@@ -2940,12 +2251,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// greenhouse device, keyed by the same list the charts look up.
   List<Widget Function()> _hydroponicsPage() {
     return [
-      () => GlassPageHeader(
-        title: 'Hydroponics',
-        icon: Icons.eco,
-        accent: categoryColor(MetricCategory.environment),
-      ),
-      () => const SizedBox(height: _cardGap),
+      () => detailHeader('Hydroponics', Icons.eco, MetricCategory.environment),
       // The camera comes first, above the readings.
       //
       // It was last because this page had no chart, so the grid was the whole
@@ -2953,24 +2259,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       // below, a camera at the bottom meant scrolling past every reading and
       // every plot to reach the one control that is not a number -- and the
       // thing you want to check most often is the thing furthest from the top.
-      () => Bound(
-        listenable: _cctvKeepAlive,
-        // **`AppTheme.brightness` is in this token for the same reason it is in
-        // `_visualToken`.** `CctvScreen`'s standby overlay is drawn from
-        // `AppPalette`/`AppSurfaces`, and without the brightness a light/dark
-        // switch left the play glyph and its ring painted in the other theme's
-        // accent until the next poll.
-        token: '$_cctvUrl|$_selectedIndex|${AppTheme.brightness}',
-        builder: () => CctvScreen(
-          streamUrl: _cctvUrl,
-          // Hydroponics is tab 2 of the four in `AppDestination` order. The
-          // flag has to know, because this panel is inside an `IndexedStack`
-          // and is therefore mounted on every tab; see `isVisible`.
-          isVisible: _selectedIndex == 2,
-        ),
+      // Hydroponics is tab 2 of the four in `AppDestination` order.
+      () => cameraPanel(
+        keepAlive: _cctvKeepAlive,
+        streamUrl: _cctvUrl,
+        selectedIndex: _selectedIndex,
+        pageIndex: 2,
       ),
       () => const SizedBox(height: _cardGap),
-      () => _bindRevision(_sensorRevision, () => _environmentGrid()),
+      () => _bindRevision(_sensorRevision, () => environmentGrid(sensor: _sensor, thresholds: thresholds, staleMinutes: staleTelemetryMinutes)),
       // One `Bound` around all four cards rather than four around four: the
       // groups are a fixed list, so they move together, and four boundaries
       // would let three cards rebuild for a bounds change on the fourth.
@@ -2998,23 +2295,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// sensor's own supply rail.
   List<Widget Function()> _fishPage() {
     return [
-      () => GlassPageHeader(
-        title: 'Fish Tank',
-        icon: Icons.set_meal,
-        accent: categoryColor(MetricCategory.water),
-      ),
-      () => const SizedBox(height: _cardGap),
+      () => detailHeader('Fish Tank', Icons.set_meal, MetricCategory.water),
       // Camera first, for the same reason as the greenhouse: it is the one
       // control on the page that is not a number, so it belongs where the eye
       // lands rather than below three charts.
-      () => Bound(
-        listenable: _cctvKeepAlive,
-        token: '$_cctvUrlFish|$_selectedIndex|${AppTheme.brightness}',
-        builder: () =>
-            CctvScreen(streamUrl: _cctvUrlFish, isVisible: _selectedIndex == 3),
+      () => cameraPanel(
+        keepAlive: _cctvKeepAlive,
+        streamUrl: _cctvUrlFish,
+        selectedIndex: _selectedIndex,
+        pageIndex: 3,
       ),
       () => const SizedBox(height: 8),
-      () => _bindRevision(_fishRevision, () => _fishGrid()),
+      () => _bindRevision(_fishRevision, () => fishGrid(fish: _fish, thresholds: thresholds, staleMinutes: staleTelemetryMinutes)),
       // Same reason as the greenhouse charts above.
       () => _bindRevision(
         _chartRevision,
@@ -3026,128 +2318,28 @@ class _DashboardScreenState extends State<DashboardScreen>
     ];
   }
 
-  Widget _telemetryCard(DeviceTelemetry? data, List<MetricDef> metrics) {
-    return TelemetryCard(
-      data: data,
-      metrics: metrics,
-      staleMinutes: _staleTelemetryMinutes,
-    );
-  }
+  /// Everything the chart builders read, gathered once per call.
+  ChartSectionInputs get _chartInputs => ChartSectionInputs(
+    history: _history,
+    spots: _chartSpots,
+    stats: _chartStats,
+    boundsCache: _chartBounds,
+    loading: _chartLoading,
+    loadFailedPrefixes: _historyLoadFailed,
+    selectedDate: _selectedDate,
+    rangeStart: _selectedRangeStart,
+    rangeEnd: _selectedRangeEnd,
+    realtimeConnected: _realtimeConnected,
+    busyNotifier: _historyBusyNotifier,
+    requestInFlight: _historyRequestInFlight,
+    onPointerActive: _setChartPointerActive,
+    bindRevision: _bindRevision,
+    revision: _chartRevision,
+  );
 
-  Widget _chartSectionHeader(String title, String prefix) {
-    // A notifier rather than reading the set directly: adding or removing a prefix
-    // from `_historyRequestInFlight` mutates a plain Set, which rebuilds nothing.
-    return ValueListenableBuilder<int>(
-      valueListenable: _historyBusyNotifier,
-      builder: (context, _, _) => ChartSectionHeader(
-        title: title,
-        selectedDate: _selectedDate,
-        rangeStart: _selectedRangeStart,
-        rangeEnd: _selectedRangeEnd,
-        realtimeConnected: _realtimeConnected,
-        refreshing: _historyRequestInFlight.contains(prefix),
-      ),
-    );
-  }
+  List<Widget Function()> _chartSectionThunks(String prefix) =>
+      chartSectionThunks(_chartInputs, prefix);
 
-  Widget _chartCard(String prefix, ChartGroup group) {
-    return TelemetryChartCard(
-      prefix: prefix,
-      group: group,
-      points: _history,
-      spots: _chartSpots,
-      stats: _chartStats,
-      boundsCache: _chartBounds,
-      loading: _chartLoading,
-      loadFailed: !_chartLoading && _historyLoadFailed.contains(prefix),
-      selectedDate: _selectedDate,
-      rangeStart: _selectedRangeStart,
-      rangeEnd: _selectedRangeEnd,
-      onPointerActive: _setChartPointerActive,
-    );
-  }
-
-  /// One header plus one card per group a prefix declares.
-  ///
-  /// **More than one group becomes a carousel rather than a stack.** The
-  /// greenhouse declares four and the fish tank three, and stacked they meant
-  /// scrolling past three plots to reach the fourth on a phone, every time. The
-  /// electrical pages declare one each and keep the plain layout -- a carousel
-  /// holding a single chart cannot be swiped and only looks like it should.
-  ///
-  /// The header, the date-range picker and the Live indicator stay outside the
-  /// carousel because they describe the page rather than the plot; only the plot
-  /// moves. The dots below it are load-bearing rather than decorative, and the
-  /// reason is that a carousel with no position indicator is indistinguishable
-  /// from a chart the user has finished with.
-  List<Widget> _chartSections(String prefix) => [
-    for (final build in _chartSectionThunks(prefix)) build(),
-  ];
-
-  /// One thunk per section, for a page's charts.
-  ///
-  /// The thunks rather than the widgets because every page's item list is
-  /// `List<Widget Function()>`, and because the card is the thing `Bound` has to
-  /// be able to defer. Building the list twice -- once as thunks for the three
-  /// electrical pages and once as widgets for the other two -- is how the
-  /// electrical pages ended up with their own hand-written chart wiring, and that
-  /// wiring is what threw `Bad state: Too many elements` when the groups were
-  /// split. There is now one implementation of "a page's charts".
-  List<Widget Function()> _chartSectionThunks(String prefix) {
-    final title = chartPageTitle(prefix);
-    if (title == null) return const [];
-    final groups = chartGroupsForPrefix(prefix);
-    if (groups.isEmpty) return const [];
-
-    // One group: the header and the card, exactly as this always rendered.
-    //
-    // **The single-group path is not a special case for tidiness.** The header
-    // names the chart, so on a one-chart page the header must name that chart,
-    // which is `groups.single.title` and not the page name. Collapsing the two
-    // would rename "PV" to "Power" on the PV tab.
-    if (groups.length == 1) {
-      return [
-        () => const SizedBox(height: _chartHeaderGap),
-        () => _chartSectionHeader(groups.single.title, prefix),
-        () => const SizedBox(height: 8),
-        () => _bindRevision(
-          _chartRevision,
-          () => _chartCard(prefix, groups.single),
-        ),
-      ];
-    }
-
-    // The tallest card in the set sizes the slot. Every card already declares
-    // its own height, so this is a maximum over declared values rather than a
-    // number chosen here -- which is why the carousel costs no vertical
-    // accuracy: each card still paints into the height it asked for.
-    final tallest = groups
-        .map((g) => g.height ?? 400.0)
-        .reduce((a, b) => a > b ? a : b);
-
-    return [
-      () => const SizedBox(height: _chartHeaderGap),
-      // The page name, not the chart name, because in a carousel the chart name
-      // moves and this does not. The indicator below the plot carries it.
-      () => _chartSectionHeader(title, prefix),
-      () => const SizedBox(height: 8),
-      // One `Bound` around the whole carousel rather than one per page. The
-      // pages are a fixed list and they move together, and a `Bound` per page
-      // would let four boundaries rebuild because one of them changed.
-      () => _bindRevision(
-        _chartRevision,
-        () => ChartCarousel(
-          itemCount: groups.length,
-          height: tallest,
-          // The dashboard's own pager gate, reused. Two horizontal pagers are
-          // nested here and without this the outer one takes every swipe — the
-          // first build swiped from the Temperature chart to the Fish Tank tab.
-          onPointerActive: _setChartPointerActive,
-          inset: kDashboardPageMargin,
-          labelBuilder: (i) => groups[i].title,
-          itemBuilder: (context, i) => _chartCard(prefix, groups[i]),
-        ),
-      ),
-    ];
-  }
+  List<Widget> _chartSections(String prefix) =>
+      chartSections(_chartInputs, prefix);
 }
