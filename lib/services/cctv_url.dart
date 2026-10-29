@@ -17,7 +17,12 @@ const defaultAllowedCctvUrl =
 const defaultAllowedFishCctvUrl =
     'https://cctv.mbkm20262027.tech/stream.html?src=cam2';
 
-const _cctvStorage = FlutterSecureStorage();
+/// Pinned to EncryptedSharedPreferences for the same reason as the ThingsBoard
+/// store: the default is already this, and writing it out keeps it this if a
+/// future plugin release changes the default.
+const _cctvStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+);
 const _cctvUrlKey = 'cctv_url';
 const _fishCctvUrlKey = 'cctv_url_fish';
 

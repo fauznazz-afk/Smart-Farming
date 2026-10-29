@@ -5,7 +5,7 @@ import 'package:plts_monitoring/utils/app_update.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  const release = AppRelease(
+  final release = AppRelease(
     tag: 'v1.14.0',
     version: '1.14.0',
     url: 'https://github.com/fauznazz-afk/Smart-Farming/releases/tag/v1.14.0',

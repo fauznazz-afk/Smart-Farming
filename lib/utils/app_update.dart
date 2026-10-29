@@ -9,12 +9,30 @@ import 'package:flutter/foundation.dart';
 /// we open - and the pair is meaningless apart.
 @immutable
 class AppRelease {
-  const AppRelease({
+  /// **The URL is validated here, not only in [parseGitHubRelease].**
+  ///
+  /// The parser already refuses a non-`https://` `html_url`, and that is the
+  /// only way a release is built today. But the value is handed to `launchUrl`
+  /// by two screens (`update_banner.dart` and `about_section.dart`), and a
+  /// guard that lives only in the parser is a guard the next constructor site
+  /// inherits nothing from. `update_banner_test.dart` builds an `AppRelease`
+  /// directly, which is exactly that second site. Asserting in the constructor
+  /// makes the invariant a property of the type.
+  ///
+  /// It is an assert, not a thrown exception, because a release with a
+  /// non-https URL is a programming error caught in debug/test, not a runtime
+  /// condition the user can act on. The parser keeps its own `startsWith` check
+  /// so that a hostile GitHub response becomes `null` ("no update") rather than
+  /// a crash during startup.
+  AppRelease({
     required this.tag,
     required this.version,
     required this.url,
     this.notes,
-  });
+  }) : assert(
+          url.startsWith('https://'),
+          'AppRelease.url must be https, was: $url',
+        );
 
   /// The tag as GitHub reports it, `v1.13.0`.
   final String tag;

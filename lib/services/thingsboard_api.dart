@@ -204,7 +204,17 @@ class ThingsBoardApi {
     'tb_refresh_token',
   ];
 
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  /// **`encryptedSharedPreferences: true` is pinned, not left to the default.**
+  ///
+  /// The plugin already uses EncryptedSharedPreferences on modern Android, so
+  /// this changes no behaviour today. It is written out because the things
+  /// stored here are the ThingsBoard JWT and refresh token: if a future plugin
+  /// release changes its default, the most sensitive store in the app must not
+  /// silently fall back to a weaker one. The option makes the requirement
+  /// legible at the call site rather than implied by a dependency's default.
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
   String? _token;
   String? _refreshToken;
   Future<_TokenRefreshResult>? _refreshInFlight;

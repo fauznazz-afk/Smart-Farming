@@ -63,6 +63,40 @@ void main() {
     });
   });
 
+  group('AppRelease constructor', () {
+    // **The invariant is a property of the type, not of the parser.** The
+    // parser already refuses a non-https url, so this is the second guard:
+    // any future constructor site (a test fixture, a cached release rebuilt
+    // from disk) inherits it without having to remember it.
+    test('refuses a non-https url', () {
+      expect(
+        () => AppRelease(
+          tag: 'v1.0.0',
+          version: '1.0.0',
+          url: 'http://insecure.example/x',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => AppRelease(
+          tag: 'v1.0.0',
+          version: '1.0.0',
+          url: 'javascript:alert(1)',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('accepts an https url', () {
+      final release = AppRelease(
+        tag: 'v1.0.0',
+        version: '1.0.0',
+        url: 'https://ok.example',
+      );
+      expect(release.url, 'https://ok.example');
+    });
+  });
+
   group('normalizeVersion', () {
     test('strips the tag decoration that has shipped in this repo', () {
       expect(normalizeVersion('v1.13.0'), '1.13.0');
