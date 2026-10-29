@@ -538,11 +538,6 @@ class AppShadows {
         ),
       ];
 
-  // ══ Backward compatibility aliases ═════════════════════════════════════
-
-  /// Alias for `medium` — the resting lift for cards, inputs and list rows.
-  static List<BoxShadow> get stamped => medium;
-
   /// A lift tinted with [hue] rather than neutral black, for a filled button
   /// that should read as its own colour. Material's `elevation` cannot carry a
   /// hue, so the call sites paint this through a `DecoratedBox` behind the fill.
@@ -1087,7 +1082,6 @@ class AppGlass {
 
   /// The ink on the **nav bar**, which is a strong glass wash over the page and
   /// therefore a light chip for the same reason the hour pills are.
-  static Color get navInk => pageGlassInk;
   static Color get navInkSoft => pageGlassInkSoft;
 
   /// The divider between the stat card's three columns.

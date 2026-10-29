@@ -41,6 +41,10 @@ flutter test test/<file>            # or .\tool\run_tests_per_file.ps1
 | 5 | `EnergyForecastResult.peakUsageAt` / `.sampleStart` / `.sampleEnd` | `lib/services/energy_forecast_service.dart:24,26,27` | **No production reader** — only test assertions | Reported, left in place |
 | 6 | `SkyCondition.isDaylight` | `lib/utils/solar_irradiance.dart:149` | **No production reader** — only `test/` | Reported, left in place |
 | 7 | `prefixTitle` | `lib/screens/dashboard/widgets/chart_card.dart:16` | **Dead** — 0 references in `lib/` and `test/` | **Removed** (audit 29 October 2026) |
+| 8 | `PreferencesMixin.alarmThresholds` getter | `lib/screens/dashboard/state/preferences_mixin.dart:142` | **Dead** — 0 references; only forwarded `thresholds`, which callers already read | **Removed** (audit 29 October 2026) |
+| 9 | `AppShadows.stamped` | `lib/screens/dashboard/utils/design_tokens.dart:544` | **Dead** — 0 references; `stampedIn` is the used member, not this alias | **Removed** (audit 29 October 2026) |
+| 10 | `AppGlass.navInk` | `lib/screens/dashboard/utils/design_tokens.dart:1090` | **Dead** — 0 references; `nav_bar.dart` uses `navInkSoft` | **Removed** (audit 29 October 2026) |
+| 11 | `kTariffBsPerKwh` | `lib/widgets/energy_summary_card.dart:21` | **Dead** — 0 references after the `Bs.` tile caption was removed | **Removed** (audit 29 October 2026) |
 
 ### 1. `chartSeriesColor` — removed
 

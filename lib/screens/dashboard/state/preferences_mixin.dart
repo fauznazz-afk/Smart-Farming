@@ -9,7 +9,6 @@ import '../../../services/cctv_url.dart';
 import '../../../services/connection_health_service.dart';
 import '../../../services/alarm_settings.dart';
 import '../../../services/thingsboard_api.dart';
-import '../../../utils/alarm_rules.dart';
 import '../../../utils/poll_interval.dart';
 import 'alarms_mixin.dart';
 
@@ -138,6 +137,4 @@ mixin DashboardPreferences<T extends StatefulWidget>
 
   /// Stops the timer without deciding whether polling is on.
   void cancelRefreshTimer() => _refreshTimer?.cancel();
-
-  AlarmThresholds get alarmThresholds => thresholds;
 }

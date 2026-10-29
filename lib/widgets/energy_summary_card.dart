@@ -6,20 +6,6 @@ import '../services/energy_forecast_service.dart';
 import '../utils/energy_comparison.dart';
 import 'liquid_glass.dart';
 
-/// Bolivian residential tariff, CRE upper residential step.
-///
-/// **Retired from the tile, kept for reference.** The tiles used to multiply
-/// every kWh by this constant and print `≈ Bs. 10.42`, which is a money figure
-/// computed from a rate the user never supplied and cannot change. The app
-/// already has a tariff field (`SettingsKeys.electricityTariffPerKwh`, in
-/// rupiah) and a cost panel that refuses to price anything without it; this
-/// constant was a second, hidden source of truth that silently disagreed with
-/// it, and on this installation it disagreed by three orders of magnitude.
-///
-/// The value stays declared because the doc records where it came from, and a
-/// reader who finds `Bs.` in a git blame deserves the reason it left.
-const double kTariffBsPerKwh = 0.84;
-
 class EnergySummaryCard extends StatelessWidget {
   const EnergySummaryCard({
     super.key,
