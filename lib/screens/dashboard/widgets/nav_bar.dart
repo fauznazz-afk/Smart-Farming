@@ -608,16 +608,18 @@ const double _kNavIconSize = 22;
 /// gone. What is left is the ripple's `_kNavItemWidth` box, so the slot only has
 /// to clear the 22 dp icon with air around it: 7 dp on each side.
 ///
-/// `shortcut:` the slot is also the horizontal touch target, and 36 dp is under
-/// Material's 44 dp. The vertical half is carried by [kGlassNavBarHeight] (54),
-/// so a destination is a 36 x 54 target; raise this back towards 44 if an
-/// accessibility audit ever demands a square one — the pill's width arithmetic
-/// below follows automatically, at the cost of a wider bar.
+/// **This is the drawn box, not the touch target.** It has to clear the 22 dp
+/// glyph and the 44 dp bubble with air, which 36 does not — the disc was being
+/// clipped by the slot it sits in. The ripple's hit area comes from the
+/// destination's own slot in [GlassNavBar] (`_kNavSlotWidth`), which is 48 dp
+/// wide by [kGlassNavBarHeight] tall and therefore clears Material's 44 dp
+/// minimum on both axes. Raising this number widens the bubble too, so it is
+/// set to the disc's own 44 and no further.
 ///
 /// The bar's width is this constant times the destination count plus the gap, and
 /// that arithmetic lives in `GlassNavBar` rather than here, so the two halves move
 /// together when this moves.
-const double _kNavItemWidth = 36;
+const double _kNavItemWidth = 44;
 
 /// The pitch the four destinations are laid out at, independent of the bar's
 /// width.
@@ -633,10 +635,13 @@ const double _kNavItemWidth = 36;
 /// shrinks the pitch rather than overflowing it; the four slots are always
 /// centred whatever that comes to.
 ///
-/// `shortcut:` this is not a touch-target width. 48 dp clears Material's 44 dp
-/// minimum, but only because the bar's 54 dp height carries the other axis — a
-/// destination is 48 x 54. If a future audit wants a guaranteed square target,
-/// raise this toward 56 and let the row take the extra width.
+/// **This is the touch target, and it is 48 on both axes.** The width is this
+/// constant; the height is [kGlassNavBarHeight] (54), so a destination is a
+/// 48 x 54 hit area — over Material's 44 dp minimum rather than relying on the
+/// drawn box, which is only [_kNavItemWidth] (44) wide.
+///
+/// It also has to hold that 44 dp drawn box with the bubble's own air, which is
+/// why the two numbers sit 4 apart rather than being one constant.
 const double _kNavSlotWidth = 48;
 
 // There were two getters here — `destination` and `selectedIndex` — that
