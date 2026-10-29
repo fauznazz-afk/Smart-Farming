@@ -40,6 +40,7 @@ flutter test test/<file>            # or .\tool\run_tests_per_file.ps1
 | 4 | `_cctvKeepAlive` | `lib/screens/dashboard_screen.dart:308` | **Inert** — private `ValueNotifier(0)` never assigned | Reported, left in place |
 | 5 | `EnergyForecastResult.peakUsageAt` / `.sampleStart` / `.sampleEnd` | `lib/services/energy_forecast_service.dart:24,26,27` | **No production reader** — only test assertions | Reported, left in place |
 | 6 | `SkyCondition.isDaylight` | `lib/utils/solar_irradiance.dart:149` | **No production reader** — only `test/` | Reported, left in place |
+| 7 | `prefixTitle` | `lib/screens/dashboard/widgets/chart_card.dart:16` | **Dead** — 0 references in `lib/` and `test/` | **Removed** (audit 29 October 2026) |
 
 ### 1. `chartSeriesColor` — removed
 

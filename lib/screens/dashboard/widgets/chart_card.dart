@@ -12,9 +12,6 @@ import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/history_range.dart';
 
-/// Human readable name for a dashboard page prefix.
-String prefixTitle(String prefix) => chartPageTitle(prefix) ?? prefix;
-
 /// Title + range label + live/polling indicator above a telemetry chart.
 class ChartSectionHeader extends StatelessWidget {
   const ChartSectionHeader({
