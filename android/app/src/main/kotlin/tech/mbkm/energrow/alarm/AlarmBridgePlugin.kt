@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -101,7 +100,7 @@ class AlarmBridgePlugin :
         } catch (error: Exception) {
             // Some builds ship without the screen. Fall back to the list, which
             // always exists, rather than leaving the user with nothing.
-            Log.w(TAG, "direct request screen unavailable; opening the app list", error)
+            AlarmLog.w(TAG, "direct request screen unavailable; opening the app list", error)
             val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
             result.success(startIntent(ctx, fallback))
         }
@@ -112,7 +111,7 @@ class AlarmBridgePlugin :
         ctx.startActivity(intent)
         true
     } catch (error: Exception) {
-        Log.w(TAG, "could not open ${intent.action}", error)
+        AlarmLog.w(TAG, "could not open ${intent.action}", error)
         false
     }
 
@@ -168,10 +167,10 @@ class AlarmBridgePlugin :
             // path today and not on that one — but the rule is stated once, at
             // the place an audit reads, rather than being re-derived by whoever
             // adds the next catch.
-            Log.e(TAG, "rejected alarm configuration: ${error.javaClass.simpleName}")
+            AlarmLog.e(TAG, "rejected alarm configuration: ${error.javaClass.simpleName}")
             result.error("bad_config", error.message, null)
         } catch (error: Exception) {
-            Log.e(TAG, "alarm bridge call ${call.method} failed: ${error.javaClass.simpleName}")
+            AlarmLog.e(TAG, "alarm bridge call ${call.method} failed: ${error.javaClass.simpleName}")
             result.error("alarm_bridge", error.message, null)
         }
     }
@@ -191,7 +190,7 @@ class AlarmBridgePlugin :
         }
         val config = parseAlarmConfig(payload)
         state(ctx).saveConfig(payload)
-        Log.i(
+        AlarmLog.i(
             TAG,
             "configured ${config.rules.size} rule(s) across " +
                 "${config.devices.size} device(s), arm=${call.argument<Boolean>("arm") == true}",
@@ -202,10 +201,10 @@ class AlarmBridgePlugin :
             // Not an error: the app may not be signed in yet. Worth saying out
             // loud, because a check that finds no credentials looks identical to
             // one that never ran.
-            Log.w(TAG, "configure arrived without an access token; background checks will idle")
+            AlarmLog.w(TAG, "configure arrived without an access token; background checks will idle")
         } else {
             AlarmTokenStore.put(ctx, access, call.argument("refreshToken"))
-            Log.i(TAG, "stored credentials for the background check")
+            AlarmLog.i(TAG, "stored credentials for the background check")
         }
         if (call.argument<Boolean>("clearCredentials") == true) {
             AlarmTokenStore.clear(ctx)
@@ -270,7 +269,7 @@ class AlarmBridgePlugin :
                 // standing down for being foregrounded would be the wrong answer.
                 AlarmCheckRunner(ctx).run(force = true)
             } catch (error: Exception) {
-                Log.e(TAG, "manual alarm check failed", error)
+                AlarmLog.e(TAG, "manual alarm check failed", error)
             }
         }
         result.success(null)

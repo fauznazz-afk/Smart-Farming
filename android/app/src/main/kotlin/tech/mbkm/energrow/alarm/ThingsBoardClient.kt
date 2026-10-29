@@ -1,6 +1,5 @@
 package tech.mbkm.energrow.alarm
 
-import android.util.Log
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -122,7 +121,7 @@ class ThingsBoardClient(
                     val json = JSONObject(body)
                     val accessToken = json.optString("token")
                     if (accessToken.isBlank()) {
-                        Log.w(TAG, "token refresh succeeded but returned no token")
+                        AlarmLog.w(TAG, "token refresh succeeded but returned no token")
                         null
                     } else {
                         // The server may rotate the refresh token too, in which
@@ -138,11 +137,11 @@ class ThingsBoardClient(
                 HttpURLConnection.HTTP_UNAUTHORIZED,
                 HttpURLConnection.HTTP_FORBIDDEN,
                 -> {
-                    Log.i(TAG, "ThingsBoard rejected the refresh token; session is over")
+                    AlarmLog.i(TAG, "ThingsBoard rejected the refresh token; session is over")
                     throw RefreshRejectedException()
                 }
                 else -> {
-                    Log.w(TAG, "ThingsBoard token refresh returned HTTP $status")
+                    AlarmLog.w(TAG, "ThingsBoard token refresh returned HTTP $status")
                     null
                 }
             }
@@ -151,7 +150,7 @@ class ThingsBoardClient(
         } catch (error: Exception) {
             // The class only, not the object: an org.json parse error embeds a
             // fragment of the unconsumed response, which for this call is the JWT.
-            Log.w(TAG, "ThingsBoard token refresh failed: ${error.javaClass.simpleName}")
+            AlarmLog.w(TAG, "ThingsBoard token refresh failed: ${error.javaClass.simpleName}")
             null
         } finally {
             connection.disconnect()

@@ -3,7 +3,6 @@ package tech.mbkm.energrow.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import java.util.concurrent.Executors
 
 /**
@@ -30,7 +29,7 @@ class AlarmCheckReceiver : BroadcastReceiver() {
                 // A background check that throws would be silent, and silent
                 // failure is what made the previous implementation impossible to
                 // diagnose. Log instead.
-                Log.e(TAG, "background alarm check failed", error)
+                AlarmLog.e(TAG, "background alarm check failed", error)
             } finally {
                 executor.shutdown()
                 pendingResult.finish()

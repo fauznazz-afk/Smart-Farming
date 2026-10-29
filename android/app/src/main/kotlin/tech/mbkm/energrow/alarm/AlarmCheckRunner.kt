@@ -1,7 +1,6 @@
 package tech.mbkm.energrow.alarm
 
 import android.content.Context
-import android.util.Log
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.text.SimpleDateFormat
@@ -70,7 +69,7 @@ class AlarmCheckRunner(context: Context) {
      */
     fun run(force: Boolean = false) {
         if (!running.compareAndSet(false, true)) {
-            Log.i(TAG, "a check is already running; skipping")
+            AlarmLog.i(TAG, "a check is already running; skipping")
             return
         }
         // Everything below has to finish inside the receiver's window, or the
@@ -87,7 +86,7 @@ class AlarmCheckRunner(context: Context) {
     }
 
     private fun runGuarded(force: Boolean, deadline: Long) {
-        Log.i(TAG, "check started")
+        AlarmLog.i(TAG, "check started")
         // Re-arm first, so a check that then fails or ends the session still
         // leaves a scheduled trigger behind. A vendor power manager that dropped
         // the alarm cannot be recovered from here directly, but every successful
@@ -98,7 +97,7 @@ class AlarmCheckRunner(context: Context) {
             // the same ThingsBoard devices on a much shorter poll. Doing the work
             // twice would double the request rate for no new information, and it
             // would risk the two disagreeing about which alarms are active.
-            Log.i(TAG, "app is in the foreground; standing down")
+            AlarmLog.i(TAG, "app is in the foreground; standing down")
             return
         }
         val config = loadConfig() ?: return finish("no alarm config stored")
@@ -156,12 +155,12 @@ class AlarmCheckRunner(context: Context) {
      */
     private fun finish(outcome: String) {
         state.recordCheck(System.currentTimeMillis(), outcome)
-        Log.i(TAG, "check finished: $outcome")
+        AlarmLog.i(TAG, "check finished: $outcome")
     }
 
     private fun loadConfig(): AlarmConfig? {
         val payload = state.configPayload() ?: run {
-            Log.i(TAG, "no alarm config has been pushed yet")
+            AlarmLog.i(TAG, "no alarm config has been pushed yet")
             return null
         }
         return try {
@@ -170,7 +169,7 @@ class AlarmCheckRunner(context: Context) {
             // Keep the stored config: it is probably from an app version this
             // build cannot read, and the next launch will replace it. Disabling
             // checks now would make the problem permanent instead of temporary.
-            Log.e(TAG, "stored alarm config is unusable: ${error.javaClass.simpleName}")
+            AlarmLog.e(TAG, "stored alarm config is unusable: ${error.javaClass.simpleName}")
             null
         }
     }
@@ -197,7 +196,7 @@ class AlarmCheckRunner(context: Context) {
         if (unauthorized.isEmpty()) return first.readings
 
         if (System.currentTimeMillis() >= deadline) {
-            Log.w(TAG, "out of time before the token refresh; retrying next tick")
+            AlarmLog.w(TAG, "out of time before the token refresh; retrying next tick")
             return first.readings
         }
         // Three outcomes, not two, and the distinction is the whole point of this
@@ -229,7 +228,7 @@ class AlarmCheckRunner(context: Context) {
             -> return first.readings
 
             is RefreshOutcome.Renewed -> {
-                Log.i(
+                AlarmLog.i(
                     TAG,
                     "refreshed the access token and retrying ${unauthorized.size} device(s)",
                 )
@@ -243,7 +242,7 @@ class AlarmCheckRunner(context: Context) {
                 for (deviceConfig in config.devices) {
                     if (deviceConfig.device !in unauthorized) continue
                     if (System.currentTimeMillis() >= deadline) {
-                        Log.w(
+                        AlarmLog.w(
                             TAG,
                             "out of time before retrying every device; deferring to next tick",
                         )
@@ -253,7 +252,7 @@ class AlarmCheckRunner(context: Context) {
                         readings[deviceConfig.device] =
                             client.fetch(deviceConfig.device, deviceConfig)
                     } catch (error: Exception) {
-                        Log.w(
+                        AlarmLog.w(
                             TAG,
                             "could not read ${deviceConfig.device.wireName} after refresh: ${error.javaClass.simpleName}",
                         )
@@ -296,14 +295,14 @@ class AlarmCheckRunner(context: Context) {
     /** Renews the access token, distinguishing "could not" from "no longer allowed". */
     private fun refreshToken(config: AlarmConfig, deadline: Long): RefreshOutcome {
         val refreshToken = AlarmTokenStore.refreshToken(context) ?: run {
-            Log.i(TAG, "no refresh token stored; cannot renew the access token")
+            AlarmLog.i(TAG, "no refresh token stored; cannot renew the access token")
             return RefreshOutcome.Unavailable
         }
         val client = ThingsBoardClient(config.baseUrl, AlarmTokenStore.accessToken(context).orEmpty())
         return try {
             val renewed = client.refresh(refreshToken, deadline)
             if (renewed == null) {
-                Log.w(TAG, "could not renew the access token; retrying next tick")
+                AlarmLog.w(TAG, "could not renew the access token; retrying next tick")
                 RefreshOutcome.Failed
             } else {
                 RefreshOutcome.Renewed(renewed.accessToken, renewed.refreshToken)
@@ -345,17 +344,17 @@ class AlarmCheckRunner(context: Context) {
                             Fetched(client.fetch(deviceConfig.device, deviceConfig), deviceConfig.device)
                         } catch (error: ThingsBoardHttpException) {
                             if (error.status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                                Log.i(TAG, "${deviceConfig.device.wireName} rejected the access token")
+                                AlarmLog.i(TAG, "${deviceConfig.device.wireName} rejected the access token")
                                 Unauthorized(deviceConfig.device)
                             } else {
-                                Log.w(
+                                AlarmLog.w(
                                     TAG,
                                     "could not read ${deviceConfig.device.wireName}: ${error.javaClass.simpleName}",
                                 )
                                 null
                             }
                         } catch (error: Exception) {
-                            Log.w(
+                            AlarmLog.w(
                                 TAG,
                                 "could not read ${deviceConfig.device.wireName}: ${error.javaClass.simpleName}",
                             )
@@ -374,7 +373,7 @@ class AlarmCheckRunner(context: Context) {
                         else -> Unit
                     }
                 } catch (error: Exception) {
-                    Log.w(TAG, "device read did not finish: ${error.javaClass.simpleName}")
+                    AlarmLog.w(TAG, "device read did not finish: ${error.javaClass.simpleName}")
                 }
             }
             ReadAttempt(readings, unauthorized)

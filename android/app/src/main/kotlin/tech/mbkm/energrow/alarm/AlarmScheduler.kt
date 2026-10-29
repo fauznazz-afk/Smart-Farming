@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 
 /**
  * Schedules the background check with the platform alarm manager.
@@ -57,7 +56,7 @@ object AlarmScheduler {
     fun schedule(context: Context) {
         val alarms = context.getSystemService(AlarmManager::class.java)
         if (alarms == null) {
-            Log.w(TAG, "AlarmManager is unavailable; background checks are off")
+            AlarmLog.w(TAG, "AlarmManager is unavailable; background checks are off")
             return
         }
         try {
@@ -86,11 +85,11 @@ object AlarmScheduler {
                 idlePendingIntent(context),
             )
             setScheduledFlag(context, true)
-            Log.i(TAG, "armed the background check every $INTERVAL_MINUTES minute(s)")
+            AlarmLog.i(TAG, "armed the background check every $INTERVAL_MINUTES minute(s)")
         } catch (error: SecurityException) {
             // Not expected: neither call needs a permission. Losing the schedule
             // silently would be the worst outcome, so say so.
-            Log.e(TAG, "could not schedule the background alarm check", error)
+            AlarmLog.e(TAG, "could not schedule the background alarm check", error)
         }
     }
 
@@ -105,7 +104,7 @@ object AlarmScheduler {
                 idlePendingIntent(context),
             )
         } catch (error: SecurityException) {
-            Log.e(TAG, "could not re-arm the background check", error)
+            AlarmLog.e(TAG, "could not re-arm the background check", error)
         }
     }
 

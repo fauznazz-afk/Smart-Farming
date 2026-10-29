@@ -1,7 +1,6 @@
 package tech.mbkm.energrow.alarm
 
 import android.content.Context
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -39,7 +38,7 @@ class AlarmStateStore(context: Context) {
         return try {
             JSONObject(raw)
         } catch (error: Exception) {
-            Log.w(TAG, "stored alarm config is not valid JSON; discarding it: ${error.javaClass.simpleName}")
+            AlarmLog.w(TAG, "stored alarm config is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(KEY_CONFIG).apply()
             null
         }
@@ -135,7 +134,7 @@ class AlarmStateStore(context: Context) {
         return try {
             JSONArray(raw)
         } catch (error: Exception) {
-            Log.w(TAG, "stored alarm history is not valid JSON; discarding it: ${error.javaClass.simpleName}")
+            AlarmLog.w(TAG, "stored alarm history is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(KEY_RECORDS).apply()
             JSONArray()
         }
@@ -151,7 +150,7 @@ class AlarmStateStore(context: Context) {
                 }
             }
         } catch (error: Exception) {
-            Log.w(TAG, "stored $key is not valid JSON; discarding it: ${error.javaClass.simpleName}")
+            AlarmLog.w(TAG, "stored $key is not valid JSON; discarding it: ${error.javaClass.simpleName}")
             prefs.edit().remove(key).apply()
             emptySet()
         }

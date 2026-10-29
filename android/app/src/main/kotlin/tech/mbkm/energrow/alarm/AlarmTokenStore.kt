@@ -6,7 +6,6 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import android.util.Log
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -76,7 +75,7 @@ object AlarmTokenStore {
             store(editor, PREF_REFRESH_IV, PREF_REFRESH_DATA, refreshToken)
             editor.apply()
         } catch (error: Exception) {
-            Log.w(TAG, "could not store alarm credentials", error)
+            AlarmLog.w(TAG, "could not store alarm credentials", error)
         }
     }
 
@@ -105,7 +104,7 @@ object AlarmTokenStore {
                 accessToken,
             ).apply()
         } catch (error: Exception) {
-            Log.w(TAG, "could not store refreshed access token", error)
+            AlarmLog.w(TAG, "could not store refreshed access token", error)
         }
     }
 
@@ -155,7 +154,7 @@ object AlarmTokenStore {
             // The keystore entry can be invalidated by a screen-lock change or a
             // restore onto new hardware. Drop the unusable material so the next
             // app launch can push fresh credentials instead of retrying forever.
-            Log.w(TAG, "could not read stored alarm credential", error)
+            AlarmLog.w(TAG, "could not read stored alarm credential", error)
             prefs.edit().remove(prefIv).remove(prefData).apply()
             null
         }
@@ -228,7 +227,7 @@ object AlarmTokenStore {
         // response is the credential itself. A keystore failure here is not that
         // path, but a rule that only holds on the paths where it has already
         // burned is not a rule.
-        Log.w(
+        AlarmLog.w(
             TAG,
             if (strongBox) {
                 "StrongBox rejected the alarm credential key (${error.javaClass.simpleName}); " +
@@ -268,7 +267,7 @@ object AlarmTokenStore {
      * returned above before anything is generated.
      */
     private fun logKeyBacking(key: SecretKey) {
-        Log.i(TAG, "alarm credential key backing: ${describeBacking(key)}")
+        AlarmLog.i(TAG, "alarm credential key backing: ${describeBacking(key)}")
     }
 
     /**

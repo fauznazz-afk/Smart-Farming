@@ -53,6 +53,18 @@ android {
         versionName = flutter.versionName
     }
 
+    // **`BuildConfig.DEBUG` has to exist, or the native log gate cannot compile.**
+    //
+    // AGP 8+ stops generating `BuildConfig` unless this feature is on, and every
+    // `AlarmLog` call needs `BuildConfig.DEBUG` to decide whether the line ships.
+    // Without it the release APK still carries the alarm module's diagnostics in
+    // logcat: device wire names, the armed rule ids, the ThingsBoard host. That is
+    // reconnaissance, not a credential, and it is the exact material that makes a
+    // stolen JWT worth stealing.
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")

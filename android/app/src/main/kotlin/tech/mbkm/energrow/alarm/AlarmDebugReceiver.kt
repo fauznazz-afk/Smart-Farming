@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.util.Log
 import java.util.concurrent.Executors
 
 /**
@@ -39,11 +38,11 @@ class AlarmDebugReceiver : BroadcastReceiver() {
         val debuggable =
             context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         if (!debuggable) {
-            Log.w(TAG, "refusing to run: this receiver is meant for debug builds only")
+            AlarmLog.w(TAG, "refusing to run: this receiver is meant for debug builds only")
             return
         }
         if (intent?.action != ACTION_DEBUG_CHECK && intent?.action != ACTION_DEBUG_RESET) {
-            Log.w(TAG, "ignoring unexpected action ${intent?.action}")
+            AlarmLog.w(TAG, "ignoring unexpected action ${intent?.action}")
             return
         }
         val appContext = context.applicationContext
@@ -55,7 +54,7 @@ class AlarmDebugReceiver : BroadcastReceiver() {
             // on its own could take hours.
             AlarmStateStore(appContext).saveActiveAlerts(emptySet())
             AlarmNotifier(appContext).ensureChannels()
-            Log.i(TAG, "cleared the reported-alarm set; the next check will announce")
+            AlarmLog.i(TAG, "cleared the reported-alarm set; the next check will announce")
             return
         }
         val pending = goAsync()
@@ -66,7 +65,7 @@ class AlarmDebugReceiver : BroadcastReceiver() {
             try {
                 AlarmCheckRunner(appContext).run(force = true)
             } catch (error: Throwable) {
-                Log.e(TAG, "debug-triggered check failed", error)
+                AlarmLog.e(TAG, "debug-triggered check failed", error)
             } finally {
                 executor.shutdown()
                 pending.finish()
