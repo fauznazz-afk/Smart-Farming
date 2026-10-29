@@ -106,16 +106,18 @@ class MetricGrid extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // **The heading is the panel's accent, not a muted caption.** A
-            // quiet grey title above a black table is a caption; a red slot name
-            // is a section of an instrument. Same reason `POWER` and `SKY` are
-            // red on the Overview page.
+            // **Cyan, not red.** Red on this panel means one thing only:
+            // `TerminalRow.alert` and `TerminalTag(alert: true)` — a reading
+            // out of bounds. A red section heading put the alarm colour on a
+            // block that was working, so the one genuinely breached value had
+            // to compete with its own title for the eye. The accent is the
+            // panel's mark for structure.
             Flexible(
               child: Text(
                 title.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppType.slotKey.copyWith(color: AppPalette.error),
+                style: AppType.slotKey.copyWith(color: AppPalette.primary),
               ),
             ),
             const Spacer(),
@@ -256,8 +258,13 @@ class _SpecRow extends StatelessWidget {
             ),
             child: Text(
               limit!,
-              style: AppType.slotMicro.copyWith(
-                color: alert ? AppPalette.error : AppSurfaces.onSurfaceVariant,
+              // `slotKey`, not `slotMicro`. This caption sits on the same line
+              // the meter's own captions use, and at 10 sp against a 24 sp
+              // figure it read as a footnote to the row above rather than as
+              // the range the reading is being judged against. Red is now
+              // reserved for a breach, so the muted case takes the label ink.
+              style: AppType.slotKey.copyWith(
+                color: alert ? AppPalette.statusBad : AppSurfaces.onSurfaceVariant,
               ),
             ),
           ),
