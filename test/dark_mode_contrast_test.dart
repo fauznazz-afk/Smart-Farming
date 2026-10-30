@@ -119,6 +119,34 @@ void main() {
     });
   }
 
+  /// **The bottom bar is a surface, and its glyphs are ink on it.**
+  ///
+  /// This is the pair the nav bar shipped wrong twice: first a white 68% wash
+  /// (a pale bar docked on a dark app), then `surfaceAlt` (a slab lighter than
+  /// the cards above it). Neither is a contrast failure — both were *legible* —
+  /// which is exactly why only a token-level assertion pins the surface a docked
+  /// bar is allowed to use. The selected glyph sits on the accent bubble and is
+  /// measured separately below.
+  test('nav bar glyphs clear AA on the bar surface', () {
+    for (final bar in <Color>[AppSurfaces.surface, AppSurfaces.surfaceAlt]) {
+      final inactive = _contrast(AppSurfaces.onSurfaceVariant, bar);
+      expect(
+        inactive,
+        greaterThanOrEqualTo(4.5),
+        reason: 'inactive nav glyph is ${inactive.toStringAsFixed(2)}:1 on a '
+            'bar surface',
+      );
+    }
+    // The selected glyph is `onHue` on the accent bubble, not on the bar.
+    final selected = _contrast(AppPalette.onHue, AppPalette.error);
+    expect(
+      selected,
+      greaterThanOrEqualTo(4.5),
+      reason: 'selected nav glyph is ${selected.toStringAsFixed(2)}:1 on the '
+          'accent bubble',
+    );
+  });
+
   test('theme application is dark-only', () {
     AppTheme.apply(Brightness.dark);
     final darkCard = AppSurfaces.surface;

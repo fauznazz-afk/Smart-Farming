@@ -282,7 +282,14 @@ class GlassNavBar extends StatelessWidget {
                   // is what "navigasi belum berubah dark" was seeing. The bar is
                   // the page's own layer, so it takes the page tone lifted a
                   // step: still translucent, still a surface, but dark.
-                  color: AppSurfaces.surfaceAlt.withValues(alpha: 0.92),
+                  // **`surface`, not `surfaceAlt`.** `surfaceAlt` is #252525
+                  // over a #121212 page, so the docked bar read as a lighter
+                  // grey slab taped to the bottom — still "not the dark theme"
+                  // to the eye even after the white wash went away. A
+                  // bottom-docked bar in this design system is the page's own
+                  // layer lifted by one *card* step, so it takes the sheet
+                  // surface and lets the hairline do the separating.
+                  color: AppSurfaces.surface,
                   // **Rounded at the top, flush at the bottom, and the sheet's
                   // radius rather than the card's.**
                   //
