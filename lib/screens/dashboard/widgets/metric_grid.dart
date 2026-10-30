@@ -133,17 +133,36 @@ class MetricGrid extends StatelessWidget {
         ),
       ),
       children: [
-        for (var i = 0; i < specs.length; i++) ...[
-          _SpecRow(
-            spec: specs[i],
-            value: values?[specs[i].key],
-            breached: verdicts.isBreached(specs[i]),
-            limit: limitLabelFor?.call(specs[i]),
-            meterFraction: _meterFraction(specs[i]),
-            showGridColors: showGridColors,
+        // **One clock for the whole grid, one fade per row.** The rows used to
+        // appear as a block; the panel now assembles itself top to bottom. It
+        // is a single controller with an interval per row rather than a
+        // controller each, so five rows cost one ticker and not five, and the
+        // stagger is capped so a long fish grid does not take twice as long as
+        // a short environment one to become readable.
+        _GridEntrance(
+          // The spec count is the animation's shape. A rebuild that changes it
+          // is a different grid, and re-keying it is what lets the entrance run
+          // again for that grid without replaying on every poll.
+          key: ValueKey(specs.length),
+          rowCount: specs.length,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < specs.length; i++) ...[
+                _SpecRow(
+                  spec: specs[i],
+                  value: values?[specs[i].key],
+                  breached: verdicts.isBreached(specs[i]),
+                  limit: limitLabelFor?.call(specs[i]),
+                  meterFraction: _meterFraction(specs[i]),
+                  showGridColors: showGridColors,
+                ),
+                if (i < specs.length - 1) const TerminalRule(),
+              ],
+            ],
           ),
-          if (i < specs.length - 1) const TerminalRule(),
-        ],
+        ),
       ],
     );
   }
@@ -170,6 +189,119 @@ class MetricGrid extends StatelessWidget {
     return ((value - min) / (max - min)).clamp(0.0, 1.0);
   }
 }
+
+/// Fades the grid's rows in, top to bottom, on the **first mount only**.
+///
+/// **One controller for the whole grid.** A controller per row would be five
+/// tickers for one gesture, and the stagger is what makes the order read as
+/// assembly rather than as noise. Rows are driven by a single interval each,
+/// so the last one starts at [_kGridStaggerStep] × (rows - 1) and no row can
+/// outlive `AppMotion.container`.
+///
+/// **A poll must not replay it.** The dashboard rebuilds this grid every ten
+/// seconds; `initState` starts the animation once and nothing restarts it.
+/// The key is the spec count, so the entrance runs again only when a
+/// genuinely different grid is drawn.
+///
+/// **Reduce-motion wins.** `MediaQuery.disableAnimationsOf` is the platform's
+/// own setting; when it is set the rows are simply present.
+class _GridEntrance extends StatefulWidget {
+  const _GridEntrance({
+    super.key,
+    required this.rowCount,
+    required this.child,
+  });
+
+  final int rowCount;
+  final Widget child;
+
+  @override
+  State<_GridEntrance> createState() => _GridEntranceState();
+}
+
+class _GridEntranceState extends State<_GridEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  /// One 0..1 curve per row, or null where the row is simply present.
+  late final List<Animation<double>?> _rows;
+
+  /// How far apart two consecutive rows start.
+  ///
+  /// `shortcut:` a fixed 60 ms step, correct for the 3-5 rows this grid ever
+  /// holds; upgrade to a step derived from `AppMotion.container / rows` if a
+  /// grid starts carrying more than about five.
+  static const Duration _step = Duration(milliseconds: 60);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: AppMotion.container,
+      vsync: this,
+    );
+    final shown = widget.rowCount.clamp(0, _kMaxStaggeredRows);
+    final span = 1.0 - (shown <= 1 ? 0.0 : (shown - 1) * _step.inMilliseconds /
+        AppMotion.container.inMilliseconds);
+    _rows = <Animation<double>?>[
+      for (var i = 0; i < widget.rowCount; i++)
+        i < shown
+            ? CurvedAnimation(
+                parent: _controller,
+                curve: Interval(
+                  (i * _step.inMilliseconds /
+                          AppMotion.container.inMilliseconds)
+                      .clamp(0.0, 1.0),
+                  ((i * _step.inMilliseconds /
+                                  AppMotion.container.inMilliseconds) +
+                              span)
+                          .clamp(0.0, 1.0),
+                  curve: AppMotion.enter,
+                ),
+              )
+            : null,
+    ];
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    for (final row in _rows) {
+      if (row is CurvedAnimation) row.dispose();
+    }
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+    final children = (widget.child as Column).children;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        for (var i = 0; i < children.length; i++)
+          _rows.length > i / 2 && _rows[i ~/ 2] != null && i.isEven
+              ? FadeTransition(
+                  opacity: _rows[i ~/ 2]!,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.05),
+                      end: Offset.zero,
+                    ).animate(_rows[i ~/ 2]!),
+                    child: children[i],
+                  ),
+                )
+              : children[i],
+      ],
+    );
+  }
+}
+
+/// How many rows may be staggered at all. Past this the remaining rows are
+/// simply present, so a long list cannot grow the entrance without bound.
+const int _kMaxStaggeredRows = 5;
 
 /// One spec: the row, and the range bar under it when there is a range.
 class _SpecRow extends StatelessWidget {

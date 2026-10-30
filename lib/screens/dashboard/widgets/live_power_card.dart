@@ -382,21 +382,33 @@ class _PowerFlow extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: AppRadius.all(AppRadius.bar),
                 child: solarForBar > 0
-                    ? Row(
-                        children: [
-                          Expanded(
-                            flex: (loadShare * 1000).round().clamp(1, 1000),
-                            child: ColoredBox(color: houseHue),
-                          ),
-                          if (loadShare < 1)
+                    // **The split boundary is tweened, not snapped.** A poll
+                    // moves the house share by whole percent every ten seconds,
+                    // and the bar used to redraw as a jump. The tween lives
+                    // inside this row, so its frames rebuild the two `Expanded`s
+                    // and nothing above them -- the poll path is untouched.
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween<double>(begin: 0, end: loadShare),
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : AppMotion.state,
+                        curve: AppMotion.enter,
+                        builder: (context, share, _) => Row(
+                          children: [
                             Expanded(
-                              flex: ((1 - loadShare) * 1000).round().clamp(
-                                1,
-                                1000,
-                              ),
-                              child: ColoredBox(color: solarHue),
+                              flex: (share * 1000).round().clamp(1, 1000),
+                              child: ColoredBox(color: houseHue),
                             ),
-                        ],
+                            if (share < 1)
+                              Expanded(
+                                flex: ((1 - share) * 1000).round().clamp(
+                                  1,
+                                  1000,
+                                ),
+                                child: ColoredBox(color: solarHue),
+                              ),
+                          ],
+                        ),
                       )
                     // Nothing to show: the track's own fill is the empty state,
                     // exactly as the brief sets `backgroundColor` on the track
@@ -491,20 +503,30 @@ class _SocLine extends StatelessWidget {
                   padding: const EdgeInsets.all(1),
                   child: ClipRRect(
                     borderRadius: AppRadius.all(AppRadius.bar),
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: (clamped ?? 0) / 100,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: accent,
-                          boxShadow: AppShadows.glow(accent),
+                    // **Tweened for the same reason as the split bar.** A SOC
+                    // that moves 40% to 41% once per poll should travel, not
+                    // flick. `disableAnimations` collapses the clock to zero.
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: (clamped ?? 0) / 100),
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : AppMotion.state,
+                      curve: AppMotion.enter,
+                      builder: (context, fraction, _) => FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: fraction,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: accent,
+                            boxShadow: AppShadows.glow(accent),
+                          ),
+                          // `SizedBox.expand` rather than a bare `DecoratedBox`:
+                          // a decoration with no child collapses to
+                          // `constraints.smallest` unless the constraints are
+                          // tight, and reasoning about whether they are is not
+                          // worth the saving.
+                          child: const SizedBox.expand(),
                         ),
-                        // `SizedBox.expand` rather than a bare `DecoratedBox`:
-                        // a decoration with no child collapses to
-                        // `constraints.smallest` unless the constraints are
-                        // tight, and reasoning about whether they are is not
-                        // worth the saving.
-                        child: const SizedBox.expand(),
                       ),
                     ),
                   ),
@@ -755,7 +777,17 @@ _LabelPlan _planLabelSlots(
 
     final used = minima.fold(0.0, (a, b) => a + b);
     if (used <= available) {
-      final slack = (available - used) / labels.length;
+      // **One dp of slack per slot is the Flex rounding budget, not a taste
+      // margin.** `RenderFlex` hands a flexed child a whole-pixel share, and
+      // the three shares plus two arrows cannot all be exact, so a slot may be
+      // granted up to a pixel less than it was planned at. A label on a break
+      // boundary -- `Charging` at 381 dp and a 2.0 scale was one -- responds to
+      // that single pixel by wrapping, and with `maxLines` set the wrap is the
+      // ellipsis: it drew `Ch…` while `Solar` and `House` were fine. Reserved
+      // before the split, so a slot is never narrower than its own minimum.
+      const flexRounding = 1.0;
+      final slack = (available - used - flexRounding * labels.length) /
+          labels.length;
       return _LabelPlan(lines, [for (final m in minima) m + slack]);
     }
   }

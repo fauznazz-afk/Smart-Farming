@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/dashboard/utils/app_motion.dart';
 import '../screens/dashboard/utils/color_helpers.dart';
 import '../screens/dashboard/utils/design_tokens.dart';
 import '../services/energy_forecast_service.dart';
@@ -130,16 +131,26 @@ class EnergySummaryCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    '${_formatEnergy(value)} kWh',
-                    maxLines: 1,
-                    softWrap: false,
-                    // `numeralLg`, and it was a hand-written 17sp/800. The brief
-                    // has no 800 — it jumps from 900 to 700 — and a numeral is
-                    // display copy in this system, so this is the 24sp/900 token
-                    // as written. It is the whole point of the scale that the
-                    // figure shouts.
-                    style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                  // **The number counts across a range switch.** 7 days to 30
+                  // days changes both tiles at once, and a jump reads as the
+                  // data having been replaced rather than as the same reading
+                  // over a longer window. `TweenedFigure` is the app's one
+                  // counter; it paints the first value verbatim and animates
+                  // only a change. The box, the `maxLines` and the style are
+                  // untouched, so the truncation pin at 320 dp still holds.
+                  child: TweenedFigure(
+                    text: _formatEnergy(value),
+                    builder: (context, text) => Text(
+                      '$text kWh',
+                      maxLines: 1,
+                      softWrap: false,
+                      // `numeralLg`, and it was a hand-written 17sp/800. The brief
+                      // has no 800 — it jumps from 900 to 700 — and a numeral is
+                      // display copy in this system, so this is the 24sp/900 token
+                      // as written. It is the whole point of the scale that the
+                      // figure shouts.
+                      style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 3),
