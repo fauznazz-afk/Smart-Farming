@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/cctv_url.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/staggered_entrance.dart';
 import '../services/secure_window.dart';
 import 'cctv/utils/cctv_status.dart';
 import 'cctv/widgets/cctv_viewport.dart';
@@ -408,7 +409,9 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
+        StaggeredEntrance(
+          index: 0,
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xs,
             AppSpacing.sm,
@@ -480,10 +483,13 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
             ],
           ),
         ),
+        ),
         // The panel's frame — an `AppCard`: `surface` fill, hairline, card
         // radius, and the card's own lift. The video matte (cctvVideoGround)
         // stays the same.
-        AppCard(
+        StaggeredEntrance(
+          index: 1,
+          child: AppCard(
           padding: EdgeInsets.zero,
           child: ClipRRect(
             // **The image rule is a hairline and a clip.** The previous system
@@ -525,6 +531,7 @@ class _CctvScreenState extends State<CctvScreen> with RouteAware {
               ),
             ),
           ),
+        ),
         ),
         // **Only while the stream is running, and this bar was on screen in every
         // state until an emulator screenshot showed what it looks like.**

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/app_log.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/staggered_entrance.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
@@ -173,7 +174,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       itemCount: _sections.length,
       itemBuilder: (context, index) {
         final section = _sections[index];
-        return Padding(
+        // Only the first four rows take the entrance; the rest are lazily built
+        // and would otherwise flash while the user is scrolling to them.
+        return StaggeredEntrance(
+          index: index,
+          child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
             vertical: AppSpacing.xs,
@@ -258,6 +263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+        ),
         );
       },
     );

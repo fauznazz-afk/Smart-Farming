@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/energy_report_service.dart';
 import '../services/thingsboard_api.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/staggered_entrance.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'energy_report/utils/period_buckets.dart';
 import 'energy_report/widgets/period_selector.dart';
@@ -239,18 +240,22 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                   // period change plus every bucket touch.
                   itemCount: buckets.isEmpty ? 2 : 6,
                   itemBuilder: (context, index) => switch (index) {
-                    0 => PeriodSelector(
-                      monthly: _monthly,
-                      selectedDate: _selectedDate,
-                      onMonthlyChanged: (value) {
-                        _touchedBucketNotifier.value = null;
-                        setState(() => _monthly = value);
-                      },
-                      onPickPeriod: _pickPeriod,
+                    0 => StaggeredEntrance(
+                      index: 0,
+                      child: PeriodSelector(
+                        monthly: _monthly,
+                        selectedDate: _selectedDate,
+                        onMonthlyChanged: (value) {
+                          _touchedBucketNotifier.value = null;
+                          setState(() => _monthly = value);
+                        },
+                        onPickPeriod: _pickPeriod,
+                      ),
                     ),
                     1 => const SizedBox(height: AppSpacing.md),
-                    2 =>
-                      buckets.isEmpty
+                    2 => StaggeredEntrance(
+                      index: 1,
+                      child: buckets.isEmpty
                           ? EmptyPeriodView(data: data!)
                           : TotalsCard(
                               monthly: _monthly,
@@ -260,20 +265,26 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                               buckets: buckets,
                               previousTotals: previousTotals,
                             ),
-                    3 =>
-                      buckets.isEmpty
+                    ),
+                    3 => StaggeredEntrance(
+                      index: 2,
+                      child: buckets.isEmpty
                           ? const SizedBox.shrink()
                           : ChartCard(
                               monthly: _monthly,
                               buckets: buckets,
                               touchedBucketNotifier: _touchedBucketNotifier,
                             ),
-                    4 =>
-                      buckets.isEmpty
+                    ),
+                    4 => StaggeredEntrance(
+                      index: 3,
+                      child: buckets.isEmpty
                           ? const SizedBox.shrink()
                           : DataNote(data: data!),
-                    _ =>
-                      buckets.isEmpty
+                    ),
+                    _ => StaggeredEntrance(
+                      index: 4,
+                      child: buckets.isEmpty
                           ? const SizedBox.shrink()
                           : ExportButton(
                               buckets: buckets,
@@ -281,6 +292,7 @@ class _EnergyReportScreenState extends State<EnergyReportScreen> {
                               monthly: _monthly,
                               sharingNotifier: _sharing,
                             ),
+                    ),
                   },
                 ),
               ),

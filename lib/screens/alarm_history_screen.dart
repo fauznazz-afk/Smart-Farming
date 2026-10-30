@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/alarm_history_service.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/staggered_entrance.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 
@@ -150,8 +151,10 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
             ? _emptyState()
             : Column(
                 children: [
-                  _filterBar(),
-                  Expanded(child: _alarmList()),
+                  StaggeredEntrance(index: 0, child: _filterBar()),
+                  Expanded(
+                    child: StaggeredEntrance(index: 1, child: _alarmList()),
+                  ),
                 ],
               ),
       ),

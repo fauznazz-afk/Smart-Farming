@@ -2018,11 +2018,30 @@ class _DashboardScreenState extends State<DashboardScreen>
             // are invoked instead, which costs nothing measurable: the expensive
             // child is the chart, and that is a `Bound` whose child is cached and
             // only rebuilt when the chart revision actually bumps.
-            ...switch (sub) {
-              0 => _pvPage(),
-              1 => _acPage(),
-              _ => _batteryPage(),
-            }.map((make) => make()),
+            // The switcher is keyed on `sub`, so a tap cross-fades the two
+            // sub-views while the selector above it stays put. It is fed the
+            // already-invoked closures, not the closures, because a list of
+            // functions has no identity AnimatedSwitcher can key on.
+            AnimatedSwitcher(
+              duration: AppMotion.state,
+              switchInCurve: AppMotion.enter,
+              switchOutCurve: AppMotion.exit,
+              // The default centres both children; a page has to keep its top
+              // edge, so the outgoing view fades where it stood.
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                alignment: Alignment.topCenter,
+                children: <Widget>[...previousChildren, ?currentChild],
+              ),
+              child: Column(
+                key: ValueKey<int>(sub),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: switch (sub) {
+                  0 => _pvPage(),
+                  1 => _acPage(),
+                  _ => _batteryPage(),
+                }.map((make) => make()).toList(),
+              ),
+            ),
           ],
         ),
       ),
