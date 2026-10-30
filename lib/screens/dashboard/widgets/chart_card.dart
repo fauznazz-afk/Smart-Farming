@@ -236,6 +236,16 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
   final GlobalKey _exportKey = GlobalKey();
   bool _exporting = false;
 
+  /// Total plotted points across every series on the last build.
+  ///
+  /// **The guard that lets the chart slide instead of morph.** fl_chart's
+  /// `ImplicitlyAnimatedWidget` lerps `lineBarsData` pairwise by index, so when
+  /// a poll appends a point the lists differ in length and the tween morphs each
+  /// point toward the *next* one instead of sliding a single point in. A zero
+  /// clock is still right for that case. The clock is only safe when the count is
+  /// unchanged and merely some values moved.
+  int _lastPointCount = 0;
+
   Future<void> _export() async {
     if (_exporting) return;
     setState(() => _exporting = true);
@@ -278,6 +288,12 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
       ),
     );
     final hasData = scaled.any((item) => item.series.points.isNotEmpty);
+    final pointCount = scaled.fold<int>(
+      0,
+      (sum, item) => sum + item.series.points.length,
+    );
+    final countUnchanged = pointCount == _lastPointCount;
+    _lastPointCount = pointCount;
     final title = group.title;
 
     // Through `AppCard.semanticLabel` rather than a `Semantics` wrapper, and the
@@ -341,7 +357,20 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
                       onPointerCancel: (_) => onPointerActive(false),
                       child: LineChart(
                         _lineChartData(scaled, bounds),
-                        duration: Duration.zero,
+                        // **Zero when the point count changed, a short clock when
+                        // it did not.** A poll that appends or truncates a point
+                        // makes fl_chart lerp `lineBarsData` pairwise by index; the
+                        // lists are then different lengths and each point morphs
+                        // toward its wrong neighbour rather than sliding in. The
+                        // same poll that only revises values on existing points
+                        // keeps the count identical, so the pairwise tween is
+                        // correct there and the chart can slide. Reduce-motion wins
+                        // over both.
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : countUnchanged
+                            ? AppMotion.state
+                            : Duration.zero,
                       ),
                     ),
                   ),
