@@ -510,7 +510,7 @@ class OverviewPanel extends StatelessWidget {
   static Widget _section(String label, {VoidCallback? onTap}) {
     final text = Text(
       label,
-      style: AppType.slotMicro.copyWith(color: AppPalette.error),
+      style: AppType.slotMicro.copyWith(color: AppPalette.accent),
     );
     return Padding(
       // **Top `md`, bottom `xs`.** The first of these was `sm`/`xs` on the
@@ -600,7 +600,7 @@ class _Header extends StatelessWidget {
                     // Red, like the reference's station label. The name above
                     // stays white so the two lines are not one red block.
                     'OVERVIEW',
-                    style: AppType.slotMicro.copyWith(color: AppPalette.error),
+                    style: AppType.slotMicro.copyWith(color: AppPalette.accent),
                   ),
               ],
             ),

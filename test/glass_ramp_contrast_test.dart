@@ -33,7 +33,7 @@ void main() {
       test('the accent ink clears AA on the accent fill', () {
         // The filled button, the selected date chip and the nav bubble all draw
         // `onHue` on the accent, so this is the app's largest text colour.
-        final ratio = _contrast(AppPalette.onHue, AppPalette.error);
+        final ratio = _contrast(AppPalette.onHue, AppPalette.accent);
         expect(
           ratio,
           greaterThanOrEqualTo(4.5),
@@ -49,7 +49,7 @@ void main() {
           AppSurfaces.surface,
           AppSurfaces.surfaceAlt,
         ]) {
-          final ratio = _contrast(AppPalette.error, surface);
+          final ratio = _contrast(AppPalette.accent, surface);
           expect(
             ratio,
             greaterThanOrEqualTo(4.5),
@@ -160,7 +160,7 @@ void main() {
         // the same pixel.
         expect(
           AppPalette.statusBad,
-          isNot(AppPalette.error),
+          isNot(AppPalette.accent),
           reason: '${entry.key}: the accent and the breach are the same colour',
         );
       });
@@ -169,7 +169,7 @@ void main() {
 
   test('both ramps resolve to the same WattVision dark values', () {
     // WattVision is dark-only: both static palettes are identical.
-    expect(AppPaletteTheme.light.error, AppPaletteTheme.dark.error);
+    expect(AppPaletteTheme.light.accent, AppPaletteTheme.dark.accent);
     expect(AppPaletteTheme.light.onHue, AppPaletteTheme.dark.onHue);
   });
 

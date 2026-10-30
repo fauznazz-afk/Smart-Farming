@@ -138,7 +138,7 @@ void main() {
       );
     }
     // The selected glyph is `onHue` on the accent bubble, not on the bar.
-    final selected = _contrast(AppPalette.onHue, AppPalette.error);
+    final selected = _contrast(AppPalette.onHue, AppPalette.accent);
     expect(
       selected,
       greaterThanOrEqualTo(4.5),

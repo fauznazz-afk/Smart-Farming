@@ -39,7 +39,7 @@ void main() {
     'secondary': AppPalette.secondary,
     'accent': AppPalette.accent,
     'success': AppPalette.success,
-    'error': AppPalette.error,
+    'error': AppPalette.accent,
     'chartViolet': AppPalette.chartViolet,
     'chartCoral': AppPalette.chartCyan,
     for (final category in MetricCategory.values)
@@ -114,13 +114,13 @@ void main() {
     test('it takes dark ink, and white would have failed', () {
       expect(AppPalette.onHue, const Color(0xFF121212));
       expect(
-        _contrast(AppPalette.onHue, AppPalette.error),
+        _contrast(AppPalette.onHue, AppPalette.accent),
         greaterThanOrEqualTo(4.5),
         reason: 'the accent fill with its own ink is '
-            '${_contrast(AppPalette.onHue, AppPalette.error).toStringAsFixed(2)}:1',
+            '${_contrast(AppPalette.onHue, AppPalette.accent).toStringAsFixed(2)}:1',
       );
       expect(
-        _contrast(Colors.white, AppPalette.error),
+        _contrast(Colors.white, AppPalette.accent),
         lessThan(4.5),
         reason: 'white now clears 4.5:1 on the accent, so the hardcoded '
             'AppPalette.onHue in banners.dart and liquid_glass.dart should be '
@@ -157,7 +157,7 @@ void main() {
         // accent instead.
         final colour = (s.key == 'page' || s.key == 'track')
             ? AppGlass.accentOnPage
-            : AppPalette.error;
+            : AppPalette.accent;
         expect(
           _contrast(colour, s.value),
           greaterThanOrEqualTo(3.0),
@@ -167,7 +167,7 @@ void main() {
         );
       }
       expect(
-        _contrast(AppPalette.error, AppSurfaces.bindingCaptionSurface),
+        _contrast(AppPalette.accent, AppSurfaces.bindingCaptionSurface),
         greaterThanOrEqualTo(4.5),
         reason: 'the accent has to clear AA as text on the binding surface, '
             'because it now draws headings and labels and not only alarms',

@@ -46,7 +46,7 @@ void main() {
         statusWarn,
         statusBad,
         statusAlert,
-        // `AppPalette.error` is deliberately absent: it is the cyan accent used
+        // `AppPalette.accent` is deliberately absent: it is the cyan accent used
         // for fills, buttons and icons — graphic chrome drawn with
         // `AppPalette.onHue` ink, not body text on a card. Asserting a graphic
         // accent clears 4.5:1 as *text* on `surfaceAlt` is the wrong claim for
@@ -157,9 +157,9 @@ void main() {
         // is a different token, because the page inverts the whole ramp.
         final messages = <String>[];
         for (final surface in cardSurfaces()) {
-          final ratio = contrast(AppPalette.error, surface);
+          final ratio = contrast(AppPalette.accent, surface);
           if (ratio < 3.0) {
-            final accentHex = hex(AppPalette.error);
+            final accentHex = hex(AppPalette.accent);
             final surfaceHex = hex(surface);
             messages.add(
                 '$accentHex on $surfaceHex = ${ratio.toStringAsFixed(2)}:1');
@@ -175,10 +175,10 @@ void main() {
         // defensible while the ratio holds - in the palette that is active,
         // which is why this is a per-palette claim and not one.
         expect(
-          contrast(AppPalette.onHue, AppPalette.error),
+          contrast(AppPalette.onHue, AppPalette.accent),
           greaterThanOrEqualTo(4.5),
           reason: '$name: onHue on the accent is '
-              '${contrast(AppPalette.onHue, AppPalette.error).toStringAsFixed(2)}:1',
+              '${contrast(AppPalette.onHue, AppPalette.accent).toStringAsFixed(2)}:1',
         );
         expect(AppPalette.onHue, const Color(0xFF121212));
       });
@@ -195,7 +195,7 @@ void main() {
           ('statusAlert', statusAlert),
         ]) {
           expect(
-            AppPalette.error,
+            AppPalette.accent,
             isNot(status.$2),
             reason: '$name: the accent and ${status.$1} are the same colour',
           );
@@ -263,11 +263,11 @@ void main() {
       'dark': AppPaletteTheme.dark,
     }.entries) {
       expect(
-        contrast(entry.value.onHue, entry.value.error),
+        contrast(entry.value.onHue, entry.value.accent),
         greaterThanOrEqualTo(4.5),
         reason:
             '${entry.key}: the accent fill with its own ink is '
-            '${contrast(entry.value.onHue, entry.value.error).toStringAsFixed(2)}:1',
+            '${contrast(entry.value.onHue, entry.value.accent).toStringAsFixed(2)}:1',
       );
     }
     expect(AppPaletteTheme.light.onHue, const Color(0xFF121212));
@@ -275,8 +275,8 @@ void main() {
     // And the hue really is shared — within 6 degrees, which is the tolerance
     // 8-bit quantisation needs, not a licence for a second accent.
     expect(
-      HSLColor.fromColor(AppPaletteTheme.light.error).hue,
-      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.error).hue, 6.0),
+      HSLColor.fromColor(AppPaletteTheme.light.accent).hue,
+      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.accent).hue, 6.0),
     );
   });
 }

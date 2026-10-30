@@ -180,7 +180,7 @@ double glassNavBarReservedHeight(BuildContext context) {
 /// Flat bottom navigation bar.
 ///
 /// The brief's tab bar: a flat bar with a hairline border, painted as glass
-/// over the page gradient, active item = `AppPalette.error` on a pill bubble
+/// over the page gradient, active item = `AppPalette.accent` on a pill bubble
 /// with no underline, inactive = muted glass ink. No shadow pair, no gradient
 /// of its own. No captions either — the bar is four icons, and each one's name
 /// lives in its `Semantics` label.
@@ -458,7 +458,7 @@ class _NavBubble extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppPalette.error,
+          color: AppPalette.accent,
         ),
         child: const SizedBox(width: 44, height: 44),
       ),
@@ -535,7 +535,7 @@ class _NavDestination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // **`onHue`, not `error`.** The bubble is behind this glyph, so accent ink
+    // **`onHue`, not `accent`.** The bubble is behind this glyph, so accent ink
     // on an accent fill is accent-on-accent. See the class doc.
     // **`navInkSoft` is the white-chip ink and is wrong here now.** The bar is
     // a dark surface (see the decoration in `build`), so the inactive glyph

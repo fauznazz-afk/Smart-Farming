@@ -29,7 +29,7 @@ class BrandLogo extends StatelessWidget {
     //
     // Both parameters are still honoured: a caller that wants its own pair can
     // have one, and the defaults no longer contradict the palette.
-    final primary = accentColor ?? AppPalette.error;
+    final primary = accentColor ?? AppPalette.accent;
     final secondary = secondaryColor ?? AppSurfaces.onSurfaceVariant;
     final mark = Container(
       width: size,

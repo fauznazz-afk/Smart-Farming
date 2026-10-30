@@ -78,7 +78,7 @@ class TelemetryErrorView extends StatelessWidget {
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: AppRadius.all(AppRadius.card),
-                boxShadow: AppShadows.stampedIn(AppPalette.error),
+                boxShadow: AppShadows.stampedIn(AppPalette.accent),
               ),
               child: FilledButton.icon(
                 onPressed: onRetry,
@@ -92,7 +92,7 @@ class TelemetryErrorView extends StatelessWidget {
                   style: AppType.buttonLabel.copyWith(color: AppPalette.onHue),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppPalette.error,
+                  backgroundColor: AppPalette.accent,
                   foregroundColor: AppPalette.onHue,
                   disabledBackgroundColor: AppSurfaces.surfaceAlt,
                   // **Card ink, not page ink.** The disabled fill is

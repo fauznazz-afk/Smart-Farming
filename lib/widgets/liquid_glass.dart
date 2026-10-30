@@ -431,7 +431,7 @@ class DateStripChip extends StatelessWidget {
     // **The ink is `AppPalette.onHue`, which is dark.** WattVision's cyan is a
     // bright fill, so the token ink is `#121212` and it clears AA on it; white
     // would be about 1.4:1.
-    final fill = isSelected ? AppPalette.error : AppSurfaces.surface;
+    final fill = isSelected ? AppPalette.accent : AppSurfaces.surface;
     // **Card ink, not page ink.** The unselected chip carries the card fill
     // (`AppSurfaces.surface`), so it is a card and not a bare patch of page.
     final ink = isSelected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;

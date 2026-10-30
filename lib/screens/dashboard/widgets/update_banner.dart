@@ -35,7 +35,7 @@ class UpdateBanner extends StatelessWidget {
             ExcludeSemantics(
               child: Icon(
                 Icons.system_update_alt,
-                color: AppPalette.error,
+                color: AppPalette.accent,
                 size: 17,
               ),
             ),
@@ -45,7 +45,7 @@ class UpdateBanner extends StatelessWidget {
                 'UPDATE ${release.version} AVAILABLE',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppType.labelUppercase.copyWith(color: AppPalette.error),
+                style: AppType.labelUppercase.copyWith(color: AppPalette.accent),
               ),
             ),
             _Action(label: 'GET', onTap: _open),
@@ -111,7 +111,7 @@ class _Action extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 label,
-                style: AppType.labelMicro.copyWith(color: AppPalette.error),
+                style: AppType.labelMicro.copyWith(color: AppPalette.accent),
               ),
             ),
           ),

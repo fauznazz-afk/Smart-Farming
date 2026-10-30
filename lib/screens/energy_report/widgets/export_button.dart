@@ -39,7 +39,7 @@ class ExportButton extends StatelessWidget {
         return DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: AppRadius.all(AppRadius.card),
-            boxShadow: AppShadows.stampedIn(AppPalette.error),
+            boxShadow: AppShadows.stampedIn(AppPalette.accent),
           ),
           child: SizedBox(
             width: double.infinity,
@@ -61,13 +61,13 @@ class ExportButton extends StatelessWidget {
                   : const Icon(Icons.file_download_outlined, size: 20),
               label: Text(isSharing ? 'Preparing CSV…' : 'Export CSV report'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppPalette.error,
+                backgroundColor: AppPalette.accent,
                 foregroundColor: AppPalette.onHue,
                 // Both disabled colours keep the fill and the ink, so the
                 // button does not grey out behind the spinner mid-write. It is
                 // still disabled — `onPressed` is null — it says so with its
                 // label rather than by becoming a different button.
-                disabledBackgroundColor: AppPalette.error,
+                disabledBackgroundColor: AppPalette.accent,
                 disabledForegroundColor:
                     AppPalette.onHue.withValues(alpha: 0.70),
                 // 13/900/0.1em. Buttons shout; `label-uppercase` is the

@@ -81,14 +81,14 @@ class ErrorView extends StatelessWidget {
             DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: AppRadius.all(AppRadius.card),
-                boxShadow: AppShadows.stampedIn(AppPalette.error),
+                boxShadow: AppShadows.stampedIn(AppPalette.accent),
               ),
               child: FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 label: const Text('Retry'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppPalette.error,
+                  backgroundColor: AppPalette.accent,
                   foregroundColor: AppPalette.onHue,
                   textStyle: AppType.buttonLabel,
                   minimumSize: const Size(0, 56),

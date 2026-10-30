@@ -220,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: AppRadius.all(AppRadius.card),
-                            boxShadow: AppShadows.stampedIn(AppPalette.error),
+                            boxShadow: AppShadows.stampedIn(AppPalette.accent),
                           ),
                           child: SizedBox(
                             width: double.infinity,
@@ -228,9 +228,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: FilledButton(
                               onPressed: _loading ? null : _handleLogin,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppPalette.error,
+                                backgroundColor: AppPalette.accent,
                                 foregroundColor: AppPalette.onHue,
-                                disabledBackgroundColor: AppPalette.error,
+                                disabledBackgroundColor: AppPalette.accent,
                                 disabledForegroundColor:
                                     AppPalette.onHue.withValues(alpha: 0.70),
                                 textStyle: AppType.buttonLabel,

@@ -110,7 +110,7 @@ class SectionCard extends StatelessWidget {
 /// Circular accent icon container used as a section/list leading.
 ///
 /// **Neutral on purpose, and the accent it used to take was amber.**
-/// [AppPalette.accent] is `statusWarn` in `color_helpers.dart` — it is the
+/// [AppPalette.warning] is `statusWarn` in `color_helpers.dart` — it is the
 /// "telemetry is stale" hue. Painting every settings icon in it gave a warning
 /// colour a decorative job, which is the same defect as the permanent green
 /// "semua normal" badge: a hue means one thing or the reader cannot rely on it.
@@ -429,7 +429,7 @@ class LabeledDropdown extends StatelessWidget {
 /// * **`AppType.buttonLabel`, not `label-uppercase`.** 13px at weight 900 with
 ///   0.1em tracking. Buttons shout; the brief gives them the display weight at
 ///   label size, which is not the same as a 12px/700 metadata line.
-/// * **The tinted lift**, `AppShadows.stampedIn(AppPalette.error)`. The one
+/// * **The tinted lift**, `AppShadows.stampedIn(AppPalette.accent)`. The one
 ///   button allowed to be electric carries a shadow in its own hue rather than a
 ///   neutral black one, so the lift reads as part of the fill.
 ///
@@ -453,7 +453,7 @@ class SaveSettingsButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: AppRadius.all(AppRadius.card),
-        boxShadow: AppShadows.stampedIn(AppPalette.error),
+        boxShadow: AppShadows.stampedIn(AppPalette.accent),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -467,13 +467,13 @@ class SaveSettingsButton extends StatelessWidget {
               : const Icon(Icons.save, size: 20),
           label: Text(saving ? 'Saving...' : 'Save settings'),
           style: FilledButton.styleFrom(
-            backgroundColor: AppPalette.error,
+            backgroundColor: AppPalette.accent,
             foregroundColor: AppPalette.onHue,
             // Both disabled colours keep the fill and the ink, so the button
             // does not grey out behind the spinner mid-write. It is still
             // disabled — `onPressed` is null — it just says so with its label
             // rather than by turning into a different button.
-            disabledBackgroundColor: AppPalette.error,
+            disabledBackgroundColor: AppPalette.accent,
             disabledForegroundColor: AppPalette.onHue.withValues(alpha: 0.70),
             textStyle: AppType.buttonLabel,
             minimumSize: const Size(0, 56),

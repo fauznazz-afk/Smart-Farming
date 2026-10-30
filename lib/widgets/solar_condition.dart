@@ -105,7 +105,7 @@ class SolarConditionCard extends StatelessWidget {
               Icon(
                 Icons.wb_sunny_rounded,
                 size: 20,
-                color: AppPalette.error,
+                color: AppPalette.accent,
               ),
               const SizedBox(width: AppSpacing.sm),
               // **The left half is the *name*, the right half is the *reading*.**
@@ -235,9 +235,9 @@ class _BrightnessBar extends StatelessWidget {
             // the accent; `design_tokens.dart` says so and this is now the only
             // place that obeys it.
             decoration: BoxDecoration(
-              color: AppPalette.error,
+              color: AppPalette.accent,
               borderRadius: BorderRadius.circular(AppRadius.bar),
-              boxShadow: AppShadows.glow(AppPalette.error, strength: 0.35),
+              boxShadow: AppShadows.glow(AppPalette.accent, strength: 0.35),
             ),
           ),
         ),

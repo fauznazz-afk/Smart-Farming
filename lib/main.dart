@@ -29,7 +29,7 @@ void main() {
 /// palette's hues are hand-specified and measured; a derived role is a copy that
 /// drifts the moment a surface moves.
 ///
-/// **Every accent-bearing role resolves to [AppPalette.error], the cyan data
+/// **Every accent-bearing role resolves to [AppPalette.accent], the cyan data
 /// accent.** Material derives an enormous amount of chrome from this one object —
 /// `FilledButton`'s fill and ink, the selected `Chip`, the `SegmentedButton`
 /// selection, a `Switch`'s active track, a `Checkbox`, the focus ring, text
@@ -48,20 +48,20 @@ void main() {
 /// so the token ink is the only legible one.
 ColorScheme _appColorScheme() => ColorScheme(
   brightness: AppTheme.brightness,
-  primary: AppPalette.error,
+  primary: AppPalette.accent,
   onPrimary: AppPalette.onHue,
-  primaryContainer: AppPalette.error,
+  primaryContainer: AppPalette.accent,
   onPrimaryContainer: AppPalette.onHue,
-  secondary: AppPalette.error,
+  secondary: AppPalette.accent,
   onSecondary: AppPalette.onHue,
-  secondaryContainer: AppPalette.error,
+  secondaryContainer: AppPalette.accent,
   onSecondaryContainer: AppPalette.onHue,
-  tertiary: AppPalette.error,
+  tertiary: AppPalette.accent,
   onTertiary: AppPalette.onHue,
   surface: AppSurfaces.surface,
   onSurface: AppSurfaces.onSurface,
   onSurfaceVariant: AppSurfaces.onSurfaceVariant,
-  error: AppPalette.error,
+  error: AppPalette.accent,
   onError: AppPalette.onHue,
   outline: AppSurfaces.border,
   outlineVariant: AppSurfaces.border,
@@ -79,7 +79,7 @@ ColorScheme _appColorScheme() => ColorScheme(
   // for the same reason `actionTextColor` is.
   inverseSurface: AppSurfaces.surface,
   onInverseSurface: AppSurfaces.onSurface,
-  inversePrimary: AppPalette.error,
+  inversePrimary: AppPalette.accent,
 );
 
 /// The type scale, on [AppType].
@@ -143,10 +143,10 @@ TextTheme _appTextTheme() {
 /// button's own hue rather than a neutral black.
 FilledButtonThemeData _buttonTheme() => FilledButtonThemeData(
   style: ButtonStyle(
-    backgroundColor: WidgetStatePropertyAll(AppPalette.error),
+    backgroundColor: WidgetStatePropertyAll(AppPalette.accent),
     foregroundColor: WidgetStatePropertyAll(AppPalette.onHue),
     elevation: const WidgetStatePropertyAll(0),
-    shadowColor: WidgetStatePropertyAll(AppPalette.error),
+    shadowColor: WidgetStatePropertyAll(AppPalette.accent),
     minimumSize: const WidgetStatePropertyAll(Size(0, 56)),
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -191,7 +191,7 @@ OutlinedButtonThemeData _outlinedButtonTheme() => OutlinedButtonThemeData(
 
 TextButtonThemeData _textButtonTheme() => TextButtonThemeData(
   style: ButtonStyle(
-    foregroundColor: WidgetStatePropertyAll(AppPalette.error),
+    foregroundColor: WidgetStatePropertyAll(AppPalette.accent),
     elevation: const WidgetStatePropertyAll(0),
     minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
     textStyle: const WidgetStatePropertyAll(AppType.labelMicro),
@@ -217,7 +217,7 @@ SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
   style: ButtonStyle(
     backgroundColor: WidgetStateProperty.resolveWith(
       (states) => states.contains(WidgetState.selected)
-          ? AppPalette.error
+          ? AppPalette.accent
           : AppSurfaces.surface,
     ),
     foregroundColor: WidgetStateProperty.resolveWith(
@@ -243,7 +243,7 @@ SegmentedButtonThemeData _segmentedTheme() => SegmentedButtonThemeData(
 /// **The fill is [AppSurfaces.input], which is the same value as
 /// [AppSurfaces.surface]: a text field is a surface.** 56dp tall, with the
 /// hairline edge doing the defining rather than a shadow, and a 2px
-/// [AppPalette.error] border on focus — the accent, which is the only attention
+/// [AppPalette.accent] border on focus — the accent, which is the only attention
 /// hue in the palette that is not also a severity.
 InputDecorationTheme _inputTheme() => InputDecorationTheme(
   filled: true,
@@ -259,7 +259,7 @@ InputDecorationTheme _inputTheme() => InputDecorationTheme(
   ),
   focusedBorder: OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.inset),
-    borderSide: BorderSide(color: AppPalette.error, width: 2),
+    borderSide: BorderSide(color: AppPalette.accent, width: 2),
   ),
   // Uppercase 700 with 0.1em tracking, per `label-uppercase-md`: a
   // placeholder in this system is a shout, not a hint.
@@ -336,7 +336,7 @@ ThemeData appThemeData() => ThemeData(
   // The brief's progress indicator: an accent line with no soft Material track
   // around it. `RefreshIndicator`'s spinner inherits it.
   progressIndicatorTheme: ProgressIndicatorThemeData(
-    color: AppPalette.error,
+    color: AppPalette.accent,
     circularTrackColor: AppSurfaces.surfaceMuted,
   ),
   // Material draws a `SnackBar` on `inverseSurface`, which on a dark scheme is
@@ -346,7 +346,7 @@ ThemeData appThemeData() => ThemeData(
   snackBarTheme: SnackBarThemeData(
     backgroundColor: AppSurfaces.surface,
     contentTextStyle: AppType.bodySm.copyWith(color: AppSurfaces.onSurface),
-    actionTextColor: AppPalette.error,
+    actionTextColor: AppPalette.accent,
   ),
   // The date pickers' chrome, which otherwise falls back to Material 3's own
   // dark defaults (`#1C1B1F`-family surface containers) and shows up as a
@@ -370,9 +370,9 @@ ThemeData appThemeData() => ThemeData(
       borderRadius: BorderRadius.circular(AppRadius.card),
       side: AppBorders.hairline,
     ),
-    headerBackgroundColor: AppPalette.error,
+    headerBackgroundColor: AppPalette.accent,
     headerForegroundColor: AppPalette.onHue,
-    rangePickerHeaderBackgroundColor: AppPalette.error,
+    rangePickerHeaderBackgroundColor: AppPalette.accent,
     rangePickerHeaderForegroundColor: AppPalette.onHue,
     headerHeadlineStyle: AppType.headlineMd,
     rangePickerHeaderHeadlineStyle: AppType.headlineMd,
@@ -391,17 +391,17 @@ ThemeData appThemeData() => ThemeData(
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sheetRow)),
     ),
     dayOverlayColor: WidgetStatePropertyAll(
-      AppPalette.error.withValues(alpha: 0.12),
+      AppPalette.accent.withValues(alpha: 0.12),
     ),
     todayForegroundColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.selected)) return AppPalette.onHue;
-      return AppPalette.error;
+      return AppPalette.accent;
     }),
     todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.selected)) return AppPalette.error;
+      if (states.contains(WidgetState.selected)) return AppPalette.accent;
       return AppSurfaces.surface;
     }),
-    todayBorder: BorderSide(color: AppPalette.error),
+    todayBorder: BorderSide(color: AppPalette.accent),
     yearBackgroundColor: WidgetStatePropertyAll(AppSurfaces.surface),
     yearForegroundColor: WidgetStateProperty.resolveWith((states) {
       if (states.contains(WidgetState.selected)) return AppPalette.onHue;
@@ -410,9 +410,9 @@ ThemeData appThemeData() => ThemeData(
       }
       return AppSurfaces.onSurface;
     }),
-    rangeSelectionBackgroundColor: AppPalette.error.withValues(alpha: 0.12),
+    rangeSelectionBackgroundColor: AppPalette.accent.withValues(alpha: 0.12),
     rangeSelectionOverlayColor: WidgetStatePropertyAll(
-      AppPalette.error.withValues(alpha: 0.12),
+      AppPalette.accent.withValues(alpha: 0.12),
     ),
   ),
 );

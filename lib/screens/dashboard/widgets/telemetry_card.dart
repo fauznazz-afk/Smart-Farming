@@ -108,7 +108,7 @@ class TelemetryCard extends StatelessWidget {
               // it was telling them is which of five hues the dashboard
               // currently believes the app is. Rows, icons and a 2px edge are
               // chrome and headings, so they take the one accent.
-              accent: AppPalette.error,
+              accent: AppPalette.accent,
               // **The 2px categorical bottom border, and it replaces the
               // [AppDivider] this row used to be separated by.** The brief's stat
               // tile is "card + leading icon in a categorical colour + numeral

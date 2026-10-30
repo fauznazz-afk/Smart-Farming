@@ -66,7 +66,7 @@ class FormattedMarkdownText extends StatelessWidget {
           child: Text(
             trimmed.substring(4),
             style: AppType.labelUppercase.copyWith(
-              color: AppPalette.error,
+              color: AppPalette.accent,
               letterSpacing: 0.5,
             ),
           ),
@@ -100,7 +100,7 @@ class FormattedMarkdownText extends StatelessWidget {
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: isUser ? AppSurfaces.onSurface : AppPalette.error,
+                  color: isUser ? AppSurfaces.onSurface : AppPalette.accent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -128,7 +128,7 @@ class FormattedMarkdownText extends StatelessWidget {
                 child: Text(
                   '${numMatch.group(1)}.',
                   style: AppType.strong.copyWith(
-                    color: isUser ? AppSurfaces.onSurface : AppPalette.error,
+                    color: isUser ? AppSurfaces.onSurface : AppPalette.accent,
                   ),
                 ),
               ),

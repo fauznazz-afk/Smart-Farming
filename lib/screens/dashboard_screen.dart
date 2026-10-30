@@ -1482,7 +1482,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       floatingActionButton: FloatingActionButton(
         onPressed: _openAiAssistant,
         tooltip: 'Ask the assistant',
-        backgroundColor: AppPalette.error,
+        backgroundColor: AppPalette.accent,
         foregroundColor: AppPalette.onHue,
         child: const Icon(Icons.auto_awesome),
       ),

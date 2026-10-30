@@ -187,7 +187,7 @@ void main() {
         );
       }
       expect(
-        AppPalette.error,
+        AppPalette.accent,
         isNot(statusWarn),
         reason:
             'the accent and the warning status are the same colour, so a '

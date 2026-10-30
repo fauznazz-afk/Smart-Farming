@@ -206,7 +206,7 @@ class _Header extends StatelessWidget {
             ),
           Text(
             'COST & PERFORMANCE',
-            style: AppType.slotMicro.copyWith(color: AppPalette.error),
+            style: AppType.slotMicro.copyWith(color: AppPalette.accent),
           ),
         ],
       ),
@@ -234,7 +234,7 @@ class _Section extends StatelessWidget {
         children: [
           Text(
             label,
-            style: AppType.slotMicro.copyWith(color: AppPalette.error),
+            style: AppType.slotMicro.copyWith(color: AppPalette.accent),
           ),
           const SizedBox(width: AppSpacing.sm),
           const Expanded(child: Divider()),

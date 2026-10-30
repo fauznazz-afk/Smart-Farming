@@ -114,7 +114,7 @@ void main() {
       for (final category in MetricCategory.values) {
         expect(
           categoryColor(category),
-          AppPalette.error,
+          AppPalette.accent,
           reason: '${category.name} resolves outside the accent. If a category '
               'needs its own hue back, that is a decision to make deliberately '
               'with the contrast and the panel both in view, not something to '
@@ -182,7 +182,7 @@ void main() {
       // the argument cannot quietly stop holding.
       expect(
         hueOf(categoryColor(MetricCategory.environment)),
-        closeTo(hueOf(AppPalette.error), 1.0),
+        closeTo(hueOf(AppPalette.accent), 1.0),
       );
       expect(
         categoryColor(MetricCategory.environment),
@@ -464,7 +464,7 @@ void main() {
         // against, while `surfaceMuted` is the muted tile. Adding them here
         // rather than to `captionSurfaces()` keeps the token list a description
         // of where *text* goes; this is a statement about a specific colour's job.
-        expectClearsAa('AppPalette.error', AppPalette.error, [
+        expectClearsAa('AppPalette.accent', AppPalette.accent, [
           ..._surfaces,
           AppSurfaces.track,
           AppSurfaces.surfaceMuted,
@@ -481,10 +481,10 @@ void main() {
           AppSurfaces.surfaceMuted,
         ]) {
           expect(
-            _contrast(AppPalette.error, s),
+            _contrast(AppPalette.accent, s),
             greaterThanOrEqualTo(3.0),
             reason: 'the accent on #${_hex(s)} is '
-                '${_contrast(AppPalette.error, s).toStringAsFixed(2)}:1',
+                '${_contrast(AppPalette.accent, s).toStringAsFixed(2)}:1',
           );
         }
       });
@@ -498,7 +498,7 @@ void main() {
         // WattVision's cyan is a bright fill, so the ink is dark: white on
         // `#00E5FF` is about 1.4:1 and fails, dark `#121212` clears AA easily.
         expectClearsAa('AppPalette.onHue on the accent', AppPalette.onHue,
-            [AppPalette.error]);
+            [AppPalette.accent]);
       });
 
       test('a wash in the accent is legible as a graphic and as text', () {
@@ -511,10 +511,10 @@ void main() {
         // hue on it. The 4.5 one is what lets a badge draw accent-coloured text.
         for (final surface in _surfaces) {
           final wash = Color.alphaBlend(
-            AppBorders.categoricalWash(AppPalette.error),
+            AppBorders.categoricalWash(AppPalette.accent),
             surface,
           );
-          final ratio = _contrast(AppPalette.error, wash);
+          final ratio = _contrast(AppPalette.accent, wash);
           expect(
             ratio,
             greaterThanOrEqualTo(3.0),
@@ -524,14 +524,14 @@ void main() {
           );
         }
         final overCard = Color.alphaBlend(
-          AppBorders.categoricalWash(AppPalette.error),
+          AppBorders.categoricalWash(AppPalette.accent),
           AppSurfaces.surface,
         );
         expect(
-          _contrast(AppPalette.error, overCard),
+          _contrast(AppPalette.accent, overCard),
           greaterThanOrEqualTo(4.5),
           reason: 'the accent on its own wash over a card is '
-              '${_contrast(AppPalette.error, overCard).toStringAsFixed(2)}:1, '
+              '${_contrast(AppPalette.accent, overCard).toStringAsFixed(2)}:1, '
               'which is under the 4.5 a caption on that wash needs; the wash '
               'alpha is the thing to raise back, not this assertion',
         );
@@ -542,10 +542,10 @@ void main() {
         // and the row edge, so it must not be confusable with the status ramp.
         // WattVision separates them by hue: cyan accent, lime ok, amber warn,
         // orange alert, red bad.
-        expect(AppPalette.error, isNot(statusWarn));
-        expect(AppPalette.error, isNot(statusOk));
-        expect(AppPalette.error, isNot(statusAlert));
-        expect(AppPalette.error, isNot(statusBad));
+        expect(AppPalette.accent, isNot(statusWarn));
+        expect(AppPalette.accent, isNot(statusOk));
+        expect(AppPalette.accent, isNot(statusAlert));
+        expect(AppPalette.accent, isNot(statusBad));
       });
     });
   });

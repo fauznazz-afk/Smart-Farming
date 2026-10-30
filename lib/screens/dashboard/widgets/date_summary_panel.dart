@@ -154,7 +154,7 @@ class DateSummaryPanel extends StatelessWidget {
                 periodLabel.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppType.slotKey.copyWith(color: AppPalette.error),
+                style: AppType.slotKey.copyWith(color: AppPalette.accent),
               ),
             ),
             const Spacer(),
@@ -274,7 +274,7 @@ class DateSummaryPanel extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: AppType.slotMicro.copyWith(color: AppPalette.error),
+        style: AppType.slotMicro.copyWith(color: AppPalette.accent),
       ),
     );
   }

@@ -64,7 +64,7 @@ Widget powerSelector(int selected, ValueChanged<int> onSelect) {
       // selector was the one control on the Power page that looked borrowed.
       style: SegmentedButton.styleFrom(
         textStyle: AppType.buttonLabel,
-        selectedBackgroundColor: AppPalette.error,
+        selectedBackgroundColor: AppPalette.accent,
         selectedForegroundColor: AppPalette.onHue,
         foregroundColor: AppSurfaces.onSurfaceVariant,
         side: BorderSide(color: AppSurfaces.border),

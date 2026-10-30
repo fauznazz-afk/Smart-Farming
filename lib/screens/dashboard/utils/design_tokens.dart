@@ -201,11 +201,8 @@ class AppPalette {
   // Semantic colors
   static Color get success => _active.success;
   static Color get warning => _active.warning;
-  static Color get error => _active.error;
+  static Color get accent => _active.accent;
   static Color get info => _active.info;
-
-  // Backward compatibility aliases
-  static Color get accent => _active.tertiary; // was amber
 
   /// Serious, not yet a breach. **Its own value, not [warning].**
   ///
@@ -262,7 +259,7 @@ class AppPaletteTheme {
     required this.warning,
     required this.statusAlert,
     required this.alertFill,
-    required this.error,
+    required this.accent,
     required this.statusBad,
     required this.successOnPage,
     required this.warningOnPage,
@@ -295,7 +292,7 @@ class AppPaletteTheme {
   /// the 4px edge that sits on it are one recipe and the edge already reads
   /// [statusBad]. Both ramps carry the same value: it is a wash of the one red.
   final Color alertFill;
-  final Color error;
+  final Color accent;
   final Color statusBad;
 
   /// The page twins of [success], [warning] and [statusBad], per ramp.
@@ -327,7 +324,7 @@ class AppPaletteTheme {
     statusAlert: Color(0xFFFF9F0A),
     // The alert banner's fill: a deep red that carries statusBad ink.
     alertFill: Color(0xFF3A1C1C),
-    error: Color(0xFF00E5FF),
+    accent: Color(0xFF00E5FF),
     // Spec alert red — the only red in the ramp.
     statusBad: Color(0xFFFF453A),
     successOnPage: Color(0xFF32D74B),
@@ -361,7 +358,7 @@ class AppPaletteTheme {
     statusAlert: Color(0xFFFF9F0A),
     // The alert banner's fill: a deep red that carries statusBad ink.
     alertFill: Color(0xFF3A1C1C),
-    error: Color(0xFF00E5FF),
+    accent: Color(0xFF00E5FF),
     // Spec alert red — the only red in the ramp.
     statusBad: Color(0xFFFF453A),
     successOnPage: Color(0xFF32D74B),

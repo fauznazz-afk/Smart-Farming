@@ -43,7 +43,7 @@ class ChartSectionHeader extends StatelessWidget {
     // straight onto `AppBackground` with the chart card *below* it. Card ink is
     // the token for content on a card, and this header is on the page.
     //
-    // **The live indicator is a glass chip.** It was `AppPalette.error` behind a
+    // **The live indicator is a glass chip.** It was `AppPalette.primary` behind a
     // local `AppGlass.isDark` branch, because the accent measured poorly against
     // the page it was drawn on: a cyan dot on a near-black page, needing a fifth
     // value to be visible. `GlassPageHeader` already answered the same question
@@ -406,7 +406,7 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
         spec.unit,
         seriesPoints,
         widget.spots.putIfAbsent(key, () => processSpots(seriesPoints)),
-        override ?? AppPalette.error,
+        override ?? AppPalette.accent,
         widget.stats[key] ?? SeriesStats.fromPoints(seriesPoints),
       ),
       spec,

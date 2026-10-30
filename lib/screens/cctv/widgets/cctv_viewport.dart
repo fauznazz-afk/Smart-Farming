@@ -152,7 +152,7 @@ class CctvStandbyOverlay extends StatelessWidget {
               width: 68,
               height: 68,
               decoration: BoxDecoration(
-                color: AppPalette.error,
+                color: AppPalette.accent,
                 shape: BoxShape.circle,
                 border: AppBorders.boundaryBorder,
               ),

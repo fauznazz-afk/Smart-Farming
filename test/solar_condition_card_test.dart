@@ -297,7 +297,7 @@ void main() {
       // *status* colour — a clear-sky card drawn in the chart triad's red would
       // say "something is wrong" about a cloudless noon. Then red became the
       // accent, which put the test and its reason at odds with each other: under
-      // the new rule the fill *is* `AppPalette.error`, so the original wording
+      // the new rule the fill *is* `AppPalette.accent`, so the original wording
       // would have failed for the correct behaviour.
       //
       // So both halves are kept and the second is the one that now carries the
@@ -319,9 +319,9 @@ void main() {
                   )
                   .decoration
               as BoxDecoration;
-      expect(decoration.color, AppPalette.error);
-      expect(AppPalette.error, isNot(statusWarn));
-      expect(AppPalette.error, isNot(statusOk));
+      expect(decoration.color, AppPalette.accent);
+      expect(AppPalette.accent, isNot(statusWarn));
+      expect(AppPalette.accent, isNot(statusOk));
       expect(decoration.color, isNot(statusWarn));
     });
   });

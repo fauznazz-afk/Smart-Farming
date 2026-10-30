@@ -98,7 +98,7 @@ enum MetricCategory {
 
 /// The colour a category is drawn in, which is the same for all five.
 ///
-/// **There is one accent and it is [AppPalette.error], the cyan data accent.**
+/// **There is one accent and it is [AppPalette.accent], the cyan data accent.**
 /// A category still exists, and still owns its telemetry keys: [MetricCategory]
 /// is what resolves a ThingsBoard key to a thing the app knows how to plot, group
 /// and label. Only the *colour* stopped being part of that.
@@ -106,7 +106,7 @@ enum MetricCategory {
 /// A category is already carried by the page it is on, the tab, the label and the
 /// row. Where the hue does mean "wrong", it is [statusBad] or [statusBadFill] and
 /// it always ships with the word that says which.
-Color categoryColor(MetricCategory category) => AppPalette.error;
+Color categoryColor(MetricCategory category) => AppPalette.accent;
 
 /// The order a chart colours its series in when a group plots more than one.
 ///
@@ -160,10 +160,10 @@ Color get statusOk => AppPalette.success;
 /// Healthy, as drawn **on the page** rather than on a card.
 Color get statusOkOnPage => AppPalette.successOnPage;
 
-/// A warning. [AppPalette.accent] — the **card** value.
+/// A warning. [AppPalette.warning] — the **card** value.
 ///
 /// **Use [statusWarnOnPage] on the page.** Same reason as [statusOk].
-Color get statusWarn => AppPalette.accent;
+Color get statusWarn => AppPalette.warning;
 
 /// A warning, as drawn **on the page**.
 Color get statusWarnOnPage => AppPalette.warningOnPage;
@@ -171,7 +171,7 @@ Color get statusWarnOnPage => AppPalette.warningOnPage;
 /// An alert: serious, not yet a breach.
 ///
 /// **The brief has two semantic hues and the app has four severities.**
-/// Collapsing alert into `error` would have been the alternative and it loses
+/// Collapsing alert into `accent` would have been the alternative and it loses
 /// information the alarm history actually carries.
 Color get statusAlert => AppPalette.statusAlert;
 
@@ -201,7 +201,7 @@ Color alarmWarning() => statusWarn;
 /// The colour a sky condition is drawn in.
 ///
 /// **The accent for daylight, a neutral for night.** The card's glyph and its
-/// brightness bar are [AppPalette.error], so a third hue here would make one card
+/// brightness bar are [AppPalette.accent], so a third hue here would make one card
 /// read as three colours. Clear, partly cloudy and overcast are three answers to
 /// "how bright is it", and the card already answers that with a lux figure and a
 /// wattage next to the label — painting them three different hues would assert a
@@ -209,9 +209,9 @@ Color alarmWarning() => statusWarn;
 /// than a hue**, so the one case where the reading genuinely means something
 /// different is the one that stops shouting.
 Color skyConditionColor(SkyCondition condition) => switch (condition) {
-  SkyCondition.clear => AppPalette.error,
-  SkyCondition.partlyCloudy => AppPalette.error,
-  SkyCondition.overcast => AppPalette.error,
+  SkyCondition.clear => AppPalette.accent,
+  SkyCondition.partlyCloudy => AppPalette.accent,
+  SkyCondition.overcast => AppPalette.accent,
   SkyCondition.night => AppSurfaces.onSurfaceVariant,
 };
 
