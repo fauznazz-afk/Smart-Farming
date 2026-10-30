@@ -7,11 +7,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A hung suite would otherwise sit on the runner for GitHub's 6 hour
+    # default. 30 minutes is roughly double the worst observed run.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          # **Pinned, not `channel: stable`.** This project is built and
+          # green on 3.47.5; a bare stable channel silently upgrades the SDK
+          # under the suite on some future Monday and can fail the build for a
+          # reason that has nothing to do with a commit. Bump this line
+          # deliberately, after a local `flutter analyze` and suite run.
+          flutter-version: 3.47.5
           channel: stable
+          cache: true
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+        timeout-minutes: 25
