@@ -119,7 +119,24 @@ class DateStrip extends StatelessWidget {
             // so the strip now takes the widest gap it can afford and only
             // falls through to scrolling when even zero does not fit — which is
             // the 3x system-font case the scroll view was actually built for.
-            final needed = _widestDayNameWidth(context) + 16 + 1;
+            // **12, not 16, and it has to agree with the chip.** This is 6 per
+            // side of `DateStripChip`'s padding plus the unselected chip's 1 px
+            // hairline, which sits *inside* the padding rather than outside it —
+            // so it changes the visual weight of the edge and not the box. It was
+            // written as 16 while the chip was padded 8, which is the kind of
+            // duplication that survives until one of the two moves. If the chip's
+            // padding changes, this is the number to change with it.
+            //
+            // **`+ 1` is the hairline on each side, and it was missing from the
+            // `needed` probe below** — which is why the chips sat edge to edge:
+            // the width the probe asked for was narrower than the chip's own box.
+            // **6 per side, and the chip's own box carries the hairline** --
+            // `DateStripChip` paints it inside its padding, so it costs no
+            // width. Asking for 13 made `needed` wider than the chip, and the
+            // `max` below then sized every chip past its fair share until the
+            // seven of them overflowed the row by 3.4 dp.
+            const chipChrome = 12;
+            final needed = _widestDayNameWidth(context) + chipChrome;
             final slack =
                 (constraints.maxWidth - needed * days.length) /
                 (days.length - 1);
@@ -132,17 +149,23 @@ class DateStrip extends StatelessWidget {
             final fairShare =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
 
-            // **12, not 16, and it has to agree with the chip.** This is 6 per
-            // side of `DateStripChip`'s padding plus the unselected chip's 1 px
-            // hairline, which sits *inside* the padding rather than outside it —
-            // so it changes the visual weight of the edge and not the box. It was
-            // written as 16 while the chip was padded 8, which is the kind of
-            // duplication that survives until one of the two moves. If the chip's
-            // padding changes, this is the number to change with it.
+            // **Never narrower than the text needs.** `fairShare` is the share
+            // the row can afford after the gap; `needed` is the floor the chip
+            // cannot go under without wrapping its day name. Taking the max is
+            // what keeps the ladder from buying a gap with the label, which is
+            // the trade the comment above forbids.
             final chipWidth = needed > fairShare ? needed : fairShare;
             final scrolls = chipWidth > fairShare + 0.5;
 
             final chips = Row(
+              // **`min`, so the row is as wide as its seven chips.** A `Row`
+              // inside a scroll view still receives the viewport's tight width
+              // as its constraint, and the default `max` main-axis size then
+              // makes it *that* wide while its children need more — which is
+              // the 3.4 px overflow the probe fix uncovered. The row has to
+              // size to its content for the scroll view to have anything to
+              // scroll over.
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < days.length; i++) ...[

@@ -276,7 +276,13 @@ class GlassNavBar extends StatelessWidget {
                   // Translucent white over the gradient lets the sweep continue
                   // through the bar, which is the reason the rest of the screen
                   // is built this way at all.
-                  color: AppGlass.fillStrong,
+                  // **A dark glass, not the white chip wash.** `fillStrong`
+                  // is white 68%, which over the flat #121212 page resolves to a
+                  // pale grey bar — a light element docked on a dark app, which
+                  // is what "navigasi belum berubah dark" was seeing. The bar is
+                  // the page's own layer, so it takes the page tone lifted a
+                  // step: still translucent, still a surface, but dark.
+                  color: AppSurfaces.surfaceAlt.withValues(alpha: 0.92),
                   // **Rounded at the top, flush at the bottom, and the sheet's
                   // radius rather than the card's.**
                   //
@@ -524,9 +530,11 @@ class _NavDestination extends StatelessWidget {
   Widget build(BuildContext context) {
     // **`onHue`, not `error`.** The bubble is behind this glyph, so accent ink
     // on an accent fill is accent-on-accent. See the class doc.
-    // The inactive glyph is glass ink, not `AppGlass.inkSoft`: `inkSoft` is the
-    // hero's ink, and the bar is a glass surface over the page.
-    final color = selected ? AppPalette.onHue : AppGlass.navInkSoft;
+    // **`navInkSoft` is the white-chip ink and is wrong here now.** The bar is
+    // a dark surface (see the decoration in `build`), so the inactive glyph
+    // takes the page ink it is docked on; a navy glyph on a navy bar was the
+    // other half of "navigasi belum berubah dark".
+    final color = selected ? AppPalette.onHue : AppSurfaces.onSurfaceVariant;
     return Pressable(
       pressedScale: 0.90,
       builder: (pressed) => AnimatedContainer(
