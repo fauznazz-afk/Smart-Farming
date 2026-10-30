@@ -2,7 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../utils/ai_provider.dart';
 
-/// Pinned to EncryptedSharedPreferences for the same reason as the ThingsBoard
+/// Pinned to the secure-storage backend for the same reason as the ThingsBoard
 /// store: the default is already this, and writing it out keeps it this if a
 /// future plugin release changes the default. This store holds the user's own
 /// AI API key.

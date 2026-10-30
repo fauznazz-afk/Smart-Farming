@@ -45,6 +45,11 @@ flutter test test/<file>            # or .\tool\run_tests_per_file.ps1
 | 9 | `AppShadows.stamped` | `lib/screens/dashboard/utils/design_tokens.dart:544` | **Dead** — 0 references; `stampedIn` is the used member, not this alias | **Removed** (audit 29 October 2026) |
 | 10 | `AppGlass.navInk` | `lib/screens/dashboard/utils/design_tokens.dart:1090` | **Dead** — 0 references; `nav_bar.dart` uses `navInkSoft` | **Removed** (audit 29 October 2026) |
 | 11 | `kTariffBsPerKwh` | `lib/widgets/energy_summary_card.dart:21` | **Dead** — 0 references after the `Bs.` tile caption was removed | **Removed** (audit 29 October 2026) |
+| 12 | `AppPalette.tertiaryOnCards` | `lib/screens/dashboard/utils/design_tokens.dart` | **Dead** — alias for `_active.tertiary` with 0 references in `lib/` and `test/`; the live `accent` getter reads `_active.accent` directly | **Removed** (audit 30 October 2026) |
+
+### Renamed (not dead code)
+
+- `AppPalette.error` → `AppPalette.accent`, 31 files (commit `24729bc`, 30 October 2026). The token already held `#00E5FF` cyan in both ramps, so the name claimed a red the value never was. A naming fix; no behaviour change.
 
 ### 1. `chartSeriesColor` — removed
 
@@ -120,6 +125,13 @@ no behaviour change.
 `hasPeakUsage` and `hasBatteryEstimate` on `EnergyForecastResult`; those three
 symbols **do not exist in the source** and have no references. It also places
 `_cctvKeepAlive` under CCTV; it actually lives in `dashboard_screen.dart`.
+
+### 12. `AppPalette.tertiaryOnCards` — removed (audit 30 October 2026)
+
+`lib/screens/dashboard/utils/design_tokens.dart`. A backward-compatibility alias
+for `_active.tertiary` with zero readers in `lib/` and `test/`. The `accent`
+getter it sat beside now reads `_active.accent` after the rename above, so the
+alias pointed at a field no other getter uses. Removed in commit `24729bc`.
 
 ### 6. `SkyCondition.isDaylight` — kept
 
