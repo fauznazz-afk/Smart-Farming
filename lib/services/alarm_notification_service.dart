@@ -45,7 +45,7 @@ class AlarmNotificationService {
     const android = AndroidInitializationSettings('@drawable/ic_energrow');
     try {
       await _notifications.initialize(
-        const InitializationSettings(android: android),
+        settings: const InitializationSettings(android: android),
       );
       await _notifications
           .resolvePlatformSpecificImplementation<
@@ -146,10 +146,10 @@ class AlarmNotificationService {
   }) async {
     try {
       await _notifications.show(
-        id.hashCode,
-        title,
-        message,
-        NotificationDetails(
+        id: id.hashCode,
+        title: title,
+        body: message,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             critical ? _channelCritical : _channelWarning,
             critical ? 'EnerGrow critical alarms' : 'EnerGrow alarms',
