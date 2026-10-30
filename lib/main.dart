@@ -65,6 +65,21 @@ ColorScheme _appColorScheme() => ColorScheme(
   onError: AppPalette.onHue,
   outline: AppSurfaces.border,
   outlineVariant: AppSurfaces.border,
+  // **`inverseSurface` defaults to `onSurface`, which is white in this ramp,**
+  // because "inverse of a dark surface" is meant to be light. WattVision is
+  // dark-only, so a white box is not an inversion of anything a user sees —
+  // it is a foreign slab. Two widgets paint with it today: `Tooltip`'s default
+  // decoration and a discrete `Slider`'s value indicator (the energy report's
+  // interval scrubber has `divisions`, so it is discrete). Both drew white.
+  //
+  // `SnackBar` reads `inverseSurface` too, but `snackBarTheme` already overrides
+  // its fill, so this is consistent with the choice made there rather than a
+  // second one. `onInverseSurface` has to move with it or the ink lands on its
+  // own fill, and `inversePrimary` is the SnackBar action's accent — stated here
+  // for the same reason `actionTextColor` is.
+  inverseSurface: AppSurfaces.surface,
+  onInverseSurface: AppSurfaces.onSurface,
+  inversePrimary: AppPalette.error,
 );
 
 /// The type scale, on [AppType].

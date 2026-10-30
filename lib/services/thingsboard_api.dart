@@ -204,16 +204,20 @@ class ThingsBoardApi {
     'tb_refresh_token',
   ];
 
-  /// **`encryptedSharedPreferences: true` is pinned, not left to the default.**
+  /// **The backend changed in 10.x, and the data migrates with it.**
   ///
-  /// The plugin already uses EncryptedSharedPreferences on modern Android, so
-  /// this changes no behaviour today. It is written out because the things
-  /// stored here are the ThingsBoard JWT and refresh token: if a future plugin
-  /// release changes its default, the most sensitive store in the app must not
-  /// silently fall back to a weaker one. The option makes the requirement
-  /// legible at the call site rather than implied by a dependency's default.
+  /// `encryptedSharedPreferences` is deprecated and ignored from 10.x onward —
+  /// Google deprecated Jetpack Security, so the plugin now encrypts with its own
+  /// KeyStore-wrapped ciphers. On first access it migrates what 9.x wrote under
+  /// EncryptedSharedPreferences into the new format, so a stored session survives
+  /// the upgrade. What it does *not* survive is a failed migration:
+  /// `resetOnError` still defaults to `true`, and its own doc comment says that
+  /// erases everything on a decryption error. For the store that holds the
+  /// ThingsBoard JWT and refresh token, `migrateWithBackup` takes a copy before
+  /// the migration starts, so a crash mid-migration is recoverable instead of a
+  /// silent forced logout.
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(migrateWithBackup: true),
   );
   String? _token;
   String? _refreshToken;

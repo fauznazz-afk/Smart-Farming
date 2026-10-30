@@ -6,8 +6,17 @@ import '../utils/ai_provider.dart';
 /// store: the default is already this, and writing it out keeps it this if a
 /// future plugin release changes the default. This store holds the user's own
 /// AI API key.
+//
+// **10.x deprecated EncryptedSharedPreferences and migrates on its own.**
+//
+// Google deprecated Jetpack Security, so the plugin encrypts with its own
+// KeyStore-wrapped ciphers now; the old option is accepted but ignored, and
+// data written by 9.x is migrated on first access. The one thing that changed
+// for the worse is a failed migration: `resetOnError` still defaults to `true`
+// and erases the store on a decryption error. `migrateWithBackup` takes a copy
+// first, so a crash mid-migration cannot silently wipe the user's AI API key.
 const _aiStorage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  aOptions: AndroidOptions(migrateWithBackup: true),
 );
 const _aiApiKeyKey = 'ai_api_key';
 const _aiProviderKey = 'ai_provider';

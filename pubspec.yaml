@@ -33,7 +33,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   http: ^1.2.0
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^10.3.4
   package_info_plus: ^9.0.1
   provider: ^6.1.0
   shared_preferences: ^2.2.0
@@ -71,7 +71,7 @@ dev_dependencies:
   # Imported directly by test/thingsboard_api_test.dart to install a secure
   # storage platform that throws, which is the only way to reproduce an
   # unreadable Android keystore. Test-only, never referenced from lib/.
-  flutter_secure_storage_platform_interface: ^1.1.2
+  flutter_secure_storage_platform_interface: ^2.1.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

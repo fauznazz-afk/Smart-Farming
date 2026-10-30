@@ -21,7 +21,11 @@ const defaultAllowedFishCctvUrl =
 /// store: the default is already this, and writing it out keeps it this if a
 /// future plugin release changes the default.
 const _cctvStorage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  // Same reasoning as `ai_settings.dart`: 10.x migrates the old
+  // EncryptedSharedPreferences data to its own ciphers on first access, and
+  // `migrateWithBackup` is what stops a crash during that migration from being
+  // erased outright by the `resetOnError` default.
+  aOptions: AndroidOptions(migrateWithBackup: true),
 );
 const _cctvUrlKey = 'cctv_url';
 const _fishCctvUrlKey = 'cctv_url_fish';
