@@ -36,7 +36,7 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
   // oversight: wrapping is decided by width alone, so 375 is what these tests
   // are about, while `ListView.builder` lays out lazily and a real 812dp phone
   // viewport (~692dp after app bar and save button) is not reliably enough to
-  // build all ten ~80dp tiles. `findsNWidgets(10)` would then fail on how many
+  // build all eleven ~80dp tiles. `findsNWidgets(11)` would then fail on how many
   // children the cache extent happened to reach, which has nothing to do with
   // the bug.
   tester.view.physicalSize = surface ?? const Size(900, 1600);
@@ -63,17 +63,20 @@ Future<void> _pumpSettings(WidgetTester tester, {Size? surface}) async {
 
 void main() {
   // Order and strings are taken from buildSettingsSections in
-  // lib/screens/settings/settings_section.dart, which returns ten sections.
+  // lib/screens/settings/settings_section.dart, which returns eleven sections.
   //
-  // There were eleven. "Appearance" held Light/Dark/Auto, and WattVision is
-  // dark-only, so that section is gone. The count here is load-bearing — it is
-  // the only assertion that notices a section leaving the list.
+  // There were ten while WattVision was dark-only. "Tema" came back when the
+  // light ramp became a real second appearance; it is first in the list because
+  // it changes what every other category is drawn on. The count here is
+  // load-bearing — it is the only assertion that notices a section leaving the
+  // list.
   testWidgets('lists every settings category', (tester) async {
     await _pumpSettings(tester);
 
     expect(find.text('Settings'), findsOneWidget);
     for (final title in [
       // The count below is what notices that.
+      'Tema', // settings_section.dart:34
       'Monitoring', // settings_section.dart:41
       'Energy alerts', // settings_section.dart:47
       'Environment alerts', // settings_section.dart:53
@@ -97,14 +100,14 @@ void main() {
   // rendered tile count is the section count. This is what catches a section
   // that exists in the list but is never laid out.
   //
-  // **Ten, since the Appearance section was removed.** The count moved before
-  // this too, for the same reason: a new category rather than a new
-  // behaviour on an existing one.
+  // **Eleven, since "Tema" returned.** The count moved before this too, for
+  // the same reason: a new category rather than a new behaviour on an existing
+  // one.
   testWidgets('renders one tile per category', (tester) async {
     await _pumpSettings(tester);
 
     // settings_screen.dart:144 - `itemCount: _sections.length`.
-    expect(find.byType(ListTile), findsNWidgets(10));
+    expect(find.byType(ListTile), findsNWidgets(11));
   });
 
   // The truncation regression. Eight of the ten category subtitles were
@@ -121,7 +124,7 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1900));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(10));
+    expect(tiles, findsNWidgets(11));
     for (var i = 0; i < 9; i++) {
       final tile = tester.widget<ListTile>(tiles.at(i));
       final title = (tile.title! as Text).data;
@@ -182,7 +185,7 @@ void main() {
     await _pumpSettings(tester, surface: const Size(375, 1900));
 
     final tiles = find.byType(ListTile);
-    expect(tiles, findsNWidgets(10));
+    expect(tiles, findsNWidgets(11));
     for (var i = 0; i < 9; i++) {
       final height = tester.getSize(tiles.at(i)).height;
       expect(

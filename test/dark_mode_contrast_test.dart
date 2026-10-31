@@ -147,21 +147,26 @@ void main() {
     );
   });
 
-  test('theme application is dark-only', () {
+  test('theme application honours the ramp it is given', () {
+    // The clamp is gone: `apply` resolves the ramp it is handed, so the two
+    // ramps paint two different pages and two different card fills, and the
+    // page ink still clears AA on its own card in each.
+    for (final ramp in Brightness.values) {
+      AppTheme.apply(ramp);
+      expect(AppTheme.brightness, ramp);
+      expect(
+        _contrast(AppGlass.pageInkStrong, AppSurfaces.surface),
+        greaterThanOrEqualTo(4.5),
+        reason: 'the ${ramp.name} ramp page ink on its own card is '
+            '${_contrast(AppGlass.pageInkStrong, AppSurfaces.surface).toStringAsFixed(2)}:1',
+      );
+    }
     AppTheme.apply(Brightness.dark);
     final darkCard = AppSurfaces.surface;
-    final darkPageInk = AppGlass.pageInkStrong;
+    final darkInk = AppSurfaces.onSurface;
     AppTheme.apply(Brightness.light);
-    final lightCard = AppSurfaces.surface;
-    final lightPageInk = AppGlass.pageInkStrong;
-
-    expect(AppTheme.brightness, Brightness.dark);
-    expect(
-      AppSurfacesPalette.dark.onSurface,
-      AppSurfacesPalette.light.onSurface,
-    );
-    expect(darkCard, lightCard);
-    expect(darkPageInk, lightPageInk);
-    expect(_contrast(darkPageInk, darkCard), greaterThanOrEqualTo(4.5));
+    expect(AppSurfaces.surface, isNot(darkCard));
+    expect(AppSurfaces.onSurface, isNot(darkInk));
+    AppTheme.apply(Brightness.dark);
   });
 }

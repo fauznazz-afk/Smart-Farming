@@ -7,6 +7,35 @@ import '../utils/app_motion.dart';
 import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 
+// Gradient dark-mode skin for the detail-page cards, local to this file so the
+// shared token layer stays untouched.
+const Color _glassFill = Color(0x0FFFFFFF);
+const Color _glassBorder = Color(0x1FFFFFFF);
+const Color _valueGradientStart = Color(0xFF00D97E);
+const Color _valueGradientEnd = Color(0xFF00D97E);
+const double _glassRadius = 26;
+
+/// A cyan-to-violet wash over a value figure. `BlendMode.srcIn` keeps the
+/// glyphs, so this paints the type rather than a box behind it.
+class _GradientValue extends StatelessWidget {
+  const _GradientValue({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [_valueGradientStart, _valueGradientEnd],
+      ).createShader(bounds),
+      child: child,
+    );
+  }
+}
+
 /// Icon + title row used at the top of each detail page.
 class GlassPageHeader extends StatelessWidget {
   const GlassPageHeader({
@@ -91,46 +120,53 @@ class TelemetryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stale = data?.isStale(minutes: staleMinutes) ?? true;
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Column(
-        children: [
-          if (stale) _StaleNotice(ageLabel: data?.ageLabel),
-          for (var index = 0; index < metrics.length; index++) ...[
-            _MetricRow(
-              metric: metrics[index],
-              value: data?.latestValues[metrics[index].key],
-              // **The accent, and it was the category hue.** The three call sites
-              // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
-              // battery keys respectively — so every row in a given card is
-              // *already* one category, and the colour could not be telling the
-              // reader anything the card's own header does not already say. What
-              // it was telling them is which of five hues the dashboard
-              // currently believes the app is. Rows, icons and a 2px edge are
-              // chrome and headings, so they take the one accent.
-              accent: AppPalette.accent,
-              // **The 2px categorical bottom border, and it replaces the
-              // [AppDivider] this row used to be separated by.** The brief's stat
-              // tile is "card + leading icon in a categorical colour + numeral
-              // value + micro unit, with a 2px categorical bottom border", and a
-              // divider-separated list of readings is a stack of those tiles as
-              // surely as the 3-up grid is. A neutral hairline between the rows
-              // described the *gap*; the categorical edge describes the *metric*,
-              // which is the thing the brief wants colour-coded.
-              //
-              // The last row carries none: the card already has its own hairline
-              // there, and two edges 4px apart read as a mistake rather than as a
-              // design.
-              //
-              // Every reading in this card is one category — the three call sites
-              // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
-              // battery keys respectively — so the hue used to be constant
-              // *within* a card and only ever varied *between* cards, which is
-              // decoration and not information.
-              beneath: index < metrics.length - 1,
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: _glassFill,
+        borderRadius: BorderRadius.circular(_glassRadius),
+        border: Border.all(color: _glassBorder),
+      ),
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          children: [
+            if (stale) _StaleNotice(ageLabel: data?.ageLabel),
+            for (var index = 0; index < metrics.length; index++) ...[
+              _MetricRow(
+                metric: metrics[index],
+                value: data?.latestValues[metrics[index].key],
+                // **The accent, and it was the category hue.** The three call sites
+                // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
+                // battery keys respectively — so every row in a given card is
+                // *already* one category, and the colour could not be telling the
+                // reader anything the card's own header does not already say. What
+                // it was telling them is which of five hues the dashboard
+                // currently believes the app is. Rows, icons and a 2px edge are
+                // chrome and headings, so they take the one accent.
+                accent: AppPalette.accent,
+                // **The 2px categorical bottom border, and it replaces the
+                // [AppDivider] this row used to be separated by.** The brief's stat
+                // tile is "card + leading icon in a categorical colour + numeral
+                // value + micro unit, with a 2px categorical bottom border", and a
+                // divider-separated list of readings is a stack of those tiles as
+                // surely as the 3-up grid is. A neutral hairline between the rows
+                // described the *gap*; the categorical edge describes the *metric*,
+                // which is the thing the brief wants colour-coded.
+                //
+                // The last row carries none: the card already has its own hairline
+                // there, and two edges 4px apart read as a mistake rather than as a
+                // design.
+                //
+                // Every reading in this card is one category — the three call sites
+                // in `dashboard_screen.dart` pass the PV keys, the AC keys and the
+                // battery keys respectively — so the hue used to be constant
+                // *within* a card and only ever varied *between* cards, which is
+                // decoration and not information.
+                beneath: index < metrics.length - 1,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -216,7 +252,7 @@ class _MetricRow extends StatelessWidget {
                     // label is the muted half and the figure is the reading.
                     // Primary ink on both made every row a wall of white.
                     style: AppType.labelUppercase.copyWith(
-                      color: AppSurfaces.onSurfaceVariant,
+                      color: AppGlass.glassInkFaint,
                     ),
                   ),
                 ),
@@ -227,11 +263,13 @@ class _MetricRow extends StatelessWidget {
                 // widget, so the poll's rebuild does not reach the page above
                 // it, and the figure starts at the value it was given — a card
                 // that opens shows the reading, not a count-up from zero.
-                TweenedFigure(
-                  text: number ?? '--',
-                  builder: (context, text) => Text(
-                    unit.isEmpty ? text : '$text $unit',
-                    style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                _GradientValue(
+                  child: TweenedFigure(
+                    text: number ?? '--',
+                    builder: (context, text) => Text(
+                      unit.isEmpty ? text : '$text $unit',
+                      style: AppType.numeralLg.copyWith(color: appPrimaryText),
+                    ),
                   ),
                 ),
               ],

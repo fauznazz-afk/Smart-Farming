@@ -6,6 +6,17 @@ import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import 'shortcut.dart';
 
+/// The vivid glass recipe, local to this file.
+///
+/// `AppCard` is opaque `#1E1E1E` and `liquid_glass.dart` is owned elsewhere, so
+/// the wash is applied by wrapping: the card keeps its transparent `Material`
+/// (which is what gives the `DashboardShortcut`'s ink somewhere to paint) and
+/// the wrapper supplies the translucent fill, the white-12% edge and the 24
+/// radius the template asks for.
+const Color _glassFill = Color(0x0FFFFFFF);
+const Color _glassEdge = Color(0x1FFFFFFF);
+const double _glassRadius = 24;
+
 /// Snapshot values shown for the battery.
 typedef BatteryStatus = ({
   double? soc,
@@ -58,10 +69,16 @@ class SystemStatusStrip extends StatelessWidget {
     return DashboardShortcut(
       onTap: onOpenBattery,
       semanticLabel: 'Battery and grid status. Opens the battery readings.',
-      child: AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _glassFill,
+          borderRadius: BorderRadius.circular(_glassRadius),
+          border: Border.all(color: _glassEdge, width: 1),
+        ),
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
             _Verdict(
               icon: batteryOk == null
                   ? Icons.cloud_off_rounded
@@ -113,7 +130,8 @@ class SystemStatusStrip extends StatelessWidget {
                 category: null,
               ),
             ],
-          ],
+            ],
+          ),
         ),
       ),
     );

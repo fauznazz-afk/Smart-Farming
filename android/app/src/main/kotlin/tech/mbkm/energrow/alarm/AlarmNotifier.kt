@@ -72,7 +72,7 @@ class AlarmNotifier(private val context: Context) {
         val critical = signal.rule.isCritical
         val channel = if (critical) CHANNEL_CRITICAL else CHANNEL_WARNING
         val notification = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_energrow)
+            .setSmallIcon(R.drawable.ic_stat_energrow)
             .setContentTitle(title(signal))
             .setContentText(signal.message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(signal.message))
@@ -122,7 +122,7 @@ class AlarmNotifier(private val context: Context) {
         signal: AlarmSignal,
         channel: String,
     ): Notification = NotificationCompat.Builder(context, channel)
-        .setSmallIcon(R.drawable.ic_energrow)
+        .setSmallIcon(R.drawable.ic_stat_energrow)
         .setContentTitle(title(signal))
         .setContentText(
             context.getString(

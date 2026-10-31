@@ -17,6 +17,17 @@ import '../utils/design_tokens.dart';
 /// see `AppShadows.glow`'s contract and the note on [_SocLine].
 const double _kBarHeight = 12;
 
+/// Glass card over the page gradient: translucent white fill, white hairline,
+/// the template's 28 dp corner.
+final Color _kCardFill = AppGlass.glassFill;
+final Color _kCardBorder = AppGlass.glassBorder;
+const double _kCardRadius = 28;
+
+/// The cyan → violet sweep on the hero figures.
+const LinearGradient _kFigureGradient = LinearGradient(
+  colors: <Color>[Color(0xFF00D97E), Color(0xFF00D97E)],
+);
+
 /// The brief's progress track: the page colour, a 1px `border` hairline,
 /// full-round ends.
 ///
@@ -79,8 +90,13 @@ class LivePowerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: _kCardFill,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+        border: Border.all(color: _kCardBorder, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -923,7 +939,9 @@ class _Term extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final faint = faintColor;
+    // Labels are white 60% on the glass card; `faint` is the flat-page ink and
+    // was the only reason the caption read as a grey step rather than a wash.
+    final faint = AppGlass.glassInkFaint;
     final labelText = Text(
       label,
       maxLines: labelLines,
@@ -946,9 +964,9 @@ class _Term extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(_kTilePadding),
       decoration: BoxDecoration(
-        color: AppSurfaces.surfaceAlt,
-        borderRadius: AppRadius.all(AppRadius.tile),
-        border: AppBorders.hairlineBorder,
+        color: _kCardFill,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kCardBorder, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,11 +989,28 @@ class _Term extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    _figureText(watts)!,
-                    style: _termFigureStyle(color: watts == null ? faint : color)
-                        .copyWith(fontSize: AppType.figureTerm.fontSize! * figureScale),
-                  ),
+                  child: watts == null
+                      ? Text(
+                          _figureText(watts)!,
+                          style: _termFigureStyle(color: faint).copyWith(
+                            fontSize:
+                                AppType.figureTerm.fontSize! * figureScale,
+                          ),
+                        )
+                      : ShaderMask(
+                          shaderCallback: (bounds) =>
+                              _kFigureGradient.createShader(bounds),
+                          blendMode: BlendMode.srcIn,
+                          child: Text(
+                            _figureText(watts)!,
+                            style: _termFigureStyle(color: AppGlass.glassInkStrong)
+                                .copyWith(
+                                  fontSize:
+                                      AppType.figureTerm.fontSize! *
+                                      figureScale,
+                                ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 2),

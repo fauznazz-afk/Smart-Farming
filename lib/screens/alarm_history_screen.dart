@@ -6,6 +6,21 @@ import '../widgets/staggered_entrance.dart';
 import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 
+/// The vivid gradient glass recipe, local to this screen.
+///
+/// `design_tokens.dart` and `liquid_glass.dart` are shared with the dashboard
+/// and owned by other changes, so the template values are declared here.
+const double _kGlassRadius = 24;
+final Color _kGlassFill = AppGlass.glassFill;
+final BoxBorder _kGlassBorder = Border.fromBorderSide(
+  BorderSide(color: AppGlass.glassBorder, width: 1),
+);
+
+/// The accent start and the ink that clears AA on it. White on this cyan is
+/// about 1.4:1, so a selected chip takes the dark page ink instead.
+const Color _kAccentStart = Color(0xFF00D97E);
+const Color _kOnGradient = Color(0xFF121212);
+
 class AlarmHistoryScreen extends StatefulWidget {
   const AlarmHistoryScreen({super.key});
 
@@ -250,9 +265,9 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
         // opaque fill does not paint over.
         return RepaintBoundary(
           child: AppSurface(
-            radius: AppRadius.card,
-            fill: AppSurfaces.surface,
-            border: AppBorders.hairlineBorder,
+            radius: _kGlassRadius,
+            fill: _kGlassFill,
+            border: _kGlassBorder,
             padding: EdgeInsets.zero,
             child: Material(
               color: Colors.transparent,
@@ -413,15 +428,17 @@ class _AlarmHistoryScreenState extends State<AlarmHistoryScreen> {
               label: Text(
                 filter.label,
                 style: AppType.labelMicro.copyWith(
-                  color: isSelected
-                      ? AppPalette.onHue
-                      : AppSurfaces.onSurfaceVariant,
+                  color: isSelected ? _kOnGradient : Colors.white,
                 ),
               ),
               selected: isSelected,
-              backgroundColor: AppSurfaces.surface,
-              selectedColor: AppPalette.accent,
-              side: isSelected ? BorderSide.none : AppBorders.hairline,
+              backgroundColor: _kGlassFill,
+              selectedColor: _kAccentStart,
+              side: isSelected
+                  ? BorderSide.none
+                  : BorderSide(
+                      color: AppGlass.glassBorder,
+                    ),
               shape: const StadiumBorder(),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.xl,

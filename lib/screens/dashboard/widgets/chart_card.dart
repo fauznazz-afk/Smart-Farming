@@ -4,13 +4,27 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../models/telemetry_model.dart';
-import '../../../widgets/liquid_glass.dart';
 import '../charts/chart_data.dart';
 import 'chart_export.dart';
 import 'chart_groups.dart';
 import '../utils/date_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/history_range.dart';
+
+/// The vivid glass recipe for this page's cards.
+///
+/// Local on purpose: `design_tokens.dart` stays WattVision and owns every other
+/// surface in the app, and `liquid_glass.dart` is owned by another change. White
+/// at 6% over the #121212 page is a card that sits *on* the page without
+/// becoming a second page; the 12% hairline is the same white one step up, so
+/// the edge and the fill are one material at two strengths rather than a fill
+/// plus an unrelated grey.
+const Color _glassFill = Color(0x0FFFFFFF);
+const Color _glassEdge = Color(0x1FFFFFFF);
+
+/// Ink at the two strengths this template uses: a heading, and a label.
+const Color _inkStrong = Color(0xFFFFFFFF);
+const Color _inkLabel = Color(0x99FFFFFF);
 
 /// Title + range label + live/polling indicator above a telemetry chart.
 class ChartSectionHeader extends StatelessWidget {
@@ -63,7 +77,8 @@ class ChartSectionHeader extends StatelessWidget {
                   // what a card title in a list row wears. The uppercase micro
                   // label is the *metric grid*'s register.
                   style: AppType.headlineMd.copyWith(
-                    color: AppGlass.pageInkStrong,
+                    color: _inkStrong,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -72,9 +87,7 @@ class ChartSectionHeader extends StatelessWidget {
                 child: Text(
                   rangeLabel,
                   overflow: TextOverflow.ellipsis,
-                  style: AppType.labelMicro.copyWith(
-                    color: AppGlass.pageInkSoft,
-                  ),
+                  style: AppType.labelMicro.copyWith(color: _inkLabel),
                 ),
               ),
             ],
@@ -144,6 +157,56 @@ class _LivePill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The chart card's own surface: translucent white over the page, radius 24,
+/// a white-12% hairline.
+///
+/// **Not `AppCard`.** `AppCard` is opaque `#1E1E1E` and lives in
+/// `liquid_glass.dart`, which this change does not own; passing it a fill is not
+/// an option it offers. The visible difference that matters is that a chart is a
+/// *window* onto the plot rather than a block, and a 6% wash reads that way where
+/// a solid card reads as a panel. The transparent `Material` between the
+/// decoration and the content is the same load-bearing placement as `AppCard`'s —
+/// without it the legend's and the export button's ink is painted over.
+class _GlassChartCard extends StatelessWidget {
+  const _GlassChartCard({
+    required this.child,
+    required this.height,
+    this.semanticLabel,
+  });
+
+  final Widget child;
+  final double height;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = RepaintBoundary(
+      child: Container(
+        height: height,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: _glassFill,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _glassEdge, width: 1),
+        ),
+        child: Material(type: MaterialType.transparency, child: child),
+      ),
+    );
+    if (semanticLabel == null) return card;
+    return Semantics(
+      label: semanticLabel,
+      container: true,
+      excludeSemantics: true,
+      child: card,
     );
   }
 }
@@ -314,14 +377,8 @@ class _TelemetryChartCardState extends State<TelemetryChartCard> {
     // an ordinary child of it.
     return RepaintBoundary(
       key: _exportKey,
-      child: AppCard(
+      child: _GlassChartCard(
         height: (loading || !hasData) ? 170 : (group.height ?? 400),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.md,
-        ),
         semanticLabel:
             '$title, ${scaled.map((s) => s.spec.label).join(', ')}. '
             '${describeHistoryRange(selectedDate: selectedDate, rangeStart: rangeStart, rangeEnd: rangeEnd)}',

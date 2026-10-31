@@ -6,6 +6,15 @@ import '../utils/color_helpers.dart';
 import '../utils/design_tokens.dart';
 import '../utils/telemetry_helpers.dart';
 
+/// The vivid glass recipe for this page's banners.
+///
+/// Local on purpose: `design_tokens.dart` stays WattVision and
+/// `liquid_glass.dart` is owned elsewhere. A 6% white wash over the page with a
+/// white-12% hairline is the same material the chart cards wear, so a banner
+/// reads as part of the page rather than as a third surface on it.
+const Color _glassFill = Color(0x0FFFFFFF);
+const double _glassRadius = 24;
+
 /// The outline a status banner wears: the status hue at 1px, nothing more.
 ///
 /// **Why a hairline and not a wash.** These banners were built on `AppSurface`
@@ -133,21 +142,28 @@ class OfflineBanner extends StatelessWidget {
       // the page that had no reason to be flat. `AppCard` rather than
       // `AppSurface`, because `AppSurface` has no shadow parameter and a banner
       // is a card.
-      child: AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        border: _statusBannerEdge(color),
-        child: Row(
-          children: [
-            Icon(Icons.wifi_off_rounded, color: color, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Offline - showing the last data from ${describeCacheAge(cacheTime)}',
-                style: AppType.labelUppercase.copyWith(color: color),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _glassFill,
+          borderRadius: BorderRadius.circular(_glassRadius),
+          border: _statusBannerEdge(color),
+        ),
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: _statusBannerEdge(color),
+          child: Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, color: color, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Offline - showing the last data from ${describeCacheAge(cacheTime)}',
+                  style: AppType.labelUppercase.copyWith(color: color),
+                ),
               ),
-            ),
-            RetryButton(onRetry: onRetry, color: color),
-          ],
+              RetryButton(onRetry: onRetry, color: color),
+            ],
+          ),
         ),
       ),
     );
@@ -203,7 +219,7 @@ class EnergyAlertBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppPalette.alertFill,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(_glassRadius),
         border: Border(
           left: BorderSide(color: AppPalette.statusBad, width: 4),
         ),

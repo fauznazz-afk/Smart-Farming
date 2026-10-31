@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/telemetry_model.dart';
 import '../../../services/energy_forecast_service.dart';
 import '../../../utils/alarm_rules.dart';
-import '../../../utils/battery_sign.dart';
 import '../../../utils/date_summary_stats.dart';
-import '../../../utils/production_buckets.dart';
 import '../../../utils/solar_irradiance.dart';
 import '../utils/date_helpers.dart';
 import '../utils/history_range.dart';
@@ -14,9 +12,9 @@ import '../widgets/cost_summary_panel.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/date_summary_panel.dart';
 import '../widgets/glass_hero_card.dart';
-import '../widgets/glass_sheet.dart';
 import '../widgets/metric_grid.dart';
 import '../widgets/metric_specs.dart';
+import '../widgets/power_summary_panel.dart';
 import '../widgets/terminal_panel.dart' show slotNumber;
 
 /// Everything the hero card, the 7-day sheet and the two panels below it read.
@@ -141,7 +139,7 @@ List<Widget Function()> overviewPage(OverviewInputs inputs) {
     () => const SizedBox(height: 18),
     () => inputs.bindRevision(
       inputs.energyRevision,
-      () => _forecastSheet(inputs),
+      () => _powerSummary(inputs),
     ),
     // **Cost and array performance, below the panel that reports the kWh it is
     // derived from.**
@@ -197,16 +195,8 @@ List<Widget Function()> overviewPage(OverviewInputs inputs) {
 /// already on screen.
 Widget _glassHero(OverviewInputs inputs) {
   final pzem = inputs.pzem;
-  final battery = inputs.battery;
   final lux = inputs.sensor?.latestValues['lux'];
   final pvPower = pzem?.latestValues['power_dc'];
-  final acPower = pzem?.latestValues['power_ac'];
-  final batteryPower = battery?.latestValues['power'];
-  final soc = battery?.latestValues['soc'];
-  final peak = pvPeakWatts(
-    inputs.history['power_dc'] ?? const <TelemetryPoint>[],
-    livePower: pvPower,
-  );
 
   // A device that has never reported prints `--`, never `0`. `slotNumber` owns
   // that decision and every figure below goes through it, so the page cannot
@@ -220,31 +210,11 @@ Widget _glassHero(OverviewInputs inputs) {
     figure: slotNumber(pvPower, decimals: 0),
     unit: 'W',
     conditionLabel: lux == null ? 'No sky sensor' : skyConditionFor(lux).label,
-    highLabel: 'Peak',
-    highValue: peak == null ? '--' : '${slotNumber(peak, decimals: 0)} W',
-    lowLabel: 'Load',
-    lowValue: '${slotNumber(acPower, decimals: 0)} W',
-    stats: [
-      // **Battery power in watts, not AC load.** See `lib/utils/battery_sign.dart`:
-      // a negative reading while the SOC falls means discharging, and the sign is
-      // never flipped at the call site, so this cell and the Battery page agree.
-      GlassHeroStat(
-        label: 'Battery Power',
-        value: '${slotNumber(batteryPower, decimals: 0)} W',
-        onTap: inputs.onOpenBattery,
-      ),
-      GlassHeroStat(
-        label: 'Battery',
-        value: batteryPower == null
-            ? '--'
-            : batteryChargeState(batteryPower).label,
-      ),
-      GlassHeroStat(
-        label: 'SOC',
-        value: '${slotNumber(soc, decimals: 0)}%',
-        onTap: inputs.onOpenBattery,
-      ),
-    ],
+    // **Peak, battery power and SOC left this card for the Power Summary.**
+    // They were a second reading of numbers the summary now carries, and the
+    // hero has no fourth value to show, so the stat strip goes rather than
+    // standing empty.
+    stats: const <GlassHeroStat>[],
     trailingActions: [
       // First, because it is the only action that changes what the whole page
       // below is describing.
@@ -310,21 +280,17 @@ IconData _heroSkyIcon(double? lux) {
   };
 }
 
-/// The white sheet: today's own row first, then the six previous days, oldest
-/// first — today is deliberately not repeated inside the day loop.
+/// PV, AC and battery side by side, with today's energy and the runtime.
 ///
-/// **Yesterday-to-today rather than today-forward.** The reference is a weather
-/// forecast, so its rows are days that have not happened. This app has no
-/// forecast — `EnergyForecastService` extrapolates the current day's power
-/// curve, which is a projection of *today*, not of seven days. Showing a row
-/// per upcoming day would mean printing a number the app cannot know, so the
-/// sheet reports the seven days it actually has samples for.
-Widget _forecastSheet(OverviewInputs inputs) {
-  final totals = dailyTotals(
-    inputs.energyHistory['power_dc'] ?? const <TelemetryPoint>[],
-    DateTime.now(),
-  );
-  final today = startOfLocalDay(DateTime.now());
+/// **This replaced the 7-Day Production sheet.** The sheet was six rows of
+/// yesterday's kWh, which duplicated the Energy Report; this panel answers the
+/// question the Overview is actually for — where the power is right now and
+/// where it went. The three figures the sheet was the only route to are kept:
+/// `dailyProductionTargetKwh`, `batteryDepletionHours` and `onOpenEnergyReport`.
+/// Retiring a setting the user can still edit would have been silent.
+Widget _powerSummary(OverviewInputs inputs) {
+  final pzem = inputs.pzem;
+  final battery = inputs.battery;
   // **The target and the runtime come from the service, and they are here
   // because the instrument panel used to carry them.** `dailyProductionTargetKwh`
   // is a number the user types into Settings, so dropping the panel without
@@ -338,62 +304,44 @@ Widget _forecastSheet(OverviewInputs inputs) {
     dailyProductionTargetKwh: inputs.dailyProductionTargetKwh,
     referenceDate: DateTime.now(),
   );
+  final pvPower = pzem?.latestValues['power_dc'];
+  final acPower = pzem?.latestValues['power_ac'];
+  final batteryPower = battery?.latestValues['power'];
+  final soc = battery?.latestValues['soc'];
+  final voltage = battery?.latestValues['voltage'];
   final target = inputs.dailyProductionTargetKwh;
-  return GlassSheet(
-    title: '7-Day Production',
-    onTitleTap: inputs.onOpenEnergyReport,
-    // **No page dots.** The reference carries three of them and they implied a
-    // swipeable pager; this sheet has no second page, so they were a promise
-    // the widget could not keep. A dead affordance is worse than no affordance.
-    trailing: const SizedBox.shrink(),
-    children: [
-      // **The unit is the trailing slot, never the number a second time.**
-      // These rows printed `1.37` and then `produksi 1.37 kWh` — the same figure
-      // twice with a word attached, which is what made the row too narrow for
-      // either half of it and the sentence ellipsised. The label already says
-      // which quantity it is; the trailing slot only needs to say the unit.
-      GlassSheetRow(
-        label: 'Today',
-        icon: Icons.bolt_rounded,
-        value: inputs.energyLoading
-            ? '...'
-            : slotNumber(inputs.solarKwh, decimals: 2),
-        trailing: inputs.energyLoading ? 'Loading' : 'kWh',
-        highlight: true,
+  return PowerSummaryPanel(
+    onOpenEnergyReport: inputs.onOpenEnergyReport,
+    todayKwh: inputs.solarKwh,
+    energyLoading: inputs.energyLoading,
+    energyError: inputs.energyError,
+    targetKwh: target,
+    targetProgress: forecast.targetProgress,
+    runtimeHours: forecast.batteryDepletionHours,
+    columns: [
+      PowerSummaryColumn(
+        label: 'PV',
+        icon: Icons.wb_sunny_rounded,
+        figure: slotNumber(pvPower, decimals: 0),
+        unit: 'W',
+        caption: 'Peak ${slotNumber(pvPeakWatts(inputs.history['power_dc'] ?? const <TelemetryPoint>[], livePower: pvPower), decimals: 0)} W',
       ),
-      if (target != null && target > 0)
-        GlassSheetRow(
-          label: 'Target',
-          icon: Icons.flag_rounded,
-          value: slotNumber(target, decimals: 1),
-          trailing:
-              '${((forecast.targetProgress ?? 0) * 100).clamp(0, 999).toStringAsFixed(0)}% tercapai',
-        ),
-      if (forecast.batteryDepletionHours != null)
-        GlassSheetRow(
-          label: 'Runtime',
-          icon: Icons.battery_charging_full_rounded,
-          value: slotNumber(forecast.batteryDepletionHours, decimals: 1),
-          trailing: 'h battery',
-        ),
-      if (inputs.energyError != null)
-        GlassSheetRow(
-          label: 'Error',
-          icon: Icons.error_outline_rounded,
-          value: '--',
-          trailing: 'Riwayat daya gagal dimuat',
-        ),
-      for (final day in totals)
-        // Today is already the highlighted 'Today' row above; the loop lists
-        // only the six previous days.
-        if (day.date != today)
-          GlassSheetRow(
-            label: dayNameShort(day.date.weekday),
-            icon: Icons.wb_sunny_rounded,
-            value: day.isEmpty ? '--' : slotNumber(day.kwh, decimals: 2),
-            // The unit, never the figure again — see the note on `Today`.
-            trailing: day.isEmpty ? 'No data' : 'kWh',
-          ),
+      PowerSummaryColumn(
+        label: 'AC',
+        icon: Icons.power_rounded,
+        figure: slotNumber(acPower, decimals: 0),
+        unit: 'W',
+        caption: 'Load ${slotNumber(inputs.loadKwh, decimals: 2)} kWh',
+      ),
+      PowerSummaryColumn(
+        label: 'BATTERY',
+        icon: Icons.battery_charging_full_rounded,
+        figure: slotNumber(batteryPower, decimals: 0),
+        unit: 'W',
+        caption: batterySummaryCaption(batteryPower, soc, voltage),
+        soc: soc,
+        onTap: inputs.onOpenBattery,
+      ),
     ],
   );
 }

@@ -289,7 +289,7 @@ class GlassNavBar extends StatelessWidget {
                   // bottom-docked bar in this design system is the page's own
                   // layer lifted by one *card* step, so it takes the sheet
                   // surface and lets the hairline do the separating.
-                  color: AppSurfaces.surface,
+                  color: AppGlass.glassFill,
                   // **Rounded at the top, flush at the bottom, and the sheet's
                   // radius rather than the card's.**
                   //
@@ -320,7 +320,10 @@ class GlassNavBar extends StatelessWidget {
                   // slate border reads as dirt, where a translucent white reads
                   // as an edge.
                   border: Border(
-                    top: BorderSide(color: AppGlass.divider, width: 1),
+                    top: BorderSide(
+                      color: AppGlass.glassBorder,
+                      width: 1,
+                    ),
                   ),
                 ),
                 // **The clip matches the decoration, and still has to be stated.**

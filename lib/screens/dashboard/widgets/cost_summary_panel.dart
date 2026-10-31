@@ -4,6 +4,51 @@ import '../utils/design_tokens.dart';
 import '../utils/energy_helpers.dart';
 import 'terminal_panel.dart';
 
+/// The vivid glass recipe for this page's panels.
+///
+/// Local on purpose: `design_tokens.dart` stays WattVision and
+/// `terminal_panel.dart` is a shared primitive other pages use. A 6% white wash
+/// over the page with a white-12% hairline is one material at two strengths;
+/// the 24 radius matches the chart cards it sits under.
+const Color _glassFill = Color(0x0FFFFFFF);
+const Color _glassEdge = Color(0x1FFFFFFF);
+const double _glassRadius = 24;
+
+/// `TerminalPanel`'s recipe, worn as a wrapper.
+///
+/// **A wrapper rather than a copy of the panel**, so the row layout, the
+/// semantics node and the header divider keep the one implementation they have.
+/// The inner panel is transparent here — its own opaque fill would paint over
+/// this wash, which is the whole defect a second decoration would introduce.
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({
+    required this.children,
+    required this.header,
+    required this.semanticLabel,
+  });
+
+  final List<Widget> children;
+  final Widget? header;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _glassFill,
+        borderRadius: BorderRadius.circular(_glassRadius),
+        border: Border.all(color: _glassEdge, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: TerminalPanel(
+        semanticLabel: semanticLabel,
+        header: header,
+        children: children,
+      ),
+    );
+  }
+}
+
 /// What the array was worth and what the house cost, over the same window the
 /// ENERGY section above it reports.
 ///
@@ -85,7 +130,7 @@ class CostSummaryPanel extends StatelessWidget {
     // same rule the Overview panel follows for the alarms tag.
     if (money == null && performance == null) return const SizedBox.shrink();
 
-    return TerminalPanel(
+    return _GlassPanel(
       semanticLabel: 'Cost and performance',
       header: _Header(periodLabel: periodLabel, onTogglePeriod: onTogglePeriod),
       children: [

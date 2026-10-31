@@ -11,6 +11,28 @@ import 'dashboard_screen.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/liquid_glass.dart';
 
+/// Flat dark green, with no gradient. Three identical stops so every call
+/// site that paints this `LinearGradient` renders flat.
+const _pageGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [
+    Color(0xFF0B1F14),
+    Color(0xFF0B1F14),
+    Color(0xFF0B1F14),
+  ],
+);
+
+/// The one accent: flat, so the button reads as a single fill rather than a
+/// second gradient on a page that has none.
+const _buttonGradient = LinearGradient(
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+  colors: [Color(0xFF00D97E), Color(0xFF00D97E)],
+);
+
+const _violet = Color(0xFF00D97E);
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -83,181 +105,286 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  InputDecoration _fieldDecoration({
+    required String label,
+    required Widget prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    const hairline = Color(0x1FFFFFFF);
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: AppGlass.glassInkFaint),
+      filled: true,
+      fillColor: AppGlass.glassFill,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 18,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: hairline),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: hairline),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(
+          color: const Color(0xFF00D97E).withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AppBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    child: const BrandLogo(size: 100, showName: false),
+      backgroundColor: const Color(0xFF0B1F14),
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: DecoratedBox(decoration: BoxDecoration(gradient: _pageGradient)),
+          ),
+          // Two soft glows. `IgnorePointer` so they never eat a tap.
+          Positioned(
+            top: -120,
+            left: -100,
+            child: IgnorePointer(
+              child: Container(
+                width: 340,
+                height: 340,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      _violet.withValues(alpha: 0.45),
+                      _violet.withValues(alpha: 0.0),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  // `card-padding`, 16, not 24. The brief has one card inset and
-                  // this was a second one.
-                  AppCard(
-                    padding: const EdgeInsets.all(AppSpacing.cardPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Not `const`: the ink is a brightness-aware getter.
-                        //
-                        // **Card ink, explicitly — and this was page ink.** This
-                        // word is inside the `AppCard`, so the ink on it is the
-                        // card's own token, not the page's.
-                        Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            'EnerGrow',
-                            textAlign: TextAlign.center,
-                            // `headline-lg`, the brief's "uppercase card title"
-                            // slot at 24/900. It was `headline-md`, which is the
-                            // *sub*-headline — and this is the screen's defining
-                            // line.
-                            style: AppType.headlineLg.copyWith(
-                              color: AppSurfaces.onSurface,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'PLTS & Smart Farming Monitoring',
-                          // The brief's metadata line: uppercase, wide-tracked,
-                          // secondary ink. It was a lowercase 12px body line,
-                          // which is the brief's slot for *paragraphs*, and this
-                          // is a strapline.
-                          style: AppType.labelUppercase.copyWith(
-                            color: faintColor,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sectionGap),
-                        TextField(
-                          controller: _usernameCtrl,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).nextFocus(),
-                          decoration: InputDecoration(
-                            labelText: 'Username / Email',
-                            // Same 48dp box the password field's default icon
-                            // occupies: a 24dp glyph in a 12dp pad. The username
-                            // glyph used to be a 22dp asset in a 13dp pad, so
-                            // the two fields' left icons sat at different sizes
-                            // and offsets - visible as the user icon reading
-                            // smaller and nudged right of the lock below it.
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              child: Image.asset(
-                                'assets/user_icon.png',
-                                width: 24,
-                                height: 24,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                colorBlendMode: BlendMode.srcIn,
-                                semanticLabel: 'User',
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        TextField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscurePassword,
-                          onSubmitted: _loading ? null : (_) => _handleLogin(),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                              onPressed: () {
-                                setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sectionGap),
-                        if (_errorMsg != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Semantics(
-                              liveRegion: true,
-                              child: AppBadge(
-                                color: statusBad,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMsg!,
-                                        style: AppType.bodySm,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        // The brief's `button-primary`, and the tinted lift is
-                        // what makes it the one electric object on the page.
-                        // Painted by the `DecoratedBox` behind the button rather
-                        // than by `FilledButton`'s own `elevation`, because
-                        // Material maps elevation through `kElevationToShadow`
-                        // and cannot carry a hue. The shadow is the accent, so it
-                        // reads as part of the fill rather than as a grey halo.
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadius.all(AppRadius.card),
-                            boxShadow: AppShadows.stampedIn(AppPalette.accent),
-                          ),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: FilledButton(
-                              onPressed: _loading ? null : _handleLogin,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppPalette.accent,
-                                foregroundColor: AppPalette.onHue,
-                                disabledBackgroundColor: AppPalette.accent,
-                                disabledForegroundColor:
-                                    AppPalette.onHue.withValues(alpha: 0.70),
-                                textStyle: AppType.buttonLabel,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadius.all(AppRadius.card),
-                                ),
-                              ),
-                              child: _loading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Login'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          Positioned(
+            bottom: -140,
+            right: -110,
+            child: IgnorePointer(
+              child: Container(
+                width: 380,
+                height: 380,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF00D97E).withValues(alpha: 0.22),
+                      const Color(0xFF00D97E).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: const BrandLogo(size: 100, showName: false),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppGlass.glassFill,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: AppGlass.glassBorder,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              'EnerGrow',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              'PLTS & SMART FARMING MONITORING',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.6,
+                                color: AppGlass.glassInkFaint,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sectionGap),
+                          TextField(
+                            controller: _usernameCtrl,
+                            textInputAction: TextInputAction.next,
+                            style: const TextStyle(color: Colors.white),
+                            onSubmitted: (_) =>
+                                FocusScope.of(context).nextFocus(),
+                            decoration: _fieldDecoration(
+                              label: 'Username / Email',
+                              // Same 48dp box the password field's default icon
+                              // occupies: a 24dp glyph in a 12dp pad.
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                child: Image.asset(
+                                  'assets/user_icon.png',
+                                  width: 24,
+                                  height: 24,
+                                  color: AppGlass.glassInkFaint,
+                                  colorBlendMode: BlendMode.srcIn,
+                                  semanticLabel: 'User',
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          TextField(
+                            controller: _passwordCtrl,
+                            obscureText: _obscurePassword,
+                            style: const TextStyle(color: Colors.white),
+                            onSubmitted:
+                                _loading ? null : (_) => _handleLogin(),
+                            decoration: _fieldDecoration(
+                              label: 'Password',
+                              prefixIcon: Icon(
+                                Icons.lock_outline,
+                                color: AppGlass.glassInkFaint,
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: AppGlass.glassInkFaint,
+                                ),
+                                onPressed: () {
+                                  setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sectionGap),
+                          if (_errorMsg != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Semantics(
+                                liveRegion: true,
+                                child: AppBadge(
+                                  color: statusBad,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _errorMsg!,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Pill button, gradient fill, glow shadow in the accent.
+                          // The shadow is painted by the `DecoratedBox` behind
+                          // the button rather than `elevation`, because Material
+                          // maps elevation through `kElevationToShadow` and
+                          // cannot carry a hue.
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF00D97E,
+                                  ).withValues(alpha: 0.35),
+                                  blurRadius: 22,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: DecoratedBox(
+                                decoration: const BoxDecoration(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(999),
+                                  ),
+                                  gradient: _buttonGradient,
+                                ),
+                                child: TextButton(
+                                  onPressed: _loading ? null : _handleLogin,
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    foregroundColor: AppPalette.onHue,
+                                    disabledForegroundColor: AppPalette.onHue
+                                        .withValues(alpha: 0.7),
+                                    shape: const StadiumBorder(),
+                                    textStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  child: _loading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Color(0xFF121212),
+                                          ),
+                                        )
+                                      : const Text('Login'),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

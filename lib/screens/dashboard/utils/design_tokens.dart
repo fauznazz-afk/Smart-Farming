@@ -7,7 +7,7 @@
 /// WattVision (designmd.ai, MIT) is a flat dark dashboard system:
 /// - **Background**: #121212, **Cards**: #1E1E1E, borders/grid #2C2C2E,
 ///   hover tile #252525
-/// - **Accent (data)**: #00E5FF cyan; **alert/red**: #FF453A;
+/// - **Accent (data)**: #00D97E green; **alert/red**: #FF453A;
 ///   **live/normal green**: #32D74B; warning amber stays for the stale tier
 /// - **Text**: #FFFFFF / #98989D
 /// - **Typography**: Inter (titles/body), JetBrains Mono (KPI figures), tabular
@@ -114,26 +114,32 @@ class AppSurfacesPalette {
     tooltip: Color(0xFF2C2C2E),
   );
 
+  /// **The light ramp, and it is a real second appearance rather than a copy.**
+  ///
+  /// A white card on a light page is the same *relationship* the dark ramp has:
+  /// the page is the outermost tone, the card is one step in, and a tile is one
+  /// step further. What flips is the direction of the step, which is why every
+  /// ink value here is a measured dark green and not a copied white.
+  ///
+  /// Measured on `#F4F6F5` page / `#FFFFFF` card / `#EDF1EF` tile / `#E4EAE7`
+  /// muted, at worst 4.55:1 (`warning` on `#DDE3E0`) — see
+  /// `theme_palette_contrast_test.dart`, which loops over both ramps.
   static const AppSurfacesPalette light = AppSurfacesPalette(
     brightness: Brightness.light,
-    // WattVision: flat #121212 page (designmd spec).
-    page: Color(0xFF121212),
-    // WattVision: cards #1E1E1E.
-    surface: Color(0xFF1E1E1E),
-    // WattVision: hover tile #252525.
-    surfaceAlt: Color(0xFF252525),
-    surfaceMuted: Color(0xFF2C2C2E),
-    onSurface: Color(0xFFFFFFFF),
-    // WattVision: muted text #98989D.
-    onSurfaceVariant: Color(0xFF98989D),
+    page: Color(0xFFF4F6F5),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFEDF1EF),
+    surfaceMuted: Color(0xFFE4EAE7),
+    onSurface: Color(0xFF10201A),
+    // 5.76:1 on the page, 6.25 on white.
+    onSurfaceVariant: Color(0xFF54645D),
     // Same value as [surfaceMuted] — documented identity kept.
-    border: Color(0xFF2C2C2E),
+    border: Color(0xFFDDE3E0),
     // Input tracks surface identity.
-    input: Color(0xFF1E1E1E),
+    input: Color(0xFFFFFFFF),
     // The page — un-lit meter segment is a hole in the surface.
-    track: Color(0xFF121212),
-    // WattVision: tooltip #2C2C2E.
-    tooltip: Color(0xFF2C2C2E),
+    track: Color(0xFFF4F6F5),
+    tooltip: Color(0xFF10201A),
   );
 }
 
@@ -158,22 +164,28 @@ class AppTheme {
 
   static Brightness get brightness => _brightness;
 
-  /// Resolves a [ThemeMode] and a platform brightness to the one appearance.
+  /// Resolves a [ThemeMode] and a platform brightness to the appearance.
   ///
-  /// **Both arguments are ignored and that is the contract.** The signature is
-  /// kept because `MaterialApp` owns a `themeMode` and the root widget has to
-  /// answer it; the answer is always dark.
-  static void applyMode(ThemeMode mode, Brightness platform) => apply();
+  /// `system` follows the platform; `light` and `dark` are the user's choice and
+  /// win over it. This is the only place the two are combined, so `MaterialApp`'s
+  /// `themeMode` and the static palette can never disagree.
+  static void applyMode(ThemeMode mode, Brightness platform) {
+    apply(switch (mode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => platform,
+    });
+  }
 
-  /// Re-resolves every ramp. **One appearance, so there is nothing to choose.**
+  /// Re-resolves every ramp.
   ///
-  /// The parameter is kept rather than deleted because the test suite drives
-  /// both ramps through this call to prove they are identical; the body clamps
-  /// it, which is what makes "dark-only" true rather than merely intended.
+  /// A null argument leaves the current brightness alone, which is what the
+  /// `MaterialApp` rebuild path wants: the mode was already resolved by
+  /// [applyMode] and the tree only needs the values refreshed.
   static void apply([Brightness? brightness]) {
-    _brightness = Brightness.dark;
-    AppSurfaces.apply(Brightness.dark);
-    AppPalette.apply(Brightness.dark);
+    _brightness = brightness ?? _brightness;
+    AppSurfaces.apply(_brightness);
+    AppPalette.apply(_brightness);
   }
 }
 
@@ -311,46 +323,58 @@ class AppPaletteTheme {
   final Color onTertiary;
   final Color onHue;
 
+  /// **The light ramp, darkened so every value clears AA as ink on white.**
+  ///
+  /// The dark ramp's hues are light because they are read on a dark card. On a
+  /// white card the same hues measure 1.5-2.5:1, so each one is re-chosen at the
+  /// darkest step of its own hue that still clears 4.5:1 on `#FFFFFF`, `#EDF1EF`,
+  /// `#E4EAE7` and `#DDE3E0`. Worst case is `warning` on `#DDE3E0` at **4.55:1**;
+  /// see `theme_palette_contrast_test.dart`.
+  ///
+  /// The accent is `#0A6E44`: 6.31:1 on white as text, and **6.31:1 under white
+  /// `onHue`** - white is the ink here, because the fill is dark. `#0B7A4B` was
+  /// the first candidate and measured 5.39:1 on white, which clears AA but leaves
+  /// the selected nav glyph and the button label thin at small sizes; the darker
+  /// step was taken for margin.
   static const AppPaletteTheme light = AppPaletteTheme(
-    // WattVision: cyan data accent (designmd spec).
-    primary: Color(0xFF00E5FF),
-    // WattVision: live/normal lime green.
-    secondary: Color(0xFF32D74B),
-    // WattVision: warning amber.
-    tertiary: Color(0xFFFBBF24),
-    success: Color(0xFF32D74B),
-    warning: Color(0xFFFBBF24),
+    primary: Color(0xFF0A6E44),
+    // Status green, distinct from the accent and still a true green.
+    secondary: Color(0xFF156B32),
+    // Warning amber, darkened from #FBBF24 (1.6:1 on white - unreadable).
+    tertiary: Color(0xFF8A5A00),
+    success: Color(0xFF156B32),
+    warning: Color(0xFF8A5A00),
     // Orange, distinct from warning on purpose.
-    statusAlert: Color(0xFFFF9F0A),
-    // The alert banner's fill: a deep red that carries statusBad ink.
-    alertFill: Color(0xFF3A1C1C),
-    accent: Color(0xFF00E5FF),
-    // Spec alert red — the only red in the ramp.
-    statusBad: Color(0xFFFF453A),
-    successOnPage: Color(0xFF32D74B),
-    warningOnPage: Color(0xFFFBBF24),
-    statusBadOnPage: Color(0xFFFF453A),
-    successOnPageLight: Color(0xFF32D74B),
-    warningOnPageLight: Color(0xFFFBBF24),
-    statusBadOnPageLight: Color(0xFFFF453A),
-    info: Color(0xFF00E5FF),
+    statusAlert: Color(0xFFA34A06),
+    // The alert banner's fill: a pale red board under the dark red ink.
+    alertFill: Color(0xFFFBE9E7),
+    accent: Color(0xFF0A6E44),
+    // Alert red, darkened from #FF453A (3.36:1 on white - under AA).
+    statusBad: Color(0xFFB32620),
+    successOnPage: Color(0xFF156B32),
+    warningOnPage: Color(0xFF8A5A00),
+    statusBadOnPage: Color(0xFFB32620),
+    successOnPageLight: Color(0xFF156B32),
+    warningOnPageLight: Color(0xFF8A5A00),
+    statusBadOnPageLight: Color(0xFFB32620),
+    info: Color(0xFF0A6E44),
     // Chart triad: alert red / chart green / 4th-series blue.
-    chartRed: Color(0xFFFF453A),
-    chartGreen: Color(0xFF30D158),
-    chartBlue: Color(0xFF5E9EFF),
-    // Measured: white on cyan #00E5FF ~1.4:1, dark ink ~10:1.
-    onPrimary: Color(0xFF121212),
-    onSecondary: Color(0xFF121212),
-    onTertiary: Color(0xFF121212),
-    onHue: Color(0xFF121212),
+    chartRed: Color(0xFFB32620),
+    chartGreen: Color(0xFF156B32),
+    chartBlue: Color(0xFF1D5FD6),
+    // White, because the accent is now a dark fill. Measured 6.31:1 on it.
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onTertiary: Color(0xFFFFFFFF),
+    onHue: Color(0xFFFFFFFF),
   );
 
   static const AppPaletteTheme dark = AppPaletteTheme(
-    // WattVision: cyan data accent (designmd spec).
-    primary: Color(0xFF00E5FF),
-    // WattVision: live/normal lime green.
+    // Dark-green data accent. 9.2:1 on the page, 10.0:1 under `onHue`.
+    primary: Color(0xFF00D97E),
+    // Status green stays the live/normal hue, distinct from the accent.
     secondary: Color(0xFF32D74B),
-    // WattVision: warning amber.
+    // Warning amber.
     tertiary: Color(0xFFFBBF24),
     success: Color(0xFF32D74B),
     warning: Color(0xFFFBBF24),
@@ -358,21 +382,24 @@ class AppPaletteTheme {
     statusAlert: Color(0xFFFF9F0A),
     // The alert banner's fill: a deep red that carries statusBad ink.
     alertFill: Color(0xFF3A1C1C),
-    accent: Color(0xFF00E5FF),
-    // Spec alert red — the only red in the ramp.
+    accent: Color(0xFF00D97E),
+    // Alert red — the only red in the ramp.
     statusBad: Color(0xFFFF453A),
     successOnPage: Color(0xFF32D74B),
     warningOnPage: Color(0xFFFBBF24),
-    statusBadOnPage: Color(0xFFFF453A),
+    // Lifted from #FF453A: that red measured 3.64:1 on the old purple page.
+    // On the flat #0B1F14 page it is 5.45:1, and lifting it again would make
+    // the card and page reds disagree with no measurement asking for it.
+    statusBadOnPage: Color(0xFFFF8A80),
     successOnPageLight: Color(0xFF32D74B),
     warningOnPageLight: Color(0xFFFBBF24),
     statusBadOnPageLight: Color(0xFFFF453A),
-    info: Color(0xFF00E5FF),
+    info: Color(0xFF00D97E),
     // Chart triad: alert red / chart green / 4th-series blue.
     chartRed: Color(0xFFFF453A),
     chartGreen: Color(0xFF30D158),
     chartBlue: Color(0xFF5E9EFF),
-    // Measured: white on cyan #00E5FF ~1.4:1, dark ink ~10:1.
+    // Measured: white on green #00D97E is ~2.1:1, dark ink 10.0:1.
     onPrimary: Color(0xFF121212),
     onSecondary: Color(0xFF121212),
     onTertiary: Color(0xFF121212),
@@ -587,10 +614,13 @@ class AppBorders {
         width: 1,
       );
 
-  static const BorderSide boundary = BorderSide(
-    color: Color(0xFFFAFAFA),
-    width: 1.5,
-  );
+  /// White over camera pixels in the dark ramp, near-black over a light page.
+  static BorderSide get boundary => BorderSide(
+        color: AppTheme.brightness == Brightness.dark
+            ? const Color(0xFFFAFAFA)
+            : const Color(0xFF10201A),
+        width: 1.5,
+      );
 
   static BoxBorder get hairlineBorder => Border.fromBorderSide(hairline);
   static BoxBorder get controlBorder => Border.fromBorderSide(control);
@@ -990,8 +1020,8 @@ class AppMotion {
 // SECTION 9: GLASS (AppGlass) — WattVision glass + sheets
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// WattVision extras: flat dark page, a gradient hero, translucent white glass
-/// over it, and dark opaque sheets.
+/// WattVision extras: a four-stop gradient page, a gradient hero, translucent
+/// white glass over it, and dark opaque sheets.
 ///
 /// **Every value here comes off the reference card, and the two opacities are
 /// the load-bearing part.** The whole glass effect is one white at two alphas:
@@ -1013,17 +1043,25 @@ class AppGlass {
 
   static bool get isDark => brightness == Brightness.dark;
 
-  /// Page gradient, top → bottom. **WattVision: flat #121212.**
+  /// Page gradient, top → bottom. **Four stops, deep purple → blue → magenta →
+  /// near-black violet.**
   ///
-  /// Kept as a three-stop list so every call site that paints a sweep still
-  /// works; the stops are identical, so it renders flat.
+  /// **The page is one flat dark-green fill, with no gradient.**
+  ///
+  /// Three identical stops rather than a single colour because every call site
+  /// paints a `LinearGradient` from this list; identical stops render flat, so
+  /// the sweep machinery costs nothing and a future depth pass is a token change.
+  ///
+  /// The list is the only place a page value is written. [pageGradientLight]
+  /// carries the identical stops, because the app is dark-only and the light
+  /// record is a copy rather than a second ramp.
   static const List<Color> pageGradientDark = <Color>[
-    // WattVision: flat #121212 page (designmd spec).
-    Color(0xFF121212),
-    // WattVision: flat #121212 page.
-    Color(0xFF121212),
-    // WattVision: flat #121212 page — also the flat page (see AppSurfaces.page).
-    Color(0xFF121212),
+    // Flat dark green, top.
+    Color(0xFF0B1F14),
+    // Flat dark green, middle — identical, so no gradient is visible.
+    Color(0xFF0B1F14),
+    // Flat dark green, bottom.
+    Color(0xFF0B1F14),
   ];
 
   /// **The page sweep for the active ramp.**
@@ -1032,12 +1070,12 @@ class AppGlass {
   static List<Color> get pageGradient =>
       isDark ? pageGradientDark : pageGradientLight;
 
-  /// The light ramp's page: unused, kept identical to dark so the dark-only
-  /// contract is literal rather than merely unused.
+  /// The light ramp's page: the flat `#F4F6F5` the light palette names, so the
+  /// sweep and `AppSurfaces.page` agree instead of disagreeing by one ramp.
   static const List<Color> pageGradientLight = <Color>[
-    Color(0xFF121212),
-    Color(0xFF121212),
-    Color(0xFF121212),
+    Color(0xFFF4F6F5),
+    Color(0xFFF4F6F5),
+    Color(0xFFF4F6F5),
   ];
 
   /// Hero gradient, top-left → bottom-right, deep into deeper.
@@ -1057,7 +1095,7 @@ class AppGlass {
   /// The wash has to carry the surface all the way to light, so that the dark
   /// label on it has something to read against. 55% reads as a tinted chip on
   /// the dark page; 68% is the selected state and the nav bar. The wash over the
-  /// flat #121212 page must keep glass ink AA.
+  /// page gradient must keep glass ink AA at every stop.
   static const double softAlpha = 0.55;
   static const double strongAlpha = 0.68;
 
@@ -1085,12 +1123,45 @@ class AppGlass {
   /// lighter half and need more body than an hour pill on the page does.
   static Color get fill => Colors.white.withValues(alpha: 0.20);
 
+  /// **The card wash, and it is the one to reach for instead of a white literal.**
+  ///
+  /// White 6% over a dark page *lifts* the surface. White 6% over a white page
+  /// does nothing at all, which is why the light leg is black: on `#F4F6F5` a
+  /// black 6% wash resolves to `#E5E7E6`, one step in from the page, and dark
+  /// ink on it still measures 13.59:1.
+  static Color get glassFill => isDark
+      ? Colors.white.withValues(alpha: 0.06)
+      : Colors.black.withValues(alpha: 0.06);
+
+  /// The hairline that goes with [glassFill]. White 12% in dark, black 12% in
+  /// light — the same step as the fill, one strength up.
+  static Color get glassBorder => isDark
+      ? Colors.white.withValues(alpha: 0.12)
+      : Colors.black.withValues(alpha: 0.12);
+
+  /// The faint ink the glass cards use for labels: white 60% in dark, and
+  /// `onSurfaceVariant` in light because a translucent black over a light wash
+  /// loses the AA the caption needs.
+  static Color get glassInkFaint =>
+      isDark ? Colors.white.withValues(alpha: 0.60) : AppSurfaces.onSurfaceVariant;
+
+  /// Strong ink for text on glass. White in dark, the card ink in light.
+  static Color get glassInkStrong =>
+      isDark ? Colors.white : AppSurfaces.onSurface;
+
   /// **The ink for content sitting on a [fillSoft] / [fillStrong] surface.**
   ///
   /// Dark, because the wash is white. This is deliberately *not*
   /// [pageInkStrong]: that is for content on the bare page. On glass the wash
   /// decides the ink.
-  static const Color pageGlassInk = Color(0xFF0B2545);
+  ///
+  /// **The light ramp's chips are white-washed on a white page, so the ink has
+  /// to invert with them.** It was `#0B2545` in both ramps and the light theme
+  /// drew dark navy labels on a `#F4F6F5` page wash — legible on paper, invisible
+  /// where the wash landed on the hero. Dark ink on a light chip, white ink on a
+  /// dark one, chosen by the same [isDark] the fills use.
+  static Color get pageGlassInk =>
+      isDark ? const Color(0xFF0B2545) : AppSurfaces.onSurface;
   // **The same value as [pageGlassInk], and the measurement is why.**
   //
   // A tinted wash gives a label no headroom: a slightly lighter step lands under
@@ -1119,20 +1190,27 @@ class AppGlass {
   static const Color arrowUpLight = Color(0xFFE85D1F);
   static const Color arrowDownLight = Color(0xFF1D5FD6);
 
+  /// Hero gradient for the active ramp: deep blue in dark, and a dark green
+  /// board in light so the hero's white ink stays legible on it.
+  static List<Color> get heroGradientActive => isDark
+      ? heroGradient
+      : const <Color>[Color(0xFF0E3B26), Color(0xFF0B2E1E)];
+
   /// The accent as a *graphic* drawn on the page, rather than on a card.
   ///
   /// WattVision's cyan clears 3:1 on #121212 for a live dot, a carousel dot and a
   /// section heading. Kept as its own token because a card accent and a page
   /// accent are measured against different grounds even when they are one hue.
-  static const Color accentOnPage = Color(0xFF00E5FF);
+  static Color get accentOnPage => AppPalette.accent;
 
   /// White ink at three strengths, which is what the **hero** needs: a title, a
   /// value, and a label. One colour at three alphas rather than three greys,
   /// because a grey chosen for a label on the hero reads flat against its
   /// gradient and this cannot.
   ///
-  /// The hero is a deep gradient, so its ink is white. Everything drawn on the
-  /// *page* instead uses [pageInkStrong] / [pageInk] / [pageInkSoft].
+  /// The hero keeps a dark board in both ramps (`heroGradientActive`), so this
+  /// ink stays white in both. Everything drawn on the *page* instead uses
+  /// [pageInkStrong] / [pageInk] / [pageInkSoft].
   static Color get inkStrong => Colors.white;
   static Color get ink => Colors.white.withValues(alpha: 0.92);
   static Color get inkSoft => Colors.white.withValues(alpha: 0.70);
@@ -1142,23 +1220,23 @@ class AppGlass {
   /// White on #121212. The light branch stays for the dark-only clamp: if a
   /// future ramp ever ships, this token already answers it.
   static Color get pageInkStrong =>
-      isDark ? Colors.white : const Color(0xFF0B2545);
+      isDark ? Colors.white : const Color(0xFF10201A);
   static Color get pageInk =>
-      isDark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF10294D);
+      isDark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF10201A);
   static Color get pageInkSoft =>
-      isDark ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF24446F);
+      isDark ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF54645D);
 
   /// The one opaque surface, and its two greys.
-  static const Color sheet = Color(0xFF1E1E1E);
-  static const Color sheetRow = Color(0xFF252525);
-  static const Color sheetTitleInk = Color(0xFFFFFFFF);
-  static const Color sheetRowInk = Color(0xFFFFFFFF);
-  static const Color sheetRowInkMuted = Color(0xFF98989D);
+  static Color get sheet => AppSurfaces.surface;
+  static Color get sheetRow => AppSurfaces.surfaceAlt;
+  static Color get sheetTitleInk => AppSurfaces.onSurface;
+  static Color get sheetRowInk => AppSurfaces.onSurface;
+  static Color get sheetRowInkMuted => AppSurfaces.onSurfaceVariant;
 
   /// The sheet's grab handle, and the two page dots.
-  static const Color handle = Color(0xFF4A4A50);
-  static const Color dotInactive = Color(0xFF48484E);
-  static const Color active = Color(0xFF00E5FF);
+  static Color get handle => AppSurfaces.border;
+  static Color get dotInactive => AppSurfaces.border;
+  static Color get active => AppPalette.accent;
 
   /// The hero's own shadow. A gradient card on a dark page cannot be separated
   /// by a tonal step the way a lighter card could, so it carries a deep soft one
@@ -1192,14 +1270,14 @@ class AppGlass {
         colors: pageGradient,
       );
 
-  /// The flat colour the gradient's own top stop lands near.
+  /// The flat colour under the sweep.
   ///
   /// **This is the fallback, not the design.** It is what an overscroll bounce
   /// exposes above and below the sweep, and what shows for the one frame before
-  /// the gradient resolves, so it must match the page or the seam is visible at
-  /// exactly the moment the user is dragging.
-  static Color get pageFallback =>
-      isDark ? const Color(0xFF121212) : const Color(0xFF121212);
+  /// the gradient resolves. It equals the gradient's *bottom* stop (`#12071F`),
+  /// which is the darker of the two ends, so the overscroll edge reads as the
+  /// page continuing rather than as a seam.
+  static Color get pageFallback => pageGradient.last;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

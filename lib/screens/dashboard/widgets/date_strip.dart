@@ -149,12 +149,16 @@ class DateStrip extends StatelessWidget {
             final fairShare =
                 (constraints.maxWidth - gap * (days.length - 1)) / days.length;
 
-            // **Never narrower than the text needs.** `fairShare` is the share
-            // the row can afford after the gap; `needed` is the floor the chip
-            // cannot go under without wrapping its day name. Taking the max is
-            // what keeps the ladder from buying a gap with the label, which is
-            // the trade the comment above forbids.
-            final chipWidth = needed > fairShare ? needed : fairShare;
+            // **A circle, so the diameter is one number and it has a ceiling.**
+            // `fairShare` is what the row can afford after the gap; `needed` is
+            // the floor the day label cannot go under; `maxDiameter` stops a
+            // wide viewport from stretching seven circles into seven discs.
+            // The max of the two floors is deliberate: a diameter that buys a
+            // gap with the label is the trade the comment above forbids, and
+            // the scroll fallback is the release valve when even that overflows.
+            const maxDiameter = 56.0;
+            final fair = fairShare < maxDiameter ? fairShare : maxDiameter;
+            final chipWidth = needed > fair ? needed : fair;
             final scrolls = chipWidth > fairShare + 0.5;
 
             final chips = Row(

@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../utils/app_log.dart';
+
 /// Window-level screen capture control, for the screens that must not be
 /// photographable.
 ///
@@ -81,7 +83,7 @@ class SecureWindow {
       // Not fatal: the screen still works, it is just photographable. Worth
       // saying, because "it failed quietly" is indistinguishable from "it is
       // protected" until the moment someone photographs it.
-      debugPrint('SecureWindow: could not apply secure=$secure (${e.message})');
+      appLog(() => 'SecureWindow: could not apply secure=$secure (${e.message})');
     } on MissingPluginException {
       // Host without the plugin. Nothing to do, and nothing to report.
     }

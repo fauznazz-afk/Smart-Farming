@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../utils/design_tokens.dart';
 
+/// The label ink this template uses, at white 60%.
+const Color _inkLabel = Color(0x99FFFFFF);
+
 /// One chart per page, swiped horizontally.
 ///
 /// **The pager row is page chrome on the page gradient, not on a card** — every
@@ -51,9 +54,9 @@ class _ChartCarouselState extends State<ChartCarousel> {
     // clear 3:1 on a sheet, not on the page.
     //
     // So the pager is drawn in the page ink ramp, like every other piece of
-    // chrome that sits on the page: the current page at
-    // [AppGlass.pageInkStrong] and the rest at [AppGlass.pageInkSoft]. Width
-    // carries "which one" and colour only carries weight.
+    // chrome that sits on the page: the current page at full white and the rest
+    // at the template's 60% label ink. Width carries "which one" and colour only
+    // carries weight.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -134,8 +137,8 @@ class _ChartCarouselState extends State<ChartCarousel> {
                 height: 6,
                 decoration: BoxDecoration(
                   color: i == _index
-                      ? AppGlass.pageInkStrong
-                      : AppGlass.pageInkSoft,
+                      ? Colors.white
+                      : _inkLabel,
                   // `AppRadius.bar` — a 6dp pill, not a 3dp radius. The dot is
                   // fully round at either number and the token says so.
                   borderRadius: BorderRadius.circular(AppRadius.bar),
@@ -145,7 +148,7 @@ class _ChartCarouselState extends State<ChartCarousel> {
             Text(
               '${widget.labelBuilder(_index)}  ·  ${_index + 1} of '
               '${widget.itemCount}',
-              style: AppType.labelMicro.copyWith(color: AppGlass.pageInkSoft),
+              style: AppType.labelMicro.copyWith(color: _inkLabel),
             ),
           ],
         ),

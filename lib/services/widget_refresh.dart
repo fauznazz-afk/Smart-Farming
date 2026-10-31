@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import '../utils/app_log.dart';
 
 /// Asks the native side to redraw every placed home-screen widget.
 ///
@@ -40,7 +41,7 @@ class WidgetRefresh {
     } on MissingPluginException {
       return false;
     } on PlatformException catch (error) {
-      debugPrint('WidgetRefresh: ${error.code}');
+      appLog(() => 'WidgetRefresh: ${error.code}');
       return false;
     }
   }

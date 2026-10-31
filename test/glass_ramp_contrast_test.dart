@@ -167,15 +167,27 @@ void main() {
     });
   }
 
-  test('both ramps resolve to the same WattVision dark values', () {
-    // WattVision is dark-only: both static palettes are identical.
-    expect(AppPaletteTheme.light.accent, AppPaletteTheme.dark.accent);
-    expect(AppPaletteTheme.light.onHue, AppPaletteTheme.dark.onHue);
+  test('each ramp carries its own accent and its own fill ink', () {
+    // The ramps are no longer copies: the dark accent is a bright green that
+    // takes dark ink, the light one a deep green that takes white.
+    expect(AppPaletteTheme.light.accent, isNot(AppPaletteTheme.dark.accent));
+    expect(AppPaletteTheme.light.onHue, const Color(0xFFFFFFFF));
+    expect(AppPaletteTheme.dark.onHue, const Color(0xFF121212));
   });
 
-  test('the page is flat dark #121212 in both ramps', () {
-    // WattVision spec: flat page in both ramps.
-    expect(AppGlass.pageGradientLight.last.computeLuminance(),
-        AppGlass.pageGradient.last.computeLuminance());
+  test('the page is a flat fill in both ramps, and each stays flat', () {
+    // Both page lists are single-value sweeps: three identical stops, so the
+    // gradient renders flat. What differs is the value, not the shape.
+    for (final page in [
+      AppGlass.pageGradientDark,
+      AppGlass.pageGradientLight,
+    ]) {
+      expect(page.toSet().length, 1, reason: 'the page sweep is not flat');
+    }
+    expect(
+      AppGlass.pageGradientLight.last.computeLuminance(),
+      greaterThan(AppGlass.pageGradientDark.last.computeLuminance()),
+      reason: 'the light page must be the lighter ground',
+    );
   });
 }

@@ -24,18 +24,17 @@ import '../screens/dashboard/utils/design_tokens.dart';
 
 /// The page backdrop.
 ///
-/// **A vertical sweep, not a flat fill, and not an orb field.** The sweep exists
-/// because the glass chips are translucent white: the transparency only means
-/// something if there is a gradient behind it for the white to lift off. WattVision
-/// flattens that sweep to a single `#121212` — the page is one value by design —
-/// but the gradient slot stays, so a page that wants depth again is a token
+/// **A flat `#0B1F14` page, painted through a gradient slot.** The slot stays
+/// because every call site paints `AppGlass.pageSweep`; the three stops are
+/// identical, so it renders flat. A page that wants depth again is a token
 /// change rather than a widget change. Three radial orbs were tried and
 /// reverted: they put a visible circular edge in the middle of the scroll area,
 /// which is a texture nobody asked for.
 ///
-/// [AppSurfaces.page] stays the fallback colour underneath, which is what shows
-/// during the one frame between the paint and the gradient's first resolve, and
-/// what any overscroll bounce exposes at the top and bottom edges.
+/// [AppGlass.pageFallback] sits underneath, equal to the gradient's bottom stop.
+/// That is what shows during the one frame between the paint and the gradient's
+/// first resolve, and what any overscroll bounce exposes at the top and bottom
+/// edges, so neither draws a seam where the user's thumb is.
 class AppBackground extends StatelessWidget {
   const AppBackground({super.key, required this.child});
 
@@ -416,9 +415,10 @@ class DateStripChip extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  /// `minHeight`, not `height`, so the chip grows with the user's font scale.
-  /// A fixed height here truncated the day number at the largest system font
-  /// sizes, and the width is measured from the text for the same reason.
+  /// **The diameter, and it is also the height.** A circle has one dimension, so
+  /// the strip measures this from the day label at the user's font scale rather
+  /// than assuming a cell that grows on one axis; that is what keeps the day
+  /// number from truncating at the largest system font sizes.
   final double width;
 
   @override
@@ -448,8 +448,15 @@ class DateStripChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: AppMotion.press,
           curve: AppMotion.enter,
+          // **A circle, so width and height are one number.** `DateStrip` sizes
+          // the diameter from the day label at the user's font scale, so the box
+          // is the text's floor rather than a fixed cell, and the scroll fallback
+          // engages before the label has to shrink.
           width: width,
-          constraints: const BoxConstraints(minHeight: 68),
+          // **A minimum, not a fixed height.** The circle's diameter is the strip's
+          // floor; the box still grows if a 3x font needs more, because a square
+          // that clips its own label is worse than one that is taller than wide.
+          constraints: BoxConstraints(minWidth: width, minHeight: width),
           // **6, not 8, and it is the strip's width budget rather than a look.**
           // Seven chips share one card's inner width, and every dp here is
           // multiplied by seven. At the user's 381 dp viewport the card's inner
@@ -461,12 +468,12 @@ class DateStripChip extends StatelessWidget {
           // 6 still clears the day number (14 sp, ~9 dp wide) by a wide margin,
           // and it is `AppSpacing.xs` + 2 rather than a new token because
           // nothing else in the app pairs with a 6 dp chip inset.
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: fill,
-            // A day cell is the brief's `rounded.sm`, not the card radius: the
-            // grid of them reads as a calendar rather than as a row of cards.
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+            // A circle, not the brief's `rounded.sm`: the seven cells read as
+            // beads on a date track rather than as a row of cards.
+            shape: BoxShape.circle,
             // The active chip has no border, per the brief. An outline round a
             // solid fill reads as a second, competing edge.
             border: isSelected ? null : AppBorders.hairlineBorder,
@@ -479,11 +486,9 @@ class DateStripChip extends StatelessWidget {
               // `maxLines: 1` with `softWrap: false` is what makes a three-letter
               // day name a *label*. Without it the text breaks at whatever
               // character it has to in order to fit, so "MON" renders as "MO"
-              // over "N" — and because the chip's height comes from its content
-              // (`minHeight: 68`, not a fixed height, so the strip survives a 3x
-              // system font), one chip grows a line taller than its six
-              // neighbours. That is the asymmetry on the Overview calendar: a
-              // seven-cell row that is not one row.
+              // over "N" — and a wrapped name would push the column past the
+              // circle's fixed height and overflow it, where the old content-
+              // sized cell merely grew one chip of seven taller than the rest.
               //
               // **Deliberately NOT wrapped in a `FittedBox`, and this is the most
               // load-bearing comment in the widget.** A `FittedBox(scaleDown)` is
@@ -523,7 +528,7 @@ class DateStripChip extends StatelessWidget {
                   fontStyle: isSelected ? FontStyle.italic : null,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 2),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

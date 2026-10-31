@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../utils/design_tokens.dart';
 
+/// Flat dark green, no gradient — three identical stops so the hero reads as
+/// one fill on a page that has none. Local on purpose: the token file owns
+/// every other surface.
+const LinearGradient _heroGradient = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: <Color>[Color(0xFF12291C), Color(0xFF12291C), Color(0xFF12291C)],
+);
+
 /// One label/value pair in the hero's translucent stat card.
 ///
 /// A plain value object rather than a widget parameter set, so a screen can
@@ -43,10 +52,6 @@ class GlassHeroCard extends StatelessWidget {
     required this.figure,
     required this.unit,
     required this.conditionLabel,
-    required this.highLabel,
-    required this.highValue,
-    required this.lowLabel,
-    required this.lowValue,
     required this.stats,
     this.trailingActions = const <Widget>[],
     this.footer,
@@ -58,10 +63,6 @@ class GlassHeroCard extends StatelessWidget {
   final String figure;
   final String unit;
   final String conditionLabel;
-  final String highLabel;
-  final String highValue;
-  final String lowLabel;
-  final String lowValue;
   final List<GlassHeroStat> stats;
 
   /// Round buttons for the top-right corner, normally two. Spacing between
@@ -114,11 +115,7 @@ class GlassHeroCard extends StatelessWidget {
           color: AppPalette.primary.withValues(alpha: 0.22),
           width: 2,
         ),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppGlass.heroGradient,
-        ),
+        gradient: _heroGradient,
         borderRadius: BorderRadius.circular(AppRadius.hero),
         boxShadow: AppGlass.heroShadow,
       ),
@@ -203,27 +200,17 @@ class GlassHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _MiniPill(label: highLabel, value: highValue, up: true),
+          if (statCells.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppGlass.fillSoft,
+                borderRadius: BorderRadius.circular(AppRadius.stat),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _MiniPill(label: lowLabel, value: lowValue, up: false),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppGlass.fillSoft,
-              borderRadius: BorderRadius.circular(AppRadius.stat),
+              child: Row(children: statCells),
             ),
-            child: Row(children: statCells),
-          ),
+          ],
           if (footer != null) ...[
             const SizedBox(height: AppSpacing.lg),
             Divider(height: 1, thickness: 1, color: AppGlass.divider),
@@ -325,47 +312,6 @@ class GlassCircleButton extends StatelessWidget {
     );
     if (tooltip == null) return button;
     return Tooltip(message: tooltip!, child: button);
-  }
-}
-
-/// The high/low pill. Its arrow is the only place in the hero where a colour
-/// means a direction rather than a reading.
-class _MiniPill extends StatelessWidget {
-  const _MiniPill({required this.label, required this.value, required this.up});
-
-  final String label;
-  final String value;
-  final bool up;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppGlass.fillSoft,
-        borderRadius: BorderRadius.circular(AppRadius.tilePill),
-      ),
-      alignment: Alignment.center,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Flexible(
-            child: Text(
-              '$label: $value',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppType.bodyMd.copyWith(color: AppGlass.pageGlassInk),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Icon(
-            up ? Icons.north_east_rounded : Icons.south_east_rounded,
-            size: 14,
-            color: up ? AppGlass.arrowUp : AppGlass.arrowDown,
-          ),
-        ],
-      ),
-    );
   }
 }
 

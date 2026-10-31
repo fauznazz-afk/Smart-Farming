@@ -4,6 +4,35 @@ import '../../../utils/alarm_rules.dart';
 import '../utils/design_tokens.dart';
 import 'terminal_panel.dart';
 
+// Gradient dark-mode skin for the environment and fish panels, local to this
+// file so the shared token layer stays untouched.
+const Color _glassFill = Color(0x0FFFFFFF);
+const Color _glassBorder = Color(0x1FFFFFFF);
+const Color _valueGradientStart = Color(0xFF00D97E);
+const Color _valueGradientEnd = Color(0xFF00D97E);
+const double _glassRadius = 26;
+
+/// A cyan-to-violet wash over a value figure. `BlendMode.srcIn` keeps the
+/// glyphs, so this paints the type rather than a box behind it.
+class _GradientValue extends StatelessWidget {
+  const _GradientValue({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [_valueGradientStart, _valueGradientEnd],
+      ).createShader(bounds),
+      child: child,
+    );
+  }
+}
+
 /// One reading in a [MetricGrid]: which telemetry key, what to call it, and
 /// whether anything is watching it.
 class MetricSpec {
@@ -91,79 +120,89 @@ class MetricGrid extends StatelessWidget {
     );
     final breached = specs.where((spec) => verdicts.isBreached(spec)).length;
 
-    return TerminalPanel(
-      // **Its own title, not `TerminalPanel`'s `'Overview'` default.**
-      // `MetricGrid` draws the Environment and Water Quality panels as well as
-      // anything else, and the default was still in force at this call site —
-      // so every one of them was announced to a screen reader as "Overview".
-      // The parameter was made a parameter precisely so this could stop
-      // happening, and then nobody passed it.
-      semanticLabel: title,
-      header: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.cardPadding,
-          vertical: AppSpacing.md,
-        ),
-        child: Row(
-          children: [
-            // **Cyan, not red.** Red on this panel means one thing only:
-            // `TerminalRow.alert` and `TerminalTag(alert: true)` — a reading
-            // out of bounds. A red section heading put the alarm colour on a
-            // block that was working, so the one genuinely breached value had
-            // to compete with its own title for the eye. The accent is the
-            // panel's mark for structure.
-            Flexible(
-              child: Text(
-                title.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.slotKey.copyWith(color: AppPalette.primary),
-              ),
-            ),
-            const Spacer(),
-            // **Say nothing when nothing is wrong.** Both tags below are a
-            // verdict on the data, so the healthy case draws nothing at all
-            // rather than a green "all normal" badge occupying the space a real
-            // breach needs.
-            if (verdicts.isStale)
-              TerminalTag(text: 'Stale data', alert: false)
-            else if (breached > 0 && showGridColors)
-              TerminalTag(text: '$breached out of range', alert: true),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: _glassFill,
+        borderRadius: BorderRadius.circular(_glassRadius),
+        border: Border.all(color: _glassBorder),
       ),
-      children: [
-        // **One clock for the whole grid, one fade per row.** The rows used to
-        // appear as a block; the panel now assembles itself top to bottom. It
-        // is a single controller with an interval per row rather than a
-        // controller each, so five rows cost one ticker and not five, and the
-        // stagger is capped so a long fish grid does not take twice as long as
-        // a short environment one to become readable.
-        _GridEntrance(
-          // The spec count is the animation's shape. A rebuild that changes it
-          // is a different grid, and re-keying it is what lets the entrance run
-          // again for that grid without replaying on every poll.
-          key: ValueKey(specs.length),
-          rowCount: specs.length,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+      child: TerminalPanel(
+        // **Its own title, not `TerminalPanel`'s `'Overview'` default.**
+        // `MetricGrid` draws the Environment and Water Quality panels as well as
+        // anything else, and the default was still in force at this call site —
+        // so every one of them was announced to a screen reader as "Overview".
+        // The parameter was made a parameter precisely so this could stop
+        // happening, and then nobody passed it.
+        semanticLabel: title,
+        header: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.cardPadding,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
             children: [
-              for (var i = 0; i < specs.length; i++) ...[
-                _SpecRow(
-                  spec: specs[i],
-                  value: values?[specs[i].key],
-                  breached: verdicts.isBreached(specs[i]),
-                  limit: limitLabelFor?.call(specs[i]),
-                  meterFraction: _meterFraction(specs[i]),
-                  showGridColors: showGridColors,
+              // **Cyan, not red.** Red on this panel means one thing only:
+              // `TerminalRow.alert` and `TerminalTag(alert: true)` — a reading
+              // out of bounds. A red section heading put the alarm colour on a
+              // block that was working, so the one genuinely breached value had
+              // to compete with its own title for the eye. The accent is the
+              // panel's mark for structure.
+              Flexible(
+                child: Text(
+                  title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.slotKey.copyWith(
+                    color: AppSurfaces.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-                if (i < specs.length - 1) const TerminalRule(),
-              ],
+              ),
+              const Spacer(),
+              // **Say nothing when nothing is wrong.** Both tags below are a
+              // verdict on the data, so the healthy case draws nothing at all
+              // rather than a green "all normal" badge occupying the space a real
+              // breach needs.
+              if (verdicts.isStale)
+                TerminalTag(text: 'Stale data', alert: false)
+              else if (breached > 0 && showGridColors)
+                TerminalTag(text: '$breached out of range', alert: true),
             ],
           ),
         ),
-      ],
+        children: [
+          // **One clock for the whole grid, one fade per row.** The rows used to
+          // appear as a block; the panel now assembles itself top to bottom. It
+          // is a single controller with an interval per row rather than a
+          // controller each, so five rows cost one ticker and not five, and the
+          // stagger is capped so a long fish grid does not take twice as long as
+          // a short environment one to become readable.
+          _GridEntrance(
+            // The spec count is the animation's shape. A rebuild that changes it
+            // is a different grid, and re-keying it is what lets the entrance run
+            // again for that grid without replaying on every poll.
+            key: ValueKey(specs.length),
+            rowCount: specs.length,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < specs.length; i++) ...[
+                  _SpecRow(
+                    spec: specs[i],
+                    value: values?[specs[i].key],
+                    breached: verdicts.isBreached(specs[i]),
+                    limit: limitLabelFor?.call(specs[i]),
+                    meterFraction: _meterFraction(specs[i]),
+                    showGridColors: showGridColors,
+                  ),
+                  if (i < specs.length - 1) const TerminalRule(),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -206,11 +245,7 @@ class MetricGrid extends StatelessWidget {
 /// **Reduce-motion wins.** `MediaQuery.disableAnimationsOf` is the platform's
 /// own setting; when it is set the rows are simply present.
 class _GridEntrance extends StatefulWidget {
-  const _GridEntrance({
-    super.key,
-    required this.rowCount,
-    required this.child,
-  });
+  const _GridEntrance({super.key, required this.rowCount, required this.child});
 
   final int rowCount;
   final Widget child;
@@ -241,21 +276,28 @@ class _GridEntranceState extends State<_GridEntrance>
       vsync: this,
     );
     final shown = widget.rowCount.clamp(0, _kMaxStaggeredRows);
-    final span = 1.0 - (shown <= 1 ? 0.0 : (shown - 1) * _step.inMilliseconds /
-        AppMotion.container.inMilliseconds);
+    final span =
+        1.0 -
+        (shown <= 1
+            ? 0.0
+            : (shown - 1) *
+                  _step.inMilliseconds /
+                  AppMotion.container.inMilliseconds);
     _rows = <Animation<double>?>[
       for (var i = 0; i < widget.rowCount; i++)
         i < shown
             ? CurvedAnimation(
                 parent: _controller,
                 curve: Interval(
-                  (i * _step.inMilliseconds /
+                  (i *
+                          _step.inMilliseconds /
                           AppMotion.container.inMilliseconds)
                       .clamp(0.0, 1.0),
-                  ((i * _step.inMilliseconds /
-                                  AppMotion.container.inMilliseconds) +
-                              span)
-                          .clamp(0.0, 1.0),
+                  ((i *
+                              _step.inMilliseconds /
+                              AppMotion.container.inMilliseconds) +
+                          span)
+                      .clamp(0.0, 1.0),
                   curve: AppMotion.enter,
                 ),
               )
@@ -347,15 +389,17 @@ class _SpecRow extends StatelessWidget {
         // `TerminalRow`. That was tried as an argument here and reverted: naming
         // `slotValueSmall` for the whole grid made every reading 12 sp, which is
         // the opposite of the request.
-        TerminalRow(
-          label: spec.label,
-          value: slotNumber(value, decimals: spec.decimals),
-          unit: spec.unit.isEmpty ? null : spec.unit,
-          alert: alert,
-          // `slotNumber` right-trims trailing zeros, which is what a tabular
-          // column wants: the device reported a whole number, so the column
-          // says so and every row is the same width.
-          divider: false,
+        _GradientValue(
+          child: TerminalRow(
+            label: spec.label,
+            value: slotNumber(value, decimals: spec.decimals),
+            unit: spec.unit.isEmpty ? null : spec.unit,
+            alert: alert,
+            // `slotNumber` right-trims trailing zeros, which is what a tabular
+            // column wants: the device reported a whole number, so the column
+            // says so and every row is the same width.
+            divider: false,
+          ),
         ),
         if (meterFraction != null)
           TerminalMeter(
@@ -388,15 +432,23 @@ class _SpecRow extends StatelessWidget {
               AppSpacing.cardPadding,
               AppSpacing.md,
             ),
-            child: Text(
-              limit!,
-              // `slotKey`, not `slotMicro`. This caption sits on the same line
-              // the meter's own captions use, and at 10 sp against a 24 sp
-              // figure it read as a footnote to the row above rather than as
-              // the range the reading is being judged against. Red is now
-              // reserved for a breach, so the muted case takes the label ink.
-              style: AppType.slotKey.copyWith(
-                color: alert ? AppPalette.statusBad : AppSurfaces.onSurfaceVariant,
+            child: ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) => const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_valueGradientStart, _valueGradientEnd],
+              ).createShader(bounds),
+              child: Text(
+                limit!,
+                // `slotKey`, not `slotMicro`. This caption sits on the same line
+                // the meter's own captions use, and at 10 sp against a 24 sp
+                // figure it read as a footnote to the row above rather than as
+                // the range the reading is being judged against. A breach keeps
+                // the status red; the gradient is the accent for a reading.
+                style: AppType.slotKey.copyWith(
+                  color: alert ? AppPalette.statusBad : AppSurfaces.onSurface,
+                ),
               ),
             ),
           ),

@@ -77,12 +77,15 @@ void main() {
 
   group('the ink on a saturated fill', () {
     test('every fill takes the token ink, and it clears AA on every one', () {
-      // WattVision's saturated fills are bright, so their shared fill ink is dark.
+      // The ink follows the fill's brightness: the bright dark-ramp fills take
+      // dark ink, the deep light-ramp fills take white.
       for (final ramp in Brightness.values) {
         AppTheme.apply(ramp);
         expect(
           AppPalette.onHue,
-          const Color(0xFF121212),
+          ramp == Brightness.dark
+              ? const Color(0xFF121212)
+              : const Color(0xFFFFFFFF),
           reason: 'the ink token in the ${ramp.name} ramp is '
               '#${_hex(AppPalette.onHue)}; the ink on a saturated fill is one '
               'colour, so a second ink is a second meaning',
@@ -111,7 +114,8 @@ void main() {
     // folded into the loops above because the loops above enumerate a *list* and
     // these are claims about one specific fill.
 
-    test('it takes dark ink, and white would have failed', () {
+    test('the dark accent takes dark ink, and white would have failed', () {
+      AppTheme.apply(Brightness.dark);
       expect(AppPalette.onHue, const Color(0xFF121212));
       expect(
         _contrast(AppPalette.onHue, AppPalette.accent),
@@ -126,6 +130,26 @@ void main() {
             'AppPalette.onHue in banners.dart and liquid_glass.dart should be '
             're-checked rather than trusted',
       );
+    });
+
+    test('the light accent is dark enough that it takes white ink', () {
+      // The light ramp's accent is a deep green, so white clears AA on it and
+      // the dark ink the bright dark-ramp accent takes would not.
+      AppTheme.apply(Brightness.light);
+      expect(AppPalette.onHue, const Color(0xFFFFFFFF));
+      expect(
+        _contrast(AppPalette.onHue, AppPalette.accent),
+        greaterThanOrEqualTo(4.5),
+        reason: 'the light accent fill with white ink is '
+            '${_contrast(AppPalette.onHue, AppPalette.accent).toStringAsFixed(2)}:1',
+      );
+      expect(
+        _contrast(const Color(0xFF121212), AppPalette.accent),
+        lessThan(4.5),
+        reason: 'dark ink on the light accent should fail, which is why onHue '
+            'is white in that ramp',
+      );
+      AppTheme.apply(Brightness.dark);
     });
 
     test('it is legible on every surface, not only where an alarm lands', () {
@@ -201,6 +225,20 @@ void main() {
         reason: 'boundary #${_hex(edge)} on the page is '
             '${_contrast(edge, AppSurfaces.page).toStringAsFixed(2)}:1',
       );
+    });
+
+    test('the light ramp boundary clears 3:1 on the light page', () {
+      // The edge is white in the dark ramp and dark in the light one; each has
+      // to clear 1.4.11 against the page it is actually drawn on.
+      AppTheme.apply(Brightness.light);
+      final edge = AppBorders.boundary.color;
+      expect(
+        _contrast(edge, AppSurfaces.page),
+        greaterThanOrEqualTo(3.0),
+        reason: 'boundary #${_hex(edge)} on the light page is '
+            '${_contrast(edge, AppSurfaces.page).toStringAsFixed(2)}:1',
+      );
+      AppTheme.apply(Brightness.dark);
     });
 
     test('the hairline is not, and is not asked to be', () {

@@ -3,11 +3,21 @@ import 'package:flutter/material.dart';
 import '../utils/app_log.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/staggered_entrance.dart';
-import 'dashboard/utils/color_helpers.dart';
 import 'dashboard/utils/design_tokens.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_section.dart';
 import 'settings/widgets/settings_fields.dart';
+
+/// The vivid gradient glass recipe, local to this screen.
+///
+/// `design_tokens.dart` is shared with the dashboard and owned by another
+/// change, so the template values are declared here rather than there.
+const double kGlassRadius = 24;
+final Color kGlassFill = AppGlass.glassFill;
+const BoxBorder kGlassBorder = Border.fromBorderSide(
+  BorderSide(color: Color(0x1FFFFFFF), width: 1),
+);
+final Color kGlassMuted = AppGlass.glassInkFaint;
 
 /// Settings browser: a category list that drills into one section at a time.
 class SettingsScreen extends StatefulWidget {
@@ -200,9 +210,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // re-rasterise with every scroll frame.
           child: RepaintBoundary(
             child: AppSurface(
-              radius: AppRadius.card,
-              fill: AppSurfaces.surface,
-              border: AppBorders.hairlineBorder,
+              radius: kGlassRadius,
+              fill: kGlassFill,
+              border: kGlassBorder,
               // `md`, not `cardPadding`. The drill-in cards are the tight ones
               // now and the list rows should match them: at 16 a category row
               // spent 32dp on padding around a two-line `ListTile` that brings
@@ -219,7 +229,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 type: MaterialType.transparency,
                 child: ListTile(
                   leading: SettingsIconBadge(icon: section.icon),
-                  title: Text(section.title, style: AppType.headlineMd),
+                  title: Text(
+                    section.title,
+                    style: AppType.headlineMd.copyWith(
+                      color: AppSurfaces.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   // No `maxLines` and no ellipsis here, deliberately.
                   //
                   // This was `maxLines: 1, overflow: TextOverflow.ellipsis`, and on
@@ -252,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // this removes, for the users least able to tolerate it.
                   subtitle: Text(
                     section.subtitle,
-                    style: AppType.bodySm.copyWith(color: faintColor),
+                    style: AppType.bodySm.copyWith(color: kGlassMuted),
                   ),
                   trailing: Icon(
                     Icons.chevron_right,

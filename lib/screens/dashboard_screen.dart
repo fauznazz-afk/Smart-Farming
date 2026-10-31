@@ -1489,10 +1489,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       // The app-bar icon stays for discoverability; the FAB is the "floating"
       // one the user asked for. Both open the same screen.
+      // **Driven by the notifier it already listens to.** This built a bar from
+      // `_selectedPage` and then handed it `_selectedIndex`, a plain field that
+      // was written in the same two places the notifier was. A rebuild through
+      // this builder could therefore arrive with a selection that no longer
+      // matched the page the user was dragging, and a poll-driven rebuild could
+      // re-target the bubble mid-slide. Reading the value the builder is given
+      // removes the second source of truth rather than synchronising it.
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: _selectedPage,
-        builder: (context, _, _) =>
-            GlassNavBar(selectedIndex: _selectedIndex, onSelect: _selectPage),
+        builder: (context, index, _) =>
+            GlassNavBar(selectedIndex: index, onSelect: _selectPage),
       ),
     );
   }

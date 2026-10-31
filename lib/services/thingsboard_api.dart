@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -242,7 +241,7 @@ class ThingsBoardApi {
     try {
       await AlarmBridge.instance.disable();
     } catch (e) {
-      debugPrint('ThingsBoardApi: could not disable the native alarm module ($e)');
+      appLog(() => 'ThingsBoardApi: could not disable the native alarm module (${e.runtimeType})');
     }
   }
 
@@ -309,7 +308,7 @@ class ThingsBoardApi {
       );
       secureStorageReadable = true;
     } catch (e) {
-      debugPrint('ThingsBoardApi: secure storage unreadable ($e)');
+      appLog(() => 'ThingsBoardApi: secure storage unreadable (${e.runtimeType})');
     }
 
     final legacyToken = preferences.getString('tb_token');

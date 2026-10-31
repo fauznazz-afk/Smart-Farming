@@ -42,7 +42,10 @@ class AlarmNotificationService {
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-    const android = AndroidInitializationSettings('@drawable/ic_energrow');
+    // Monochrome status-bar icon. Android requires white-on-transparent for the
+    // small icon; the full-colour @drawable/ic_energrow would be flattened to a
+    // grey square on the status bar.
+    const android = AndroidInitializationSettings('@drawable/ic_stat_energrow');
     try {
       await _notifications.initialize(
         settings: const InitializationSettings(android: android),
@@ -158,7 +161,7 @@ class AlarmNotificationService {
             priority: critical ? Priority.max : Priority.high,
             category: AndroidNotificationCategory.alarm,
             enableVibration: true,
-            icon: '@drawable/ic_energrow',
+            icon: '@drawable/ic_stat_energrow',
           ),
         ),
       );

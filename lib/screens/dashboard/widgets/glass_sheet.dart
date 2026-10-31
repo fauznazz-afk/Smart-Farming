@@ -82,7 +82,7 @@ class GlassSheet extends StatelessWidget {
                     ),
                     if (onTitleTap != null) ...<Widget>[
                       const SizedBox(width: 2),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
                         size: 18,
                         color: AppGlass.sheetRowInkMuted,

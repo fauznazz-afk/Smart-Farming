@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import '../utils/app_log.dart';
 
 const allowedCctvHost = 'cctv.mbkm20262027.tech';
 const defaultAllowedCctvUrl =
@@ -218,7 +219,7 @@ Future<void> scrubCctvWebData({WebViewController? controller}) async {
     // Not fatal, and worth saying rather than failing quietly: the stream still
     // plays, it just starts without a cleared jar, and "it worked" and "it was
     // scrubbed" are indistinguishable from the outside.
-    debugPrint('CctvWebData: could not clear cookies (${e.message})');
+    appLog(() => 'CctvWebData: could not clear cookies (${e.message})');
   } on MissingPluginException {
     // Host without the plugin. Nothing to clear, nothing to report.
   }
@@ -242,7 +243,7 @@ Future<void> scrubCctvWebData({WebViewController? controller}) async {
   try {
     await controller.clearLocalStorage();
   } on PlatformException catch (e) {
-    debugPrint('CctvWebData: could not clear DOM storage (${e.message})');
+    appLog(() => 'CctvWebData: could not clear DOM storage (${e.message})');
   } on MissingPluginException {
     // As above.
   }

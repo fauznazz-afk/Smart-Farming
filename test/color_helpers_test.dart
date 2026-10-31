@@ -17,6 +17,12 @@ final List<Color> _surfaces = [
   AppSurfaces.surfaceAlt,
 ];
 
+/// The same two card surfaces, read at assertion time so they follow the ramp.
+List<Color> _surfacesForRamp() => [
+      AppSurfaces.surface,
+      AppSurfaces.surfaceAlt,
+    ];
+
 /// The surfaces content on the page is drawn on.
 ///
 /// A function, not a `final` list, so it reads the live ramp rather than the one
@@ -308,14 +314,22 @@ void main() {
     test('the card and page status values converge in the dark-only ramp', () {
       // WattVision puts both page and card in the same dark family, so the page
       // twins no longer need a second hue or lightness.
+      // **`statusBad` is the exception, and the purple page is why.**
+      // `#FF453A` measures 3.64:1 on the page gradient's brightest stop
+      // `#4A1D6E`, under AA, so its page twin is a lighter red. Green and
+      // amber already clear every stop, so they still converge.
       AppTheme.apply(Brightness.dark);
       expect(statusOk, statusOkOnPage);
       expect(statusWarn, statusWarnOnPage);
-      expect(statusBad, statusBadOnPage);
+      expect(statusBadOnPage, isNot(statusBad));
+      // The light ramp separates every page twin from its card value: a
+      // caption that clears AA on a white card is too dark for the light page,
+      // so `statusBadOnPage` there is the darker #B32620.
+      // The light ramp keeps the card and page reds equal: #B32620 clears AA
+      // on both the white card and the light page, so no second red is needed.
       AppTheme.apply(Brightness.light);
-      expect(statusOk, statusOkOnPage);
-      expect(statusWarn, statusWarnOnPage);
-      expect(statusBad, statusBadOnPage);
+      expect(statusBadOnPage, statusBad);
+      AppTheme.apply(Brightness.dark);
     });
 
     test('every caption colour clears AA on every caption surface', () {
@@ -330,22 +344,36 @@ void main() {
         'statusBad',
         'statusAlert',
       ];
-      for (var i = 0; i < names.length; i++) {
-        expectClearsAa(names[i], _captionPalette()[i], _surfaces);
+      // Both ramps: the light captions are different values measured on light
+      // surfaces, so a single dark-only pass would leave them unmeasured.
+      for (final ramp in Brightness.values) {
+        AppTheme.apply(ramp);
+        for (var i = 0; i < names.length; i++) {
+          expectClearsAa(
+            '${names[i]} in the ${ramp.name} ramp',
+            _captionPalette()[i],
+            _surfacesForRamp(),
+          );
+        }
       }
+      AppTheme.apply(Brightness.dark);
     });
 
     test('every category hue clears AA as a caption too', () {
       // A category hue is not only a figure: it is a chart line, a nav label and
       // a badge foreground, and the badge puts it on a 10%-alpha wash of itself.
       // The bare hue is the strictest of those cases, so it is the one measured.
-      for (final category in MetricCategory.values) {
-        expectClearsAa(
-          '${category.name} hue',
-          categoryColor(category),
-          _surfaces,
-        );
+      for (final ramp in Brightness.values) {
+        AppTheme.apply(ramp);
+        for (final category in MetricCategory.values) {
+          expectClearsAa(
+            '${category.name} hue in the ${ramp.name} ramp',
+            categoryColor(category),
+            _surfacesForRamp(),
+          );
+        }
       }
+      AppTheme.apply(Brightness.dark);
     });
 
     test('a badge wash leaves its own foreground readable', () {

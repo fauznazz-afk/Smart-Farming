@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
 
-import '../../dashboard/utils/color_helpers.dart';
 import '../../dashboard/utils/design_tokens.dart';
 import '../../../widgets/liquid_glass.dart';
 import '../utils/settings_validation.dart';
+
+// ── Vivid gradient glass, defined locally ────────────────────────────────────
+// This screen owns its look. `design_tokens.dart` is shared with the dashboard
+// and is another agent's file, so the template values live here instead.
+const Color kGlassAccentStart = Color(0xFF00D97E);
+const Color kGlassAccentEnd = Color(0xFF00D97E);
+
+/// The accent run used on primary values and filled buttons.
+const LinearGradient kAccentGradient = LinearGradient(
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+  colors: [kGlassAccentStart, kGlassAccentEnd],
+);
+
+/// Ink on a gradient fill. The cyan end is bright, so white would be ~1.4:1;
+/// the dark page ink clears AA on both stops.
+const Color kOnGradient = Color(0xFF121212);
+
+/// Muted label ink: white at 60%.
+final Color kGlassMuted = AppGlass.glassInkFaint;
+
+/// The card recipe: white 6% fill, white 12% hairline, radius 24.
+BoxDecoration glassDecoration({double radius = AppRadius.sheet}) =>
+    BoxDecoration(
+      color: AppGlass.glassFill,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: AppGlass.glassBorder),
+    );
 
 /// Rounded surface with an icon badge, title, subtitle, and body.
 class SectionCard extends StatelessWidget {
@@ -24,7 +51,13 @@ class SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: AppCard(
+      // The glass recipe is applied by wrapping rather than by replacing
+      // `AppCard`: the card already owns the transparent `Material` its
+      // `SwitchListTile`s and `TextField`s need for ink, and
+      // `settings_screen_test.dart` asserts that ordering.
+      child: DecoratedBox(
+        decoration: glassDecoration(),
+        child: AppCard(
         // The brief's `card-padding`, 16. It was 14/8, which is neither the
         // card scale nor anything else — the previous system had no 16.
         //
@@ -66,7 +99,13 @@ class SectionCard extends StatelessWidget {
                       // uppercase label, and that is what this is now. Nothing is
                       // lost with the title: `settings_screen_test.dart` finds it
                       // by text, not by style.
-                      Text(title, style: AppType.labelUppercase),
+                      Text(
+                        title,
+                        style: AppType.headlineMd.copyWith(
+                          color: AppGlass.glassInkStrong,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
@@ -80,7 +119,7 @@ class SectionCard extends StatelessWidget {
                         // check against the tile-height ceiling
                         // `settings_screen_test.dart` pins, and it has not
                         // been measured here.
-                        style: AppType.bodySm.copyWith(color: faintColor),
+                        style: AppType.bodySm.copyWith(color: kGlassMuted),
                       ),
                     ],
                   ),
@@ -101,6 +140,7 @@ class SectionCard extends StatelessWidget {
             const SizedBox(height: 6),
             child,
           ],
+        ),
         ),
       ),
     );
@@ -134,11 +174,11 @@ class SettingsIconBadge extends StatelessWidget {
       width: 28,
       height: 28,
       decoration: BoxDecoration(
-        color: AppSurfaces.surfaceAlt,
+        gradient: kAccentGradient,
         shape: BoxShape.circle,
-        border: AppBorders.controlBorder,
       ),
-      child: Icon(icon, color: AppSurfaces.onSurfaceVariant, size: 16),
+      // Dark ink on the gradient: the cyan end is bright, white is 1.4:1.
+      child: Icon(icon, color: kOnGradient, size: 16),
     );
   }
 }
@@ -199,14 +239,15 @@ class SettingsSwitchRow extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       isThreeLine: false,
       contentPadding: EdgeInsets.zero,
-      title: Text(title, style: AppType.labelUppercase),
+      title: Text(
+        title,
+        style: AppType.labelUppercase.copyWith(color: AppGlass.glassInkStrong),
+      ),
       subtitle: subtitle == null
           ? null
           : Text(
               subtitle!,
-              style: AppType.bodySm.copyWith(
-                color: AppSurfaces.onSurfaceVariant,
-              ),
+              style: AppType.bodySm.copyWith(color: kGlassMuted),
             ),
       value: value,
       onChanged: onChanged,
@@ -251,10 +292,10 @@ class NumberField extends StatelessWidget {
       // third literal.
       style: inactive
           ? AppType.labelUppercase.copyWith(
-              color: AppSurfaces.onSurfaceVariant,
+              color: kGlassMuted,
               fontStyle: FontStyle.italic,
             )
-          : AppType.labelUppercase,
+          : AppType.labelUppercase.copyWith(color: AppGlass.glassInkStrong),
       decoration: settingsFieldDecoration(
         label: label,
         helperText: inactive ? 'Not saved yet' : null,
@@ -353,11 +394,7 @@ class UnsavedDefaultsNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info_outline,
-            size: 15,
-            color: AppSurfaces.onSurfaceVariant,
-          ),
+          Icon(Icons.info_outline, size: 15, color: kGlassMuted),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -366,9 +403,7 @@ class UnsavedDefaultsNote extends StatelessWidget {
                         'you save.'
                   : '$count limits are shown as defaults. They are not '
                         'monitored until you save.',
-              style: AppType.bodySm.copyWith(
-                color: AppSurfaces.onSurfaceVariant,
-              ),
+              style: AppType.bodySm.copyWith(color: kGlassMuted),
             ),
           ),
         ],
@@ -453,7 +488,7 @@ class SaveSettingsButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: AppRadius.all(AppRadius.card),
-        boxShadow: AppShadows.stampedIn(AppPalette.accent),
+        boxShadow: AppShadows.stampedIn(kGlassAccentStart),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -467,14 +502,14 @@ class SaveSettingsButton extends StatelessWidget {
               : const Icon(Icons.save, size: 20),
           label: Text(saving ? 'Saving...' : 'Save settings'),
           style: FilledButton.styleFrom(
-            backgroundColor: AppPalette.accent,
-            foregroundColor: AppPalette.onHue,
+            backgroundColor: kGlassAccentStart,
+            foregroundColor: kOnGradient,
             // Both disabled colours keep the fill and the ink, so the button
             // does not grey out behind the spinner mid-write. It is still
             // disabled — `onPressed` is null — it just says so with its label
             // rather than by turning into a different button.
-            disabledBackgroundColor: AppPalette.accent,
-            disabledForegroundColor: AppPalette.onHue.withValues(alpha: 0.70),
+            disabledBackgroundColor: kGlassAccentStart,
+            disabledForegroundColor: kOnGradient.withValues(alpha: 0.70),
             textStyle: AppType.buttonLabel,
             minimumSize: const Size(0, 56),
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
@@ -523,14 +558,13 @@ class SecondaryButton extends StatelessWidget {
       icon: icon,
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        backgroundColor: AppSurfaces.page,
-        // **Page ink on a page-coloured fill**, for the same reason the energy
-        // report's period button gives up card ink: the fill is the page, so the
-        // ink has to be the page's own token rather than the card's.
-        foregroundColor: AppGlass.pageInkStrong,
-        disabledBackgroundColor: AppSurfaces.page,
-        disabledForegroundColor: AppGlass.pageInkSoft,
-        side: AppBorders.hairline,
+        // Glass fill rather than the page, so the button sits on the glass card
+        // as an inset action instead of a hole in it.
+        backgroundColor: AppGlass.glassFill,
+        foregroundColor: AppGlass.glassInkStrong,
+        disabledBackgroundColor: AppGlass.glassFill,
+        disabledForegroundColor: kGlassMuted,
+        side: BorderSide(color: AppGlass.glassBorder),
         textStyle: AppType.buttonLabel,
         minimumSize: const Size(0, 48),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),

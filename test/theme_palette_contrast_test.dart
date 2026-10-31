@@ -180,7 +180,12 @@ void main() {
           reason: '$name: onHue on the accent is '
               '${contrast(AppPalette.onHue, AppPalette.accent).toStringAsFixed(2)}:1',
         );
-        expect(AppPalette.onHue, const Color(0xFF121212));
+        expect(
+          AppPalette.onHue,
+          palette.brightness == Brightness.dark
+              ? const Color(0xFF121212)
+              : const Color(0xFFFFFFFF),
+        );
       });
 
       test('a category can never be mistaken for a status colour', () {
@@ -224,7 +229,13 @@ void main() {
           reason: '$name: two of these are the same colour — '
               '${fills.map(hex).join(', ')}',
         );
-        expect(AppSurfaces.border, AppSurfaces.surfaceMuted);
+        // The light ramp separates them: a light card needs a visible hairline,
+        // and `border` #DDE3E0 against `surfaceMuted` #E4EAE7 is that step.
+        if (palette.brightness == Brightness.dark) {
+          expect(AppSurfaces.border, AppSurfaces.surfaceMuted);
+        } else {
+          expect(AppSurfaces.border, isNot(AppSurfaces.surfaceMuted));
+        }
       });
 
       test('the track is the page, in both palettes', () {
@@ -240,18 +251,26 @@ void main() {
     });
   }
 
-  test('the two palettes are identical because the app is dark-only', () {
-    expect(AppSurfacesPalette.light.page, AppSurfacesPalette.dark.page);
-    expect(AppSurfacesPalette.light.surface, AppSurfacesPalette.dark.surface);
-    expect(AppSurfacesPalette.light.onSurface, AppSurfacesPalette.dark.onSurface);
-    for (final entry in palettes.entries) {
-      expect(
-        entry.value.surface.computeLuminance(),
-        lessThan(0.5),
-        reason:
-            '${entry.key}: WattVision card must stay a dark surface',
-      );
-    }
+  test('the two palettes are two real ramps, dark under light', () {
+    expect(AppSurfacesPalette.light.page, isNot(AppSurfacesPalette.dark.page));
+    expect(
+      AppSurfacesPalette.light.surface,
+      isNot(AppSurfacesPalette.dark.surface),
+    );
+    expect(
+      AppSurfacesPalette.light.onSurface,
+      isNot(AppSurfacesPalette.dark.onSurface),
+    );
+    expect(
+      AppSurfacesPalette.dark.surface.computeLuminance(),
+      lessThan(0.5),
+      reason: 'the dark card must stay a dark surface',
+    );
+    expect(
+      AppSurfacesPalette.light.surface.computeLuminance(),
+      greaterThan(0.5),
+      reason: 'the light card must be a light surface',
+    );
   });
 
   test('one accent hue across both ramps, with the ink that clears AA on it', () {
@@ -270,13 +289,13 @@ void main() {
             '${contrast(entry.value.onHue, entry.value.accent).toStringAsFixed(2)}:1',
       );
     }
-    expect(AppPaletteTheme.light.onHue, const Color(0xFF121212));
+    expect(AppPaletteTheme.light.onHue, const Color(0xFFFFFFFF));
     expect(AppPaletteTheme.dark.onHue, const Color(0xFF121212));
-    // And the hue really is shared — within 6 degrees, which is the tolerance
-    // 8-bit quantisation needs, not a licence for a second accent.
+    // Still one hue, not two: both accents are the same green, separated by
+    // lightness so each takes the ink that clears AA on it.
     expect(
       HSLColor.fromColor(AppPaletteTheme.light.accent).hue,
-      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.accent).hue, 6.0),
+      closeTo(HSLColor.fromColor(AppPaletteTheme.dark.accent).hue, 12.0),
     );
   });
 }
